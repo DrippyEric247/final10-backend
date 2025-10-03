@@ -37,7 +37,7 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'http://localhost:3000', 
     'http://localhost:3001',
-    'https://final10-client.onrender.com'
+    'https://final10-backend.onrender.com'
   ];
   
   if (allowedOrigins.includes(origin)) {
