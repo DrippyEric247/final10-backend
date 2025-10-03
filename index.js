@@ -34,7 +34,11 @@ app.options('*', cors(corsConfig));
 // Additional CORS handling for preflight requests (enhanced)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001'];
+  const allowedOrigins = [
+    'http://localhost:3000', 
+    'http://localhost:3001',
+    'https://final10-client.onrender.com'
+  ];
   
   if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
