@@ -95,7 +95,7 @@ const corsConfig = {
   origin: [
     'http://localhost:3000',
     'http://localhost:3001',
-    'https://final10-backend.onrender.com'
+    'https://final10-client.onrender.com'
   ],
   credentials: true,
   optionsSuccessStatus: 200,
