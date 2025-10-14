@@ -3,12 +3,12 @@ FROM mcr.microsoft.com/playwright:v1.46.1-jammy
 
 # Set Node version explicitly
 ENV NODE_VERSION=20.18.1
-
+ENV NPM_VERSION=11.6.2
 WORKDIR /app
 
 # Install only prod deps for a smaller image
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy everything else
 COPY . .
