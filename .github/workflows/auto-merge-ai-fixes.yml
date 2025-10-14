@@ -2,7 +2,7 @@ name: 🔄 Auto-Merge AI Fixes
 
 on:
   pull_request:
-    types: [opened, synchronize, approved]
+    types: [opened, synchronize]
   pull_request_review:
     types: [submitted]
 
@@ -94,16 +94,14 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pr.number,
-                body: `🤖 **Auto-Merged by AI System**
-
-This AI-generated fix has been automatically merged and deployed.
-
-**Merge Details:**
-- ✅ Merged: ${mergeResult.merged}
-- ✅ SHA: \`${mergeResult.sha}\`
-- ✅ Method: ${mergeResult.merge_method}
-
-The related issue will be automatically closed.`
+                body: |
+                  🤖 **Auto-Merged by AI System**
+                  This AI-generated fix has been automatically merged and deployed.
+                  **Merge Details:**
+                  - ✅ Merged: ${mergeResult.merged}
+                  - ✅ SHA: `${mergeResult.sha}`
+                  - ✅ Method: ${mergeResult.merge_method}
+                  The related issue will be automatically closed.
               });
               
             } catch (error) {
@@ -113,15 +111,13 @@ The related issue will be automatically closed.`
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pr.number,
-                body: `❌ **Auto-Merge Failed**
-
-The automated merge failed:
-
-\`\`\`
-${error.message}
-\`\`\`
-
-Please review and merge manually.`
+                body: |
+                  ❌ **Auto-Merge Failed**
+                  The automated merge failed:
+                  ```
+                  ${error.message}
+                  ```
+                  Please review and merge manually.
               });
             }
       
@@ -153,16 +149,14 @@ Please review and merge manually.`
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: issueNumber,
-                    body: `✅ **Bug Fixed & Deployed**
-
-This issue has been automatically fixed and deployed by the AI development team.
-
-**Fix Details:**
-- 🤖 **PR:** #${pr.number}
-- ✅ **Status:** Merged and deployed
-- 🚀 **Deployed:** ${new Date().toISOString()}
-
-The fix is now live in production. Thank you for reporting this issue!`
+                    body: |
+                      ✅ **Bug Fixed & Deployed**
+                      This issue has been automatically fixed and deployed by the AI development team.
+                      **Fix Details:**
+                      - 🤖 **PR:** #${pr.number}
+                      - ✅ **Status:** Merged and deployed
+                      - 🚀 **Deployed:** ${new Date().toISOString()}
+                      The fix is now live in production. Thank you for reporting this issue!
                   });
                   
                   console.log(`✅ Closed related issue #${issueNumber}`);
@@ -181,6 +175,7 @@ The fix is now live in production. Thank you for reporting this issue!`
           echo "Merged: $(date)"
           echo "Repository: ${{ github.repository }}"
           echo "Related issues have been automatically closed"
+
 
 
 
