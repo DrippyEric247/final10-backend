@@ -1,0 +1,343 @@
+/* Browser Compatibility Fixes */
+
+/* Ensure backdrop-filter works across all browsers */
+@supports (backdrop-filter: blur(10px)) {
+  .backdrop-blur {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  .backdrop-blur {
+    background: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Safari-specific fixes */
+@supports (-webkit-backdrop-filter: blur(10px)) {
+  .safari-backdrop {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}
+
+/* Firefox fallbacks - using @supports instead of @-moz-document */
+@supports (-moz-appearance: none) {
+  .firefox-fallback {
+    background: rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* Ensure proper theme-color support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --theme-color: #0a0f1a;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --theme-color: #ffffff;
+  }
+}
+
+/* Additional browser-specific fixes */
+@supports (display: grid) {
+  .grid-fallback {
+    display: grid;
+  }
+}
+
+@supports not (display: grid) {
+  .grid-fallback {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+/* Ensure proper CSS custom properties support */
+@supports (--css: variables) {
+  .css-vars-supported {
+    /* CSS custom properties are supported */
+  }
+}
+
+@supports not (--css: variables) {
+  .css-vars-fallback {
+    /* Fallback for browsers that don't support CSS custom properties */
+    background: #0a0f1a;
+    color: #e6eaf2;
+  }
+}
+
+/* Webkit-specific fixes for Safari */
+@supports (-webkit-appearance: none) {
+  .webkit-fixes {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Ensure proper backdrop-filter support detection */
+.backdrop-filter-test {
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(10px)) and not (-webkit-backdrop-filter: blur(10px)) {
+  .backdrop-filter-test {
+    background: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Additional compatibility for older browsers */
+.legacy-browser-support {
+  /* Ensure proper box-sizing */
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  
+  /* Ensure proper flexbox support */
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+/* Ensure proper gradient support */
+.gradient-fallback {
+  background: #8a2be2; /* Fallback color */
+  background: linear-gradient(90deg, #ffd166, #8a2be2);
+}
+
+/* Ensure proper border-radius support */
+.border-radius-fallback {
+  -webkit-border-radius: 12px;
+  -moz-border-radius: 12px;
+  border-radius: 12px;
+}
+
+/* Ensure proper transition support */
+.transition-fallback {
+  -webkit-transition: all 0.3s ease;
+  -moz-transition: all 0.3s ease;
+  -o-transition: all 0.3s ease;
+  transition: all 0.3s ease;
+}
+
+/* Ensure proper transform support */
+.transform-fallback {
+  -webkit-transform: translateY(-2px);
+  -moz-transform: translateY(-2px);
+  -ms-transform: translateY(-2px);
+  -o-transform: translateY(-2px);
+  transform: translateY(-2px);
+}
+
+/* Ensure proper box-shadow support */
+.box-shadow-fallback {
+  -webkit-box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  -moz-box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Ensure proper user-select support */
+.user-select-fallback {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Ensure proper appearance support */
+.appearance-fallback {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Ensure proper outline support */
+.outline-fallback {
+  -webkit-outline: none;
+  -moz-outline: none;
+  outline: none;
+}
+
+/* Ensure proper cursor support */
+.cursor-fallback {
+  -webkit-cursor: pointer;
+  cursor: pointer;
+}
+
+/* Ensure proper overflow support */
+.overflow-fallback {
+  -webkit-overflow: hidden;
+  -moz-overflow: hidden;
+  overflow: hidden;
+}
+
+/* Ensure proper text-overflow support */
+.text-overflow-fallback {
+  -webkit-text-overflow: ellipsis;
+  -moz-text-overflow: ellipsis;
+  text-overflow: ellipsis;
+}
+
+/* Ensure proper white-space support */
+.white-space-fallback {
+  -webkit-white-space: nowrap;
+  -moz-white-space: nowrap;
+  white-space: nowrap;
+}
+
+/* Ensure proper word-wrap support */
+.word-wrap-fallback {
+  -webkit-word-wrap: break-word;
+  -moz-word-wrap: break-word;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Ensure proper hyphens support */
+.hyphens-fallback {
+  -webkit-hyphens: auto;
+  -moz-hyphens: auto;
+  -ms-hyphens: auto;
+  hyphens: auto;
+}
+
+/* Ensure proper text-decoration support */
+.text-decoration-fallback {
+  -webkit-text-decoration: none;
+  -moz-text-decoration: none;
+  text-decoration: none;
+}
+
+/* Ensure proper text-shadow support */
+.text-shadow-fallback {
+  -webkit-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  -moz-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Ensure proper filter support */
+.filter-fallback {
+  -webkit-filter: brightness(1.1);
+  -moz-filter: brightness(1.1);
+  -ms-filter: brightness(1.1);
+  -o-filter: brightness(1.1);
+  filter: brightness(1.1);
+}
+
+/* Ensure proper animation support */
+.animation-fallback {
+  -webkit-animation: spin 1s linear infinite;
+  -moz-animation: spin 1s linear infinite;
+  -ms-animation: spin 1s linear infinite;
+  -o-animation: spin 1s linear infinite;
+  animation: spin 1s linear infinite;
+}
+
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@-moz-keyframes spin {
+  0% { -moz-transform: rotate(0deg); }
+  100% { -moz-transform: rotate(360deg); }
+}
+
+@-ms-keyframes spin {
+  0% { -ms-transform: rotate(0deg); }
+  100% { -ms-transform: rotate(360deg); }
+}
+
+@-o-keyframes spin {
+  0% { -o-transform: rotate(0deg); }
+  100% { -o-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Ensure proper media query support */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  .retina-fallback {
+    -webkit-transform: scale(0.5);
+    transform: scale(0.5);
+  }
+}
+
+/* Ensure proper touch support */
+.touch-fallback {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure proper scroll support */
+.scroll-fallback {
+  -webkit-overflow-scrolling: touch;
+  -moz-overflow-scrolling: touch;
+  -ms-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+/* Ensure proper selection support */
+.selection-fallback {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Ensure proper focus support */
+.focus-fallback {
+  -webkit-focus-ring-color: transparent;
+  -moz-focus-ring-color: transparent;
+  focus-ring-color: transparent;
+}
+
+/* Ensure proper placeholder support */
+.placeholder-fallback::-webkit-input-placeholder {
+  color: #9aa3b2;
+}
+
+.placeholder-fallback::-moz-placeholder {
+  color: #9aa3b2;
+}
+
+.placeholder-fallback:-ms-input-placeholder {
+  color: #9aa3b2;
+}
+
+.placeholder-fallback::placeholder {
+  color: #9aa3b2;
+}
+
+/* Ensure proper autofill support */
+.autofill-fallback:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #0b1323 inset;
+  -webkit-text-fill-color: #e6eaf2;
+}
+
+.autofill-fallback:-webkit-autofill:hover {
+  -webkit-box-shadow: 0 0 0 1000px #0b1323 inset;
+  -webkit-text-fill-color: #e6eaf2;
+}
+
+.autofill-fallback:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #0b1323 inset;
+  -webkit-text-fill-color: #e6eaf2;
+}
+
+.autofill-fallback:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0b1323 inset;
+  -webkit-text-fill-color: #e6eaf2;
+}

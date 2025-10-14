@@ -1,0 +1,123 @@
+name: 🐛 Bug Report
+description: Report a bug in Final10
+title: "[Bug]: "
+labels: ["bug", "triage:ai"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Our AI development team will automatically analyze and fix this issue.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity Level
+      description: How severe is this bug?
+      options:
+        - Low - Minor issue, doesn't affect core functionality
+        - Medium - Significant issue, affects some functionality
+        - High - Critical issue, affects core functionality
+        - Critical - System breaking, prevents app from working
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Page/Component
+      description: Which page or component is affected?
+      placeholder: e.g., /trending, /profile, Payment modal
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide detailed steps to reproduce the issue
+      placeholder: |
+        1. Go to the Trending page
+        2. Click on "Promote Your Listing"
+        3. Fill out the form
+        4. Click Submit
+        5. See error message
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: The promotion should be created successfully and payment should process
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: An error message appears and the promotion is not created
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide environment details
+      placeholder: |
+        - OS: Windows 10
+        - Browser: Chrome 119.0
+        - Device: Desktop
+        - User Type: Premium subscriber
+      value: |
+        - OS: 
+        - Browser: 
+        - Device: 
+        - User Type: 
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console Logs/Errors
+      description: Any error messages or console logs?
+      placeholder: |
+        ```
+        Error: Failed to create promotion
+        at PromotionService.createPromotion (promotionService.js:45)
+        ```
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **🤖 AI Development Team**
+        
+        This issue will be automatically analyzed by our AI development team. The system will:
+        
+        1. 🔍 **Analyze** the bug report and identify the root cause
+        2. 🔧 **Generate** a fix using AI-powered code analysis
+        3. 🧪 **Test** the fix automatically
+        4. 📝 **Create** a Pull Request with the fix
+        5. ✅ **Deploy** the fix once approved
+        
+        **Expected Timeline:** 5-15 minutes for analysis and fix generation.
+
+
+
+
+

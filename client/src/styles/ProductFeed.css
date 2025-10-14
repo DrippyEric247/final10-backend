@@ -1,0 +1,279 @@
+/* Navigation Styles */
+.main-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: rgba(0, 0, 0, 0.9);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-brand h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.nav-items {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 15px;
+  text-decoration: none;
+  color: #aaa;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  position: relative;
+}
+
+.nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.nav-item.active {
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.nav-icon {
+  font-size: 20px;
+}
+
+.nav-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .nav-items {
+    gap: 10px;
+  }
+  
+  .nav-label {
+    display: none;
+  }
+  
+  .nav-item {
+    padding: 15px 10px;
+  }
+  
+  .nav-icon {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-navigation {
+    padding: 10px 15px;
+  }
+  
+  .nav-items {
+    gap: 5px;
+  }
+  
+  .nav-item {
+    padding: 12px 8px;
+  }
+}
+
+/* container */
+.feed-wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+.feed-header h1 { color: #fff; margin: 0 0 4px; }
+.feed-header .muted { color: #a2a2b3; margin: 0 0 16px; }
+
+/* status messages */
+.feed-status {
+  text-align: center;
+  padding: 40px 20px;
+  color: #a2a2b3;
+  font-size: 16px;
+}
+
+/* grid */
+.feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* card */
+.card {
+  background: linear-gradient(180deg, rgba(73,32,115,.55), rgba(16,16,32,.65));
+  border: 1px solid rgba(140,88,255,.25);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* thumb */
+.thumb { position: relative; aspect-ratio: 16 / 10; background: #0e0e1a; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chip {
+  position: absolute; left: 10px; top: 10px;
+  background: rgba(117,61,255,.9);
+  color: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12px;
+}
+.chip-score { right: 10px; left: auto; background: rgba(45,189,107,.9); }
+
+/* meta */
+.meta { padding: 12px 14px; color: #e8e8ff; }
+.title {
+  font-weight: 600; margin: 0 0 8px; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: #b9b9d6; }
+.price { font-weight: 700; color: #caa9ff; }
+.end { color: #9bb6ff; }
+.sub { color: #9aa3b2; }
+
+/* AI scores */
+.ai-scores {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.score {
+  background: rgba(45,189,107,.2);
+  color: #2dbd6b;
+  border: 1px solid rgba(45,189,107,.3);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* actions */
+.actions { display: flex; gap: 10px; padding: 12px 14px 16px; }
+.btn { appearance: none; border: 1px solid rgba(140,88,255,.35); padding: 8px 12px;
+  border-radius: 10px; background: transparent; color: #ddd; cursor: pointer; font-weight: 600; }
+.btn:hover { border-color: rgba(140,88,255,.7); }
+.btn-primary { background: linear-gradient(90deg,#a67cff,#6d42ff); border-color: transparent; color: #fff; }
+.btn-ghost { background: transparent; }
+
+/* helpers */
+.feed-status { text-align: center; color: #aab; padding: 14px; }
+.feed-status.error { color: #ff8a8a; }
+.muted { color: #9aa3b2; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 18px; }
+.chip-outline { position: static; border: 1px solid rgba(140,88,255,.35); background: transparent; }
+.input { width: 100%; max-width: 740px; border-radius: 10px; padding: 10px 12px; border: 1px solid #3b3060; background:#0f0f1b; color:#eaeafc; }
+.scan-form { display: flex; gap: 10px; margin: 6px 0 18px; }
+
+/* Payment form styles */
+.payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.payment-element-container {
+  padding: 20px;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  background: #1f2937;
+}
+
+.payment-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 24px;
+  background: linear-gradient(90deg, #a67cff, #6d42ff);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #8c5cff, #5a2eff);
+  transform: translateY(-1px);
+}
+
+.payment-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-message {
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #fca5a5;
+  font-size: 14px;
+}
+
+/* Stripe Elements styling */
+.StripeElement {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 12px;
+  color: #eaeafc;
+}
+
+.StripeElement--focus {
+  border-color: #a67cff;
+  box-shadow: 0 0 0 1px #a67cff;
+}
+
+.StripeElement--invalid {
+  border-color: #ef4444;
+}
+
+.StripeElement--complete {
+  border-color: #10b981;
+}
+

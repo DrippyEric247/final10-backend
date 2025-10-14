@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: final10-server
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    # Add your other environment variables here
+    # - key: MONGODB_URI
+    #   value: your_mongodb_connection_string
+    # - key: JWT_SECRET
+    #   value: your_jwt_secret
+    # - key: STRIPE_SECRET_KEY
+    #   value: your_stripe_secret_key
+
+  - type: web
+    name: final10-client
+    env: static
+    plan: free
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/build
+    # Add environment variables for your client if needed
+    # envVars:
+    #   - key: REACT_APP_API_URL
+    #     value: https://final10-server.onrender.com
+
+
+
+
+
+
+
+
+
+
+
+

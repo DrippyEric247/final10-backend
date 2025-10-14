@@ -1,0 +1,117 @@
+/* ---------- Final10 Theme (CSS variables) ----------- */
+:root{
+  --f10-bg: #0a0f1a;          /* deep navy/black */
+  --f10-bg-2:#0f1729;         /* panel bg */
+  --f10-grad-1:#ffd166;       /* honey gold */
+  --f10-grad-2:#8a2be2;       /* electric purple */
+  --f10-grad-3:#00d4ff;       /* sky neon */
+  --f10-text:#e6eaf2;         /* base text */
+  --f10-text-dim:#9aa3b2;
+  --f10-accent:#ffd166;       /* gold accent */
+  --f10-danger:#ff5470;
+  --f10-success:#22c55e;
+
+  --f10-radius:16px;
+  --f10-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+/* App background */
+.bg-app{
+  min-height:100vh;
+  background:
+    radial-gradient(1200px 800px at 70% -10%, rgba(138,43,226,.15), transparent 60%),
+    radial-gradient(900px 600px at -10% 30%, rgba(0,212,255,.12), transparent 55%),
+    linear-gradient(180deg, var(--f10-bg), #070b13 70%);
+  color: var(--f10-text);
+}
+
+/* Container */
+.container{
+  width:100%;
+  max-width:1200px;
+  margin:0 auto;
+  padding: 24px;
+}
+
+/* Card */
+.card{
+  background: linear-gradient(180deg, var(--f10-bg-2), #0b1323);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: var(--f10-radius);
+  box-shadow: var(--f10-shadow);
+}
+
+/* Buttons */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  gap:.5rem; padding:.8rem 1.1rem; border-radius: 12px;
+  font-weight:700; letter-spacing:.2px; border:1px solid transparent;
+  transition: transform .08s ease, filter .15s ease, opacity .15s ease;
+  cursor:pointer; text-decoration:none; color:#0a0f1a; user-select:none;
+}
+
+.btn:active{ transform: translateY(1px) scale(.99); }
+
+.btn-primary{
+  background: linear-gradient(90deg, var(--f10-grad-1), var(--f10-grad-2));
+  color:#0a0f1a;
+}
+.btn-purple{
+  background: linear-gradient(90deg, var(--f10-grad-2), var(--f10-grad-3));
+  color:white;
+  border-color: rgba(255,255,255,.12);
+}
+.btn-ghost{
+  background: transparent;
+  color: var(--f10-text);
+  border-color: rgba(255,255,255,.14);
+}
+
+/* Inputs */
+.input{
+  width:100%; background:#0b1323; color:var(--f10-text);
+  border:1px solid rgba(255,255,255,.1); border-radius:12px;
+  padding:.85rem 1rem; outline:none;
+}
+.input::placeholder{ color:var(--f10-text-dim); }
+
+/* Chips / badges */
+.chip{
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.35rem .6rem; border-radius:999px;
+  font-size:.78rem; border:1px solid rgba(255,255,255,.12);
+  color:var(--f10-text);
+}
+.chip--success{ background: rgba(34,197,94,.12); border-color:rgba(34,197,94,.35); color:#7ee2a6;}
+.chip--danger{  background: rgba(255,84,112,.12); border-color:rgba(255,84,112,.35); color:#ff99ab;}
+
+/* Gradient text */
+.text-gradient{
+  background: linear-gradient(90deg, var(--f10-grad-1), var(--f10-grad-2), var(--f10-grad-3));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+
+/* Nav */
+.nav{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:1rem; padding:18px 24px;
+  position:sticky; top:0; z-index:20;
+  background: rgba(10,15,26,.6); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.nav a{ color:var(--f10-text-dim); text-decoration:none; font-weight:600;}
+.nav a.active, .nav a:hover{ color:var(--f10-text); }
+.logo{
+  display:flex; align-items:center; gap:.6rem; font-weight:900; letter-spacing:.2px;
+}
+.logo-badge{
+  width:28px;height:28px;border-radius:8px;
+  background:linear-gradient(130deg,var(--f10-grad-2),var(--f10-grad-1));
+  box-shadow:0 6px 18px rgba(255,209,102,.35);
+}
+.footer{
+  padding:30px 24px; color:var(--f10-text-dim);
+  border-top:1px solid rgba(255,255,255,.06); margin-top:48px;
+  text-align:center;
+}
+

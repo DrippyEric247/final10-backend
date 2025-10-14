@@ -1,0 +1,6 @@
+@import './styles/theme.css';
+
+/* you can keep or add your existing global resets here */
+*{ box-sizing: border-box; }
+html, body, #root{ height:100%; }
+
