@@ -1,16 +1,19 @@
 # ✅ Playwright image already has Chromium + fonts + deps installed
 FROM mcr.microsoft.com/playwright:v1.46.1-jammy
 
-# Set Node version explicitly
+# Make npm faster & more tolerant on CI networks
+RUN npm config set fetch-retries 5 \
+ && npm config set fetch-retry-mintimeout 20000 \
+ && npm config set fetch-timeout 600000
+
 ENV NODE_VERSION=20.18.1
-ENV NPM_VERSION=11.6.2
 WORKDIR /app
 
-# Install only prod deps for a smaller image
+# Install deps with cache to avoid repeated downloads
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN --mount=type=cache,target=/root/.npm npm install --omit=dev
 
-# Copy everything else
+# Copy app code last (keeps cache warm)
 COPY . .
 
 # Env + port
@@ -23,4 +26,3 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Start your server (uses your "start" script)
 CMD ["npm", "start"]
-
