@@ -1,6 +1,9 @@
 # ✅ Playwright image already has Chromium + fonts + deps installed
 FROM mcr.microsoft.com/playwright:v1.46.1-jammy
 
+# Set Node version explicitly
+ENV NODE_VERSION=20.18.1
+
 WORKDIR /app
 
 # Install only prod deps for a smaller image
