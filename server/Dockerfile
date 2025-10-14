@@ -2,14 +2,20 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy and install dependencies with cache support
+# Only copy the manifests first for better layer caching
 COPY package*.json ./
-RUN --mount=type=cache,id=npm-cache,target=/root/.npm npm install --omit=dev
 
-# Build the production image
+# Install prod deps (no cache mount to avoid Railway error)
+RUN npm ci --omit=dev
+
+# -------- runtime image --------
 FROM node:20-alpine
 WORKDIR /app
+
+# Bring in node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+
+# Copy the rest of the backend
 COPY . .
 
 ENV NODE_ENV=production
