@@ -1,0 +1,51 @@
+{
+  "name": "@savvy/shield-sdk",
+  "version": "1.0.0",
+  "description": "SavvyShield SDK for cross-app fraud detection and prevention",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts"
+  },
+  "keywords": [
+    "savvy",
+    "shield",
+    "fraud",
+    "detection",
+    "security",
+    "sdk"
+  ],
+  "author": "Savvy Universe",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/jest": "^29.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "eslint": "^8.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/savvyuniverse/shield-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/savvyuniverse/shield-sdk/issues"
+  },
+  "homepage": "https://github.com/savvyuniverse/shield-sdk#readme"
+}
+
+
+
+
+
+
