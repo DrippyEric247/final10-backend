@@ -1,7 +1,13 @@
 node_modules
 .git
 .gitignore
-README.md
-client/
-tests/
-*.log
+Dockerfile*
+.dockerignore
+env*
+.env*
+logs
+coverage
+client
+.github
+docs
+*.md
