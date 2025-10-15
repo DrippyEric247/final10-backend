@@ -5,7 +5,8 @@ WORKDIR /app
 
 # Install only prod deps for a smaller image
 COPY package*.json ./
-RUN npm ci --only=production
+RUN --mount=type=cache,id=npm-cache-{{.RunID}},target=/root/.npm \
+    npm ci --omit=dev --no-audit --no-fund
 
 # Copy the rest
 COPY . .
