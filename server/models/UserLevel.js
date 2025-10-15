@@ -57,7 +57,7 @@ const userLevelSchema = new mongoose.Schema({
 });
 
 // Index for efficient queries
-userLevelSchema.index({ userId: 1 });
+// Note: userId index is automatically created by unique: true
 userLevelSchema.index({ currentLevel: -1 });
 userLevelSchema.index({ totalXP: -1 });
 

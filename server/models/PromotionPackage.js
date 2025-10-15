@@ -144,7 +144,7 @@ const promotionPackageSchema = new mongoose.Schema({
 // Indexes
 promotionPackageSchema.index({ type: 1, tier: 1 });
 promotionPackageSchema.index({ isActive: 1, sortOrder: 1 });
-promotionPackageSchema.index({ slug: 1 });
+// Note: slug index is automatically created by unique: true
 
 // Virtual for is available
 promotionPackageSchema.virtual('isAvailable').get(function() {
