@@ -1,15 +1,17 @@
 # syntax=docker/dockerfile:1.7
 
-# --- dependencies layer ---
+# --- deps layer ---
     FROM node:20-bullseye-slim AS deps
     WORKDIR /app
     
+    # Copy dependency files
     COPY package*.json ./
     
-    RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
+    # Install dependencies with proper cache key
+    RUN --mount=type=cache,id=npm-cache-{{.RunID}},target=/root/.npm \
         npm ci --omit=dev --no-audit --no-fund
     
-    # --- production layer ---
+    # --- runtime layer ---
     FROM node:20-bullseye-slim
     WORKDIR /app
     
@@ -17,8 +19,10 @@
     ENV PORT=8080
     EXPOSE 8080
     
+    # Copy node_modules and rest of app
     COPY --from=deps /app/node_modules ./node_modules
     COPY . .
     
     CMD ["npm", "start"]
+    
     
