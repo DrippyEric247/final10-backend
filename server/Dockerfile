@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install prod deps (no cache mount to avoid Railway error)
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # -------- runtime image --------
 FROM node:20-alpine
