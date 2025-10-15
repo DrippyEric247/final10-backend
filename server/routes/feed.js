@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const FeedItem = require('../models/feeditem');
+const FeedItem = require('../models/FeedItem');
 const { ingestYouTube } = require('../services/youtube');
 const { ingestReddit } = require('../services/reddit');
 const auth = require('../middleware/auth');

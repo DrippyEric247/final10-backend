@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const FeedItem = require('../models/feeditem');
+const FeedItem = require('../models/FeedItem');
 const { isProductText } = require('../lib/productFilter');
 
 const YT_API = 'https://www.googleapis.com/youtube/v3/search';

@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const FeedItem = require('../models/feeditem');
+const FeedItem = require('../models/FeedItem');
 const { isProductText } = require('../lib/productFilter');
 
 async function ingestReddit({ subs = ['BuyItForLife','Sneakers'], limit = 25 }) {
