@@ -29,8 +29,23 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('f10_token');
-      window.location.href = '/login';
+      const errorMessage = error.response?.data?.error || '';
+      const isTokenError = errorMessage.toLowerCase().includes('token') || 
+                          errorMessage.toLowerCase().includes('expired') ||
+                          errorMessage.toLowerCase().includes('invalid') ||
+                          error.config?.url?.includes('/auth/');
+      
+      // Only logout and redirect if it's a token/auth-related error
+      // Don't logout for other 401 errors (like missing eBay OAuth, etc.)
+      if (isTokenError) {
+        console.log('🔒 Auth token invalid/expired, logging out...');
+        localStorage.removeItem('f10_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      } else {
+        console.log('⚠️ 401 error but not token-related:', errorMessage);
+      }
     }
     return Promise.reject(error);
   }
