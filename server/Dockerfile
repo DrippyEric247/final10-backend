@@ -8,7 +8,7 @@
     COPY package*.json ./
     
     # Install dependencies with proper cache key
-    RUN npm ci --omit=dev --no-audit --no-fund
+    RUN npm i --omit=dev --no-audit --no-fund
     
     # --- runtime layer ---
     FROM node:20-bullseye-slim
