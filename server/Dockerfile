@@ -8,8 +8,7 @@
     COPY package*.json ./
     
     # Install dependencies with proper cache key
-    RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
-        npm ci --omit=dev --no-audit --no-fund
+    RUN npm ci --omit=dev --no-audit --no-fund
     
     # --- runtime layer ---
     FROM node:20-bullseye-slim
