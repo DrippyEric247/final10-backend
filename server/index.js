@@ -1,6 +1,11 @@
 // top (already there)
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// Load .env only when not in production
+if (process.env.NODE_ENV !== 'production') {
+  // eslint-disable-next-line global-require
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
+}
 
 const express = require('express');
 const mongoose = require('mongoose');
