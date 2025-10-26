@@ -7,8 +7,9 @@ WORKDIR /app
 # Copy server package files
 COPY server/package*.json ./
 
-# Install dependencies with proper cache key
-RUN npm ci --omit=dev --no-audit --no-fund
+# Install dependencies with proper cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --no-audit --no-fund
 
 # --- runtime layer ---
 FROM node:20-bullseye-slim
