@@ -2,21 +2,20 @@
 FROM node:20-bullseye-slim
 WORKDIR /app
 
-# copy only the server's package files first
-COPY server/package*.json server/
+# Copy package files from this folder
+COPY package*.json ./
 
-# install deps inside server folder
+# Install production dependencies
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --no-audit --no-fund --prefix server
+    npm ci --omit=dev --no-audit --no-fund
 
-# copy rest of the server code
-COPY server/ server/
+# Copy the rest of your server code
+COPY . .
 
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["node", "server/index.js"]
+CMD ["node", "index.js"]
 
-    
     
