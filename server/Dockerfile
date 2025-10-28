@@ -1,21 +1,22 @@
 # syntax=docker/dockerfile:1.7
+
 FROM node:20-bullseye-slim
+
+# Work at /app
 WORKDIR /app
 
-# Copy package files from this folder
-COPY package*.json ./
+# Use the package.json that lives in /server
+COPY server/package*.json ./
 
-# Install production dependencies
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --no-audit --no-fund
+# Install server deps (creates /app/node_modules)
+RUN npm ci --omit=dev --no-audit --no-fund
 
-# Copy the rest of your server code
-COPY . .
+# Copy the server source into /app/server
+COPY server ./server
 
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["node", "index.js"]
-
-    
+# Start your app
+CMD ["node", "server/index.js"]
