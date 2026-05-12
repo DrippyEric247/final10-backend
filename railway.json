@@ -3,7 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
-    "watchPatterns": ["server/**/*.js", "server/**/*.json", "server/package*.json"]
+    "watchPatterns": ["**/*.js", "**/*.json", "package*.json"]
   },
   "deploy": {
     "startCommand": "npm start",
