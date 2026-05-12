@@ -4,10 +4,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const ReferralLog = require('../models/ReferralLog');
+const CreatorEvent = require('../models/CreatorEvent');
 const auth = require('../middleware/auth');
+const { validateRequest } = require('../middleware/validateRequest');
+const { authLoginLimiter, authSignupLimiter } = require('../middleware/rateLimits');
+const schemas = require('../validation/schemas');
+const { HttpError } = require('../middleware/apiErrors');
+const { auditFireAndForget } = require('../services/securityAuditService');
 
-
-// import ONCE from the service (remove any duplicate local definitions)
 const { referralFraudCheck, logReferral } = require('../services/referralGuard');
 
 const router = express.Router();
@@ -15,7 +19,13 @@ const router = express.Router();
 const REFERRAL_POINTS = Number(process.env.REFERRAL_POINTS || 5000);
 const REFERRAL_DAILY_CAP = Number(process.env.REFERRAL_DAILY_CAP || 10);
 
-// helpers
+const BCRYPT_ROUNDS = 12;
+
+function signUserToken(user) {
+  const sub = String(user._id);
+  return jwt.sign({ sub, id: user._id, userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -29,66 +39,66 @@ function endOfToday() {
 
 /**
  * POST /api/auth/signup
- * Body: { firstName, lastName, username, email, password, referralCode? }
  */
-router.post('/signup', async (req, res) => {
+router.post('/signup', authSignupLimiter, validateRequest(schemas.authSignupBody), async (req, res, next) => {
   try {
-    const { firstName, lastName, username, email, password, referralCode } = req.body || {};
-
-    // basic checks
-    if (!firstName || !lastName || !username || !email || !password) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
+    const { firstName, lastName, username, email, password, referralCode } = req.body;
+    // Phase B: client-supplied attribution payload (creator deep links, etc.).
+    // We accept it loosely — schema validation is intentionally lenient so
+    // we never block a signup on missing/extra attribution fields.
+    const attribution = (req.body && typeof req.body.attribution === 'object') ? req.body.attribution : null;
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
-    if (existing) return res.status(400).json({ message: 'Email or username already in use' });
+    if (existing) {
+      return next(new HttpError(400, 'SIGNUP_CONFLICT', 'Email or username already in use'));
+    }
 
-    // create user with signup bonus
-    const passwordHash = await bcrypt.hash(password, 10);
-    let signupBonus = 100; // Give new users 100 points for signing up
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    let signupBonus = 100;
     let membershipTier = 'free';
     let subscriptionExpires = null;
-    
-    // Special bonus for "welcome" referral code
+
     if (referralCode === 'welcome') {
-      signupBonus = 500; // Extra bonus for welcome code
-      membershipTier = 'premium'; // Give 7-day free trial
-      subscriptionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      signupBonus = 500;
+      membershipTier = 'premium';
+      subscriptionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     }
-    
+
     const user = await User.create({
-      firstName, 
-      lastName, 
-      username, 
-      email, 
-      password: passwordHash, 
-      points: signupBonus, 
+      firstName,
+      lastName,
+      username,
+      email,
+      password: passwordHash,
+      points: signupBonus,
       lastActive: new Date(),
-      referralCodeUsed: referralCode || null, // Track which referral code was used
+      referralCodeUsed: referralCode || null,
       membershipTier,
-      subscriptionExpires
+      subscriptionExpires,
     });
 
-    // give each user their own shareable code (their _id as string is simple & unique)
     user.referralCode = user._id.toString();
 
     let referrer = null;
     if (referralCode) {
-      // accept either a stored code (referrer.referralCode) OR a raw ObjectId
       referrer =
         (await User.findOne({ referralCode })) ||
         (await User.findById(referralCode).catch(() => null));
       if (referrer && String(referrer._id) === String(user._id)) {
-        // self-ref by id
-        await logReferral({ referrerId: referrer._id, refereedId: user._id, ip: '', ua: '', status: 'blocked', reason: 'self_by_id' });
+        await logReferral({
+          referrerId: referrer._id,
+          refereedId: user._id,
+          ip: '',
+          ua: '',
+          status: 'blocked',
+          reason: 'self_by_id',
+        });
         referrer = null;
       }
     }
 
-    // save the user (with referralCode set)
     await user.save();
 
-    // Handle referral credit if there is a valid referrer
     if (referrer) {
       const check = await referralFraudCheck(req, referrer._id, email, user._id);
 
@@ -102,7 +112,6 @@ router.post('/signup', async (req, res) => {
           reason: check.reason || 'failed_check',
         });
       } else {
-        // within daily cap?
         const todayAcceptedCount = await ReferralLog.countDocuments({
           referrerId: referrer._id,
           status: 'accepted',
@@ -110,11 +119,7 @@ router.post('/signup', async (req, res) => {
         });
 
         if (todayAcceptedCount < REFERRAL_DAILY_CAP) {
-          // award points
-          await User.updateOne(
-            { _id: referrer._id },
-            { $inc: { points: REFERRAL_POINTS } }
-          );
+          await User.updateOne({ _id: referrer._id }, { $inc: { points: REFERRAL_POINTS } });
 
           await logReferral({
             referrerId: referrer._id,
@@ -125,7 +130,6 @@ router.post('/signup', async (req, res) => {
             reason: 'ok',
           });
         } else {
-          // cap reached — log but do not award more
           await logReferral({
             referrerId: referrer._id,
             refereedId: user._id,
@@ -136,20 +140,43 @@ router.post('/signup', async (req, res) => {
           });
         }
 
-        // keep a simple backlink for analytics (optional)
         user.referredBy = referrer._id;
-        
-        // Give the new user bonus points for using a referral code (if not already got welcome bonus)
+
         if (referralCode !== 'welcome') {
-          user.points += 200; // Bonus for using any referral code
+          user.points += 200;
         }
-        
+
         await user.save();
       }
     }
 
-    // sign JWT
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Phase B: persist attribution and log a creator signup event.
+    if (attribution) {
+      try {
+        await user.applyAttribution(attribution);
+        if (user.creatorId || user.creatorHandle) {
+          await CreatorEvent.create({
+            type: 'signup',
+            creatorId: user.creatorId || null,
+            creatorHandle: user.creatorHandle || attribution.creatorHandle || null,
+            creatorCode: user.creatorCodeApplied || attribution.creatorCode || null,
+            campaign: user.attributionCampaign || attribution.campaign || null,
+            source: user.referralSource || attribution.source || null,
+            landingPath: user.attributionLandingPath || attribution.landingPath || null,
+            userId: user._id,
+            amount: 0,
+          });
+        }
+      } catch (attrErr) {
+        // Attribution should never break signup.
+        // eslint-disable-next-line no-console
+        console.error('Attribution apply failed:', attrErr);
+      }
+    }
+
+    const token = signUserToken(user);
+
+    auditFireAndForget('AUTH_SIGNUP', { userId: user._id, req, meta: { username: user.username } });
 
     return res.status(201).json({
       token,
@@ -165,28 +192,31 @@ router.post('/signup', async (req, res) => {
         referredBy: user.referredBy || null,
         membershipTier: user.membershipTier,
         subscriptionExpires: user.subscriptionExpires,
+        creatorId: user.creatorId || null,
+        creatorHandle: user.creatorHandle || null,
+        attributedTo: user.attributedTo || null,
+        creatorCodeApplied: user.creatorCodeApplied || null,
       },
     });
   } catch (err) {
-    console.error('Signup error:', err);
-    return res.status(500).json({ message: 'Server error during registration' });
+    return next(err);
   }
 });
 
 /**
  * POST /api/auth/login
- * Body: { email, password }
  */
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), async (req, res, next) => {
   try {
+    const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    const ok = user ? await bcrypt.compare(password, user.password) : false;
+    if (!user || !ok) {
+      auditFireAndForget('AUTH_LOGIN_FAILED', { req, severity: 'warn', meta: {} });
+      return next(new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid credentials'));
+    }
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(400).json({ message: "Invalid credentials" });
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = signUserToken(user);
     return res.json({
       token,
       user: {
@@ -201,19 +231,17 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ message: 'Server error' });
+    return next(err);
   }
 });
 
 /**
  * GET /api/auth/me
- * Header: Authorization: Bearer <token>
  */
-router.get('/me', auth, async (req, res) => {
+router.get('/me', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).lean();
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const user = await User.findById(req.user._id || req.user.id).lean();
+    if (!user) return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));
 
     return res.json({
       id: user._id,
@@ -224,10 +252,27 @@ router.get('/me', auth, async (req, res) => {
       points: user.points,
       referralCode: user.referralCode,
       referredBy: user.referredBy || null,
+      premiumTier: user.premiumTier || user.membershipTier || 'free',
+      leaderboardScore: user.leaderboardScore ?? 0,
+      currentStreak: user.currentStreak ?? 0,
+      powerMultiplier: user.powerMultiplier ?? 1,
+      equippedCosmetics: user.equippedCosmetics || {
+        emblemId: 'sigil_starter',
+        callingCardId: 'card_default',
+        titleId: null,
+      },
+      // Phase B/C surfaces
+      creatorId: user.creatorId || null,
+      creatorHandle: user.creatorHandle || null,
+      attributedTo: user.attributedTo || null,
+      creatorCodeApplied: user.creatorCodeApplied || null,
+      followingCount: Array.isArray(user.following) ? user.following.length : 0,
+      followersCount: Array.isArray(user.followers) ? user.followers.length : 0,
+      pinnedWins: user.pinnedWins || [],
+      weeklyStats: user.weeklyStats || null,
     });
   } catch (err) {
-    console.error('Me error:', err);
-    return res.status(500).json({ message: 'Server error' });
+    return next(err);
   }
 });
 

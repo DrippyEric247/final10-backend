@@ -29,6 +29,37 @@ const userSchema = new mongoose.Schema({
   referralDay:         { type: String, default: null },          // 'YYYY-MM-DD'
   referralCountToday:  { type: Number, default: 0 },
 
+  // ---- creator attribution (Phase B) ----
+  // creatorId: server-side User._id of the creator that drove this signup.
+  creatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  // creatorHandle: cached username/handle for cheap rendering.
+  creatorHandle: { type: String, default: null },
+  // referralSource: bucket for analytics (creator|referral|campaign|deeplink|organic).
+  referralSource: { type: String, default: 'organic', index: true },
+  // attributedTo: free-form attribution slug for funnels (overrides bucket if set).
+  attributedTo: { type: String, default: null, index: true },
+  // creatorCodeApplied: the auto-applied creator code at signup, if any.
+  creatorCodeApplied: { type: String, default: null },
+  // attributionCampaign: utm_campaign / campaign tag at first touch.
+  attributionCampaign: { type: String, default: null },
+  // attributionLandingPath: first URL the user hit during attribution capture.
+  attributionLandingPath: { type: String, default: null },
+  // attributionCapturedAt: when attribution was first stamped.
+  attributionCapturedAt: { type: Date, default: null },
+
+  // ---- social fabric (Phase C) ----
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // pinnedWins: ordered list of Auction ids the user has chosen to showcase.
+  pinnedWins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Auction' }],
+  // weeklyStats: rolling weekly totals for compare cards. Reset by cron/usage.
+  weeklyStats: {
+    weekKey: { type: String, default: null },     // ISO week key e.g. '2026-W16'
+    savvyEarned: { type: Number, default: 0 },
+    winsCount: { type: Number, default: 0 },
+    bestMovesFollowed: { type: Number, default: 0 },
+  },
+
   // ---- subscription & search limits ----
   membershipTier: { 
     type: String, 
@@ -36,6 +67,8 @@ const userSchema = new mongoose.Schema({
     default: 'free' 
   },
   subscriptionExpires: Date,
+  /** Last Stripe payment intent applied to premium (idempotent confirm). */
+  lastProcessedPremiumPaymentIntentId: { type: String, default: null },
   subscriptionEnd: Date,  // Alternative subscription end date
   isPremium: { type: Boolean, default: false },
   hasClaimedCommunityReward: { type: Boolean, default: false },
@@ -103,6 +136,22 @@ const userSchema = new mongoose.Schema({
     canViewAnalytics: { type: Boolean, default: false }
   },
 
+  // ---- Final10 progression / cosmetics (server source of truth) ----
+  premiumTier: {
+    type: String,
+    enum: ['free', 'premium', 'pro'],
+    default: 'free',
+  },
+  leaderboardScore: { type: Number, default: 0 },
+  currentStreak: { type: Number, default: 0 },
+  /** Season-style power multiplier (1 = baseline). */
+  powerMultiplier: { type: Number, default: 1 },
+  equippedCosmetics: {
+    emblemId: { type: String, default: 'sigil_starter' },
+    callingCardId: { type: String, default: 'card_default' },
+    titleId: { type: String, default: null },
+  },
+
   // ---- Owner Grants (Owner Perks) ----
   ownerGrants: [{
     type: {
@@ -115,6 +164,13 @@ const userSchema = new mongoose.Schema({
     grantedAt: { type: Date, default: Date.now }
   }],
 }, { timestamps: true });
+
+userSchema.pre('save', function syncPremiumTier(next) {
+  if (this.isModified('membershipTier')) {
+    this.premiumTier = this.membershipTier;
+  }
+  next();
+});
 
 // Method to check if user can perform a search
 userSchema.methods.canSearch = function() {
@@ -798,6 +854,93 @@ userSchema.statics.createSuperAdmin = async function(username, email, password) 
 // Static method to get superadmin
 userSchema.statics.getSuperAdmin = function() {
   return this.findOne({ role: 'superadmin' });
+};
+
+// ---- Phase B: attribution helpers ------------------------------------------
+
+/**
+ * Resolve the creator user from a handle/username/code, return their _id and
+ * canonical handle. Returns { id, handle } or { id: null, handle: null }.
+ */
+userSchema.statics.resolveCreatorIdentity = async function (handleOrCode) {
+  if (!handleOrCode) return { id: null, handle: null };
+  const raw = String(handleOrCode).trim();
+  if (!raw) return { id: null, handle: null };
+
+  // Match against username (case-insensitive) first.
+  let candidate = await this.findOne({
+    username: { $regex: '^' + raw.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', $options: 'i' }
+  }).select('_id username').lean();
+
+  if (!candidate) {
+    // Fall back to looking up by referralCode (which we set to the user _id).
+    candidate = await this.findOne({ referralCode: raw }).select('_id username').lean();
+  }
+
+  if (!candidate) return { id: null, handle: null };
+  return { id: candidate._id, handle: candidate.username || null };
+};
+
+/**
+ * Apply Phase B attribution payload to a user document. Safe to call with
+ * partial / null payloads — only writes fields when provided.
+ */
+userSchema.methods.applyAttribution = async function (payload) {
+  if (!payload || typeof payload !== 'object') return this;
+  const User = this.constructor;
+  const handle = payload.creatorHandle ? String(payload.creatorHandle).trim() : null;
+  if (handle) {
+    const ident = await User.resolveCreatorIdentity(handle);
+    if (ident.id && String(ident.id) !== String(this._id)) {
+      this.creatorId = ident.id;
+      this.creatorHandle = ident.handle || handle;
+    } else {
+      // Still capture the handle even if we couldn't resolve the user yet.
+      this.creatorHandle = handle;
+    }
+  }
+  if (payload.creatorCode) this.creatorCodeApplied = String(payload.creatorCode);
+  if (payload.campaign) this.attributionCampaign = String(payload.campaign);
+  if (payload.source) this.referralSource = String(payload.source);
+  if (payload.landingPath) this.attributionLandingPath = String(payload.landingPath).slice(0, 512);
+  if (payload.capturedAt) {
+    const ts = new Date(Number(payload.capturedAt));
+    if (!Number.isNaN(ts.getTime())) this.attributionCapturedAt = ts;
+  }
+  // attributedTo defaults to the creator handle when present, else campaign.
+  this.attributedTo = this.creatorHandle || this.attributionCampaign || this.attributedTo || null;
+  return this.save();
+};
+
+// ---- Phase C: weekly stat helpers ------------------------------------------
+
+function isoWeekKey(date = new Date()) {
+  // ISO 8601 week-numbering year + week, e.g. "2026-W16".
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+userSchema.statics.isoWeekKey = isoWeekKey;
+
+userSchema.methods.bumpWeeklyStat = async function (statName, increment = 1) {
+  const key = isoWeekKey();
+  if (!this.weeklyStats || this.weeklyStats.weekKey !== key) {
+    this.weeklyStats = {
+      weekKey: key,
+      savvyEarned: 0,
+      winsCount: 0,
+      bestMovesFollowed: 0,
+    };
+  }
+  if (typeof this.weeklyStats[statName] !== 'number') {
+    this.weeklyStats[statName] = 0;
+  }
+  this.weeklyStats[statName] += Number(increment) || 0;
+  return this.save();
 };
 
 module.exports = mongoose.model('User', userSchema);

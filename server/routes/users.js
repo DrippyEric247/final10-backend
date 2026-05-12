@@ -434,6 +434,106 @@ router.get('/:id/points', async (req, res) => {
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/*  Phase C: pinned wins + weekly compare                                     */
+/* -------------------------------------------------------------------------- */
+
+// Get a user's pinned wins (the auctions they chose to showcase on their profile).
+router.get('/:id/pinned-wins', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('pinnedWins username')
+      .populate({
+        path: 'pinnedWins',
+        select: 'title imageUrl currentBid endTime status soldPrice winner',
+      })
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      handle: user.username,
+      pinnedWins: user.pinnedWins || [],
+    });
+  } catch (error) {
+    console.error('Get pinned wins error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update the authenticated user's pinned wins. Body: { auctionIds: [..] }
+router.put('/me/pinned-wins', auth, async (req, res) => {
+  try {
+    const { auctionIds } = req.body || {};
+    if (!Array.isArray(auctionIds)) {
+      return res.status(400).json({ message: 'auctionIds must be an array' });
+    }
+    const limited = auctionIds.slice(0, 12); // hard cap on showcase size
+
+    // Verify the auctions actually exist (cheap pre-check; non-blocking).
+    const found = await Auction.find({ _id: { $in: limited } }).select('_id').lean();
+    const validIds = found.map((a) => a._id);
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.pinnedWins = validIds;
+    await user.save();
+
+    res.json({ ok: true, pinnedWins: user.pinnedWins });
+  } catch (error) {
+    console.error('Set pinned wins error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Compare weekly Savvy / wins between the authenticated user and another user.
+router.get('/:id/weekly-compare', auth, async (req, res) => {
+  try {
+    const me = await User.findById(req.user.id)
+      .select('username weeklyStats')
+      .lean();
+    const them = await User.findById(req.params.id)
+      .select('username weeklyStats')
+      .lean();
+
+    if (!me || !them) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const weekKey = User.isoWeekKey();
+    const normalize = (stats) => {
+      if (!stats || stats.weekKey !== weekKey) {
+        return { weekKey, savvyEarned: 0, winsCount: 0, bestMovesFollowed: 0 };
+      }
+      return {
+        weekKey: stats.weekKey,
+        savvyEarned: stats.savvyEarned || 0,
+        winsCount: stats.winsCount || 0,
+        bestMovesFollowed: stats.bestMovesFollowed || 0,
+      };
+    };
+
+    const meStats = normalize(me.weeklyStats);
+    const themStats = normalize(them.weeklyStats);
+
+    res.json({
+      weekKey,
+      me: { handle: me.username, ...meStats },
+      them: { handle: them.username, ...themStats },
+      delta: {
+        savvyEarned: meStats.savvyEarned - themStats.savvyEarned,
+        winsCount: meStats.winsCount - themStats.winsCount,
+        bestMovesFollowed: meStats.bestMovesFollowed - themStats.bestMovesFollowed,
+      },
+    });
+  } catch (error) {
+    console.error('Weekly compare error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get user's eBay connection status
 router.get('/:id/ebay-status', auth, async (req, res) => {
   try {

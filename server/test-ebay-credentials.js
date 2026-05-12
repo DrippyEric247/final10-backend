@@ -49,8 +49,7 @@ async function testEbayCredentials() {
           headers: { Authorization: `Bearer ${token}` },
           params: {
             q: 'iPhone',
-            limit: 3,
-            filter: 'buyingOptions:{AUCTION}'
+            limit: 3
           }
         });
         

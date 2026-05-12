@@ -2,27 +2,10 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/requireRole');
 
 // Apply auth middleware to all routes
 router.use(auth);
-
-// Superadmin-only middleware for owner control
-const requireSuperAdmin = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user || !user.isSuperAdmin()) {
-      return res.status(403).json({ 
-        message: 'Superadmin access required. Only the system owner can access this.',
-        required: 'superadmin',
-        current: user?.role || 'none'
-      });
-    }
-    req.superAdmin = user;
-    next();
-  } catch (error) {
-    res.status(500).json({ message: 'Error checking superadmin permissions' });
-  }
-};
 
 /**
  * GET /api/owner/search-users

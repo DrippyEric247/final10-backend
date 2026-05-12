@@ -1,5 +1,76 @@
+const crypto = require('crypto');
 const SimpleScraper = require('./scrapers/SimpleScraper');
 const Auction = require('../models/Auction');
+
+const ALLOWED_PLATFORMS = new Set(['ebay', 'mercari', 'facebook', 'internal']);
+
+function stableExternalId(...parts) {
+  return crypto.createHash('sha1').update(parts.map(String).join('|')).digest('hex').slice(0, 24);
+}
+
+/**
+ * Scrapers sometimes omit `source` (e.g. OfferUp mock used root `platform` only).
+ * Auction schema requires source.platform in enum: ebay | mercari | facebook | internal.
+ */
+function normalizeAuctionForDb(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const data = { ...raw };
+
+  if (!data.aiScore || typeof data.aiScore !== 'object') {
+    data.aiScore = {
+      dealPotential: Math.min(100, Math.max(0, Number(data.dealPotential) || 50)),
+      competitionLevel: ['low', 'medium', 'high'].includes(data.competitionLevel)
+        ? data.competitionLevel
+        : 'medium',
+      trendingScore: Math.min(100, Math.max(0, Number(data.trendingScore) || 50)),
+    };
+  }
+
+  const url = (data.source && data.source.url) || data.itemUrl || data.url || '';
+  const prevSource = data.source && typeof data.source === 'object' ? { ...data.source } : {};
+  let platform = prevSource.platform;
+  let externalId = prevSource.externalId;
+
+  const topPlatform = String(data.platform || '').toLowerCase();
+  if (!platform) {
+    if (topPlatform === 'offerup') {
+      platform = 'internal';
+      externalId = externalId || `offerup_${stableExternalId(url, data.title)}`;
+    } else if (ALLOWED_PLATFORMS.has(topPlatform) && topPlatform !== 'internal') {
+      platform = topPlatform;
+      externalId = externalId || (url ? stableExternalId(url) : null);
+    } else {
+      platform = 'internal';
+      externalId = externalId || `agg_${stableExternalId(data.title, url, Date.now())}`;
+    }
+  }
+
+  if (platform && !ALLOWED_PLATFORMS.has(platform)) {
+    platform = 'internal';
+    externalId = externalId || `ext_${stableExternalId(platform, url, data.title)}`;
+  }
+
+  if (!externalId) {
+    externalId = `ext_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  data.source = { platform, externalId, url: url || undefined };
+
+  if (!data.startTime) {
+    const endMs = data.endTime ? new Date(data.endTime).getTime() : Date.now() + 86400000;
+    data.startTime = new Date(endMs - 7 * 86400000);
+    if (!data.endTime) data.endTime = new Date(endMs);
+  }
+
+  if (!Array.isArray(data.images) || data.images.length === 0) {
+    if (data.imageUrl) {
+      data.images = [{ url: data.imageUrl, alt: data.title || 'Listing' }];
+    }
+  }
+
+  return data;
+}
 
 class AuctionAggregator {
   constructor() {
@@ -67,21 +138,27 @@ class AuctionAggregator {
       
       for (const auctionData of auctions) {
         try {
+          const normalized = normalizeAuctionForDb(auctionData);
+          if (!normalized || !normalized.source) {
+            console.warn('Skipping auction: could not normalize payload', auctionData?.title);
+            continue;
+          }
+
           // Check if auction already exists (by external ID and platform)
           const existingAuction = await Auction.findOne({
-            'source.platform': auctionData.source.platform,
-            'source.externalId': auctionData.source.externalId
+            'source.platform': normalized.source.platform,
+            'source.externalId': normalized.source.externalId
           });
 
           if (existingAuction) {
             // Update existing auction
-            Object.assign(existingAuction, auctionData);
+            Object.assign(existingAuction, normalized);
             existingAuction.lastUpdated = new Date();
             await existingAuction.save();
             savedAuctions.push(existingAuction);
           } else {
             // Create new auction
-            const auction = new Auction(auctionData);
+            const auction = new Auction(normalized);
             await auction.save();
             savedAuctions.push(auction);
           }
@@ -129,8 +206,14 @@ class AuctionAggregator {
       
       // Sort by deal potential and trending score
       liveResults.sort((a, b) => {
-        const scoreA = (a.aiScore.dealPotential + a.aiScore.trendingScore) / 2;
-        const scoreB = (b.aiScore.dealPotential + b.aiScore.trendingScore) / 2;
+        const scoreA =
+          (((a.aiScore && a.aiScore.dealPotential) || a.dealPotential || 0) +
+            ((a.aiScore && a.aiScore.trendingScore) || a.trendingScore || 0)) /
+          2;
+        const scoreB =
+          (((b.aiScore && b.aiScore.dealPotential) || b.dealPotential || 0) +
+            ((b.aiScore && b.aiScore.trendingScore) || b.trendingScore || 0)) /
+          2;
         return scoreB - scoreA;
       });
 
@@ -179,9 +262,9 @@ class AuctionAggregator {
       
       // Group by platform
       const byPlatform = {
-        ebay: results.filter(r => r.source.platform === 'ebay'),
-        mercari: results.filter(r => r.source.platform === 'mercari'),
-        facebook: results.filter(r => r.source.platform === 'facebook')
+        ebay: results.filter((r) => r.source && r.source.platform === 'ebay'),
+        mercari: results.filter((r) => r.source && r.source.platform === 'mercari'),
+        facebook: results.filter((r) => r.source && r.source.platform === 'facebook')
       };
 
       // Return one from each platform

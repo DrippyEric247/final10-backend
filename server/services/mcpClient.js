@@ -7,7 +7,7 @@ const axios = require('axios');
 
 class MCPClient {
   constructor() {
-    this.apiKey = process.env.RENDER_API_KEY || 'rnd_gfiAGPtzxY8YLb09FL9erD0bbBo8';
+    this.apiKey = process.env.RENDER_API_KEY || '';
     this.baseURL = 'https://mcp.render.com/mcp';
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -126,6 +126,9 @@ class MCPClient {
 }
 
 module.exports = MCPClient;
+
+
+
 
 
 

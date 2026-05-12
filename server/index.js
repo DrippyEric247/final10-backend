@@ -7,7 +7,11 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
+const { validateCoreEnv, printSecurityStartupReport } = require('./config/envValidation');
+validateCoreEnv();
+
 const express = require('express');
+const { requestTelemetry } = require('./middleware/requestTelemetry');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const compression = require('compression');
@@ -53,6 +57,16 @@ app.use('/api/', limiter);
 app.use(cors(corsConfig));
 app.options('*', cors(corsConfig));
 
+const { stripeWebhookHandler } = require('./routes/stripeWebhook');
+
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    Promise.resolve(stripeWebhookHandler(req, res)).catch(next);
+  }
+);
+
 // Additional CORS handling for preflight requests (enhanced)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -85,6 +99,7 @@ app.use((req, res, next) => {
 // --- BODY PARSERS (must be before routes) ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestTelemetry);
 
 // --- Routes
 const configRoutes      = require('./routes/config');
@@ -110,6 +125,13 @@ const bugReportRoutes   = require('./routes/bugReports');
 const shieldRoutes      = require('./routes/shield');
 const { router: shieldEnforcementRouter, checkShieldStatus, checkFeatureAccess } = require('./routes/shieldEnforcement');
 const ownerControlRoutes = require('./routes/ownerControl');
+const progressionRoutes = require('./routes/progressionRoutes');
+const cosmeticRoutes = require('./routes/cosmeticRoutes');
+const entitlementRoutes = require('./routes/entitlementRoutes');
+const offersRoutes = require('./routes/offers');
+const businessOffersRoutes = require('./routes/businessOffers');
+const creatorRoutes = require('./routes/creators');
+const partyRoutes = require('./routes/parties');
 
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
@@ -134,6 +156,13 @@ app.use('/api/bug-reports', bugReportRoutes);
 app.use('/api/shield', shieldRoutes);
 app.use('/final10', shieldEnforcementRouter);
 app.use('/api/owner', ownerControlRoutes);
+app.use('/api/progression', progressionRoutes);
+app.use('/api/cosmetics', cosmeticRoutes);
+app.use('/api/entitlements', entitlementRoutes);
+app.use('/api/offers', offersRoutes);
+app.use('/api/business-offers', businessOffersRoutes);
+app.use('/api/creators', creatorRoutes);
+app.use('/api/parties', partyRoutes);
 
 // health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -178,19 +207,13 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     process.exit(1);
   });
 
-// --- ERROR HANDLING MIDDLEWARE ---
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-  });
+// --- 404 HANDLER (before centralized error handler) ---
+app.use('*', (req, res) => {
+  res.status(404).json({ code: 'NOT_FOUND', message: 'Route not found' });
 });
 
-// --- 404 HANDLER ---
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+const { errorHandler } = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // --- START SERVER ---
 const PORT = process.env.PORT || 8080;
@@ -200,6 +223,10 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
   console.log(`🌟 Savvy Universe Empire is LIVE!`);
+  console.log('eBay auth mode: dynamic app token');
+  console.log(`eBay env: ${process.env.EBAY_ENV || 'production'}`);
+  console.log('mock fallback: disabled');
+  printSecurityStartupReport();
 });
 
 // --- GRACEFUL SHUTDOWN ---

@@ -6,10 +6,19 @@ const User = require('../models/User');
 const cache = new Map(); // key: userId -> {access_token, exp}
 
 async function getAccessTokenForUser(user) {
+  if (!user) {
+    throw new Error('No authenticated user for eBay token');
+  }
+
+  const userId = user.id ?? user._id?.toString?.();
+  if (!userId) {
+    throw new Error('No authenticated user for eBay token');
+  }
+
   // If user is just an ID object from middleware, fetch the full user
   let fullUser = user;
-  if (user.id && !user.hasEbayConnected) {
-    fullUser = await User.findById(user.id);
+  if (userId && !user.hasEbayConnected) {
+    fullUser = await User.findById(userId);
     if (!fullUser) {
       throw new Error('User not found');
     }
@@ -26,7 +35,7 @@ async function getAccessTokenForUser(user) {
   }
 
   // Check cache first
-  const cached = cache.get(user.id);
+  const cached = cache.get(userId);
   const now = Date.now();
 
   if (cached && now < cached.exp - 120_000) {
@@ -46,7 +55,7 @@ async function getAccessTokenForUser(user) {
     await fullUser.updateEbayAccessToken(data.access_token, data.expires_in);
 
     // Update cache
-    cache.set(fullUser.id, { access_token: data.access_token, exp });
+    cache.set(fullUser.id ?? fullUser._id?.toString?.(), { access_token: data.access_token, exp });
     return data.access_token;
   } catch (error) {
     console.error('Failed to refresh eBay access token:', error);

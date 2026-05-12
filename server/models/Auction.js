@@ -59,9 +59,8 @@ const auctionSchema = new mongoose.Schema({
     default: 'active'
   },
   seller: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    type: String,
+    default: "unknown"
   },
   winner: {
     type: mongoose.Schema.Types.ObjectId,

@@ -320,6 +320,7 @@ class SimpleScraper {
       const price = item.price;
       const endTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
       
+      const itemUrl = `https://offerup.com/item/${Date.now()}-${i}`;
       listings.push({
         title: item.title,
         description: item.title,
@@ -327,20 +328,34 @@ class SimpleScraper {
         condition: 'good',
         startingPrice: price,
         currentBid: price,
-        endTime: endTime,
-        seller: 'Local Seller',
-        platform: 'offerup',
-        imageUrl: `https://via.placeholder.com/300x200?text=${encodeURIComponent(item.title.substring(0, 20))}`,
-        itemUrl: `https://offerup.com/item/${Date.now()}-${i}`,
-        bids: 0,
+        startTime: new Date(endTime.getTime() - 7 * 24 * 60 * 60 * 1000),
+        endTime,
         timeRemaining: 7 * 24 * 60 * 60, // 7 days in seconds
-        dealPotential: this.calculateOfferUpDealPotential(price, item.location),
-        competitionLevel: 'low',
-        trendingScore: this.calculateOfferUpTrendingScore(price, item.location),
+        images: [
+          {
+            url: `https://via.placeholder.com/300x200?text=${encodeURIComponent(item.title.substring(0, 20))}`,
+            alt: item.title,
+          },
+        ],
         tags: this.extractTags(item.title),
-        location: item.location,
+        location: {
+          city: String(item.location).split(',')[0]?.trim() || 'Local',
+          state: 'CA',
+          country: 'US',
+        },
+        source: {
+          platform: 'internal',
+          externalId: `offerup_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 9)}`,
+          url: itemUrl,
+        },
+        aiScore: {
+          dealPotential: this.calculateOfferUpDealPotential(price, item.location),
+          competitionLevel: 'low',
+          trendingScore: this.calculateOfferUpTrendingScore(price, item.location),
+        },
+        status: 'active',
+        bidCount: 0,
         isLocal: true,
-        platformType: 'marketplace'
       });
     }
 

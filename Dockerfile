@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM node:20-bullseye-slim AS deps
-WORKDIR /app
-COPY package*.json ./
+WORKDIR /app/server
+COPY server/package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 
 FROM node:20-bullseye-slim

@@ -2,6 +2,11 @@ const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { logPaymentFailure } = require('../services/structuredLog');
+const { validateRequest } = require('../middleware/validateRequest');
+const schemas = require('../validation/schemas');
+const { HttpError } = require('../middleware/apiErrors');
+const { ensureEntitlementRow } = require('../services/premiumEntitlementService');
 
 const router = express.Router();
 
@@ -83,8 +88,9 @@ router.post('/create-payment-intent', auth, async (req, res) => {
     });
 
   } catch (error) {
+    logPaymentFailure('/payments/create-payment-intent', error && error.message, 'CREATE_INTENT_FAILED');
     console.error('Payment intent creation error:', error);
-    res.status(500).json({ message: 'Failed to create payment intent' });
+    res.status(500).json({ code: 'PAYMENT_INTENT_FAILED', message: 'Failed to create payment intent' });
   }
 });
 
@@ -96,6 +102,18 @@ router.post('/confirm-payment', auth, async (req, res) => {
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (
+      user.lastProcessedPremiumPaymentIntentId &&
+      String(user.lastProcessedPremiumPaymentIntentId) === String(paymentIntentId)
+    ) {
+      return res.json({
+        code: 'IDEMPOTENT_REPLAY',
+        message: 'This payment was already applied.',
+        subscriptionExpires: user.subscriptionExpires,
+        bonusPoints: 0,
+      });
     }
 
     // Retrieve payment intent from Stripe (or mock)
@@ -132,11 +150,12 @@ router.post('/confirm-payment', auth, async (req, res) => {
     const subscriptionExpires = new Date();
     subscriptionExpires.setMonth(subscriptionExpires.getMonth() + 1);
 
-    // Update user to premium
+    // Update user to premium (idempotent per paymentIntentId)
     await User.findByIdAndUpdate(user._id, {
       membershipTier: 'premium',
       subscriptionExpires: subscriptionExpires,
-      $inc: { points: 100 } // Bonus points for upgrading
+      lastProcessedPremiumPaymentIntentId: paymentIntentId,
+      $inc: { points: 100 }, // Bonus points for upgrading
     });
 
     // Log the transaction (you might want to create a PaymentLog model)
@@ -149,8 +168,9 @@ router.post('/confirm-payment', auth, async (req, res) => {
     });
 
   } catch (error) {
+    logPaymentFailure('/payments/confirm-payment', error && error.message, 'CONFIRM_FAILED');
     console.error('Payment confirmation error:', error);
-    res.status(500).json({ message: 'Failed to confirm payment' });
+    res.status(500).json({ code: 'PAYMENT_CONFIRM_FAILED', message: 'Failed to confirm payment' });
   }
 });
 
@@ -201,6 +221,94 @@ router.post('/cancel-subscription', auth, async (req, res) => {
   } catch (error) {
     console.error('Subscription cancellation error:', error);
     res.status(500).json({ message: 'Failed to cancel subscription' });
+  }
+});
+
+/**
+ * Stripe Checkout — subscription is confirmed via webhook only.
+ */
+router.post(
+  '/create-checkout-session',
+  auth,
+  validateRequest(schemas.paymentCheckoutBody),
+  async (req, res, next) => {
+    try {
+      const uid = req.user._id || req.user.id;
+      const user = await User.findById(uid);
+      if (!user) {
+        return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));
+      }
+      const priceId = process.env.STRIPE_PREMIUM_PRICE_ID;
+      if (!process.env.STRIPE_SECRET_KEY || !String(process.env.STRIPE_SECRET_KEY).startsWith('sk_') || !priceId) {
+        return next(
+          new HttpError(503, 'PAYMENTS_NOT_CONFIGURED', 'Subscription checkout is not configured on this server.')
+        );
+      }
+
+      const row = await ensureEntitlementRow(user._id);
+      if (!row) {
+        return next(new HttpError(500, 'ENTITLEMENT_INIT_FAILED', 'Could not initialize subscription profile.'));
+      }
+      let customerId = row.providerCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { userId: user._id.toString() },
+        });
+        customerId = customer.id;
+        row.providerCustomerId = customerId;
+        await row.save();
+      }
+
+      const base = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+      const successUrl =
+        typeof req.body.successUrl === 'string' && req.body.successUrl.length
+          ? req.body.successUrl
+          : `${base}/premium?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl =
+        typeof req.body.cancelUrl === 'string' && req.body.cancelUrl.length ? req.body.cancelUrl : `${base}/premium?checkout=cancel`;
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        client_reference_id: user._id.toString(),
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        line_items: [{ price: priceId, quantity: 1 }],
+        metadata: { userId: user._id.toString() },
+        subscription_data: { metadata: { userId: user._id.toString() } },
+      });
+
+      return res.json({ url: session.url, sessionId: session.id });
+    } catch (err) {
+      logPaymentFailure('/payments/create-checkout-session', err && err.message, 'CHECKOUT_SESSION_FAILED');
+      return next(new HttpError(502, 'PROVIDER_CHECKOUT_FAILED', 'Unable to start checkout with the payment provider.'));
+    }
+  }
+);
+
+/**
+ * Stripe Customer Portal — manage/cancel subscription (provider-hosted).
+ */
+router.post('/billing-portal', auth, async (req, res, next) => {
+  try {
+    const uid = req.user._id || req.user.id;
+    const row = await ensureEntitlementRow(uid);
+    if (!row || !row.providerCustomerId) {
+      return next(new HttpError(400, 'NO_BILLING_CUSTOMER', 'No Stripe customer on file yet. Complete checkout first.'));
+    }
+    if (!process.env.STRIPE_SECRET_KEY || !String(process.env.STRIPE_SECRET_KEY).startsWith('sk_')) {
+      return next(new HttpError(503, 'PAYMENTS_NOT_CONFIGURED', 'Billing portal is not configured.'));
+    }
+    const base = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const session = await stripe.billingPortal.sessions.create({
+      customer: row.providerCustomerId,
+      return_url: `${base}/profile`,
+    });
+    return res.json({ url: session.url });
+  } catch (err) {
+    logPaymentFailure('/payments/billing-portal', err && err.message, 'PORTAL_FAILED');
+    return next(new HttpError(502, 'PROVIDER_PORTAL_FAILED', 'Unable to open billing portal.'));
   }
 });
 
