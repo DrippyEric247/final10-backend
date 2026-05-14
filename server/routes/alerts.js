@@ -1,17 +1,46 @@
 const router = require('express').Router();
 const Alert = require('../models/Alert');
 const auth = require('../middleware/auth');  // your JWT middleware
+const User = require('../models/User');
+const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
 
 // Get my alerts
 router.get('/', auth, async (req, res) => {
-  const alerts = await Alert.find({ user: req.user.id }).sort('-updatedAt');
+  const alerts = await Alert.find({ user: req.user.id })
+    .sort('-updatedAt')
+    .populate({
+      path: 'matches.auction',
+      select: 'title currentBid timeRemaining source url images',
+    });
   res.json(alerts);
 });
 
 // Create alert
 router.post('/', auth, async (req, res) => {
-  const { name, keywords = [], maxPrice, minConfidence = 70, sources = ['ebay'] } = req.body;
+  const {
+    name,
+    keywords = [],
+    maxPrice,
+    minConfidence = 70,
+    sources = ['ebay'],
+    persona = 'buyer',
+    kind = 'custom',
+    status = 'active',
+    context = {},
+  } = req.body;
   if (!name || !Array.isArray(keywords)) return res.status(400).json({ message: 'Invalid payload' });
+  const user = await User.findById(req.user.id).select('subscription membershipTier');
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  const tier = normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
+  const tierCfg = getTierConfig(tier);
+  const existingCount = await Alert.countDocuments({ user: req.user.id });
+  if (Number.isFinite(tierCfg.alertsMax) && existingCount >= tierCfg.alertsMax) {
+    return res.status(403).json({
+      message: `Alert limit reached for ${tierCfg.label} plan`,
+      alertsMax: tierCfg.alertsMax,
+      alertsSpeed: tierCfg.alertsSpeed,
+    });
+  }
 
   const alert = await Alert.create({
     user: req.user.id,
@@ -20,6 +49,14 @@ router.post('/', auth, async (req, res) => {
     maxPrice,
     minConfidence,
     sources,
+    persona,
+    kind,
+    status,
+    context: {
+      ...context,
+      alertsSpeed: tierCfg.alertsSpeed,
+      subscriptionTier: tier,
+    },
   });
 
   res.status(201).json(alert);
@@ -30,6 +67,34 @@ router.patch('/:id/toggle', auth, async (req, res) => {
   const alert = await Alert.findOne({ _id: req.params.id, user: req.user.id });
   if (!alert) return res.status(404).json({ message: 'Not found' });
   alert.isActive = !alert.isActive;
+  await alert.save();
+  res.json(alert);
+});
+
+// Update fields (edit from client)
+router.patch('/:id', auth, async (req, res) => {
+  const alert = await Alert.findOne({ _id: req.params.id, user: req.user.id });
+  if (!alert) return res.status(404).json({ message: 'Not found' });
+  const body = req.body || {};
+  if (body.name != null) alert.name = String(body.name).trim().slice(0, 200);
+  if (Array.isArray(body.keywords)) {
+    alert.keywords = body.keywords.map((k) => String(k).trim()).filter(Boolean);
+  }
+  if (body.maxPrice !== undefined) {
+    alert.maxPrice =
+      body.maxPrice === null || body.maxPrice === '' ? undefined : Number(body.maxPrice);
+  }
+  if (body.minConfidence != null) {
+    const c = Number(body.minConfidence);
+    if (Number.isFinite(c)) alert.minConfidence = Math.min(100, Math.max(0, Math.round(c)));
+  }
+  if (body.kind != null) alert.kind = String(body.kind).slice(0, 64);
+  if (body.persona != null) alert.persona = body.persona;
+  if (Array.isArray(body.sources)) alert.sources = body.sources;
+  if (body.status != null) alert.status = body.status;
+  if (body.context != null && typeof body.context === 'object') {
+    alert.context = { ...alert.context, ...body.context };
+  }
   await alert.save();
   res.json(alert);
 });

@@ -1,55 +1,136 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useReducer } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { 
-  User, 
-  Settings, 
-  Award, 
-  Calendar, 
-  Target, 
-  CheckCircle, 
-  Clock, 
-  Share2, 
-  Search, 
-  Eye, 
-  Gift,
-  Star,
-  TrendingUp,
-  Users,
-  Link as LinkIcon,
-  ExternalLink,
-  CheckCircle2,
-  AlertCircle
-} from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  getDailyTasks, 
-  claimDailyLogin, 
-  watchAd, 
-  trackAppShare, 
-  trackProductShare, 
-  completeSocialPost,
+import {
+  getDailyTasks,
+  claimDailyLogin,
   getLevelInfo,
   getMilestones,
-  getLevelStats
 } from '../lib/api';
-import useHashtagTracker from '../hooks/useHashtagTracker';
 import api from '../services/authService';
-import RedeemCodeSection from '../components/RedeemCodeSection';
+import ProfilePageLayout from './ProfilePageLayout';
+import PremiumEntitlementCard from '../components/PremiumEntitlementCard';
+import { useEntitlement } from '../hooks/useEntitlement';
+import { calculateRewardMultiplier } from '../lib/rewardMultiplier';
+import '../styles/ProfileTasks.css';
+import { buildRankedLeaderboard } from '../data/leaderboardMock';
+import { buildThemStatsFromRanked, resolveRivalUserId } from '../data/rivalryMock.js';
+import { BP_UPDATE_EVENT } from '../lib/battlePassConfig';
+import {
+  BATTLE_PASS_TIERS,
+  MOCK_PROFILE_ACTIVITIES,
+  pickNextBestGoal,
+  sortActivitiesByRecency,
+} from '../lib/profilePageEngagement.js';
+import {
+  getUniversalBoostState,
+  notifyUniversalProgressRefresh,
+  UNIVERSAL_BAR_TASK_PULSE_EVENT,
+} from '../lib/universalBoostProgress';
+import { emitPowerToast } from '../lib/final10PowerFeedback';
+import { POWER_UX } from '../lib/final10PowerConfig';
+import { getBattlePassProgress, recordBattlePassXp } from '../lib/battlePassEngine';
+import { buildRivalryComparison, defaultChaseReward } from '../lib/rivalryComparison.js';
+import { triggerActionReward, triggerDailyLoginReward } from '../lib/rewardEngine';
+import SavvyBalanceCard from '../components/profile/SavvyBalanceCard';
+import LoadingState from '../components/ui/states/LoadingState';
+import ErrorState from '../components/ui/states/ErrorState';
+import { trackPointsEarned } from '../lib/analytics';
+import { getApiBaseUrl } from '../lib/runtimeApi';
+import { useSavvyPoints } from '../store/savvyStore';
+import ProgramBadge from '../components/programs/ProgramBadge';
+import { getEquippedCallingCardId, getEquippedEmblemId } from '../lib/customizationCatalog';
+import {
+  applyTierMultiplier,
+  DEV_SUBSCRIPTION_TOOLS_EVENT,
+  formatTierMultiplierLabel,
+  getAdvantageTier,
+  getBestMoveBoostedCap,
+  getEffectiveSubscriptionTier,
+} from '../lib/tierMultiplier';
+import '../styles/SavvyPrograms.css';
+import { resetOnboardingPreferences } from '../lib/onboardingPreferences';
+
+const getSavvySyncBonus = (completedCount, totalSystems) => {
+  if (completedCount >= totalSystems) return 3;
+  if (completedCount >= 3) return 2;
+  if (completedCount >= 2) return 1.5;
+  return 1;
+};
+
+const getWeekKeyUTC = (timestampMs) => {
+  const d = new Date(timestampMs);
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+};
+
+const PERMANENT_RANKS = [
+  { name: "Bronze", minPoints: 0, color: "text-amber-500" },
+  { name: "Silver", minPoints: 1000, color: "text-slate-300" },
+  { name: "Gold", minPoints: 5000, color: "text-yellow-400" },
+  { name: "Platinum", minPoints: 12000, color: "text-cyan-300" },
+  { name: "Legend", minPoints: 25000, color: "text-fuchsia-400" },
+];
+
+const VIP_RANKS = ["VIP Bronze", "VIP Silver", "VIP Gold", "VIP Platinum", "VIP Legend"];
+const VIP_MAINTAIN_THRESHOLD = 100;
+const VIP_PROMOTE_THRESHOLD = 180;
+
+const TASK_DAILY_BONUS_MIN = 100;
+const TASK_DAILY_BONUS_MAX = 130;
+
+const getDayKey = (timestampMs) => {
+  const d = new Date(timestampMs);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const getBestMovePowerUsedToday = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem("f10_best_move_power_daily_v1") || "{}");
+    const today = getDayKey(Date.now());
+    if (raw.date !== today) return 0;
+    return Math.max(0, Number(raw.used) || 0);
+  } catch {
+    return 0;
+  }
+};
 
 const Profile = () => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const { user, refreshProfile } = useAuth();
+  const savvyLive = useSavvyPoints();
   const navigate = useNavigate();
-  const [showAdModal, setShowAdModal] = useState(false);
-  const [socialPostData, setSocialPostData] = useState({ platform: '', postUrl: '' });
+  const location = useLocation();
+  const entitlement = useEntitlement(Boolean(user));
+  const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [pointsUpdating, setPointsUpdating] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
-  
+  const [advTierTick, bumpAdvTier] = useReducer((n) => n + 1, 0);
+  void advTierTick;
+
+  useEffect(() => {
+    const bump = () => bumpAdvTier();
+    window.addEventListener('f10:subscription-tier-updated', bump);
+    window.addEventListener(DEV_SUBSCRIPTION_TOOLS_EVENT, bump);
+    return () => {
+      window.removeEventListener('f10:subscription-tier-updated', bump);
+      window.removeEventListener(DEV_SUBSCRIPTION_TOOLS_EVENT, bump);
+    };
+  }, []);
+
   // Handle points earned from redeem codes
   const handlePointsEarned = (points) => {
     setPointsUpdating(true);
+    void refreshProfile();
     // Refresh points data
     queryClient.invalidateQueries(['dailyTasks']);
     queryClient.invalidateQueries(['levelInfo']);
@@ -63,20 +144,14 @@ const Profile = () => {
       setPointsUpdating(false);
     }, 3000);
   };
-  
-  // Enhanced hashtag tracking
-  const {
-    connections,
-    trackedPosts,
-    isConnected,
-    connectAccount,
-    triggerScan,
-    getTotalSocialPoints,
-    getSocialStats
-  } = useHashtagTracker();
 
   // Fetch daily tasks
-  const { data: tasksData, isLoading, error } = useQuery({
+  const {
+    data: tasksData,
+    isLoading,
+    isError: tasksIsError,
+    refetch: refetchTasks,
+  } = useQuery({
     queryKey: ['dailyTasks'],
     queryFn: getDailyTasks,
     enabled: !!user,
@@ -94,7 +169,12 @@ const Profile = () => {
   });
 
   // Fetch level information
-  const { data: levelData, isLoading: levelLoading } = useQuery({
+  const {
+    data: levelData,
+    isLoading: levelLoading,
+    isError: levelIsError,
+    refetch: refetchLevel,
+  } = useQuery({
     queryKey: ['levelInfo'],
     queryFn: getLevelInfo,
     enabled: !!user,
@@ -108,19 +188,594 @@ const Profile = () => {
     },
   });
 
-  // Fetch milestones
-  const { data: milestonesData } = useQuery({
+  useQuery({
     queryKey: ['milestones'],
     queryFn: getMilestones,
     enabled: !!user,
   });
 
-  // Fetch level stats
-  const { data: statsData } = useQuery({
-    queryKey: ['levelStats'],
-    queryFn: getLevelStats,
-    enabled: !!user,
+  /** Deep-link from Home “Savvy Balance” — scroll to the same card as the profile Savvy balance. */
+  useEffect(() => {
+    if (!user || isLoading || levelLoading) return;
+    if (location.hash !== '#savvy-balance') return;
+    const id = window.requestAnimationFrame(() => {
+      document.getElementById('savvy-balance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [user, isLoading, levelLoading, location.hash]);
+
+  const basePoints = Number(tasksData?.totalPoints || 0);
+  const streakMetaRaw = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("f10_bundle_streak_data") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const streakWeeks = Number(streakMetaRaw?.streak) || 0;
+  const nowMs = Date.now();
+  const currentWeekKey = getWeekKeyUTC(nowMs);
+  const currentDayKey = getDayKey(nowMs);
+  const completedTasksCount = Object.values(tasksData?.dailyTasks?.tasks || {}).filter(task => task?.completed).length;
+  const weeklyActivityScore = Math.max(
+    0,
+    (completedTasksCount * 25) + (streakWeeks * 10) + Math.min(100, Math.floor(basePoints / 1000) * 5)
+  );
+  const permanentRank =
+    [...PERMANENT_RANKS].reverse().find((rank) => basePoints >= rank.minPoints) || PERMANENT_RANKS[0];
+  const permanentRankIndex = PERMANENT_RANKS.findIndex((r) => r.name === permanentRank.name);
+  const nextPermanentRank = PERMANENT_RANKS[permanentRankIndex + 1] || null;
+  const rankProgressToNext = (() => {
+    if (!nextPermanentRank) {
+      return {
+        pct: 100,
+        blocksFilled: 9,
+        ptsRemaining: 0,
+      };
+    }
+    const lo = permanentRank.minPoints;
+    const hi = nextPermanentRank.minPoints;
+    const span = Math.max(1, hi - lo);
+    const t = (basePoints - lo) / span;
+    const pct = Math.max(0, Math.min(100, t * 100));
+    const blocksFilled = Math.min(9, Math.round((pct / 100) * 9));
+    return {
+      pct,
+      blocksFilled,
+      ptsRemaining: Math.max(0, nextPermanentRank.minPoints - basePoints),
+    };
+  })();
+  const silverMinPoints = PERMANENT_RANKS.find((r) => r.name === "Silver")?.minPoints ?? 1000;
+  const hasSilverRank = basePoints >= silverMinPoints;
+  const vipStatusMode = !hasSilverRank
+    ? "locked"
+    : weeklyActivityScore < VIP_MAINTAIN_THRESHOLD
+    ? "atRisk"
+    : weeklyActivityScore < VIP_PROMOTE_THRESHOLD
+    ? "unlocking"
+    : "active";
+  const vipRankDataRaw = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_vip_rank_data") || "{}");
+      return {
+        tier: Number.isFinite(Number(raw.tier)) ? Number(raw.tier) : 0,
+        lastEvaluatedWeek: raw.lastEvaluatedWeek || currentWeekKey,
+        lastScore: Number(raw.lastScore) || 0,
+      };
+    } catch {
+      return { tier: 0, lastEvaluatedWeek: currentWeekKey, lastScore: 0 };
+    }
+  })();
+  const [vipRankData, setVipRankData] = useState(vipRankDataRaw);
+  const [taskBonusMessage, setTaskBonusMessage] = useState("");
+  const [unlockToasts, setUnlockToasts] = useState([]);
+  const prevTaskDoneSetRef = useRef(null);
+  const [dailyClearedShow, setDailyClearedShow] = useState(false);
+  const [dailyClearedNonce, setDailyClearedNonce] = useState(0);
+  const prevAllTasksCompleteRef = useRef(null);
+  const [taskProgressState, setTaskProgressState] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_task_progress_state") || "{}");
+      return {
+        lastCompletedPeriod: raw.lastCompletedPeriod || "",
+        lastBonusPoints: Number(raw.lastBonusPoints) || 0,
+      };
+    } catch {
+      return { lastCompletedPeriod: "", lastBonusPoints: 0 };
+    }
   });
+  const [taskStreakData, setTaskStreakData] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_task_streak_data") || "{}");
+      return {
+        streak: Number(raw.streak) || 0,
+        lastEvaluatedWeek: raw.lastEvaluatedWeek || currentWeekKey,
+        completedWeeks: raw.completedWeeks && typeof raw.completedWeeks === "object" ? raw.completedWeeks : {},
+      };
+    } catch {
+      return { streak: 0, lastEvaluatedWeek: currentWeekKey, completedWeeks: {} };
+    }
+  });
+
+  const getTaskProgress = () => {
+    const safeReadArray = (key) => {
+      try {
+        const raw = JSON.parse(localStorage.getItem(key) || "[]");
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    };
+    const safeReadObject = (key) => {
+      try {
+        const raw = JSON.parse(localStorage.getItem(key) || "{}");
+        return raw && typeof raw === "object" ? raw : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const watchlist = safeReadArray("f10_watchlist_ids");
+    const bundles = safeReadArray("f10_saved_bundles");
+    const streakRaw = safeReadObject("f10_bundle_streak_data");
+    const completedWeeks = streakRaw.completedWeeks && typeof streakRaw.completedWeeks === "object"
+      ? streakRaw.completedWeeks
+      : {};
+    const anyWeekCompleted = Object.values(completedWeeks).some(Boolean);
+    const dealClicks = Number(localStorage.getItem("f10_deal_click_count") || 0);
+    const profileVisits = Number(localStorage.getItem("f10_profile_visits") || 0);
+
+    const tasks = [
+      { id: "save_item", label: "Save at least 1 item", done: watchlist.length > 0 },
+      { id: "bundle_action", label: "Create or complete a bundle", done: bundles.length > 0 || anyWeekCompleted },
+      { id: "visit_app", label: "Visit app today", done: profileVisits > 0 },
+      { id: "click_deal", label: "Click at least 1 deal", done: dealClicks > 0 },
+      { id: "keep_streak", label: "Maintain an active streak", done: streakWeeks > 0 },
+    ];
+
+    const completed = tasks.filter((t) => t.done).length;
+    const total = tasks.length;
+    const remaining = Math.max(0, total - completed);
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { tasks, completed, total, remaining, percent };
+  };
+
+  const taskProgress = getTaskProgress();
+
+  const taskDoneSig = taskProgress.tasks
+    .map((t) => `${t.id}:${t.done ? 1 : 0}`)
+    .join('|');
+
+  useEffect(() => {
+    const nowDone = new Set(
+      taskProgress.tasks.filter((t) => t.done).map((t) => t.id)
+    );
+    if (prevTaskDoneSetRef.current === null) {
+      prevTaskDoneSetRef.current = nowDone;
+      return;
+    }
+    const prev = prevTaskDoneSetRef.current;
+    nowDone.forEach((id) => {
+      if (!prev.has(id)) {
+        recordBattlePassXp('task_step');
+        triggerActionReward("task_complete");
+        notifyUniversalProgressRefresh();
+        window.dispatchEvent(new CustomEvent(UNIVERSAL_BAR_TASK_PULSE_EVENT));
+        emitPowerToast(POWER_UX.TASK_STEP_POWER_POP);
+      }
+    });
+    prevTaskDoneSetRef.current = nowDone;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- taskDoneSig fingerprints task done state
+  }, [taskDoneSig]);
+
+  useEffect(() => {
+    const full =
+      taskProgress.total > 0 && taskProgress.completed === taskProgress.total;
+    if (prevAllTasksCompleteRef.current === null) {
+      prevAllTasksCompleteRef.current = full;
+      return;
+    }
+    if (full && !prevAllTasksCompleteRef.current) {
+      setDailyClearedNonce((n) => n + 1);
+      setDailyClearedShow(true);
+      notifyUniversalProgressRefresh();
+      window.setTimeout(() => setDailyClearedShow(false), 2200);
+    }
+    prevAllTasksCompleteRef.current = full;
+  }, [taskProgress.completed, taskProgress.total]);
+
+  const prevTaskStreakRef = useRef(null);
+  useEffect(() => {
+    const s = Number(taskStreakData.streak) || 0;
+    if (prevTaskStreakRef.current != null && s > prevTaskStreakRef.current) {
+      recordBattlePassXp('streak_week');
+    }
+    prevTaskStreakRef.current = s;
+  }, [taskStreakData.streak]);
+
+  const currentWeekTaskCompleted = Boolean(taskStreakData.completedWeeks?.[currentWeekKey]);
+  const displayTaskStreak = taskStreakData.streak + (currentWeekTaskCompleted ? 1 : 0);
+  const watchlistCount = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_watchlist_ids") || "[]");
+      return Array.isArray(raw) ? raw.length : 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const bundleCount = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_selected_bundle_ids") || "[]");
+      return Array.isArray(raw) ? raw.length : 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const localMissionComplete = (() => {
+    try {
+      const m = JSON.parse(localStorage.getItem("f10_local_mission_data") || "{}");
+      return Boolean(m.rewardReady) || (Number(m.purchases) || 0) >= 2;
+    } catch {
+      return false;
+    }
+  })();
+  const promotedItems = (() => {
+    try {
+      const p = JSON.parse(localStorage.getItem("f10_promoted_item_ids") || "[]");
+      return Array.isArray(p) ? p.length : 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const localPurchasesCount = (() => {
+    try {
+      return Number(JSON.parse(localStorage.getItem("f10_local_mission_data") || "{}").purchases) || 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const scanVideosCount = (() => {
+    try {
+      return Number(JSON.parse(localStorage.getItem("f10_scan_earn_state") || "{}").scannedVideos) || 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const rewardSystem = calculateRewardMultiplier({
+    bundleCount,
+    watchlistCount,
+    streakWeeks,
+    localMissionComplete,
+    promotedItems,
+  });
+  const scanComplete = (() => {
+    try {
+      return localStorage.getItem("f10_scan_complete") === "true" || localStorage.getItem("f10_video_scanner_used") === "true";
+    } catch {
+      return false;
+    }
+  })();
+  const systems = useMemo(
+    () => ({
+      bundleComplete: bundleCount >= 2,
+      watchlistComplete: watchlistCount >= 3,
+      localComplete: localMissionComplete,
+      scanComplete,
+      promotionComplete: promotedItems >= 3,
+      taskComplete: taskProgress.completed === taskProgress.total && taskProgress.total > 0,
+    }),
+    [
+      bundleCount,
+      watchlistCount,
+      localMissionComplete,
+      scanComplete,
+      promotedItems,
+      taskProgress.completed,
+      taskProgress.total,
+    ]
+  );
+  const completedSystemsCount = Object.values(systems).filter(Boolean).length;
+  const totalSystems = Object.keys(systems).length;
+  const savvySyncBonus = getSavvySyncBonus(completedSystemsCount, totalSystems);
+  const baseBoost = rewardSystem.totalBoost;
+  const tabExplorerBoost = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_localdeals_explorer") || "{}");
+      if (raw.weekKey === currentWeekKey && raw.complete) return 1.05;
+    } catch {
+      /* ignore */
+    }
+    return 1;
+  })();
+  const totalBoost = Math.min(5, baseBoost * savvySyncBonus * tabExplorerBoost);
+
+  const breakdown = rewardSystem.breakdown;
+  const leaderboardScore = Math.floor(basePoints * totalBoost);
+  const savvyGameRows = [
+    {
+      systemKey: "watchlistComplete",
+      icon: "⭐",
+      label: "Watchlist",
+      doThis: "Save 3 items you’re watching",
+      actionShort: "Save 3 items",
+      rewardLine: "+0.1x",
+    },
+    {
+      systemKey: "taskComplete",
+      icon: "🔥",
+      label: "Tasks",
+      doThis: "Finish today’s daily checklist",
+      actionShort: "Clear daily list",
+      rewardLine: "+0.2x",
+    },
+    {
+      systemKey: "bundleComplete",
+      icon: "📦",
+      label: "Bundle",
+      doThis: "Lock in a 2-item bundle",
+      actionShort: "2-item bundle",
+      rewardLine: "+0.2x",
+    },
+    {
+      systemKey: "localComplete",
+      icon: "📍",
+      label: "Local",
+      doThis: "Complete 2 Quick Snipes",
+      actionShort: "2 Quick Snipes",
+      rewardLine: "+0.2x",
+    },
+    {
+      systemKey: "scanComplete",
+      icon: "📷",
+      label: "Scan",
+      doThis: "Scan a video or deal once",
+      actionShort: "Scan once",
+      rewardLine: "+0.2x",
+    },
+    {
+      systemKey: "promotionComplete",
+      icon: "📣",
+      label: "Promote",
+      doThis: "Promote 3 listings",
+      actionShort: "3 listings",
+      rewardLine: "+0.2x",
+    },
+  ];
+  const getSavvyRowStatus = (systemKey) => {
+    if (systems[systemKey]) return "complete";
+    if (systemKey === "watchlistComplete") return watchlistCount > 0 ? "inProgress" : "start";
+    if (systemKey === "taskComplete") {
+      if (taskProgress.total <= 0) return "start";
+      return taskProgress.completed > 0 && taskProgress.completed < taskProgress.total
+        ? "inProgress"
+        : "start";
+    }
+    if (systemKey === "bundleComplete") return bundleCount > 0 ? "inProgress" : "start";
+    if (systemKey === "localComplete") return localPurchasesCount > 0 ? "inProgress" : "start";
+    if (systemKey === "scanComplete") return scanVideosCount > 0 ? "inProgress" : "start";
+    if (systemKey === "promotionComplete") return promotedItems > 0 ? "inProgress" : "start";
+    return "start";
+  };
+  const savvyNextUnlock = (() => {
+    const c = completedSystemsCount;
+    if (c >= totalSystems) {
+      return { nextBoost: null, systemsNeeded: 0, maxed: true };
+    }
+    if (c < 2) return { nextBoost: "1.5x", systemsNeeded: 2 - c, maxed: false };
+    if (c < 3) return { nextBoost: "2.0x", systemsNeeded: 3 - c, maxed: false };
+    return { nextBoost: "3.0x", systemsNeeded: totalSystems - c, maxed: false };
+  })();
+  useEffect(() => {
+    localStorage.setItem(
+      "f10_leaderboard_meta",
+      JSON.stringify({
+        streakWeeks,
+        taskStreakWeeks: displayTaskStreak,
+        breakdown,
+        savvySyncBonus,
+        tabExplorerBoost,
+        totalBoost,
+        multiplier: totalBoost,
+        leaderboardScore,
+        updatedAt: Date.now(),
+      })
+    );
+  }, [basePoints, streakWeeks, displayTaskStreak, breakdown, savvySyncBonus, tabExplorerBoost, totalBoost, leaderboardScore]);
+
+  useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("f10_weekly_activity_scores") || "{}");
+      raw[currentWeekKey] = weeklyActivityScore;
+      localStorage.setItem("f10_weekly_activity_scores", JSON.stringify(raw));
+    } catch {
+      localStorage.setItem(
+        "f10_weekly_activity_scores",
+        JSON.stringify({ [currentWeekKey]: weeklyActivityScore })
+      );
+    }
+  }, [currentWeekKey, weeklyActivityScore]);
+
+  useEffect(() => {
+    setVipRankData((prev) => {
+      if (!prev || prev.lastEvaluatedWeek === currentWeekKey) {
+        return prev;
+      }
+
+      let nextTier = Number(prev.tier) || 0;
+      const priorScore = Number(prev.lastScore) || 0;
+
+      if (priorScore >= VIP_PROMOTE_THRESHOLD) {
+        nextTier = Math.min(VIP_RANKS.length - 1, nextTier + 1);
+      } else if (priorScore < VIP_MAINTAIN_THRESHOLD) {
+        nextTier = Math.max(0, nextTier - 1);
+      }
+
+      return {
+        tier: nextTier,
+        lastEvaluatedWeek: currentWeekKey,
+        lastScore: weeklyActivityScore,
+      };
+    });
+  }, [currentWeekKey, weeklyActivityScore]);
+
+  useEffect(() => {
+    setVipRankData((prev) => ({
+      ...prev,
+      lastScore: weeklyActivityScore,
+    }));
+  }, [weeklyActivityScore]);
+
+  useEffect(() => {
+    localStorage.setItem("f10_vip_rank_data", JSON.stringify(vipRankData));
+  }, [vipRankData]);
+
+  useEffect(() => {
+    localStorage.setItem("f10_profile_visits", String((Number(localStorage.getItem("f10_profile_visits") || 0) + 1)));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("f10_task_progress_state", JSON.stringify(taskProgressState));
+  }, [taskProgressState]);
+
+  useEffect(() => {
+    if (taskProgress.completed !== taskProgress.total || taskProgress.total === 0) return;
+    setTaskStreakData((prev) => ({
+      ...prev,
+      completedWeeks: {
+        ...(prev.completedWeeks || {}),
+        [currentWeekKey]: true,
+      },
+    }));
+  }, [taskProgress.completed, taskProgress.total, currentWeekKey]);
+
+  useEffect(() => {
+    setTaskStreakData((prev) => {
+      if (!prev || prev.lastEvaluatedWeek === currentWeekKey) return prev;
+      const completedLastWeek = Boolean(prev.completedWeeks?.[prev.lastEvaluatedWeek]);
+      const nextStreak = completedLastWeek ? prev.streak + 1 : Math.max(0, prev.streak - 1);
+      return {
+        ...prev,
+        streak: nextStreak,
+        lastEvaluatedWeek: currentWeekKey,
+      };
+    });
+  }, [currentWeekKey]);
+
+  useEffect(() => {
+    localStorage.setItem("f10_task_streak_data", JSON.stringify(taskStreakData));
+  }, [taskStreakData]);
+
+  useEffect(() => {
+    const key = "f10_savvy_sync_state";
+    let previous = [];
+    try {
+      const raw = JSON.parse(localStorage.getItem(key) || "{}");
+      previous = Array.isArray(raw.completedSystems) ? raw.completedSystems : [];
+    } catch {
+      previous = [];
+    }
+
+    const current = Object.entries(systems)
+      .filter(([, done]) => done)
+      .map(([id]) => id);
+    const justCompleted = current.filter((id) => !previous.includes(id));
+    if (justCompleted.length) {
+      justCompleted.forEach(() => triggerActionReward("system_complete"));
+      const nowStamp = Date.now();
+      const toasts = justCompleted.map((id) => ({
+        id: `system-${id}-${nowStamp}`,
+        title: "Boost unlocked",
+        body: `${id.replace("Complete", "").replace(/([A-Z])/g, " $1").trim()} — your rewards just got stronger`,
+      }));
+      setUnlockToasts((prev) => [...prev, ...toasts].slice(-4));
+      toasts.forEach((toast) => {
+        setTimeout(() => {
+          setUnlockToasts((prev) => prev.filter((t) => t.id !== toast.id));
+        }, 2600);
+      });
+    }
+
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        completedSystems: current,
+        completedSystemsCount,
+        savvySyncBonus,
+        updatedAt: Date.now(),
+      })
+    );
+  }, [systems, completedSystemsCount, savvySyncBonus, totalSystems]);
+
+  useEffect(() => {
+    const key = "f10_last_boost_tier";
+    const currentTier =
+      totalBoost >= 5 ? 5 : totalBoost >= 3 ? 3 : totalBoost >= 2 ? 2 : totalBoost >= 1.5 ? 1.5 : 1;
+    const raw = localStorage.getItem(key);
+    if (raw == null) {
+      localStorage.setItem(key, String(currentTier));
+      return;
+    }
+    const previousTier = Number(raw);
+    if (Number.isFinite(previousTier) && currentTier > previousTier) {
+      const toastId = `boost-${Date.now()}`;
+      setUnlockToasts((prev) => [
+        ...prev,
+        {
+          id: toastId,
+          title: "Boost tier up!",
+          body: `Your boost is now ${currentTier.toFixed(1)}×`,
+        },
+      ].slice(-4));
+      setTimeout(() => {
+        setUnlockToasts((prev) => prev.filter((t) => t.id !== toastId));
+      }, 3000);
+    }
+    localStorage.setItem(key, String(currentTier));
+  }, [totalBoost]);
+
+  useEffect(() => {
+    if (taskProgress.completed !== taskProgress.total) return;
+    if (taskProgress.total === 0) return;
+    if (taskProgressState.lastCompletedPeriod === currentDayKey) return;
+
+    const rawBonus = 100 + Math.floor(Math.random() * 31);
+    const randomBonus = applyTierMultiplier(rawBonus);
+    recordBattlePassXp('tasks_complete_bonus');
+    triggerActionReward("daily_login", {
+      title: `🎁 +${randomBonus} POINTS`,
+      subtitle: `Daily task bonus claimed (${formatTierMultiplierLabel()} boost)`,
+      accent: "points",
+    });
+    setTaskBonusMessage(`Daily task bonus unlocked! +${randomBonus} points`);
+    setTaskProgressState({
+      lastCompletedPeriod: currentDayKey,
+      lastBonusPoints: randomBonus,
+    });
+
+    try {
+      const progressRaw = JSON.parse(localStorage.getItem("f10_task_progress_log") || "[]");
+      const progressLog = Array.isArray(progressRaw) ? progressRaw : [];
+      progressLog.unshift({
+        period: currentDayKey,
+        bonusPoints: randomBonus,
+        completedAt: Date.now(),
+      });
+      localStorage.setItem("f10_task_progress_log", JSON.stringify(progressLog.slice(0, 30)));
+    } catch {
+      localStorage.setItem(
+        "f10_task_progress_log",
+        JSON.stringify([{ period: currentDayKey, bonusPoints: randomBonus, completedAt: Date.now() }])
+      );
+    }
+
+    if ((window?.location?.pathname || "").includes("/profile")) {
+      setTimeout(() => {
+        queryClient.invalidateQueries(['dailyTasks']);
+        queryClient.invalidateQueries(['levelInfo']);
+        void refreshProfile();
+      }, 300);
+    }
+  }, [taskProgress, taskProgressState.lastCompletedPeriod, currentDayKey, queryClient, refreshProfile]);
 
   // Fetch eBay connection status
   const { data: ebayStatus, isLoading: ebayStatusLoading } = useQuery({
@@ -138,8 +793,14 @@ const Profile = () => {
     mutationFn: claimDailyLogin,
     onSuccess: (data) => {
       console.log('Daily login claimed successfully:', data);
+      const added = Number(data?.added);
+      if (Number.isFinite(added) && added > 0) {
+        trackPointsEarned(added, 'daily_login_claim');
+      }
+      recordBattlePassXp('daily_login');
+      const reward = triggerDailyLoginReward(20);
       setPointsUpdating(true);
-      setShowSuccessMessage(`+${data.pointsEarned || 50} points earned!`);
+      setShowSuccessMessage(`${reward.title} earned!`);
       // Invalidate all related queries to refresh the UI
       queryClient.invalidateQueries(['dailyTasks']);
       queryClient.invalidateQueries(['levelInfo']);
@@ -147,6 +808,7 @@ const Profile = () => {
       queryClient.invalidateQueries(['milestones']);
       // Force refetch of daily tasks to get updated points
       queryClient.refetchQueries(['dailyTasks']).finally(() => {
+        void refreshProfile();
         setPointsUpdating(false);
         setTimeout(() => setShowSuccessMessage(''), 3000);
       });
@@ -161,127 +823,190 @@ const Profile = () => {
     },
   });
 
-  const watchAdMutation = useMutation({
-    mutationFn: watchAd,
-    onSuccess: (data) => {
-      console.log('Ad watched successfully:', data);
-      setPointsUpdating(true);
-      queryClient.invalidateQueries(['dailyTasks']);
-      queryClient.invalidateQueries(['levelInfo']);
-      queryClient.invalidateQueries(['levelStats']);
-      queryClient.invalidateQueries(['milestones']);
-      queryClient.refetchQueries(['dailyTasks']).finally(() => {
-        setPointsUpdating(false);
-      });
-      setShowAdModal(false);
-    },
-    onError: (error) => {
-      console.error('Watch ad failed:', error);
-      setPointsUpdating(false);
-      const errorMessage = error.status === 429 
-        ? 'Too many requests. Please wait a moment and try again.'
-        : (error.message || 'Unknown error');
-      alert('Failed to watch ad: ' + errorMessage);
-    },
-  });
-
-  const shareAppMutation = useMutation({
-    mutationFn: trackAppShare,
-    onSuccess: (data) => {
-      console.log('App shared successfully:', data);
-      queryClient.invalidateQueries(['dailyTasks']);
-      queryClient.invalidateQueries(['levelInfo']);
-      queryClient.invalidateQueries(['levelStats']);
-      queryClient.invalidateQueries(['milestones']);
-      queryClient.refetchQueries(['dailyTasks']);
-    },
-    onError: (error) => {
-      console.error('Share app failed:', error);
-      alert('Failed to share app: ' + (error.message || 'Unknown error'));
-    },
-  });
-
-  const shareProductMutation = useMutation({
-    mutationFn: ({ productId, productTitle }) => trackProductShare(productId, productTitle),
-    onSuccess: (data) => {
-      console.log('Product shared successfully:', data);
-      queryClient.invalidateQueries(['dailyTasks']);
-      queryClient.invalidateQueries(['levelInfo']);
-      queryClient.invalidateQueries(['levelStats']);
-      queryClient.invalidateQueries(['milestones']);
-      queryClient.refetchQueries(['dailyTasks']);
-    },
-    onError: (error) => {
-      console.error('Share product failed:', error);
-      alert('Failed to share product: ' + (error.message || 'Unknown error'));
-    },
-  });
-
-  const socialPostMutation = useMutation({
-    mutationFn: ({ platform, postUrl }) => completeSocialPost(platform, postUrl),
-    onSuccess: (data) => {
-      console.log('Social post completed successfully:', data);
-      queryClient.invalidateQueries(['dailyTasks']);
-      queryClient.invalidateQueries(['levelInfo']);
-      queryClient.invalidateQueries(['levelStats']);
-      queryClient.invalidateQueries(['milestones']);
-      queryClient.refetchQueries(['dailyTasks']);
-      setSocialPostData({ platform: '', postUrl: '' });
-    },
-    onError: (error) => {
-      console.error('Social post failed:', error);
-      alert('Failed to complete social post: ' + (error.message || 'Unknown error'));
-    },
-  });
-
-  const handleWatchAd = () => {
-    setShowAdModal(true);
-    // Simulate ad watching
-    setTimeout(() => {
-      watchAdMutation.mutate();
-    }, 3000);
-  };
-
-  const handleShareApp = () => {
-    // Prompt user for share URL and platform
-    const shareUrl = prompt('Please paste the URL of your share post (Twitter, Facebook, etc.):');
-    const platform = prompt('What platform did you share on? (twitter, facebook, instagram, etc.):');
-    
-    if (!shareUrl || !platform) {
-      alert('Both share URL and platform are required for verification.');
-      return;
-    }
-    
-    shareAppMutation.mutate({ shareUrl, platform });
-  };
-
-  const handleShareProduct = () => {
-    // Prompt user for product details and share URL
-    const productId = prompt('Enter the product ID:') || 'mock-product-123';
-    const productTitle = prompt('Enter the product title:') || 'Sample Product';
-    const shareUrl = prompt('Please paste the URL of your product share post:');
-    const platform = prompt('What platform did you share on? (twitter, facebook, instagram, etc.):');
-    
-    if (!shareUrl || !platform) {
-      alert('Both share URL and platform are required for verification.');
-      return;
-    }
-    
-    shareProductMutation.mutate({ productId, productTitle, shareUrl, platform });
-  };
-
-  const handleSocialPost = () => {
-    if (socialPostData.platform && socialPostData.postUrl) {
-      socialPostMutation.mutate(socialPostData);
-    }
-  };
-
   // Handle eBay OAuth connection
   const handleConnectEbay = () => {
     // Real browser navigation so redirects/CORS work properly
-    const API_BASE = process.env.REACT_APP_API_BASE || '/api';
-    window.location.href = `${API_BASE}/ebay-auth/start`;
+    window.location.href = `${getApiBaseUrl()}/ebay-auth/start`;
   };
+
+  const [rivalryTick, setRivalryTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setRivalryTick((t) => t + 1);
+    window.addEventListener('f10-universal-progress-refresh', bump);
+    window.addEventListener('f10-power-core-updated', bump);
+    window.addEventListener(BP_UPDATE_EVENT, bump);
+    return () => {
+      window.removeEventListener('f10-universal-progress-refresh', bump);
+      window.removeEventListener('f10-power-core-updated', bump);
+      window.removeEventListener(BP_UPDATE_EVENT, bump);
+    };
+  }, []);
+
+  const rankedForRivalry = useMemo(() => {
+    if (!user) return [];
+    const rows = buildRankedLeaderboard(user).map((r) =>
+      r.isCurrentUser
+        ? {
+            ...r,
+            score: leaderboardScore,
+            streakWeeks,
+            taskStreakWeeks: displayTaskStreak,
+          }
+        : r
+    );
+    rows.sort((a, b) => b.score - a.score);
+    return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  }, [user, leaderboardScore, streakWeeks, displayTaskStreak]);
+
+  const rivalUserId = resolveRivalUserId(searchParams.get('versus'));
+
+  const rivalryUi = useMemo(() => {
+    void rivalryTick;
+    const skeleton = searchParams.get('rivalLoading') === '1';
+    if (!user) {
+      return {
+        comparison: null,
+        chaseReward: null,
+        titleUpper: 'RIVAL',
+        short: 'Rival',
+        loading: false,
+      };
+    }
+    const themStats = buildThemStatsFromRanked(rivalUserId, rankedForRivalry);
+    const ub = getUniversalBoostState();
+    const bp = getBattlePassProgress();
+    let auctionsWon = 0;
+    try {
+      auctionsWon = Number(localStorage.getItem('f10_auction_wins') || '0') || 0;
+    } catch {
+      /* ignore */
+    }
+    const youRow = rankedForRivalry.find((r) => r.isCurrentUser);
+    const displayName = user.firstName || user.username || 'You';
+    const youStats = {
+      userId: String(user.id ?? ''),
+      displayName,
+      leaderboardScore,
+      leaderboardRank: youRow?.rank ?? (rankedForRivalry.length || 99),
+      powerMultiplier: Number(ub.currentBoost) || 1,
+      bundleStreakWeeks: streakWeeks,
+      taskStreakWeeks: displayTaskStreak,
+      vipTier: Math.min(5, Math.max(0, Number(vipRankData?.tier) || 0)),
+      seasonTiersCleared: bp.completedCount,
+      auctionsWon,
+      savvyPointsThisWeek: weeklyActivityScore,
+    };
+    if (!themStats) {
+      return {
+        comparison: null,
+        chaseReward: null,
+        titleUpper: 'RIVAL',
+        short: 'Rival',
+        loading: skeleton,
+      };
+    }
+    if (themStats.userId && String(user.id) === String(themStats.userId)) {
+      return {
+        comparison: null,
+        chaseReward: null,
+        titleUpper: 'YOU',
+        short: displayName,
+        loading: false,
+      };
+    }
+    return {
+      comparison: buildRivalryComparison(youStats, themStats),
+      chaseReward: defaultChaseReward(themStats),
+      titleUpper: themStats.displayName.replace(/\s+/g, '').toUpperCase(),
+      short: themStats.displayName,
+      loading: skeleton,
+    };
+  }, [
+    user,
+    rivalUserId,
+    rankedForRivalry,
+    rivalryTick,
+    leaderboardScore,
+    streakWeeks,
+    displayTaskStreak,
+    weeklyActivityScore,
+    vipRankData?.tier,
+    searchParams,
+  ]);
+
+  const handleRivalryStartChase = useCallback(() => {
+    console.info('[Rivalry] Start the Chase');
+  }, []);
+  const handleRivalryViewLoadout = useCallback(() => {
+    console.info('[Rivalry] View My Full Loadout');
+  }, []);
+
+  const profileEngagement = useMemo(() => {
+    if (!user) {
+      return { activityItems: [], nextGoal: null };
+    }
+    void rivalryTick;
+    const themStats = buildThemStatsFromRanked(rivalUserId, rankedForRivalry);
+    const youRow = rankedForRivalry.find((r) => r.isCurrentUser);
+    const bp = getBattlePassProgress();
+    let auctionsWon = 0;
+    try {
+      auctionsWon = Number(localStorage.getItem('f10_auction_wins') || '0') || 0;
+    } catch {
+      /* ignore */
+    }
+    const rank = youRow?.rank ?? 99;
+    const pointsBehindRival =
+      themStats && leaderboardScore < themStats.leaderboardScore
+        ? themStats.leaderboardScore - leaderboardScore
+        : null;
+
+    const activityItems = sortActivitiesByRecency(MOCK_PROFILE_ACTIVITIES).slice(0, 6);
+    const nextGoal = pickNextBestGoal({
+      rivalDisplayName: themStats?.displayName ?? null,
+      pointsBehindRival,
+      leaderboardRank: rank,
+      leaderboardScore,
+      tasksCompleted: taskProgress.completed,
+      tasksTotal: taskProgress.total,
+      streakWeeks,
+      taskStreakWeeks: displayTaskStreak,
+      bpXp: bp.xp,
+      bpMaxXp: bp.maxXp,
+      bpCompletedTiers: bp.completedCount,
+      bpTotalTiers: BATTLE_PASS_TIERS.length,
+      auctionsWon,
+      auctionNextMilestoneAt: 5,
+      weeklyActivityScore,
+      vipMaintainThreshold: VIP_MAINTAIN_THRESHOLD,
+      vipPromoteThreshold: VIP_PROMOTE_THRESHOLD,
+      hasSilverRank,
+      vipStatusMode,
+    });
+    return { activityItems, nextGoal };
+  }, [
+    user,
+    rivalryTick,
+    rivalUserId,
+    rankedForRivalry,
+    leaderboardScore,
+    taskProgress.completed,
+    taskProgress.total,
+    streakWeeks,
+    displayTaskStreak,
+    weeklyActivityScore,
+    hasSilverRank,
+    vipStatusMode,
+  ]);
+
+  const handleProfileGoalCta = useCallback((actionId) => {
+    console.info('[ProfileGoal]', actionId);
+  }, []);
+
+  const handleRetakeSetup = useCallback(() => {
+    resetOnboardingPreferences();
+    navigate('/onboarding/preferences');
+  }, [navigate]);
 
   if (!user) {
     return (
@@ -298,669 +1023,160 @@ const Profile = () => {
 
   if (isLoading || levelLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 pt-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
-            <p className="text-gray-400 mt-4">Loading your profile...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gray-900 pt-20 flex justify-center px-4">
+        <LoadingState label="Loading your profile…" className="max-w-md w-full" />
       </div>
     );
   }
 
+  const profileBannerError = tasksIsError || levelIsError;
+
   const dailyTasks = tasksData?.dailyTasks || {};
   const tasks = dailyTasks.tasks || {};
-  const allTasksCompleted = dailyTasks.allTasksCompleted || false;
-  
+  const advantageTierId = getEffectiveSubscriptionTier();
+  const advantageTier = getAdvantageTier(advantageTierId);
+  const boostedCap = getBestMoveBoostedCap(advantageTierId);
+  const boostedRemaining = Number.isFinite(boostedCap)
+    ? Math.max(0, boostedCap - getBestMovePowerUsedToday())
+    : Number.POSITIVE_INFINITY;
+
   const levelInfo = levelData?.level || {};
-  const milestones = milestonesData?.milestones || [];
-  const stats = statsData?.stats || {};
+
+  const boostSystemRowsLayout = savvyGameRows.map((row) => ({
+    key: row.systemKey,
+    label: row.label,
+    reward: row.rewardLine,
+    on: Boolean(systems[row.systemKey]),
+    progress: getSavvyRowStatus(row.systemKey) === "inProgress",
+  }));
+  const vipRankName = VIP_RANKS[Math.min(VIP_RANKS.length - 1, Math.max(0, Number(vipRankData?.tier) || 0))];
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Profile</h1>
-              <p className="text-gray-400">Welcome back, {user.firstName || user.username}!</p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-purple-400 flex items-center gap-2">
-                {pointsUpdating && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>}
-                {tasksData?.totalPoints || 0} pts
-                <button
-                  onClick={() => {
-                    queryClient.refetchQueries(['dailyTasks']);
-                    queryClient.refetchQueries(['levelInfo']);
-                  }}
-                  className="ml-2 text-xs bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded"
-                  title="Refresh points"
-                >
-                  🔄
-                </button>
-              </div>
-              <div className="text-sm text-gray-400">
-                {tasksData?.userTier || 'free'} tier
-              </div>
-              {showSuccessMessage && (
-                <div className="text-sm text-green-400 font-medium mt-1 animate-pulse">
-                  {showSuccessMessage}
-                </div>
-              )}
-            </div>
+    <>
+      {profileBannerError ? (
+        <div className="max-w-6xl mx-auto px-4 pt-6">
+          <ErrorState
+            title="Some profile data didn’t load"
+            description="Daily tasks or level info may be missing. Retry to refresh."
+            onRetry={() => {
+              void refetchTasks();
+              void refetchLevel();
+            }}
+            retryLabel="Retry"
+            className="text-left items-stretch"
+          />
+        </div>
+      ) : null}
+      <ProfilePageLayout
+        savvyBalanceSlot={
+          <SavvyBalanceCard
+            balance={savvyLive.savvyPoints}
+            lifetimeEarned={Math.max(savvyLive.lifetimeEarned, savvyLive.savvyPoints)}
+            streakLabel={displayTaskStreak > 0 ? `On a ${displayTaskStreak}-week streak` : "Active earner"}
+          />
+        }
+        entitlementSlot={
+          <PremiumEntitlementCard entitlement={entitlement} onRefreshSubscription={() => void entitlement.reload()} />
+        }
+        programBadgeSlot={<ProgramBadge />}
+        user={user}
+        basePoints={basePoints}
+        tasksData={tasksData}
+        pointsUpdating={pointsUpdating}
+        showSuccessMessage={showSuccessMessage}
+        advantageLevel={advantageTier.label}
+        advantageMultiplier={formatTierMultiplierLabel(advantageTierId)}
+        bestMovePowerLine={Number.isFinite(boostedCap) ? `${boostedRemaining} / ${boostedCap}` : "Unlimited"}
+        savvyNextUnlock={savvyNextUnlock}
+        leaderboardScore={leaderboardScore}
+        permanentRank={permanentRank}
+        nextPermanentRank={nextPermanentRank}
+        rankProgressToNext={rankProgressToNext}
+        taskProgress={taskProgress}
+        taskBonusMessage={taskBonusMessage}
+        taskDailyBonusMin={TASK_DAILY_BONUS_MIN}
+        taskDailyBonusMax={TASK_DAILY_BONUS_MAX}
+        boostSystemRows={boostSystemRowsLayout}
+        vipRankName={vipRankName}
+        vipStatusMode={vipStatusMode}
+        weeklyActivityScore={weeklyActivityScore}
+        vipPromoteThreshold={VIP_PROMOTE_THRESHOLD}
+        vipMaintainThreshold={VIP_MAINTAIN_THRESHOLD}
+        hasSilverRank={hasSilverRank}
+        silverMinPoints={silverMinPoints}
+        levelInfo={levelInfo}
+        streakWeeks={streakWeeks}
+        displayTaskStreak={displayTaskStreak}
+        onRefreshPoints={() => {
+          queryClient.refetchQueries(["dailyTasks"]);
+          queryClient.refetchQueries(["levelInfo"]);
+        }}
+        onClaimDailyLogin={() => claimLoginMutation.mutate()}
+        claimLoginPending={claimLoginMutation.isPending}
+        dailyLoginDone={tasks.dailyLogin?.completed || false}
+        ebayStatus={ebayStatus}
+        ebayStatusLoading={ebayStatusLoading}
+        onConnectEbay={handleConnectEbay}
+        onPointsEarned={handlePointsEarned}
+        rivalryRivalDisplayNameUpper={rivalryUi.titleUpper}
+        rivalryThemShortName={rivalryUi.short}
+        rivalryComparison={rivalryUi.loading ? null : rivalryUi.comparison}
+        rivalryChaseReward={rivalryUi.loading ? null : rivalryUi.chaseReward}
+        rivalryLoading={rivalryUi.loading}
+        onRivalryStartChase={handleRivalryStartChase}
+        onRivalryViewLoadout={handleRivalryViewLoadout}
+        profileActivityItems={profileEngagement.activityItems}
+        profileNextGoal={profileEngagement.nextGoal}
+        onProfileGoalCta={handleProfileGoalCta}
+        equippedCallingCardId={user?.equippedCallingCardId || getEquippedCallingCardId()}
+        equippedEmblemId={user?.equippedEmblemId || getEquippedEmblemId()}
+      />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4 flex flex-wrap gap-4 text-sm">
+            <Link to="/settings" className="text-purple-300 hover:text-purple-200">Settings</Link>
+            <Link to="/privacy" className="text-gray-300 hover:text-white">Privacy</Link>
+            <Link to="/terms" className="text-gray-300 hover:text-white">Terms</Link>
+            <Link to="/support" className="text-gray-300 hover:text-white">Support</Link>
+            <Link to="/delete-account" className="text-red-300 hover:text-red-200">Delete Account</Link>
+            <button type="button" onClick={handleRetakeSetup} className="text-purple-300 hover:text-purple-200">Retake setup</button>
           </div>
-
-          {/* Level Progress Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl p-6 mb-8 border border-purple-500/30"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-500/20 p-3 rounded-lg">
-                  <Award className="h-6 w-6 text-purple-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Level {levelInfo.currentLevel || 1}</h2>
-                  <p className="text-sm text-gray-400">{levelInfo.totalXP || 0} Total XP</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-purple-400">
-                  {levelInfo.xpToNextLevel || 100} XP to next level
-                </div>
-                <div className="text-sm text-gray-400">
-                  Level {levelInfo.currentLevel || 1} → {levelInfo.currentLevel + 1 || 2}
-                </div>
-              </div>
-            </div>
-            
-            {/* XP Progress Bar */}
-            <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
-              <div 
-                className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
-                style={{ 
-                  width: `${levelInfo.xpInfo ? (levelInfo.xpInfo.xpProgress / levelInfo.xpInfo.xpRange) * 100 : 0}%` 
-                }}
-              ></div>
-            </div>
-            
-            <div className="flex justify-between text-xs text-gray-400">
-              <span>{levelInfo.xpInfo?.currentLevelStart || 0} XP</span>
-              <span>{levelInfo.xpInfo?.nextLevelStart || 100} XP</span>
-            </div>
-          </motion.div>
-
-          {/* Redeem Code Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="mb-8"
-          >
-            <RedeemCodeSection onPointsEarned={handlePointsEarned} />
-          </motion.div>
-
-          {/* eBay Connection Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="bg-gray-800 rounded-xl p-6 mb-8"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-500/20 p-3 rounded-lg">
-                  <LinkIcon className="h-6 w-6 text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">eBay Connection</h2>
-                  <p className="text-sm text-gray-400">Connect your eBay account for enhanced features</p>
-                </div>
-              </div>
-              {ebayStatus?.connected && (
-                <div className="flex items-center gap-2 bg-green-500/20 text-green-400 px-3 py-1 rounded-full">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-sm font-medium">Connected</span>
-                </div>
-              )}
-            </div>
-
-            {ebayStatusLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-                <span className="ml-3 text-gray-400">Checking connection status...</span>
-              </div>
-            ) : ebayStatus?.connected ? (
-              <div className="space-y-4">
-                {/* Connection Status */}
-                <div className="flex items-center justify-between p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-400" />
-                    <div>
-                      <div className="text-white font-medium">eBay Account Connected</div>
-                      <div className="text-sm text-gray-400">
-                        Connected on {new Date(ebayStatus.connectedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-green-400 font-medium">
-                      {ebayStatus.hasValidToken ? 'Token Valid' : 'Token Expired'}
-                    </div>
-                    {ebayStatus.needsRefresh && (
-                      <div className="text-xs text-yellow-400">Needs Refresh</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Permissions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-gray-700/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Search className="h-4 w-4 text-blue-400" />
-                      <span className="text-sm font-medium text-white">Browse Permissions</span>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {ebayStatus.hasBuyBrowsePermissions ? '✅ Full access' : '❌ Limited access'}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-gray-700/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-green-400" />
-                      <span className="text-sm font-medium text-white">Buy Permissions</span>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {ebayStatus.hasBuyBrowsePermissions ? '✅ Full access' : '❌ Limited access'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Scopes */}
-                {ebayStatus.scopes && ebayStatus.scopes.length > 0 && (
-                  <div className="p-4 bg-gray-700/50 rounded-lg">
-                    <div className="text-sm font-medium text-white mb-2">Granted Permissions</div>
-                    <div className="flex flex-wrap gap-2">
-                      {ebayStatus.scopes.map((scope, index) => (
-                        <span
-                          key={index}
-                          className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded"
-                        >
-                          {scope.split('/').pop() || scope}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="mb-4">
-                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <h3 className="text-lg font-medium text-white mb-2">eBay Account Not Connected</h3>
-                  <p className="text-gray-400 mb-6">
-                    Connect your eBay account to access enhanced features like real-time auction data, 
-                    personalized recommendations, and advanced search capabilities.
-                  </p>
-                </div>
-                <button
-                  onClick={handleConnectEbay}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto transition-colors"
-                >
-                  <LinkIcon className="h-4 w-4" />
-                  Connect eBay Account
-                  <ExternalLink className="h-4 w-4" />
-                </button>
-                <p className="text-xs text-gray-500 mt-3">
-                  You'll be redirected to eBay to authorize the connection
-                </p>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Daily Tasks Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="bg-gray-800 rounded-xl p-6 mb-8"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-6 w-6 text-purple-400" />
-                <h2 className="text-xl font-bold text-white">Daily Tasks</h2>
-              </div>
-              {allTasksCompleted && (
-                <div className="flex items-center gap-2 bg-green-500/20 text-green-400 px-3 py-1 rounded-full">
-                  <Gift className="h-4 w-4" />
-                  <span className="text-sm font-medium">All Complete!</span>
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-4">
-              {/* Daily Login Task */}
-              <TaskCard
-                icon={<Target className="h-5 w-5" />}
-                title="Daily Login"
-                description="Log in to claim your daily points"
-                points={50}
-                completed={tasks.dailyLogin?.completed || false}
-                onAction={() => claimLoginMutation.mutate()}
-                actionText={tasks.dailyLogin?.completed ? "Already Claimed" : "Claim"}
-                loading={claimLoginMutation.isPending}
-                disabled={tasks.dailyLogin?.completed || false}
-              />
-
-              {/* Search Task */}
-              <TaskCard
-                icon={<Search className="h-5 w-5" />}
-                title="Search for Products"
-                description={`Search for ${tasks.search?.target || 1} product(s) to earn points`}
-                points={25}
-                completed={tasks.search?.completed || false}
-                progress={tasks.search?.progress || 0}
-                target={tasks.search?.target || 1}
-                actionText={tasks.search?.completed ? "Completed" : "Search Now"}
-                onAction={() => navigate('/auctions')}
-                disabled={tasks.search?.completed || false}
-              />
-
-              {/* Watch Ads Task */}
-              <TaskCard
-                icon={<Eye className="h-5 w-5" />}
-                title="Watch Ads"
-                description={`Watch ${tasks.watchAds?.target || 5} ads for extra searches`}
-                points={50}
-                completed={tasks.watchAds?.completed || false}
-                progress={tasks.watchAds?.progress || 0}
-                target={tasks.watchAds?.target || 5}
-                onAction={handleWatchAd}
-                actionText={tasks.watchAds?.completed ? "Completed" : "Watch Ad"}
-                loading={watchAdMutation.isPending}
-                disabled={tasks.watchAds?.completed || false}
-              />
-
-              {/* Share App Task */}
-              <TaskCard
-                icon={<Share2 className="h-5 w-5" />}
-                title="Share App"
-                description={`Share Final10 with ${tasks.shareApp?.target || 3} friends`}
-                points={300}
-                completed={tasks.shareApp?.completed || false}
-                progress={tasks.shareApp?.progress || 0}
-                target={tasks.shareApp?.target || 3}
-                onAction={handleShareApp}
-                actionText={tasks.shareApp?.completed ? "Completed" : "Share"}
-                loading={shareAppMutation.isPending}
-                disabled={tasks.shareApp?.completed || false}
-              />
-
-              {/* Share Product Task */}
-              <TaskCard
-                icon={<TrendingUp className="h-5 w-5" />}
-                title="Share Product"
-                description="Share a product you found to earn points"
-                points={75}
-                completed={tasks.shareProduct?.completed || false}
-                onAction={handleShareProduct}
-                actionText={tasks.shareProduct?.completed ? "Completed" : "Share Product"}
-                loading={shareProductMutation.isPending}
-                disabled={tasks.shareProduct?.completed || false}
-              />
-
-              {/* Enhanced Social Media Post Task */}
-              <TaskCard
-                icon={<Users className="h-5 w-5" />}
-                title="Social Media Post"
-                description={
-                  isConnected 
-                    ? "Post with #StayEarning #StaySavvy - Auto-tracked!" 
-                    : "Post your Final10 win with #StayEarning #StaySavvy"
-                }
-                points={300}
-                completed={tasks.socialPost?.completed || false}
-                onAction={() => setSocialPostData({ platform: 'twitter', postUrl: '' })}
-                actionText={tasks.socialPost?.completed ? "Completed" : (isConnected ? "Auto-Tracking Active" : "Complete Post")}
-                disabled={tasks.socialPost?.completed || false}
-              />
-
-              {/* AI Video Scanner Task */}
-              <TaskCard
-                icon={<span className="text-lg">🤖</span>}
-                title="Use AI Video Scanner"
-                description="Use the AI video scanner to identify products"
-                points={20}
-                completed={tasks.useVideoScanner?.completed || false}
-                onAction={() => window.location.href = '/scanner'}
-                actionText={tasks.useVideoScanner?.completed ? "Completed" : "Use Scanner"}
-                disabled={tasks.useVideoScanner?.completed || false}
-              />
-
-              {/* Search Local Deals Task */}
-              <TaskCard
-                icon={<span className="text-lg">🏪</span>}
-                title="Search for a Local Deal"
-                description="Search for local deals on OfferUp and local marketplaces"
-                points={25}
-                completed={tasks.searchLocalDeals?.completed || false}
-                onAction={() => window.location.href = '/local-deals'}
-                actionText={tasks.searchLocalDeals?.completed ? "Completed" : "Search Local Deals"}
-                disabled={tasks.searchLocalDeals?.completed || false}
-              />
-            </div>
-
-            {/* Bonus Points */}
-            {allTasksCompleted && (
-              <div className="mt-6 p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-500/30">
-                <div className="flex items-center gap-3">
-                  <Star className="h-6 w-6 text-yellow-400" />
-                  <div>
-                    <h3 className="font-bold text-white">Daily Bonus Unlocked!</h3>
-                    <p className="text-sm text-gray-300">Complete all tasks to earn 1000 bonus points!</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </motion.div>
-
-          {/* User Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
-          >
-            <div className="bg-gray-800 rounded-xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Award className="h-6 w-6 text-purple-400" />
-                <h3 className="text-lg font-bold text-white">Total Points</h3>
-              </div>
-              <div className="text-3xl font-bold text-purple-400">
-                {tasksData?.totalPoints || 0}
-              </div>
-              <p className="text-sm text-gray-400 mt-2">Lifetime earned</p>
-            </div>
-
-            <div className="bg-gray-800 rounded-xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <User className="h-6 w-6 text-blue-400" />
-                <h3 className="text-lg font-bold text-white">Membership</h3>
-              </div>
-              <div className="text-2xl font-bold text-blue-400 capitalize">
-                {tasksData?.userTier || 'Free'}
-              </div>
-              <p className="text-sm text-gray-400 mt-2">Current tier</p>
-            </div>
-
-            <div className="bg-gray-800 rounded-xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Clock className="h-6 w-6 text-green-400" />
-                <h3 className="text-lg font-bold text-white">Tasks Today</h3>
-              </div>
-              <div className="text-3xl font-bold text-green-400">
-                {Object.values(tasks).filter(task => task.completed).length}
-              </div>
-              <p className="text-sm text-gray-400 mt-2">Completed</p>
-            </div>
-          </motion.div>
-
-          {/* Milestones Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className="bg-gray-800 rounded-xl p-6"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <Star className="h-6 w-6 text-yellow-400" />
-              <h2 className="text-xl font-bold text-white">Milestones</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {milestones.map((milestone, index) => (
-                <div 
-                  key={index}
-                  className={`p-4 rounded-lg border ${
-                    milestone.achieved 
-                      ? 'bg-green-500/10 border-green-500/30' 
-                      : 'bg-gray-700/50 border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{milestone.icon}</span>
-                    <div>
-                      <h3 className={`font-bold ${milestone.achieved ? 'text-green-400' : 'text-gray-400'}`}>
-                        {milestone.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">Level {milestone.level}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-400 mb-2">{milestone.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-purple-400">
-                      +{milestone.reward} points
-                    </span>
-                    {milestone.achieved && (
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* Enhanced Social Tracking Status */}
-        {isConnected && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-green-900/20 to-blue-900/20 rounded-lg p-6 mb-6 border border-green-500/20"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500 rounded-lg">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Auto-Tracking Active</h3>
-                  <p className="text-sm text-green-400">Your social posts are being monitored automatically</p>
-                </div>
-              </div>
-              <button
-                onClick={() => triggerScan()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+        </div>
+        {unlockToasts.length > 0 && (
+          <div className="fixed top-24 right-4 z-50 flex flex-col gap-3 w-[min(92vw,340px)] pointer-events-none">
+            {unlockToasts.map((toast) => (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, x: 20, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 16, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className="rounded-xl border border-purple-400/40 bg-gray-900/95 shadow-[0_0_20px_rgba(124,58,237,0.35)] px-4 py-3"
               >
-                Scan Now
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">{getTotalSocialPoints()}</div>
-                <div className="text-sm text-gray-400">Social Points</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">{trackedPosts?.length || 0}</div>
-                <div className="text-sm text-gray-400">Tracked Posts</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">
-                  {Object.values(connections || {}).filter(conn => conn.connected).length}
-                </div>
-                <div className="text-sm text-gray-400">Connected Platforms</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">
-                  {getSocialStats().totalLikes?.toLocaleString() || 0}
-                </div>
-                <div className="text-sm text-gray-400">Total Likes</div>
-              </div>
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs">#StayEarning</span>
-              <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs">#StaySavvy</span>
-              <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs">#Final10</span>
-              <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs">#AuctionWin</span>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Ad Modal */}
-        {showAdModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-xl p-8 max-w-md mx-4">
-              <h3 className="text-xl font-bold text-white mb-4">Watching Ad...</h3>
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                <p className="text-gray-400">Please wait while the ad loads...</p>
-                <p className="text-sm text-gray-500 mt-2">This will earn you 5 extra searches!</p>
-              </div>
-            </div>
+                <div className="text-xs uppercase tracking-wide text-cyan-300 font-semibold">⚡ Unlock</div>
+                <div className="text-sm font-bold text-white">{toast.title}</div>
+                <div className="text-xs text-gray-300 mt-1">{toast.body}</div>
+              </motion.div>
+            ))}
           </div>
         )}
-
-        {/* Social Post Modal */}
-        {socialPostData.platform && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-xl p-6 max-w-md mx-4">
-              <h3 className="text-xl font-bold text-white mb-4">Complete Social Post</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Platform
-                  </label>
-                  <select
-                    value={socialPostData.platform}
-                    onChange={(e) => setSocialPostData({...socialPostData, platform: e.target.value})}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                  >
-                    <option value="twitter">Twitter</option>
-                    <option value="instagram">Instagram</option>
-                    <option value="facebook">Facebook</option>
-                    <option value="tiktok">TikTok</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Post URL
-                  </label>
-                  <input
-                    type="url"
-                    value={socialPostData.postUrl}
-                    onChange={(e) => setSocialPostData({...socialPostData, postUrl: e.target.value})}
-                    placeholder="https://..."
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                  />
-                </div>
-                
-                {!isConnected && (
-                  <div className="p-3 bg-yellow-900/20 border border-yellow-500/20 rounded-lg">
-                    <p className="text-sm text-yellow-300">
-                      💡 <strong>Tip:</strong> Connect your social accounts for automatic tracking and bonus points!
-                    </p>
-                  </div>
-                )}
-                
-                {isConnected && (
-                  <div className="p-3 bg-green-900/20 border border-green-500/20 rounded-lg">
-                    <p className="text-sm text-green-300">
-                      ✅ <strong>Auto-tracking active!</strong> Your posts with hashtags will be detected automatically.
-                    </p>
-                  </div>
-                )}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleSocialPost}
-                    disabled={!socialPostData.postUrl || socialPostMutation.isPending}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium"
-                  >
-                    {socialPostMutation.isPending ? 'Submitting...' : 'Submit'}
-                  </button>
-                  <button
-                    onClick={() => setSocialPostData({ platform: '', postUrl: '' })}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
+      {dailyClearedShow ? (
+        <div
+          key={dailyClearedNonce}
+          className="f10-daily-cleared-root"
+          aria-live="polite"
+        >
+          <div className="f10-daily-cleared-vignette" aria-hidden />
+          <div className="f10-daily-cleared-burst" aria-hidden>
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Task Card Component
-const TaskCard = ({ 
-  icon, 
-  title, 
-  description, 
-  points, 
-  completed, 
-  progress = 0, 
-  target = 1, 
-  onAction, 
-  actionText, 
-  loading = false, 
-  disabled = false 
-}) => {
-  const progressPercentage = target > 1 ? (progress / target) * 100 : (completed ? 100 : 0);
-
-  return (
-    <div className={`bg-gray-700 rounded-lg p-4 border ${completed ? 'border-green-500/50' : 'border-gray-600'}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${completed ? 'bg-green-500/20' : 'bg-purple-500/20'}`}>
-            {completed ? <CheckCircle className="h-5 w-5 text-green-400" /> : icon}
-          </div>
-          <div>
-            <h3 className="font-medium text-white">{title}</h3>
-            <p className="text-sm text-gray-400">{description}</p>
-            {target > 1 && (
-              <div className="mt-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-600 rounded-full h-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${progressPercentage}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-xs text-gray-400">{progress}/{target}</span>
-                </div>
-              </div>
-            )}
-          </div>
+          <div className="f10-daily-cleared-label">✅ Daily cleared</div>
         </div>
-        <div className="text-right">
-          <div className="text-lg font-bold text-purple-400">+{points}</div>
-          <button
-            onClick={onAction}
-            disabled={disabled || loading}
-            className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              disabled 
-                ? 'bg-green-500/20 text-green-400 cursor-not-allowed' 
-                : 'bg-purple-600 hover:bg-purple-700 text-white'
-            }`}
-          >
-            {loading ? 'Loading...' : completed ? 'Completed' : actionText}
-          </button>
-        </div>
-      </div>
-    </div>
+      ) : null}
+    </>
   );
 };
 

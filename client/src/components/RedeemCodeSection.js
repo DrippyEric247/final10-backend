@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import api from '../services/authService';
 import easterEggService from '../services/easterEggService';
+import Final10SocialLinks from './Final10SocialLinks';
 
 const RedeemCodeSection = ({ onPointsEarned }) => {
   const [code, setCode] = useState('');
@@ -230,6 +231,15 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
             <span>Some codes are time-limited, act fast!</span>
           </div>
         </div>
+      </div>
+
+      <div className="mb-6">
+        <Final10SocialLinks
+          variant="compact"
+          className="redeem-social-compact"
+          title="Follow for code drops"
+          subtitle="Follow Final10 socials for hidden codes, teaser drops, and time-limited rewards."
+        />
       </div>
 
       {/* Recent Redemptions */}

@@ -11,8 +11,10 @@ import {
 } from 'lucide-react';
 import { getCommunityGoals, getCommunityProgress, claimCommunityReward } from '../lib/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const CommunityGoals = () => {
+  const { user } = useAuth();
   const [goals, setGoals] = useState(null);
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,7 @@ const CommunityGoals = () => {
       key: 'savvyPoints',
       label: 'Savvy Points',
       icon: <Award className="w-5 h-5" />,
-      current: progress?.savvyPoints || 0,
+      current: progress?.savvyPoints ?? Math.max(0, Math.round(Number(user?.savvyPoints) || 0)),
       target: goals?.savvyPoints?.target || 1000000,
       unit: '',
       color: 'from-purple-500 to-purple-600'

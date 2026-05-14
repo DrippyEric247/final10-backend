@@ -15,13 +15,19 @@ export function clearInvalidAuth() {
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('authToken');
     
-    console.log('✅ Cleared all authentication data from storage');
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('Cleared all authentication data from storage');
+    }
     
     // Reload the page to reset the app state
     window.location.reload();
     
   } catch (error) {
-    console.error('❌ Error clearing auth data:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.error('Error clearing auth data:', error);
+    }
   }
 }
 
@@ -30,29 +36,38 @@ export async function validateCurrentToken() {
   try {
     const token = localStorage.getItem('f10_token');
     if (!token) {
-      console.log('ℹ️ No token found in localStorage');
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('No token found in localStorage');
+      }
       return false;
     }
     
     // Test the token by making a request to /auth/me
-    const response = await fetch('http://localhost:5000/api/auth/me', {
+    const response = await fetch('/api/auth/me', {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
-    
+
     if (response.ok) {
-      const userData = await response.json();
-      console.log('✅ Token is valid for user:', userData.username);
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('Token is valid');
+      }
       return true;
-    } else {
-      console.log('❌ Token is invalid, status:', response.status);
-      return false;
     }
-    
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('Token is invalid, status:', response.status);
+    }
+    return false;
   } catch (error) {
-    console.error('❌ Error validating token:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.error('Error validating token:', error);
+    }
     return false;
   }
 }

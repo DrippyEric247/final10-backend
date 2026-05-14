@@ -1,0 +1,601 @@
+.f10-ccard {
+  --cc-glow: rgba(167, 139, 250, 0.24);
+  --cc-speed-mult: 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  min-height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.8);
+  isolation: isolate;
+  transform: translateZ(0);
+  transition: transform 180ms ease, box-shadow 220ms ease, border-color 220ms ease, filter 220ms ease;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35), 0 0 16px var(--cc-glow);
+  aspect-ratio: 3 / 1;
+}
+
+.f10-ccard:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.85);
+  outline-offset: 2px;
+}
+
+.f10-ccard-bg,
+.f10-ccard-shimmer,
+.f10-ccard-sweep,
+.f10-ccard-aura,
+.f10-ccard-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.f10-ccard-bg {
+  z-index: 0;
+  background: var(--f10-card-stripe);
+  background-size: 180% 180%;
+  animation: f10-ccard-grad calc(14s / var(--cc-speed-mult)) ease-in-out infinite alternate;
+}
+
+.f10-ccard-shimmer {
+  z-index: 1;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 100%
+  );
+  background-size: 240% 100%;
+  opacity: 0.55;
+  animation: f10-ccard-shine calc(9s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard-sweep {
+  z-index: 2;
+  background: var(--f10-card-flare);
+  opacity: 0.85;
+}
+
+.f10-ccard-aura {
+  z-index: 2;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35), inset 0 0 34px var(--cc-glow);
+  animation: f10-ccard-pulse calc(4.6s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard-particles {
+  z-index: 2;
+  opacity: 0;
+}
+
+.f10-ccard-particles span {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 10px rgba(125, 211, 252, 0.7);
+  animation: f10-ccard-drift calc(4.5s / var(--cc-speed-mult)) linear infinite;
+}
+
+.f10-ccard-particles span:nth-child(1) {
+  left: 18%;
+  top: 75%;
+}
+.f10-ccard-particles span:nth-child(2) {
+  left: 52%;
+  top: 88%;
+  animation-delay: -1.2s;
+}
+.f10-ccard-particles span:nth-child(3) {
+  left: 80%;
+  top: 68%;
+  animation-delay: -2.2s;
+}
+
+.f10-ccard-text {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 76px;
+  padding: 0 14px;
+}
+
+.f10-ccard-title {
+  margin: 0;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.f10-ccard-sub {
+  margin: 2px 0 0;
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 0.72rem;
+}
+
+.f10-ccard-symbol {
+  margin: 0 0 2px;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  color: rgba(250, 204, 21, 0.9);
+  text-transform: uppercase;
+}
+
+.f10-ccard-collection {
+  margin: 2px 0 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.82);
+}
+
+.f10-ccard-equipped {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 6;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.75);
+  background: rgba(8, 47, 73, 0.82);
+  color: #a5f3fc;
+  animation: f10-ccard-badge-shimmer 2.8s linear infinite;
+}
+
+.f10-ccard--common {
+  --cc-glow: rgba(148, 163, 184, 0.2);
+}
+
+.f10-ccard--rare {
+  --cc-glow: rgba(56, 189, 248, 0.28);
+}
+
+.f10-ccard--rare .f10-ccard-shimmer {
+  opacity: 0.7;
+  animation-duration: calc(6.5s / var(--cc-speed-mult));
+}
+
+.f10-ccard--epic {
+  --cc-glow: rgba(192, 132, 252, 0.34);
+}
+
+.f10-ccard--epic .f10-ccard-particles {
+  opacity: 1;
+}
+
+.f10-ccard--elite {
+  --cc-glow: rgba(45, 212, 191, 0.42);
+  animation: f10-ccard-breathe calc(6.2s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard--elite .f10-ccard-particles {
+  opacity: 1;
+}
+
+.f10-ccard--elite .f10-ccard-sweep {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(45, 212, 191, 0.22) 30%,
+    rgba(167, 243, 208, 0.28) 50%,
+    rgba(34, 211, 238, 0.22) 70%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  animation: f10-ccard-legendary-sweep calc(9.2s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard--elite .f10-ccard-aura {
+  box-shadow:
+    inset 0 0 24px rgba(0, 0, 0, 0.35),
+    inset 0 0 44px rgba(45, 212, 191, 0.22),
+    0 0 18px rgba(45, 212, 191, 0.22);
+}
+
+.f10-ccard--legendary {
+  --cc-glow: rgba(251, 191, 36, 0.4);
+  animation: f10-ccard-breathe calc(5.6s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+/* Exclusive — manual-grant only. Gold/purple, stronger than legendary. */
+.f10-ccard--exclusive {
+  --cc-glow: rgba(250, 204, 21, 0.55);
+  animation: f10-ccard-breathe calc(4.6s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard--exclusive .f10-ccard-bg {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(250, 204, 21, 0.22), transparent 55%),
+    radial-gradient(120% 80% at 100% 100%, rgba(168, 85, 247, 0.28), transparent 55%),
+    var(--f10-card-stripe);
+}
+
+.f10-ccard--exclusive .f10-ccard-sweep {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(250, 204, 21, 0.3) 26%,
+    rgba(255, 255, 255, 0.38) 50%,
+    rgba(192, 132, 252, 0.32) 74%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  animation: f10-ccard-legendary-sweep calc(6.6s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard--exclusive .f10-ccard-aura {
+  box-shadow:
+    inset 0 0 28px rgba(0, 0, 0, 0.38),
+    inset 0 0 52px rgba(250, 204, 21, 0.28),
+    0 0 26px rgba(168, 85, 247, 0.3),
+    0 0 12px rgba(250, 204, 21, 0.35);
+}
+
+.f10-ccard--exclusive .f10-ccard-particles {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.7));
+}
+
+/* Gilded border frame unique to exclusive tier. */
+.f10-ccard--exclusive::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(
+    135deg,
+    rgba(250, 204, 21, 0.85),
+    rgba(244, 114, 182, 0.6),
+    rgba(168, 85, 247, 0.9),
+    rgba(250, 204, 21, 0.85)
+  );
+  background-size: 220% 220%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  animation: f10-ccard-exclusive-frame 6.4s ease-in-out infinite;
+  z-index: 3;
+}
+
+@keyframes f10-ccard-exclusive-frame {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+
+.f10-ccard--exclusive.f10-ccard--paused::before {
+  animation-play-state: paused;
+}
+
+/* Honorable first-responder lane: dark neon with emergency red/blue sweep and gold accents. */
+.f10-ccard--first-responder {
+  --cc-glow: rgba(250, 204, 21, 0.24);
+  border-color: rgba(250, 204, 21, 0.34);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.5),
+    0 0 14px rgba(59, 130, 246, 0.26),
+    0 0 16px rgba(248, 113, 113, 0.2),
+    0 0 10px rgba(250, 204, 21, 0.16);
+}
+
+.f10-ccard--first-responder .f10-ccard-bg {
+  background:
+    radial-gradient(90% 160% at 0% 50%, rgba(59, 130, 246, 0.2), transparent 55%),
+    radial-gradient(90% 160% at 100% 50%, rgba(248, 113, 113, 0.2), transparent 55%),
+    var(--f10-card-stripe);
+}
+
+.f10-ccard--first-responder .f10-ccard-shimmer {
+  opacity: 0.35;
+}
+
+.f10-ccard--first-responder .f10-ccard-sweep {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.28) 20%,
+    rgba(255, 255, 255, 0.18) 40%,
+    rgba(248, 113, 113, 0.32) 62%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  animation: emergencySweep 5.8s linear infinite;
+}
+
+.f10-ccard--first-responder .f10-ccard-aura {
+  animation: pulseGlow 3.2s ease-in-out infinite;
+}
+
+.f10-ccard--first-responder .f10-ccard-particles {
+  opacity: 1;
+}
+
+.f10-ccard--first-responder .f10-ccard-particles span {
+  width: 3px;
+  height: 3px;
+  background: rgba(250, 204, 21, 0.92);
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.7);
+  animation-name: sparkFloat;
+  animation-duration: 3.8s;
+}
+
+.f10-ccard-orbit-ring {
+  position: absolute;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  right: 10px;
+  bottom: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.42);
+  box-shadow: inset 0 0 10px rgba(250, 204, 21, 0.22);
+  animation: orbitMove 8.2s linear infinite;
+}
+
+.f10-ccard-orbit-ring::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.95);
+  transform: translateX(-50%);
+}
+
+.f10-ccard-honor-band {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  z-index: 3;
+  background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.72), transparent);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.4), inset 0 0 34px rgba(59, 130, 246, 0.2);
+    opacity: 0.82;
+  }
+  50% {
+    box-shadow:
+      inset 0 0 28px rgba(0, 0, 0, 0.42),
+      inset 0 0 44px rgba(248, 113, 113, 0.22),
+      0 0 16px rgba(250, 204, 21, 0.2);
+    opacity: 1;
+  }
+}
+
+@keyframes emergencySweep {
+  0%, 70% {
+    background-position: -140% 50%;
+  }
+  100% {
+    background-position: 140% 50%;
+  }
+}
+
+@keyframes orbitMove {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sparkFloat {
+  0% {
+    transform: translateY(0) scale(0.7);
+    opacity: 0;
+  }
+  15%, 78% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-30px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.f10-ccard--legendary .f10-ccard-sweep {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(251, 191, 36, 0.18) 28%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(244, 114, 182, 0.22) 72%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  animation: f10-ccard-legendary-sweep calc(8.5s / var(--cc-speed-mult)) ease-in-out infinite;
+}
+
+.f10-ccard--legendary .f10-ccard-aura {
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.35),
+    inset 0 0 48px rgba(251, 191, 36, 0.22),
+    0 0 22px rgba(251, 191, 36, 0.2);
+}
+
+.f10-ccard--equipped {
+  border-color: rgba(34, 211, 238, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.34),
+    0 14px 36px rgba(34, 211, 238, 0.2),
+    0 0 32px rgba(167, 139, 250, 0.2);
+  --cc-speed-mult: 1.2;
+}
+
+.f10-ccard--equipped .f10-ccard-aura {
+  animation-duration: calc(3.2s / var(--cc-speed-mult));
+}
+
+.f10-ccard--locked {
+  filter: saturate(0.7) brightness(0.82);
+}
+
+.f10-ccard:hover,
+.f10-ccard:focus-visible,
+.f10-ccard--touch-boost {
+  transform: scale(1.04);
+  --cc-speed-mult: 1.6;
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.36),
+    0 18px 42px rgba(15, 23, 42, 0.45),
+    0 0 32px rgba(251, 191, 36, 0.28);
+}
+
+.f10-ccard:hover .f10-ccard-sweep,
+.f10-ccard:focus-visible .f10-ccard-sweep,
+.f10-ccard--touch-boost .f10-ccard-sweep {
+  animation: f10-ccard-interact-sweep 550ms ease-out 1;
+}
+
+.f10-ccard--paused *,
+.f10-ccard--paused::before,
+.f10-ccard--paused::after {
+  animation-play-state: paused !important;
+}
+
+.f10-ccard--unlock {
+  animation: f10-ccard-unlock-in 540ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.f10-ccard--unlock .f10-ccard-text {
+  animation: f10-ccard-unlock-text 520ms ease forwards;
+  animation-delay: 200ms;
+  opacity: 0;
+}
+
+@keyframes f10-ccard-grad {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes f10-ccard-shine {
+  0%,
+  72% {
+    background-position: -130% 50%;
+  }
+  100% {
+    background-position: 130% 50%;
+  }
+}
+
+@keyframes f10-ccard-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes f10-ccard-drift {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.8);
+    opacity: 0;
+  }
+  15%,
+  75% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(-38px) translateX(8px) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes f10-ccard-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.012);
+  }
+}
+
+@keyframes f10-ccard-legendary-sweep {
+  0%,
+  70% {
+    background-position: -140% 50%;
+    opacity: 0.6;
+  }
+  100% {
+    background-position: 140% 50%;
+    opacity: 1;
+  }
+}
+
+@keyframes f10-ccard-interact-sweep {
+  from {
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+@keyframes f10-ccard-badge-shimmer {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(34, 211, 238, 0.2);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(34, 211, 238, 0.6);
+    filter: brightness(1.15);
+  }
+}
+
+@keyframes f10-ccard-unlock-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.93);
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.04);
+    box-shadow: 0 0 26px rgba(251, 191, 36, 0.55);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes f10-ccard-unlock-text {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

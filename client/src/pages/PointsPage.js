@@ -1,17 +1,34 @@
 // src/pages/PointsPage.js
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppConfig } from '../lib/useAppConfig';
+import { useSavvyPoints } from '../store/savvyStore';
+import { useAuth } from '../context/AuthContext';
+import { SavvyPointsIcon } from '../components/rewards/SavvyPointsIcon';
+import { formatDollarValue } from '../lib/savvyValue';
+import {
+  SAVVY_CREDIT_EVENT,
+  SAVVY_STORE_ITEMS,
+  convertPointsToCredits,
+  getSavvyCreditState,
+  redeemSavvyStoreItem,
+} from '../lib/savvyCredits';
+import { getLifetimeLeaderboard, getMyPoints, redeemPointsDiscount } from '../lib/api';
+import { parseApiError } from '../lib/apiErrorParsing';
+import LoadingState from '../components/ui/states/LoadingState';
+import ErrorState from '../components/ui/states/ErrorState';
+import EmptyState from '../components/ui/states/EmptyState';
 
 // tiny helpers
 const fmt = n => (n ?? 0).toLocaleString();
 const pct = n => `${Math.round((n ?? 0) * 100)}%`;
 
 export default function PointsPage() {
-  const cfg = useAppConfig();               // trialDays, multipliers, badgeTiers, discountRatio, etc.
+  const { cfg, loading: configLoading, error: configError, reload: reloadConfig } = useAppConfig();               // trialDays, multipliers, badgeTiers, discountRatio, etc.
+  const { refreshProfile } = useAuth();
+  const { savvyPoints, spendPoints } = useSavvyPoints();
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
-  // user data
-  const [balance, setBalance] = useState(0);
   const [lifetime, setLifetime] = useState(0);
   const [badges, setBadges] = useState([]);
   const [history, setHistory] = useState([]);
@@ -26,68 +43,59 @@ export default function PointsPage() {
 
   // countdown text
   const [countdown, setCountdown] = useState('');
+  const [creditState, setCreditState] = useState(() => getSavvyCreditState());
+  const [convertInput, setConvertInput] = useState('');
+  const [coinPulse, setCoinPulse] = useState(false);
+  const actionsToday = useMemo(
+    () => history.filter(item => {
+      const t = new Date(item.createdAt || 0).getTime();
+      if (!t) return false;
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      return t >= start;
+    }).length,
+    [history]
+  );
+
+  const loadWallet = useCallback(async () => {
+    setFetchError(null);
+    setLoading(true);
+    try {
+      const me = await getMyPoints();
+      void refreshProfile();
+      setLifetime(me.lifetimePointsEarned || 0);
+      setBadges(me.badges || []);
+      setHistory(me.recent || []);
+      setTrial(me.trial || null);
+      try {
+        const list = await getLifetimeLeaderboard();
+        setLeaders(Array.isArray(list) ? list.slice(0, 5) : []);
+      } catch (leaderErr) {
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.error('Failed to fetch leaderboard:', leaderErr);
+        }
+        setLeaders([]);
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.error('Failed to fetch points data:', error);
+      }
+      setFetchError(error);
+      setLifetime(0);
+      setBadges([]);
+      setHistory([]);
+      setTrial(null);
+      setLeaders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshProfile]);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const token = localStorage.getItem('f10_token');
-        const response = await fetch('http://localhost:5000/api/points/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          if (response.status === 429) {
-            console.warn('Rate limited, will retry later');
-            return;
-          }
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const me = await response.json();
-        if (!mounted) return;
-        setBalance(me.pointsBalance || 0);
-        setLifetime(me.lifetimePointsEarned || 0);
-        setBadges(me.badges || []);
-        setHistory(me.recent || []);
-        setTrial(me.trial || null);
-      } catch (error) {
-        console.error('Failed to fetch points data:', error);
-        if (!mounted) return;
-        // Set default values on error
-        setBalance(0);
-        setLifetime(0);
-        setBadges([]);
-        setHistory([]);
-        setTrial(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    // leaderboard preview (top 5) - with error handling
-    fetch('http://localhost:5000/api/leaderboard/lifetime')
-      .then(async (r) => {
-        if (!r.ok) {
-          if (r.status === 429) {
-            console.warn('Rate limited on leaderboard, will retry later');
-            return [];
-          }
-          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-        }
-        return r.json();
-      })
-      .then(list => setLeaders(Array.isArray(list) ? list.slice(0, 5) : []))
-      .catch(error => {
-        console.error('Failed to fetch leaderboard:', error);
-        setLeaders([]);
-      });
-
-    return () => { mounted = false; };
-  }, []);
+    void loadWallet();
+  }, [loadWallet]);
 
   // trial countdown (minutes precision)
   useEffect(() => {
@@ -105,6 +113,12 @@ export default function PointsPage() {
     return () => clearInterval(id);
   }, [trial]);
 
+  useEffect(() => {
+    const onCredit = () => setCreditState(getSavvyCreditState());
+    window.addEventListener(SAVVY_CREDIT_EVENT, onCredit);
+    return () => window.removeEventListener(SAVVY_CREDIT_EVENT, onCredit);
+  }, []);
+
   // derived: example discount preview
   const discountPreview = useMemo(() => {
     const pts = parseInt(redeemAmt || '0', 10);
@@ -116,7 +130,7 @@ export default function PointsPage() {
   const redeem = async () => {
     const amount = parseInt(redeemAmt || '0', 10);
     if (!amount || amount <= 0) return setToast('Enter a positive number of points.');
-    if (amount > balance) return setToast('Not enough points to redeem.');
+    if (amount > savvyPoints) return setToast('Not enough points to redeem.');
 
     const body = {
       amount,
@@ -125,57 +139,116 @@ export default function PointsPage() {
     };
 
     try {
-      const token = localStorage.getItem('f10_token');
-      const response = await fetch('http://localhost:5000/api/points/redeem', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          setToast('Too many requests. Please wait a moment and try again.');
-          setTimeout(() => setToast(''), 2500);
-          return;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const resp = await response.json();
+      const resp = await redeemPointsDiscount(body);
 
       if (resp?.ok) {
         setToast(`Redeemed ${fmt(amount)} points → ${resp.discountUSD ? `$${resp.discountUSD.toFixed(2)} off` : 'applied'}`);
-        // refresh me
-        const meResponse = await fetch('http://localhost:5000/api/points/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (meResponse.ok) {
-          const me = await meResponse.json();
-          setBalance(me.pointsBalance || 0);
+        try {
+          const me = await getMyPoints();
+          await refreshProfile();
           setLifetime(me.lifetimePointsEarned || 0);
           setBadges(me.badges || []);
           setHistory(me.recent || []);
+        } catch {
+          /* refresh best-effort */
         }
         setRedeemAmt('');
       } else {
         setToast(resp?.error || 'Redeem failed');
       }
     } catch (error) {
-      console.error('Redeem error:', error);
-      setToast('Network error. Please try again.');
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.error('Redeem error:', error);
+      }
+      const parsed = parseApiError(error);
+      const genericAxios =
+        typeof parsed.message === 'string' &&
+        /^Request failed with status code\b/i.test(parsed.message);
+      setToast(
+        parsed.status === 429
+          ? 'Too many requests. Please wait a moment and try again.'
+          : genericAxios
+            ? 'Could not redeem points. Please try again.'
+            : parsed.message
+      );
     }
     setTimeout(() => setToast(''), 2500);
   };
 
-  if (!cfg) return <div style={{ padding: 24 }}>Loading config…</div>;
-  if (loading) return <div style={{ padding: 24 }}>Loading points…</div>;
+  const convertToCredits = () => {
+    const pts = Math.max(0, Math.round(Number(convertInput) || 0));
+    const ok = window.confirm(`Convert ${pts.toLocaleString()} Savvy to $${formatDollarValue(pts)} credit?`);
+    if (!ok) return;
+    const result = convertPointsToCredits(pts, savvyPoints);
+    if (!result.ok) {
+      setToast(result.reason || 'Could not convert points');
+      setTimeout(() => setToast(''), 2800);
+      return;
+    }
+    spendPoints(pts, 'Convert to credit');
+    setCreditState(result.creditState);
+    setConvertInput('');
+    setCoinPulse(true);
+    setTimeout(() => setCoinPulse(false), 1200);
+    setToast(`Converted ${pts.toLocaleString()} Savvy → $${formatDollarValue(pts)} credit`);
+    setTimeout(() => setToast(''), 2800);
+  };
+
+  const redeemStoreItem = (itemId) => {
+    const item = SAVVY_STORE_ITEMS.find((x) => x.id === itemId);
+    if (!item) return;
+    const text = `Spend ${item.costSavvy.toLocaleString()} Savvy for ${item.label}?`;
+    if (!window.confirm(text)) return;
+    const result = redeemSavvyStoreItem(itemId, savvyPoints);
+    if (!result.ok) {
+      setToast(result.reason || 'Redemption failed');
+      setTimeout(() => setToast(''), 2800);
+      return;
+    }
+    spendPoints(item.costSavvy, item.label || 'Store redeem');
+    setCreditState(result.creditState);
+    setCoinPulse(true);
+    setTimeout(() => setCoinPulse(false), 1300);
+    setToast(`Redeemed: ${item.label}`);
+    setTimeout(() => setToast(''), 2800);
+  };
+
+  if (configLoading || loading) {
+    return (
+      <div className="container" style={{ maxWidth: 960, margin: '32px auto', padding: '0 16px' }}>
+        <LoadingState label={configLoading ? "Loading app config..." : "Loading Savvy wallet..."} />
+      </div>
+    );
+  }
+
+  if (configError || !cfg) {
+    return (
+      <div className="container" style={{ maxWidth: 960, margin: '32px auto', padding: '0 16px' }}>
+        <ErrorState
+          title="Couldn't load app configuration"
+          description="Final10 couldn't reach the production API. Please verify API URL settings and try again."
+          error={configError}
+          onRetry={reloadConfig}
+          retryLabel="Retry config load"
+        />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="container" style={{ maxWidth: 960, margin: '32px auto', padding: '0 16px' }}>
+        <ErrorState
+          title="Couldn't load wallet"
+          description="Your Savvy balance and activity couldn't be refreshed. Check your connection and try again."
+          error={fetchError}
+          onRetry={() => void loadWallet()}
+          retryLabel="Retry"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container" style={{ maxWidth: 960, margin: '32px auto', padding: '0 16px' }}>
@@ -189,10 +262,10 @@ export default function PointsPage() {
       {/* Hero */}
       <section style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid #2a2a2a' }}>
         <h2 style={{ margin: '0 0 6px' }}>Final10 is Live</h2>
-        <p style={{ margin: 0, opacity: 0.9 }}>AI-powered auctions, SavvyPoints, and product-first social.</p>
+        <p style={{ margin: 0, opacity: 0.9 }}>Final10 is part of the Savvy Universe. More apps. More rewards. Same balance.</p>
         <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
           <a className="btn" href="/auctions">Browse Auctions</a>
-          <a className="btn btn-outline" href="/points">View Points</a>
+          <a className="btn btn-outline" href="/profile#savvy-balance">View Savvy Balance</a>
         </div>
       </section>
 
@@ -275,14 +348,29 @@ export default function PointsPage() {
 
       {/* Balance & Redeem */}
       <section className="card" style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: '1px solid #2a2a2a' }}>
-        <h3 style={{ marginTop: 0 }}>Points</h3>
+        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SavvyPointsIcon size={18} glow animated={coinPulse} />
+          Savvy Balance
+        </h3>
+        <div style={{ marginTop: -4, marginBottom: 12, fontSize: 13, color: '#93c5fd' }}>
+          Savvy points carry across the ecosystem.
+        </div>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ opacity: 0.8 }}>Balance</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(balance)} SavvyPoints</div>
+            <div style={{ opacity: 0.8 }}>Position Balance</div>
+            <div style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SavvyPointsIcon size={16} glow animated={coinPulse} />
+              {fmt(savvyPoints)} Savvy
+            </div>
+            <div
+              style={{ marginTop: 3, fontSize: 13, color: '#fcd34d' }}
+              title="Savvy value can be used for rewards and discounts across supported experiences."
+            >
+              ≈ ${formatDollarValue(savvyPoints)} value
+            </div>
           </div>
           <div>
-            <div style={{ opacity: 0.8 }}>Lifetime Earned</div>
+            <div style={{ opacity: 0.8 }}>Lifetime Stacked</div>
             <div style={{ fontSize: 20, fontWeight: 600 }}>{fmt(lifetime)}</div>
           </div>
           <div>
@@ -310,7 +398,64 @@ export default function PointsPage() {
           <button onClick={redeem} className="btn" disabled={!redeemAmt}>
             Redeem → ({discountPreview} off)
           </button>
-          <div style={{ opacity: 0.8 }}>Redeemable on any Final10 auction.</div>
+          <div style={{ opacity: 0.8 }}>Your Savvy balance is persistent across the Savvy Universe.</div>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: '1px solid #2a2a2a' }}>
+        <h3 style={{ marginTop: 0 }}>Savvy Credits</h3>
+        <div style={{ color: '#d1d5db', fontSize: 14, marginBottom: 10 }}>
+          Credit balance: <strong style={{ color: '#fef3c7' }}>${formatDollarValue(creditState.creditCents / 100, true)}</strong>
+          {creditState.premiumDays > 0 ? (
+            <span style={{ marginLeft: 8, color: '#a5f3fc' }}>• Premium days: {creditState.premiumDays}</span>
+          ) : null}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="number"
+            min="0"
+            value={convertInput}
+            onChange={(e) => setConvertInput(e.target.value)}
+            placeholder="Convert Savvy to credit"
+            style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #444', minWidth: 220 }}
+          />
+          <button onClick={convertToCredits} className="btn" disabled={!convertInput}>
+            Convert ({convertInput ? `$${formatDollarValue(convertInput)}` : '$0.00'})
+          </button>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: '1px solid #2a2a2a' }}>
+        <h3 style={{ marginTop: 0 }}>Savvy Store</h3>
+        <p style={{ marginTop: 0, color: '#9ca3af', fontSize: 13 }}>
+          Safe redemption only. No direct cash-outs.
+        </p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {SAVVY_STORE_ITEMS.map((item) => (
+            <div key={item.id} style={{ border: '1px solid #374151', borderRadius: 10, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#f3f4f6' }}>{item.label}</div>
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>{item.costSavvy.toLocaleString()} Savvy required</div>
+              </div>
+              <button className="btn btn-outline" onClick={() => redeemStoreItem(item.id)} disabled={savvyPoints < item.costSavvy}>
+                Redeem
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="card" style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: '1px solid #2a2a2a' }}>
+        <h3 style={{ marginTop: 0 }}>This Week Snapshot</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ border: '1px solid #334155', borderRadius: 10, padding: 10 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Top users this week</div>
+            <div style={{ marginTop: 4, fontWeight: 700, color: '#e2e8f0' }}>{leaders.length ? `${leaders.length} active leaders tracked` : 'Leaderboard warming up'}</div>
+          </div>
+          <div style={{ border: '1px solid #334155', borderRadius: 10, padding: 10 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Actions completed today</div>
+            <div style={{ marginTop: 4, fontWeight: 700, color: '#fef3c7' }}>{actionsToday}</div>
+          </div>
         </div>
       </section>
 
@@ -336,7 +481,11 @@ export default function PointsPage() {
             ))}
           </ul>
         ) : (
-          <div style={{ opacity: 0.7 }}>No activity yet.</div>
+          <EmptyState
+            title="No activity yet"
+            description="Earn Savvy from auctions, tasks, and streaks — it will show up here."
+            className="f10-state--inline text-left items-stretch max-w-none"
+          />
         )}
       </section>
 
@@ -353,7 +502,16 @@ export default function PointsPage() {
             ))}
           </ol>
         ) : (
-          <div style={{ opacity: 0.7 }}>Leaderboard warming up…</div>
+          <EmptyState
+            title="Leaderboard warming up"
+            description="Top lifetime earners will appear here once rankings sync."
+            action={
+              <button type="button" className="f10-state__retry" onClick={() => void loadWallet()}>
+                Refresh
+              </button>
+            }
+            className="f10-state--inline text-left items-stretch max-w-none"
+          />
         )}
         <div style={{ marginTop: 10 }}>
           <a className="btn btn-outline" href="/leaderboard">View Full Leaderboard</a>

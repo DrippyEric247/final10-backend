@@ -86,7 +86,8 @@ const OwnerControlPanel = () => {
   };
 
   const handleGrant = async () => {
-    if (!selectedUser || !grantAmount) return;
+    if (!selectedUser) return;
+    if ((grantType === 'points' || grantType === 'premium') && !grantAmount) return;
     
     try {
       let endpoint = '';
@@ -103,6 +104,12 @@ const OwnerControlPanel = () => {
         case 'premium':
           endpoint = '/api/owner/grant-premium-subscription';
           payload.durationMonths = parseInt(grantAmount);
+          break;
+        case 'founding':
+          endpoint = '/api/owner/grant-founding-access';
+          payload.email = selectedUser.email;
+          payload.betaTester = true;
+          payload.foundingAccess = true;
           break;
         default:
           return;
@@ -510,10 +517,11 @@ const OwnerControlPanel = () => {
                   <option value="points">Points</option>
                   <option value="lifetime">Lifetime Subscription</option>
                   <option value="premium">Premium Subscription</option>
+                  <option value="founding">Founding Tester Access</option>
                 </select>
               </div>
               
-              {grantType !== 'lifetime' && (
+              {grantType !== 'lifetime' && grantType !== 'founding' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     {grantType === 'points' ? 'Points Amount' : 'Duration (months)'}

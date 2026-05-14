@@ -1,6 +1,39 @@
 @import './styles/theme.css';
+@import './styles/deal-card.css';
 
 /* you can keep or add your existing global resets here */
 *{ box-sizing: border-box; }
-html, body, #root{ height:100%; }
+html {
+  height: 100%;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 5rem;
+}
+body {
+  height: 100%;
+  margin: 0;
+  overflow-x: clip;
+}
+#root {
+  min-height: 100%;
+  overflow-x: clip;
+}
+
+/* Tab journey mini-panel — avoid viewport bleed + clear bottom FAB lane */
+.f10-tab-journey-panel {
+  position: fixed;
+  z-index: 60;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  width: min(320px, calc(100vw - max(32px, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px))));
+  max-height: min(420px, calc(100dvh - 140px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 640px) {
+  .f10-tab-journey-panel {
+    bottom: max(92px, calc(env(safe-area-inset-bottom, 0px) + 80px));
+    max-height: min(36vh, 240px);
+  }
+}
 

@@ -1,0 +1,126 @@
+.creator-landing {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+  color: #e2e8f0;
+}
+
+.creator-landing-loading,
+.creator-landing-error {
+  max-width: 600px;
+  margin: 60px auto;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.creator-landing-header {
+  text-align: center;
+  padding: 30px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  background: linear-gradient(
+    140deg,
+    rgba(76, 29, 149, 0.4),
+    rgba(15, 23, 42, 0.92)
+  );
+  margin-bottom: 24px;
+}
+
+.creator-landing-handle {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 1rem;
+  color: #f0abfc;
+  letter-spacing: 0.04em;
+}
+
+.creator-landing-name {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 4px 0 10px;
+}
+
+.creator-landing-stats {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 0.9rem;
+  color: #ddd6fe;
+  margin-bottom: 18px;
+}
+
+.creator-landing-cta {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.creator-landing-section {
+  margin-top: 16px;
+}
+
+.creator-landing-section-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  margin-bottom: 12px;
+}
+
+.creator-landing-empty {
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  border: 1px dashed rgba(100, 116, 139, 0.5);
+  border-radius: 12px;
+}
+
+.creator-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.creator-landing-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(51, 65, 85, 0.55);
+  background: rgba(15, 23, 42, 0.78);
+  display: flex;
+  flex-direction: column;
+}
+
+.creator-landing-card img,
+.creator-landing-card-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.85);
+  font-size: 2rem;
+  color: #facc15;
+}
+
+.creator-landing-card-meta {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.creator-landing-card-title {
+  font-weight: 700;
+  color: #f1f5f9;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.creator-landing-card-price {
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}

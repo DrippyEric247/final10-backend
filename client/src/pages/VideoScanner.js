@@ -8,31 +8,89 @@ import {
   Pause, 
   RotateCcw,
   CheckCircle,
-  AlertCircle,
   Loader2,
   Video,
   Search,
   Zap
 } from 'lucide-react';
 import { scanVideo, trackVideoScanner } from '../lib/api';
+import { notifyUniversalProgressRefresh } from '../lib/universalBoostProgress';
+import { recordPowerAfterScan } from '../lib/final10PowerEngine';
+import { POWER } from '../lib/final10PowerConfig';
+import { emitPowerToast } from '../lib/final10PowerFeedback';
+import ListingCardImage from '../components/listings/ListingCardImage';
+import ErrorState from '../components/ui/states/ErrorState';
+import EmptyState from '../components/ui/states/EmptyState';
+import { parseApiError } from '../lib/apiErrorParsing';
 
 const VideoScanner = () => {
+  const [scanEarn, setScanEarn] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('f10_scan_earn_state') || '{}');
+      return {
+        scannedVideos: Number(raw.scannedVideos) || 0,
+        creatorScans: Number(raw.creatorScans) || 0,
+      };
+    } catch {
+      return { scannedVideos: 0, creatorScans: 0 };
+    }
+  });
   const [videoFile, setVideoFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [scanResults, setScanResults] = useState(null);
   const [error, setError] = useState(null);
+  const scanTarget = 4;
+  const scanProgress = Math.min(100, Math.round((Math.min(scanEarn.scannedVideos, scanTarget) / scanTarget) * 100));
+  const bonusUnlocked = scanEarn.scannedVideos >= scanTarget;
+  const hasCreatorBonus = scanEarn.creatorScans >= 1;
+
+  const detectCreatorVideo = (data, url) => {
+    const normalizedUrl = String(url || '').toLowerCase();
+    const creatorDomains = ['youtube.com', 'youtu.be', 'tiktok.com', 'instagram.com', 'twitch.tv'];
+    if (creatorDomains.some((d) => normalizedUrl.includes(d))) return true;
+
+    const analysis = String(data?.analysis || '').toLowerCase();
+    if (analysis.includes('creator') || analysis.includes('influencer') || analysis.includes('content')) return true;
+
+    const products = Array.isArray(data?.products) ? data.products : [];
+    return products.some((p) => {
+      const text = `${p?.name || ''} ${p?.description || ''}`.toLowerCase();
+      return text.includes('creator') || text.includes('influencer');
+    });
+  };
+
+  const registerScanEarn = (data) => {
+    const isCreator = detectCreatorVideo(data, videoUrl);
+    setScanEarn((prev) => {
+      const next = {
+        scannedVideos: prev.scannedVideos + 1,
+        creatorScans: prev.creatorScans + (isCreator ? 1 : 0),
+      };
+      localStorage.setItem('f10_scan_earn_state', JSON.stringify(next));
+      if (next.scannedVideos >= scanTarget) {
+        localStorage.setItem('f10_scan_complete', 'true');
+        localStorage.setItem('f10_video_scanner_used', 'true');
+      }
+      recordPowerAfterScan();
+      notifyUniversalProgressRefresh();
+      emitPowerToast(POWER.DISPLAY.scanPowerPop, "Scan logged");
+      return next;
+    });
+  };
 
   // Video scanning mutation
   const scanMutation = useMutation({
     mutationFn: scanVideo,
     onSuccess: (data) => {
       setScanResults(data);
+      registerScanEarn(data);
       setIsScanning(false);
       setError(null);
     },
     onError: (error) => {
-      setError(error.response?.data?.message || 'Video scan failed');
+      const { message } = parseApiError(error);
+      setError(message || 'Video scan failed. Please try again.');
       setIsScanning(false);
     }
   });
@@ -116,6 +174,35 @@ const VideoScanner = () => {
           <p className="text-xl text-gray-400 max-w-3xl mx-auto">
             Upload a video or paste a URL to identify products using our advanced AI technology
           </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.08 }}
+          className="bg-gray-800 rounded-xl p-6 mb-8 border border-purple-500/30"
+        >
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+            <h3 className="text-lg font-semibold text-white">Scan &amp; Earn</h3>
+            <span className={`text-sm font-semibold ${bonusUnlocked ? 'text-green-300' : 'text-purple-300'}`}>
+              {bonusUnlocked ? 'Bonus Unlocked' : `${scanEarn.scannedVideos}/${scanTarget} scans`}
+            </span>
+          </div>
+          <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden mb-2">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-300"
+              style={{ width: `${scanProgress}%` }}
+            />
+          </div>
+          <div className="text-sm text-gray-300">
+            Scanned videos: <span className="text-white font-semibold">{scanEarn.scannedVideos}</span> / {scanTarget}
+          </div>
+          <div className={`text-sm mt-1 ${hasCreatorBonus ? 'text-yellow-300 font-semibold' : 'text-gray-400'}`}>
+            Creator bonus: {hasCreatorBonus ? 'Active (reward doubled)' : 'Scan at least 1 creator video to double reward'}
+          </div>
+          <div className="text-xs text-gray-400 mt-1">
+            Reward state: {bonusUnlocked ? (hasCreatorBonus ? '2x bonus unlocked' : '1x bonus unlocked') : 'Locked'}
+          </div>
         </motion.div>
 
         {/* Daily Task Info */}
@@ -213,18 +300,20 @@ const VideoScanner = () => {
         </motion.div>
 
         {/* Error Display */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/20 border border-red-500/30 rounded-xl p-6 mb-8"
-          >
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-red-400" />
-              <p className="text-red-400">{error}</p>
-            </div>
-          </motion.div>
-        )}
+        {error ? (
+          <div className="mb-8">
+            <ErrorState
+              title="Scan didn’t finish"
+              description={typeof error === 'string' ? error : 'Something went wrong while analyzing the video.'}
+              onRetry={() => {
+                setError(null);
+                void handleScan();
+              }}
+              retryLabel="Retry scan"
+              className="text-left items-stretch"
+            />
+          </div>
+        ) : null}
 
         {/* Scan Results */}
         {scanResults && (
@@ -250,13 +339,16 @@ const VideoScanner = () => {
                     className="bg-gray-700 rounded-lg p-4 border border-gray-600"
                   >
                     <div className="flex items-start gap-4">
-                      {product.image && (
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-16 h-16 object-cover rounded-lg"
-                        />
-                      )}
+                      {product.image ? (
+                        <div className="w-16 shrink-0">
+                          <ListingCardImage
+                            item={{ imageUrl: product.image, title: product.name }}
+                            alt={product.name || 'Product'}
+                            aspectRatio="1 / 1"
+                            borderRadius="12px"
+                          />
+                        </div>
+                      ) : null}
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-white mb-2">
                           {product.name}
@@ -283,12 +375,16 @@ const VideoScanner = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-400">
-                  No products detected in this video. Try a different video or check the quality.
-                </p>
-              </div>
+              <EmptyState
+                icon={<Video className="h-6 w-6" />}
+                title="No products detected"
+                description="Try a shorter clip, better lighting, or a URL where items are clearly visible."
+                action={
+                  <button type="button" className="f10-state__retry" onClick={resetScanner}>
+                    New scan
+                  </button>
+                }
+              />
             )}
 
             {/* AI Analysis */}

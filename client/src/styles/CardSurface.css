@@ -1,0 +1,207 @@
+/* ---------------------------------------------------------------------------
+ * Listing card surface — shared visual language across Auctions, Quick Snipes,
+ * Trending Feed, Savvy Offers, and anywhere else we render a listing.
+ *
+ * Spec (Final10 "dark glass" contrast pass):
+ *   - background:      rgba(20, 20, 35, 0.9)
+ *   - backdrop-filter: blur(10px)
+ *   - border:          1px solid rgba(255, 255, 255, 0.08)
+ *   - box-shadow:      0 8px 30px rgba(0, 0, 0, 0.4)
+ *
+ * Text tokens:
+ *   - primary:   rgba(255, 255, 255, 0.9)
+ *   - secondary: rgba(255, 255, 255, 0.6)
+ *
+ * Goal: high contrast, instantly readable, premium glass/neon feel.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  --f10-surface-bg: rgba(20, 20, 35, 0.9);
+  --f10-surface-border: rgba(255, 255, 255, 0.08);
+  --f10-surface-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --f10-text-primary: rgba(255, 255, 255, 0.9);
+  --f10-text-secondary: rgba(255, 255, 255, 0.6);
+}
+
+.f10-listing-surface,
+.auction-card-hover,
+.feed-wrap .card {
+  position: relative;
+  background: var(--f10-surface-bg) !important;
+  border: 1px solid var(--f10-surface-border) !important;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--f10-surface-shadow);
+  color: var(--f10-text-primary);
+  transition: transform 260ms ease, box-shadow 260ms ease,
+    border-color 260ms ease;
+}
+
+/* Hover lift — still premium, still calm. */
+.f10-listing-surface:hover,
+.auction-card-hover:hover,
+.feed-wrap .card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(140, 88, 255, 0.28) !important;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.45),
+    0 18px 36px -20px rgba(140, 88, 255, 0.35);
+}
+
+/* ---------------------------------------------------------------------------
+ * Text visibility — primary / secondary tokens.
+ *
+ * Apply the primary color to all direct descendants and common text roles so
+ * Tailwind's `text-gray-*` utilities can't bring back washed-out grays that
+ * clash with the glass surface.
+ * ------------------------------------------------------------------------- */
+
+.f10-listing-surface,
+.auction-card-hover,
+.feed-wrap .card {
+  color: var(--f10-text-primary);
+}
+
+.f10-listing-surface h1,
+.f10-listing-surface h2,
+.f10-listing-surface h3,
+.f10-listing-surface h4,
+.auction-card-hover h1,
+.auction-card-hover h2,
+.auction-card-hover h3,
+.feed-wrap .card h3,
+.feed-wrap .card .title {
+  color: var(--f10-text-primary);
+}
+
+.f10-listing-surface small,
+.f10-listing-surface .text-gray-400,
+.f10-listing-surface .text-gray-500,
+.auction-card-hover .text-gray-400,
+.auction-card-hover .text-gray-500,
+.feed-wrap .card .sub,
+.feed-wrap .card .muted,
+.feed-wrap .card .trend-reason {
+  color: var(--f10-text-secondary) !important;
+}
+
+/* Opt-in utility tokens. */
+.f10-text-primary {
+  color: var(--f10-text-primary) !important;
+}
+.f10-text-secondary {
+  color: var(--f10-text-secondary) !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Kill pure-white / near-white card skins. The glass surface should never sit
+ * on top of a solid white plate — drop it out and let the glass do the work.
+ * ------------------------------------------------------------------------- */
+
+.f10-listing-surface.bg-white,
+.f10-listing-surface[class*="bg-white"],
+.f10-listing-surface .bg-white,
+.f10-listing-surface [class*="bg-gray-50"],
+.f10-listing-surface [class*="bg-gray-100"],
+.f10-listing-surface [class*="bg-slate-50"],
+.f10-listing-surface [class*="bg-slate-100"] {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--f10-text-primary) !important;
+}
+
+/* Inner plates (e.g. DealCard's "Current / Market value" tiles) — make sure
+ * they also respect the dark-glass aesthetic. */
+.f10-listing-surface .rounded-xl.bg-black\/25,
+.f10-listing-surface [class*="bg-gray-800"],
+.f10-listing-surface [class*="bg-gray-900"] {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Optional motion — a soft glow pulse for the first card in every
+ * "Best Move" section. Opt-in via `.f10-listing-surface--pulse`.
+ * ------------------------------------------------------------------------- */
+
+@keyframes f10SurfacePulse {
+  0%, 100% {
+    box-shadow:
+      0 8px 30px rgba(0, 0, 0, 0.4),
+      0 0 0 0 rgba(251, 191, 36, 0);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 10px 34px rgba(0, 0, 0, 0.45),
+      0 0 0 3px rgba(251, 191, 36, 0.15);
+    transform: scale(1.01);
+  }
+}
+
+.f10-listing-surface--pulse {
+  animation: f10SurfacePulse 4.5s ease-in-out infinite;
+}
+
+.f10-best-section--bestMove .f10-listing-surface:first-of-type,
+.f10-best-section--bestMove .auction-card-hover:first-of-type,
+.f10-best-section--bestMove .card:first-of-type {
+  animation: f10SurfacePulse 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-listing-surface,
+  .auction-card-hover,
+  .feed-wrap .card,
+  .f10-listing-surface--pulse,
+  .f10-best-section--bestMove .f10-listing-surface:first-of-type,
+  .f10-best-section--bestMove .auction-card-hover:first-of-type,
+  .f10-best-section--bestMove .card:first-of-type {
+    transition: none;
+    animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Fallback for browsers without backdrop-filter — keep the solid dark plate
+ * so legibility never drops.
+ * ------------------------------------------------------------------------- */
+
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .f10-listing-surface,
+  .auction-card-hover,
+  .feed-wrap .card {
+    background: rgba(20, 20, 35, 0.97) !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Side "purple pill" gradient dimming.
+ *
+ * Reduces intensity on common sticky/floating purple gradient elements so
+ * they read as ambient glow rather than loud chrome. Pure opacity on the
+ * element keeps text/children readable; the optional glow style is applied
+ * via the `f10-dim-pill` opt-in class.
+ * ------------------------------------------------------------------------- */
+
+.f10-dim-pill,
+[data-f10-side-pill] {
+  opacity: 0.85;
+  box-shadow: 0 0 20px rgba(120, 80, 255, 0.4);
+}
+
+/* ---------------------------------------------------------------------------
+ * Light-mode safety net — still dark glass, just softer.
+ * ------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: light) {
+  .f10-listing-surface,
+  .auction-card-hover,
+  .feed-wrap .card {
+    background: rgba(20, 20, 35, 0.82) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: var(--f10-text-primary);
+  }
+}

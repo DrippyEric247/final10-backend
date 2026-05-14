@@ -1,10 +1,15 @@
 import axios from 'axios';
+import { devDiagApiFailure } from '../lib/devApiDiagnostics';
+import { parseApiError } from '../lib/apiErrorParsing';
+import { getApiBaseUrl } from '../lib/runtimeApi';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = getApiBaseUrl();
+const DEFAULT_TIMEOUT_MS = Math.min(Math.max(Number(process.env.REACT_APP_API_TIMEOUT_MS) || 28000, 8000), 120000);
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
+  timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -28,6 +33,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.code === 'ECONNABORTED') {
+      devDiagApiFailure('authService_timeout', { url: error.config?.url });
+    } else if (error.response) {
+      devDiagApiFailure('authService_http', { ...parseApiError(error), url: error.config?.url });
+    }
     if (error.response?.status === 401) {
       const errorMessage = error.response?.data?.error || '';
       const isTokenError = errorMessage.toLowerCase().includes('token') || 
@@ -38,13 +48,17 @@ api.interceptors.response.use(
       // Only logout and redirect if it's a token/auth-related error
       // Don't logout for other 401 errors (like missing eBay OAuth, etc.)
       if (isTokenError) {
-        console.log('🔒 Auth token invalid/expired, logging out...');
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.warn('Auth token invalid or expired; redirecting to login');
+        }
         localStorage.removeItem('f10_token');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
-      } else {
-        console.log('⚠️ 401 error but not token-related:', errorMessage);
+      } else if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.warn('401 error (not treated as session expiry)', errorMessage);
       }
     }
     return Promise.reject(error);

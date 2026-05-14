@@ -13,6 +13,7 @@ import {
   Target
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import ListingCardImage from './listings/ListingCardImage';
 
 const PromotedItemCard = ({ item, index, isPromoted = false }) => {
   const getPromotionBadge = (type) => {
@@ -76,18 +77,16 @@ const PromotedItemCard = ({ item, index, isPromoted = false }) => {
       )}
 
       {/* Image */}
-      <div className="thumb relative">
-        <img 
-          src={item.images?.[0]?.url || "https://via.placeholder.com/400x300/1f2937/8b5cf6?text=Product"} 
-          alt={item.images?.[0]?.alt || item.title} 
-          loading="lazy" 
-          className={`transition-transform duration-300 group-hover:scale-105 ${
-            isPromoted ? 'ring-2 ring-purple-500/30' : ''
-          }`}
-          onError={(e) => {
-            e.target.src = "https://via.placeholder.com/400x300/1f2937/8b5cf6?text=Product";
-          }}
-        />
+      <div className={`thumb relative ${isPromoted ? 'ring-2 ring-purple-500/30 rounded-xl overflow-hidden' : ''}`}>
+        <div className="transition-transform duration-300 group-hover:scale-105">
+          <ListingCardImage
+            item={item}
+            alt={item.images?.[0]?.alt || item.title || 'Product'}
+            aspectRatio="4 / 3"
+            borderRadius="0"
+            fallbackSrc="https://via.placeholder.com/400x300/1f2937/8b5cf6?text=Product"
+          />
+        </div>
         
         {/* Platform Badge */}
         <span className={`chip ${isPromoted ? 'bg-purple-600 text-white' : ''}`}>

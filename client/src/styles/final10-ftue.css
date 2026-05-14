@@ -1,0 +1,176 @@
+.f10-ftue-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: radial-gradient(circle at 70% 10%, rgba(251, 191, 36, 0.2), rgba(2, 6, 23, 0.9) 48%);
+  backdrop-filter: blur(6px);
+}
+
+.f10-ftue-card {
+  width: min(560px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  background: linear-gradient(145deg, rgba(30, 27, 75, 0.96), rgba(15, 23, 42, 0.98));
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.55), 0 0 34px rgba(251, 191, 36, 0.18);
+  padding: 22px 18px 18px;
+  position: relative;
+}
+
+.f10-ftue-card h2 {
+  margin: 8px 0 10px;
+  font-size: clamp(1.35rem, 5vw, 1.9rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.f10-ftue-card p {
+  margin: 0 0 14px;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.f10-ftue-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 800;
+  font-size: 0.86rem;
+  cursor: pointer;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  color: #111827;
+  box-shadow: 0 7px 24px rgba(251, 191, 36, 0.35);
+}
+
+.f10-ftue-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.f10-ftue-skip,
+.f10-ftue-skip-mini,
+.f10-ftue-link {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.f10-ftue-skip {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+
+.f10-ftue-tip {
+  position: fixed;
+  left: 12px;
+  top: 84px;
+  z-index: 2147483590;
+  max-width: 230px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  background: rgba(15, 23, 42, 0.95);
+  padding: 10px 10px 8px;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.45);
+  animation: f10-ftue-fade-in 180ms ease;
+}
+
+.f10-ftue-tip-title {
+  color: #fef3c7;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.f10-ftue-tip-actions {
+  margin-top: 6px;
+  text-align: right;
+}
+
+.f10-ftue-reward-pop {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 2147483590;
+  border-radius: 13px;
+  padding: 11px 14px;
+  background: linear-gradient(90deg, rgba(2, 6, 23, 0.96), rgba(88, 28, 135, 0.92));
+  border: 1px solid rgba(251, 191, 36, 0.52);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: f10-ftue-fade-in 180ms ease;
+}
+
+.f10-ftue-reward-title {
+  color: #fef08a;
+  font-weight: 900;
+  font-size: 0.92rem;
+}
+
+.f10-ftue-reward-sub {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+}
+
+.f10-ftue-mini-card {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: min(330px, calc(100% - 24px));
+  z-index: 2147483588;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+  padding: 12px 12px 10px;
+  animation: f10-ftue-fade-in 180ms ease;
+}
+
+.f10-ftue-mini-card h4 {
+  margin: 2px 0 6px;
+  font-size: 0.94rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.f10-ftue-mini-card p {
+  margin: 0 0 8px;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+.f10-ftue-mini-card small {
+  color: #fcd34d;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.f10-ftue-lines {
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 8px;
+}
+
+.f10-ftue-mini-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@keyframes f10-ftue-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

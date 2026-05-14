@@ -6,7 +6,8 @@ export default function ProfilePage() {
 
   if (!user) return <p>Please log in</p>;
 
-  const referralLink = `${window.location.origin}/register?ref=${user.id}`;
+  const refId = user?.id != null ? String(user.id) : user?.username != null ? String(user.username) : "";
+  const referralLink = `${window.location.origin}/register?ref=${encodeURIComponent(refId || "guest")}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);

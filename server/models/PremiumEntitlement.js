@@ -9,7 +9,7 @@ const PREMIUM_STATUSES = [
   'expired',
 ];
 
-const PREMIUM_TIERS = ['free', 'premium', 'vip'];
+const PREMIUM_TIERS = ['free', 'premium', 'vip', 'elite'];
 
 const PROVIDERS = ['stripe', 'apple', 'google'];
 

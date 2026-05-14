@@ -1,0 +1,114 @@
+.savvy-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #f8fafc;
+  line-height: 1;
+}
+
+.savvy-mark__icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, rgba(56, 189, 248, 0.32), rgba(15, 23, 42, 0.2) 58%, transparent 78%);
+}
+
+.savvy-mark__icon {
+  display: block;
+}
+
+.savvy-mark__icon-wrap--image {
+  overflow: hidden;
+  background: transparent;
+}
+
+.savvy-mark__icon-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.savvy-mark__word {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: linear-gradient(90deg, #ecfeff 0%, #bae6fd 45%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.savvy-mark__product {
+  font-weight: 700;
+  color: #bfdbfe;
+  opacity: 0.96;
+}
+
+.savvy-mark--glow .savvy-mark__icon-wrap {
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28), 0 0 14px rgba(14, 165, 233, 0.34);
+}
+
+.savvy-mark--animated .savvy-mark__icon-wrap {
+  animation: savvy-mark-idle-shimmer 3.8s ease-in-out infinite;
+}
+
+.savvy-mark--animated.savvy-mark--glow .savvy-mark__icon-wrap {
+  animation: savvy-mark-idle-shimmer 3.8s ease-in-out infinite, savvy-mark-soft-pulse 2.1s ease-in-out infinite;
+}
+
+.savvy-mark--pulse .savvy-mark__icon-wrap {
+  animation: savvy-mark-reward-pulse 0.7s ease-out 2;
+}
+
+.savvy-mark--levelup .savvy-mark__icon-wrap {
+  animation: savvy-mark-level-up-glow 0.95s ease-out 1;
+}
+
+@keyframes savvy-mark-idle-shimmer {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes savvy-mark-soft-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes savvy-mark-reward-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes savvy-mark-level-up-glow {
+  0% {
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2), 0 0 12px rgba(14, 165, 233, 0.25);
+    transform: scale(1);
+  }
+  45% {
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45), 0 0 30px rgba(14, 165, 233, 0.55);
+    transform: scale(1.1);
+  }
+  100% {
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28), 0 0 14px rgba(14, 165, 233, 0.34);
+    transform: scale(1);
+  }
+}
+

@@ -1,0 +1,127 @@
+/* ---------------------------------------------------------------------------
+ * Global app background system.
+ *
+ * Two fixed, pointer-events:none layers sit behind the app:
+ *   1. `.f10-app-bg`      — the Final10 brand mark (variant-sized)
+ *   2. `.f10-app-overlay` — a dark gradient that protects legibility and
+ *                           ensures the UI always reads premium & clean.
+ *
+ * In-flow page content is lifted to z-index 1 so it paints above both
+ * background layers without touching positioned widgets (sticky nav,
+ * fixed assistant dock, modals) which keep their own stacking.
+ * ------------------------------------------------------------------------- */
+
+.f10-app-bg,
+.f10-app-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.f10-app-bg {
+  z-index: 0;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  /* Smooth swap when navigating between routes. */
+  transition: opacity 360ms ease, filter 360ms ease, background-image 320ms ease,
+    transform 8s ease-in-out;
+  will-change: transform, opacity;
+}
+
+.f10-app-overlay {
+  /* Kept as a no-op layer so the element tree is stable — brightness is
+   * restored to full, no darkening applied. */
+  z-index: 0;
+  background: transparent;
+}
+
+/* Lift in-flow content above the fixed background + overlay. Positioned
+ * siblings (sticky nav, fixed dock) already paint above z-index 0 so we
+ * don't touch them. */
+.bg-app > header.app-auth-header,
+.bg-app > main {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * Variant: `default` (Auctions, etc.) — faded logo
+ * Variant: `dense`   (listing grids)  — minimal mark
+ * Variant: `feature` (Home)           — full, slightly stronger logo
+ * Variant: `universe`(identity tabs)  — Savvy Universe artwork, strong
+ * ------------------------------------------------------------------------- */
+
+.f10-app-bg--default,
+.f10-app-bg--dense,
+.f10-app-bg--feature {
+  background-position: center 38%;
+  background-size: min(720px, 70vmin) auto;
+  /* Faded Final10 logo — present as ambient branding, never loud. */
+  filter: saturate(1.1) brightness(1.05) contrast(1.02);
+  opacity: 0.3;
+}
+
+/* Home / landing — logo breathes a bit stronger than everywhere else. */
+.f10-app-bg--feature {
+  background-size: min(820px, 78vmin) auto;
+  opacity: 0.4;
+}
+
+/* Listing-heavy grids — logo pulls way back so content stays king. */
+.f10-app-bg--dense {
+  background-size: min(620px, 58vmin) auto;
+  opacity: 0.15;
+}
+
+/* Savvy Universe identity tabs — signature artwork, slightly brighter than
+ * the default variants so identity tabs still feel distinctive. */
+.f10-app-bg--universe {
+  background-position: center 32%;
+  background-size: min(860px, 80vmin) auto;
+  filter: saturate(1.3) brightness(1.18) contrast(1.06);
+  opacity: 0.85;
+}
+
+/* ---------------------------------------------------------------------------
+ * Subtle motion — a slow breath + drift so the mark feels alive.
+ * Honors `prefers-reduced-motion`.
+ * ------------------------------------------------------------------------- */
+
+@keyframes f10AppBgBreathe {
+  0%, 100% {
+    transform: scale(1.01) translateZ(0);
+    filter: saturate(1.1) contrast(1.02) brightness(1.05);
+  }
+  50% {
+    transform: scale(1.02) translateZ(0);
+    filter: saturate(1.15) contrast(1.04) brightness(1.1);
+  }
+}
+
+.f10-app-bg--feature,
+.f10-app-bg--universe,
+.f10-app-bg--default {
+  animation: f10AppBgBreathe 18s ease-in-out infinite;
+}
+
+/* `dense` stays perfectly still — those pages are already busy. */
+
+/* ---------------------------------------------------------------------------
+ * Light-mode safety net — Final10 ships dark, but keep a tasteful look if a
+ * user forces a light theme.
+ * ------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: light) {
+  .f10-app-bg--default { opacity: 0.22; }
+  .f10-app-bg--dense   { opacity: 0.1; }
+  .f10-app-bg--feature { opacity: 0.3; }
+  .f10-app-bg--universe { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-app-bg {
+    animation: none !important;
+    transition: none;
+  }
+}

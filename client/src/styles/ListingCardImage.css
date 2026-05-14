@@ -1,0 +1,22 @@
+/* Listing hero images — crisp scaling inside fixed aspect frames */
+.f10-listing-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  image-rendering: auto;
+  filter: contrast(1.05) saturate(1.06);
+}
+
+.f10-listing-img--lowsrc {
+  transform: scale(1.08);
+  transform-origin: center;
+  filter: contrast(1.09) saturate(1.1);
+}
+
+.f10-listing-img-frame {
+  width: 100%;
+  overflow: hidden;
+  background: #0a0a0a;
+}

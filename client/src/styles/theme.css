@@ -1,5 +1,11 @@
 /* ---------- Final10 Theme (CSS variables) ----------- */
 :root{
+  --bg-dark: #05070d;
+  --card-bg: rgba(20, 25, 40, 0.6);
+  --neon-blue: #3b82f6;
+  --neon-purple: #a855f7;
+  --neon-pink: #ec4899;
+
   --f10-bg: #0a0f1a;          /* deep navy/black */
   --f10-bg-2:#0f1729;         /* panel bg */
   --f10-grad-1:#ffd166;       /* honey gold */
@@ -13,6 +19,11 @@
 
   --f10-radius:16px;
   --f10-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+body{
+  background: radial-gradient(circle at top, #0a0f1f, #05070d 70%);
+  color: white;
 }
 
 /* App background */
@@ -31,14 +42,33 @@
   max-width:1200px;
   margin:0 auto;
   padding: 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Card */
 .card{
-  background: linear-gradient(180deg, var(--f10-bg-2), #0b1323);
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: var(--f10-radius);
-  box-shadow: var(--f10-shadow);
+  background: var(--card-bg);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    0 0 20px rgba(168,85,247,0.15),
+    inset 0 0 10px rgba(255,255,255,0.05);
+}
+
+.glow{
+  box-shadow:
+    0 0 10px rgba(168,85,247,0.4),
+    0 0 25px rgba(59,130,246,0.3);
 }
 
 /* Buttons */

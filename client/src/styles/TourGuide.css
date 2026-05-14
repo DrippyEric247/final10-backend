@@ -1,0 +1,375 @@
+/**
+ * Contextual first-time tab guidance.
+ *
+ * Visual contract:
+ *   - Backdrop dims the page but does NOT capture pointer events, so the
+ *     user can still click anything underneath (including the spotlit
+ *     element). The tour is guidance, never a blocker.
+ *   - The spotlight is a ring around the anchor with a soft radial glow;
+ *     it's pointer-events: none for the same reason.
+ *   - Only the card captures pointer events (buttons + dismiss).
+ */
+
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483400;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.tour-overlay.is-visible {
+  opacity: 1;
+}
+
+.tour-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+      ellipse at center,
+      rgba(2, 6, 23, 0.15),
+      rgba(2, 6, 23, 0.42) 70%
+    );
+  backdrop-filter: blur(1.5px);
+  pointer-events: none;
+}
+
+.tour-spotlight {
+  position: absolute;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 2px rgba(250, 204, 21, 0.55),
+    0 0 0 6px rgba(250, 204, 21, 0.18),
+    0 0 26px rgba(250, 204, 21, 0.25),
+    0 0 0 9999px rgba(2, 6, 23, 0.18);
+  pointer-events: none;
+  animation: tour-spotlight-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes tour-spotlight-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(250, 204, 21, 0.5),
+      0 0 0 6px rgba(250, 204, 21, 0.14),
+      0 0 22px rgba(250, 204, 21, 0.2),
+      0 0 0 9999px rgba(2, 6, 23, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(250, 204, 21, 0.7),
+      0 0 0 8px rgba(250, 204, 21, 0.25),
+      0 0 32px rgba(250, 204, 21, 0.32),
+      0 0 0 9999px rgba(2, 6, 23, 0.22);
+  }
+}
+
+.tour-card {
+  position: absolute;
+  pointer-events: auto;
+  width: min(92vw, 360px);
+  padding: 16px 18px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: linear-gradient(
+    160deg,
+    rgba(15, 23, 42, 0.98),
+    rgba(2, 6, 23, 0.98)
+  );
+  color: #e2e8f0;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(167, 139, 250, 0.08) inset;
+  transform: translateY(6px) scale(0.98);
+  opacity: 0;
+  animation: tour-card-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 80ms;
+}
+
+.tour-card--top::after,
+.tour-card--bottom::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.tour-card--bottom::after {
+  top: -7px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.tour-card--top::after {
+  bottom: -7px;
+  border-left: none;
+  border-top: none;
+}
+
+@keyframes tour-card-enter {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tour-card-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.tour-card-dismiss:hover {
+  color: #f1f5f9;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.tour-card-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: #67e8f9;
+  margin-bottom: 6px;
+}
+
+.tour-card-title {
+  margin: 0 0 6px;
+  font-size: 1.06rem;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+  padding-right: 18px;
+}
+
+.tour-card-body {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.42;
+  color: #cbd5e1;
+}
+
+.tour-card-reward-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  background: linear-gradient(
+    140deg,
+    rgba(120, 53, 15, 0.28),
+    rgba(15, 23, 42, 0.55)
+  );
+  color: #fef3c7;
+  font-size: 0.78rem;
+}
+
+.tour-card-reward-hint strong { color: #fde68a; }
+
+.tour-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-card-btn {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 120ms ease, filter 160ms ease,
+    background 160ms ease, border-color 160ms ease;
+}
+
+.tour-card-btn.ghost {
+  background: rgba(15, 23, 42, 0.75);
+  color: #cbd5e1;
+  border-color: rgba(100, 116, 139, 0.5);
+}
+
+.tour-card-btn.ghost:hover {
+  border-color: rgba(148, 163, 184, 0.75);
+}
+
+.tour-card-btn.primary {
+  color: #0f172a;
+  background: linear-gradient(120deg, #facc15, #f59e0b);
+  box-shadow: 0 10px 24px rgba(250, 204, 21, 0.25);
+}
+
+.tour-card-btn.primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+/* -------- Quick Snipes micro-demo -------- */
+
+.tour-card-demo {
+  margin-bottom: 10px;
+}
+
+.tour-demo-quick {
+  padding: 4px;
+}
+
+.tour-demo-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  background: rgba(15, 23, 42, 0.88);
+  overflow: hidden;
+}
+
+.tour-demo-card.is-live {
+  border-color: rgba(250, 204, 21, 0.5);
+  box-shadow: 0 0 22px rgba(250, 204, 21, 0.18);
+  transition: border-color 420ms ease, box-shadow 420ms ease;
+}
+
+.tour-demo-card-image {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background: linear-gradient(140deg, #1e293b, #0f172a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.tour-demo-card-image-icon {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+.tour-demo-card-flag {
+  position: absolute;
+  bottom: -6px;
+  left: -4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #34d399, #10b981);
+  color: #052e1e;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 260ms ease, transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tour-demo-card-flag.is-on {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tour-demo-card-body { min-width: 0; }
+
+.tour-demo-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.tour-demo-card-prices {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tour-demo-card-price {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.tour-demo-card-market {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.tour-demo-card-move {
+  margin-top: 4px;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 300ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tour-demo-card-move.is-on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tour-demo-reward {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #facc15, #f59e0b);
+  color: #0f172a;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.8);
+  transition: opacity 240ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tour-demo-reward.is-on {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (max-width: 480px) {
+  .tour-card { width: calc(100vw - 24px); }
+  .tour-card-title { font-size: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-overlay,
+  .tour-spotlight,
+  .tour-card,
+  .tour-demo-card-flag,
+  .tour-demo-card-move,
+  .tour-demo-reward {
+    animation: none !important;
+    transition: none !important;
+  }
+}

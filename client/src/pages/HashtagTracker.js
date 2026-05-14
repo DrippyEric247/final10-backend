@@ -17,76 +17,34 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../lib/api';
 
-// API functions for hashtag tracking
+// API functions for hashtag tracking (same-origin `/api` — never hardcode localhost)
 const hashtagAPI = {
-  // Get user's social media connections
   getConnections: async () => {
-    const token = localStorage.getItem('f10_token');
-    const response = await fetch('http://localhost:5000/api/social/connections', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Failed to fetch connections');
-    return response.json();
+    const { data } = await api.get('/social/connections');
+    return data;
   },
 
-  // Connect social media account
   connectAccount: async (platform, authData) => {
-    const token = localStorage.getItem('f10_token');
-    const response = await fetch('http://localhost:5000/api/social/connect', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ platform, authData })
-    });
-    if (!response.ok) throw new Error('Failed to connect account');
-    return response.json();
+    const { data } = await api.post('/social/connect', { platform, authData });
+    return data;
   },
 
-  // Get tracked posts
   getTrackedPosts: async () => {
-    const token = localStorage.getItem('f10_token');
-    const response = await fetch('http://localhost:5000/api/social/tracked-posts', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Failed to fetch tracked posts');
-    return response.json();
+    const { data } = await api.get('/social/tracked-posts');
+    return data;
   },
 
-  // Manually trigger hashtag scan
   triggerScan: async () => {
-    const token = localStorage.getItem('f10_token');
-    const response = await fetch('http://localhost:5000/api/social/scan-hashtags', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Failed to trigger scan');
-    return response.json();
+    const { data } = await api.post('/social/scan-hashtags', {});
+    return data;
   },
 
-  // Get hashtag campaign stats
   getCampaignStats: async () => {
-    const token = localStorage.getItem('f10_token');
-    const response = await fetch('http://localhost:5000/api/social/campaign-stats', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Failed to fetch campaign stats');
-    return response.json();
-  }
+    const { data } = await api.get('/social/campaign-stats');
+    return data;
+  },
 };
 
 const HashtagTracker = () => {
@@ -528,6 +486,9 @@ const ConnectModal = ({ platform, onClose, onSubmit, isLoading }) => {
 };
 
 export default HashtagTracker;
+
+
+
 
 
 

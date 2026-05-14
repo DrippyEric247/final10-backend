@@ -16,27 +16,37 @@ export const SocketProvider = ({ children }) => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      const newSocket = io(process.env.REACT_APP_SERVER_URL || 'http://localhost:5000', {
+    const token = localStorage.getItem('f10_token') || localStorage.getItem('token');
+
+    if (token && typeof window !== 'undefined') {
+      const url = process.env.REACT_APP_SERVER_URL || window.location.origin;
+      const newSocket = io(url, {
         auth: {
-          token
-        }
+          token,
+        },
       });
 
       newSocket.on('connect', () => {
-        console.log('Connected to server');
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('Socket connected');
+        }
         setConnected(true);
       });
 
       newSocket.on('disconnect', () => {
-        console.log('Disconnected from server');
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('Socket disconnected');
+        }
         setConnected(false);
       });
 
       newSocket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.error('Socket connection error:', error);
+        }
         setConnected(false);
       });
 

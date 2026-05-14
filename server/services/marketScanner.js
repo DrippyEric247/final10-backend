@@ -205,7 +205,7 @@ class MarketScanner {
         endTime: new Date(Date.now() + (auctionData.timeRemaining * 1000)),
         timeRemaining: auctionData.timeRemaining,
         status: 'active',
-        seller: null, // External auction, no internal seller
+        seller: 'external',
         source: {
           platform: auctionData.platform,
           url: auctionData.url
@@ -270,23 +270,26 @@ class MarketScanner {
   async checkAlerts(auction) {
     try {
       const alerts = await Alert.find({ isActive: true });
-      
-      for (const alert of alerts) {
-        if (alert.matchesAuction(auction)) {
-          // Add match to alert
-          alert.matches.push({
-            auction: auction._id,
-            matchedAt: new Date(),
-            reason: 'Matches alert criteria'
-          });
-          
-          alert.triggerCount += 1;
-          alert.lastTriggered = new Date();
-          await alert.save();
 
-          // Send notification to user
-          await this.sendAlertNotification(alert.user, auction, alert);
-        }
+      for (const alert of alerts) {
+        if (!alert.matchesAuction(auction)) continue;
+
+        const already = (alert.matches || []).some(
+          (m) => String(m.auction) === String(auction._id)
+        );
+        if (already) continue;
+
+        alert.matches.push({
+          auction: auction._id,
+          matchedAt: new Date(),
+          reason: 'Matches alert criteria',
+        });
+
+        alert.triggerCount = Number(alert.triggerCount || 0) + 1;
+        alert.lastTriggeredAt = new Date();
+        await alert.save();
+
+        await this.sendAlertNotification(alert.user, auction, alert);
       }
     } catch (error) {
       console.error('Error checking alerts:', error);
@@ -298,10 +301,31 @@ class MarketScanner {
       const user = await User.findById(userId);
       if (!user) return;
 
-      // In a real implementation, this would send push notifications, emails, etc.
       console.log(`Alert triggered for user ${user.username}: ${auction.title}`);
-      
-      // Award points for alert trigger
+
+      const title = `Deal alert: ${alert.name}`;
+      const body = String(auction.title || '').slice(0, 280);
+
+      await User.findByIdAndUpdate(userId, {
+        $push: {
+          notifications: {
+            $each: [
+              {
+                kind: 'alert_match',
+                title,
+                body,
+                listingId: String(auction._id),
+                offerId: '',
+                createdAt: new Date(),
+                readAt: null,
+              },
+            ],
+            $position: 0,
+            $slice: 100,
+          },
+        },
+      });
+
       const SavvyPoint = require('../models/SavvyPoint');
       await SavvyPoint.awardPoints(
         userId,
@@ -312,7 +336,6 @@ class MarketScanner {
         'Auction',
         1
       );
-
     } catch (error) {
       console.error('Error sending alert notification:', error);
     }

@@ -26,6 +26,14 @@ function signUserToken(user) {
   return jwt.sign({ sub, id: user._id, userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
+function hasFoundingTesterAccess(user) {
+  if (!user) return false;
+  const flagged = Boolean(user.betaTester || user.foundingAccess);
+  if (!flagged) return false;
+  if (!user.betaAccessExpiresAt) return true;
+  return new Date(user.betaAccessExpiresAt) > new Date();
+}
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -196,6 +204,10 @@ router.post('/signup', authSignupLimiter, validateRequest(schemas.authSignupBody
         creatorHandle: user.creatorHandle || null,
         attributedTo: user.attributedTo || null,
         creatorCodeApplied: user.creatorCodeApplied || null,
+        betaTester: Boolean(user.betaTester),
+        foundingAccess: Boolean(user.foundingAccess),
+        betaAccessExpiresAt: user.betaAccessExpiresAt || null,
+        foundingTesterAccess: hasFoundingTesterAccess(user),
       },
     });
   } catch (err) {
@@ -228,6 +240,10 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
         points: user.points,
         referralCode: user.referralCode,
         referredBy: user.referredBy || null,
+        betaTester: Boolean(user.betaTester),
+        foundingAccess: Boolean(user.foundingAccess),
+        betaAccessExpiresAt: user.betaAccessExpiresAt || null,
+        foundingTesterAccess: hasFoundingTesterAccess(user),
       },
     });
   } catch (err) {
@@ -270,6 +286,30 @@ router.get('/me', auth, async (req, res, next) => {
       followersCount: Array.isArray(user.followers) ? user.followers.length : 0,
       pinnedWins: user.pinnedWins || [],
       weeklyStats: user.weeklyStats || null,
+      subscription: user.subscription || {
+        tier: 'free',
+        billing: 'monthly',
+        multiplier: 1,
+        earlyAdopter: false,
+        renewalDate: null,
+      },
+      savvyPoints: Number(user.savvyPoints || 0),
+      flipBestScoreEver:
+        user.flipBestScoreEver != null && Number.isFinite(Number(user.flipBestScoreEver))
+          ? Math.round(Number(user.flipBestScoreEver) * 10) / 10
+          : null,
+      flipTotalCompleted: Number(user.flipTotalCompleted || 0),
+      flipAverageScore:
+        user.flipTotalCompleted > 0 && Number.isFinite(Number(user.flipScoreLifetimeSum))
+          ? Math.round((Number(user.flipScoreLifetimeSum) / Number(user.flipTotalCompleted)) * 10) / 10
+          : null,
+      badges: Array.isArray(user.badges) ? user.badges : [],
+      earlyAdopterLocked: Boolean(user.earlyAdopterLocked),
+      earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice || null,
+      betaTester: Boolean(user.betaTester),
+      foundingAccess: Boolean(user.foundingAccess),
+      betaAccessExpiresAt: user.betaAccessExpiresAt || null,
+      foundingTesterAccess: hasFoundingTesterAccess(user),
     });
   } catch (err) {
     return next(err);

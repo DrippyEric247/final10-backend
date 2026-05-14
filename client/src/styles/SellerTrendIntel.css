@@ -1,0 +1,2519 @@
+/**
+ * Seller Trend Intelligence — dashboard + inline badges + alert feed.
+ *
+ * Visual system follows the same premium dark ethos as the deal-card
+ * shell: soft gradient borders, emerald for "good for you" signals,
+ * indigo for seller-side signals.
+ */
+
+/* ===================== Shared tokens ===================== */
+
+:root {
+  --str-emerald: rgba(52, 211, 153, 0.45);
+  --str-emerald-soft: rgba(52, 211, 153, 0.1);
+  --str-indigo: rgba(129, 140, 248, 0.45);
+  --str-indigo-soft: rgba(129, 140, 248, 0.1);
+  --str-surface: linear-gradient(
+    160deg,
+    rgba(15, 23, 42, 0.9),
+    rgba(2, 6, 23, 0.9)
+  );
+}
+
+/* ===================== Trend badge (inline) ===================== */
+
+.seller-trend-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  background: linear-gradient(
+    120deg,
+    rgba(120, 53, 15, 0.26),
+    rgba(15, 23, 42, 0.55)
+  );
+  color: #fde68a;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+  margin-top: 12px;
+}
+
+.seller-trend-badge-label {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.seller-trend-badge-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fef3c7;
+}
+
+.seller-trend-badge-savvy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.seller-trend-badge-sep {
+  color: rgba(254, 243, 199, 0.55);
+}
+
+/* ===================== Alert feed ===================== */
+
+.seller-trend-alerts {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: var(--str-surface);
+}
+
+.seller-trend-alerts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.seller-trend-alerts-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #a5b4fc;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.seller-trend-alerts-link {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c7d2fe;
+  text-decoration: none;
+}
+
+.seller-trend-alerts-link:hover { color: #e0e7ff; }
+
+.seller-trend-alerts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seller-trend-alert {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(71, 85, 105, 0.45);
+}
+
+.seller-trend-alert-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.seller-trend-alert-delta {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #6ee7b7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.seller-trend-alert-detail {
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+}
+
+.seller-trend-alerts-upsell {
+  margin-top: 10px;
+  font-size: 0.74rem;
+  color: #e0e7ff;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px dashed rgba(129, 140, 248, 0.5);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.seller-trend-alerts--empty {
+  border-style: dashed;
+  border-color: rgba(71, 85, 105, 0.45);
+}
+
+.seller-trend-alerts-empty-title {
+  color: #f1f5f9;
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.seller-trend-alerts-empty-body {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* ===================== Dashboard ===================== */
+
+/* ---- eBay Browse snapshot (active listings, not sold) ---- */
+.seller-trends-ebay-disclaimer {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.seller-trends-ebay-disclaimer strong {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.seller-trends-ebay-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.seller-trends-ebay-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.seller-trends-ebay-kw {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #e0e7ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.seller-trends-ebay-window {
+  margin: 0 0 24px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(71, 85, 105, 0.35);
+}
+
+.seller-trends-ebay-window-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.seller-trends-ebay-window-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.seller-trends-ebay-window-detail {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.seller-trends-ebay-fallback {
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  color: #fde68a;
+  font-size: 0.88rem;
+}
+
+.seller-trends-local-head {
+  margin: 28px 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.seller-trend-ebay-card.seller-trend-card {
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+.seller-trend-ebay-card .seller-trend-card-flag {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+}
+
+.seller-trends-wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 0 48px;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.seller-trends-header {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 20px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: var(--str-surface);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+}
+
+.seller-trends-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #a5b4fc;
+  margin-bottom: 4px;
+}
+
+.seller-trends-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+}
+
+.seller-trends-sub {
+  margin: 8px 0 0;
+  max-width: 560px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.seller-trends-stats {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.seller-trends-stat {
+  min-width: 110px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.seller-trends-stat-value {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.seller-trends-stat-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.seller-trends-empty {
+  padding: 28px 24px;
+  border-radius: 16px;
+  border: 1px dashed rgba(129, 140, 248, 0.4);
+  background: rgba(15, 23, 42, 0.55);
+  text-align: center;
+}
+
+.seller-trends-empty h2 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  color: #f1f5f9;
+}
+
+.seller-trends-empty p {
+  margin: 0 auto;
+  max-width: 560px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.seller-trends-empty-meta {
+  margin-top: 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.seller-trends-alerts {
+  /* lets SellerTrendAlerts stretch full width on the dashboard page */
+}
+
+.seller-trends-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+/* ===================== Trend card ===================== */
+
+.seller-trend-card {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: var(--str-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.seller-trend-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(129, 140, 248, 0.55);
+}
+
+.seller-trend-card.is-trending {
+  border-color: rgba(250, 204, 21, 0.55);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.2) inset,
+    0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.seller-trend-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.seller-trend-card-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  letter-spacing: -0.005em;
+}
+
+.seller-trend-card-score-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seller-trend-card-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.4);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  letter-spacing: 0.04em;
+}
+
+.seller-trend-card-score {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #c7d2fe;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.seller-trend-card-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.seller-trend-card-stat {
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  text-align: center;
+}
+
+.seller-trend-card-stat-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.seller-trend-card-stat-value {
+  margin-top: 2px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.seller-trend-card-stat-value.is-positive { color: #6ee7b7; }
+
+.seller-trend-card-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seller-trend-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.seller-trend-card-row-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.seller-trend-card-row-label--natural {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 800;
+  color: #cbd5e1;
+}
+
+.seller-trend-card-row--resell {
+  align-items: flex-start;
+}
+
+.seller-trend-card-profit-hint {
+  margin: -2px 0 0;
+  padding: 0 8px 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.seller-trend-card-row-value {
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.seller-trend-card-comp--low { color: #6ee7b7; }
+.seller-trend-card-comp--medium { color: #fde68a; }
+.seller-trend-card-comp--high { color: #fda4af; }
+.seller-trend-card-comp--unknown { color: #94a3b8; font-weight: 600; }
+
+.seller-trend-card-recs {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(71, 85, 105, 0.5);
+}
+
+.seller-trend-card-recs-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: #a5b4fc;
+  text-transform: uppercase;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.seller-trend-card-recs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.seller-trend-card-rec {
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+/* ===================== Premium ===================== */
+
+.seller-trends-premium {
+  padding: 20px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: linear-gradient(
+    150deg,
+    rgba(49, 46, 129, 0.35),
+    rgba(15, 23, 42, 0.9)
+  );
+}
+
+.seller-trends-premium-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: #c7d2fe;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.seller-trends-premium-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.seller-trends-premium-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.seller-trends-premium-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+}
+
+.seller-trends-premium-item.is-unlocked {
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.seller-trends-premium-item-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.seller-trends-premium-chip {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #6ee7b7;
+}
+
+.seller-trends-premium-chip.muted {
+  color: #c7d2fe;
+  background: rgba(129, 140, 248, 0.12);
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.seller-trends-premium-item-blurb {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.seller-trends-premium-foot {
+  margin-top: 14px;
+  text-align: right;
+}
+
+.seller-trends-primary-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: linear-gradient(120deg, #a78bfa, #818cf8);
+  color: #0f172a;
+  font-weight: 800;
+  text-decoration: none;
+  font-size: 0.88rem;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.seller-trends-primary-link:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+/* ===================== Auto Flip Suggestions ===================== */
+
+.seller-flip-section {
+  margin-top: 28px;
+  padding: 20px 20px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  background: linear-gradient(
+    165deg,
+    rgba(6, 78, 59, 0.35),
+    rgba(15, 23, 42, 0.92)
+  );
+}
+
+.seller-flip-section-head {
+  margin-bottom: 16px;
+}
+
+.seller-flip-eyebrow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.seller-flip-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: #6ee7b7;
+  font-weight: 800;
+}
+
+.seller-flip-live-pill {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #a7f3d0;
+}
+
+.seller-flip-title {
+  margin: 6px 0 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.seller-flip-sub {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  max-width: 62ch;
+}
+
+.seller-flip-hero {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.12) inset;
+}
+
+.seller-flip-hero-badge {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fde68a;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.seller-flip-hero-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  line-height: 1.35;
+}
+
+.seller-flip-hero-meta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 0.84rem;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.seller-flip-hero-profit {
+  color: #6ee7b7;
+  font-variant-numeric: tabular-nums;
+}
+
+.seller-flip-hero-actions {
+  margin-top: 12px;
+}
+
+.seller-flip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.seller-flip-card {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: var(--str-surface);
+  overflow: hidden;
+  min-height: 200px;
+}
+
+.seller-flip-card--locked {
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.seller-flip-card-inner {
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.seller-flip-card--locked .seller-flip-card-inner {
+  filter: blur(5px);
+  user-select: none;
+  pointer-events: none;
+}
+
+.seller-flip-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.05),
+    rgba(15, 23, 42, 0.88)
+  );
+}
+
+.seller-flip-lock-msg {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #f1f5f9;
+}
+
+.seller-flip-lock-link {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #a5b4fc;
+  text-decoration: none;
+}
+
+.seller-flip-lock-link:hover {
+  text-decoration: underline;
+}
+
+.seller-flip-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seller-flip-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.3;
+}
+
+.seller-flip-cat {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+/* ===================== Flip Score ===================== */
+
+.seller-flip-score-wrap {
+  margin-top: 8px;
+  padding: 10px 10px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.seller-flip-score-wrap--hero {
+  margin-top: 10px;
+  padding: 12px 12px 10px;
+}
+
+.seller-pcalc-modal .seller-flip-score-wrap {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.seller-flip-score-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seller-flip-score-num {
+  font-size: 1.65rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.seller-flip-score-wrap--hero .seller-flip-score-num {
+  font-size: 2.35rem;
+}
+
+.seller-flip-score-suffix {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.seller-flip-score-badge {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seller-flip-score-emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.seller-flip-score-why {
+  margin: 8px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.seller-flip-score-why strong {
+  color: #e2e8f0;
+  font-weight: 800;
+}
+
+.seller-flip-score--elite {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(6, 78, 59, 0.22);
+}
+
+.seller-flip-score--elite .seller-flip-score-num {
+  color: #6ee7b7;
+}
+
+.seller-flip-score--strong {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(30, 58, 138, 0.28);
+}
+
+.seller-flip-score--strong .seller-flip-score-num {
+  color: #93c5fd;
+}
+
+.seller-flip-score--risky {
+  border-color: rgba(250, 204, 21, 0.45);
+  background: rgba(120, 53, 15, 0.18);
+}
+
+.seller-flip-score--risky .seller-flip-score-num {
+  color: #fde68a;
+}
+
+.seller-flip-score--avoid {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.seller-flip-score--avoid .seller-flip-score-num {
+  color: #fca5a5;
+}
+
+.seller-flip-dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seller-flip-dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.seller-flip-dl dt {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 0 1 46%;
+}
+
+.seller-flip-dt-natural {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: #cbd5e1;
+  font-size: 0.72rem;
+}
+
+.seller-flip-dl dd {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.seller-flip-profit {
+  color: #6ee7b7;
+}
+
+.seller-flip-card-foot {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.seller-flip-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.seller-flip-card--opens-calc {
+  cursor: pointer;
+}
+
+.seller-flip-card--opens-calc:hover {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.seller-flip-confidence {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(71, 85, 105, 0.6);
+  color: #cbd5e1;
+}
+
+.seller-flip-confidence--high {
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(6, 78, 59, 0.25);
+}
+
+.seller-flip-confidence--medium {
+  color: #fde68a;
+  border-color: rgba(250, 204, 21, 0.4);
+  background: rgba(120, 53, 15, 0.2);
+}
+
+.seller-flip-confidence--low {
+  color: #94a3b8;
+}
+
+.seller-flip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-decoration: none;
+  background: linear-gradient(120deg, #34d399, #10b981);
+  color: #022c22;
+  border: none;
+  cursor: pointer;
+}
+
+.seller-flip-btn:hover {
+  filter: brightness(1.06);
+}
+
+.seller-flip-btn--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.seller-flip-btn--secondary {
+  background: transparent;
+  color: #a7f3d0;
+  border: 1px solid rgba(52, 211, 153, 0.55);
+  cursor: pointer;
+  text-decoration: none;
+  font: inherit;
+}
+
+.seller-flip-btn--secondary:hover {
+  background: rgba(16, 185, 129, 0.12);
+  filter: none;
+}
+
+.seller-flip-btn--compact {
+  padding: 7px 10px;
+  font-size: 0.72rem;
+}
+
+/* ===================== Flip profit calculator modal ===================== */
+
+.seller-pcalc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.seller-pcalc-modal {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  max-height: min(92vh, 720px);
+  overflow-y: auto;
+  padding: 22px 20px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.94));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.seller-pcalc-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.seller-pcalc-close:hover {
+  background: rgba(51, 65, 85, 0.95);
+}
+
+.seller-pcalc-title {
+  margin: 0 36px 0 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.seller-pcalc-deal-title {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.seller-pcalc-actions-top {
+  margin-top: 14px;
+}
+
+.seller-pcalc-autofill {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(129, 140, 248, 0.55);
+  background: rgba(99, 102, 241, 0.1);
+  color: #c7d2fe;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.seller-pcalc-autofill:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.seller-pcalc-fields {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.seller-pcalc-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.seller-pcalc-optional {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.seller-pcalc-input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.75);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.seller-pcalc-input:focus {
+  outline: 2px solid rgba(52, 211, 153, 0.45);
+  outline-offset: 1px;
+}
+
+.seller-pcalc-fee-block {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(71, 85, 105, 0.55);
+}
+
+.seller-pcalc-fee-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+}
+
+.seller-pcalc-fee-value {
+  font-variant-numeric: tabular-nums;
+  color: #6ee7b7;
+  font-weight: 900;
+}
+
+.seller-pcalc-range {
+  width: 100%;
+  margin-top: 8px;
+  accent-color: #34d399;
+  cursor: pointer;
+}
+
+.seller-pcalc-range-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.seller-pcalc-results {
+  margin-top: 18px;
+  padding: 14px 14px 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(71, 85, 105, 0.6);
+  background: rgba(15, 23, 42, 0.65);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.seller-pcalc-results--good {
+  border-color: rgba(52, 211, 153, 0.65);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15) inset;
+}
+
+.seller-pcalc-results--risk {
+  border-color: rgba(250, 204, 21, 0.55);
+  box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.12) inset;
+}
+
+.seller-pcalc-results--bad {
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.12) inset;
+}
+
+.seller-pcalc-results-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #e2e8f0;
+  margin-bottom: 10px;
+}
+
+.seller-pcalc-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 0.84rem;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.seller-pcalc-line--hero {
+  border-top: none;
+  padding-top: 0;
+  margin-top: -4px;
+}
+
+.seller-pcalc-line + .seller-pcalc-line {
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.seller-pcalc-line strong {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.seller-pcalc-results--good .seller-pcalc-line strong {
+  color: #6ee7b7;
+}
+
+.seller-pcalc-results--risk .seller-pcalc-line strong {
+  color: #fde68a;
+}
+
+.seller-pcalc-results--bad .seller-pcalc-line strong {
+  color: #fca5a5;
+}
+
+.seller-pcalc-foot {
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* ===================== List this item assistant ===================== */
+
+.seller-trend-card-list-actions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(71, 85, 105, 0.55);
+}
+
+.seller-trend-card-list-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(99, 102, 241, 0.12);
+  color: #e9d5ff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.seller-trend-card-list-btn:hover {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.seller-lassist-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.75);
+  backdrop-filter: blur(6px);
+}
+
+.seller-lassist-modal {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: min(92vh, 760px);
+  overflow-y: auto;
+  padding: 22px 20px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  background: linear-gradient(165deg, rgba(30, 27, 75, 0.55), rgba(15, 23, 42, 0.96));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.seller-lassist-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.seller-lassist-steps span {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #64748b;
+  border: 1px solid rgba(71, 85, 105, 0.7);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.seller-lassist-steps span.is-on {
+  color: #ede9fe;
+  border-color: rgba(167, 139, 250, 0.65);
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.seller-lassist-steps-line {
+  width: 22px !important;
+  height: 2px !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background: rgba(71, 85, 105, 0.65);
+}
+
+.seller-lassist-title {
+  margin: 0 36px 0 0;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.seller-lassist-source {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+}
+
+.seller-lassist-panel {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.seller-lassist-lead {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f1f5f9;
+}
+
+.seller-lassist-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.seller-lassist-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seller-lassist-summary li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(71, 85, 105, 0.45);
+}
+
+.seller-lassist-summary span {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.seller-lassist-summary strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+.seller-lassist-demand {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #a7f3d0;
+  font-weight: 700;
+}
+
+.seller-lassist-primary {
+  margin-top: 4px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 11px;
+  font-size: 0.88rem;
+  font-weight: 900;
+  cursor: pointer;
+  background: linear-gradient(120deg, #a78bfa, #6366f1);
+  color: #0f172a;
+}
+
+.seller-lassist-primary:hover {
+  filter: brightness(1.05);
+}
+
+.seller-lassist-secondary {
+  padding: 10px 14px;
+  border-radius: 11px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+}
+
+.seller-lassist-secondary:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.seller-lassist-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.seller-lassist-nav--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.seller-lassist-ai {
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seller-lassist-ai-line {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #d1fae5;
+}
+
+.seller-lassist-ai-line.muted {
+  font-weight: 600;
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.seller-lassist-toggle-row {
+  display: flex;
+  gap: 8px;
+}
+
+.seller-lassist-toggle {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.seller-lassist-toggle.is-on {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #ecfdf5;
+  background: rgba(6, 78, 59, 0.35);
+}
+
+.seller-lassist-textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.75);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 88px;
+  font-family: inherit;
+}
+
+.seller-lassist-textarea--mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.74rem;
+}
+
+.seller-lassist-footnote {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* ===================== Savvy Flip sale reward modal ===================== */
+
+.seller-flip-reward-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.seller-flip-reward-modal {
+  position: relative;
+  width: min(420px, 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: var(--str-surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  padding: 22px 20px 18px;
+  color: #e2e8f0;
+}
+
+.seller-flip-reward-hero {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.seller-flip-reward-headline {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #ecfdf5;
+  letter-spacing: -0.02em;
+}
+
+.seller-flip-reward-subcopy {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.seller-flip-reward-big {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 900;
+  color: #34d399;
+}
+
+.seller-flip-reward-execution {
+  margin: 10px 0 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #bae6fd;
+}
+
+.seller-flip-reward-elite {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fde68a;
+  line-height: 1.35;
+}
+
+.seller-flip-reward-stats {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  justify-content: center;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.seller-flip-reward-stats strong {
+  color: #e2e8f0;
+}
+
+.seller-flip-savvy-potential {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #a5b4fc;
+  line-height: 1.35;
+}
+
+.seller-flip-savvy-potential--calc {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.seller-flip-gamify-strip {
+  margin: 16px 0 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: rgba(30, 27, 75, 0.35);
+}
+
+.seller-flip-gamify-title {
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c4b5fd;
+  margin-bottom: 8px;
+}
+
+.seller-flip-gamify-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.seller-flip-gamify-stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.seller-flip-gamify-stats strong {
+  font-size: 0.95rem;
+  color: #f1f5f9;
+}
+
+.seller-flip-reward-breakdown {
+  border-radius: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: rgba(15, 23, 42, 0.65);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.seller-flip-reward-bd-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.seller-flip-reward-bd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seller-flip-reward-bd-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.seller-flip-reward-bd-list li.is-cap {
+  color: #fca5a5;
+  font-size: 0.82rem;
+}
+
+.seller-flip-reward-bd-list .is-neg {
+  color: #fca5a5;
+}
+
+.seller-flip-reward-cap-note {
+  margin: 10px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #94a3b8;
+}
+
+.seller-flip-reward-done {
+  width: 100%;
+  justify-content: center;
+}
+
+.seller-pcalc-savvy-block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(71, 85, 105, 0.45);
+}
+
+.seller-pcalc-savvy-title {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.seller-pcalc-savvy-hint {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.seller-pcalc-savvy-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seller-pcalc-savvy-err {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .seller-trends-header { flex-direction: column; }
+  .seller-trends-stats { flex-wrap: wrap; }
+  .seller-trend-card-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Elite flip lane teaser (9.0+ gated) */
+.seller-flip-elite-empty-pool {
+  margin: 0 0 12px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #fcd34d;
+  max-width: 640px;
+}
+
+.seller-flip-elite-lane {
+  margin-top: 28px;
+  padding: 18px 16px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: linear-gradient(160deg, rgba(66, 32, 6, 0.35), rgba(15, 23, 42, 0.92));
+}
+.seller-flip-elite-lane-head {
+  margin-bottom: 14px;
+}
+.seller-flip-elite-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fde68a;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: rgba(120, 53, 15, 0.35);
+}
+.seller-flip-elite-title {
+  margin: 10px 0 6px;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #fef3c7;
+}
+.seller-flip-elite-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #fcd34d;
+  max-width: 640px;
+}
+.seller-flip-elite-blur-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.seller-flip-elite-blur-card {
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  overflow: hidden;
+  min-height: 120px;
+}
+.seller-flip-elite-blur-inner {
+  padding: 12px;
+  filter: blur(5px);
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.65;
+}
+.seller-flip-elite-blur-score {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fef08a;
+}
+.seller-flip-elite-blur-title {
+  margin: 8px 0 4px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  line-height: 1.25;
+}
+.seller-flip-elite-blur-profit {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #86efac;
+}
+.seller-flip-elite-cta-copy {
+  margin: 16px 0 6px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #fef9c3;
+}
+.seller-flip-elite-cta {
+  display: inline-block;
+  font-size: 0.86rem;
+  font-weight: 900;
+  color: #c4b5fd;
+  text-decoration: none;
+}
+.seller-flip-elite-cta:hover {
+  text-decoration: underline;
+}
+
+.seller-trends-stats-wrap {
+  position: relative;
+  min-height: 72px;
+}
+.seller-trends-stats--elite-locked {
+  filter: blur(6px);
+  opacity: 0.45;
+  user-select: none;
+  pointer-events: none;
+}
+.seller-trends-stats-elite-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px dashed rgba(129, 140, 248, 0.45);
+}
+.seller-trends-stats-elite-overlay strong {
+  color: #fde68a;
+  font-size: 0.95rem;
+}
+.seller-trends-stats-elite-overlay span {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  max-width: 280px;
+  line-height: 1.35;
+}
+.seller-trends-stats-elite-overlay a {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #a5b4fc;
+  text-decoration: none;
+}
+.seller-trends-stats-elite-overlay a:hover {
+  text-decoration: underline;
+}
+
+.seller-trends-ai-next {
+  margin-top: 28px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  background: rgba(15, 23, 42, 0.75);
+}
+.seller-trends-ai-next--locked {
+  position: relative;
+  overflow: hidden;
+}
+.seller-trends-ai-next--locked::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(15, 23, 42, 0.65));
+  pointer-events: none;
+}
+.seller-trends-ai-next h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #e0e7ff;
+}
+.seller-trends-ai-next p {
+  margin: 0 0 10px;
+  font-size: 0.84rem;
+  color: #94a3b8;
+  max-width: 520px;
+  line-height: 1.4;
+}
+.seller-trends-ai-next a {
+  font-size: 0.84rem;
+  font-weight: 900;
+  color: #a5b4fc;
+  text-decoration: none;
+}
+.seller-trends-ai-next a:hover {
+  text-decoration: underline;
+}
+
+/* ========== Seller Signals (personalized intelligence) ========== */
+
+.ssi-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 8px 0 28px;
+}
+
+.ssi-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.ssi-modal {
+  width: min(520px, 100%);
+  max-height: min(88vh, 720px);
+  overflow: auto;
+  padding: 22px 20px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.55);
+}
+
+.ssi-modal-title {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.ssi-modal-sub {
+  margin: 0 0 16px;
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.ssi-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ssi-cat-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ssi-cat-chip:hover {
+  border-color: rgba(129, 140, 248, 0.55);
+  color: #fff;
+}
+
+.ssi-cat-chip.is-on {
+  border-color: rgba(52, 211, 153, 0.65);
+  background: rgba(52, 211, 153, 0.12);
+  color: #bbf7d0;
+}
+
+.ssi-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.ssi-btn {
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.86rem;
+  padding: 10px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.ssi-btn-primary {
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.95), rgba(52, 211, 153, 0.55));
+  color: #0f172a;
+  border-color: rgba(129, 140, 248, 0.35);
+}
+
+.ssi-btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.ssi-btn-ghost {
+  background: transparent;
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.55);
+}
+
+.ssi-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.ssi-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ssi-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ssi-mode-pill {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: rgba(2, 6, 23, 0.45);
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.ssi-mode-pill.is-active {
+  border-color: rgba(250, 204, 21, 0.55);
+  color: #fef3c7;
+  background: rgba(120, 53, 15, 0.25);
+}
+
+.ssi-linkish {
+  border: none;
+  background: none;
+  color: #a5b4fc;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ssi-filter-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.ssi-filter-chip {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: rgba(15, 23, 42, 0.65);
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.ssi-filter-chip.is-active {
+  border-color: rgba(129, 140, 248, 0.65);
+  color: #e0e7ff;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.ssi-savvy {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: linear-gradient(110deg, rgba(52, 211, 153, 0.08), rgba(15, 23, 42, 0.75));
+}
+
+.ssi-savvy-mark {
+  color: #6ee7b7;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.ssi-savvy-text {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #d1fae5;
+  line-height: 1.45;
+}
+
+.ssi-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.ssi-card {
+  border-radius: 16px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.92));
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.ssi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.ssi-card.is-hot {
+  border-color: rgba(250, 204, 21, 0.45);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.12) inset;
+}
+
+.ssi-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ssi-card-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.ssi-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.ssi-card-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ssi-type-pill {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.ssi-metrics {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.ssi-metrics dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.ssi-metrics dd {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+.ssi-casual-lines {
+  margin: 0;
+  padding-left: 18px;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.ssi-casual-lines strong {
+  color: #f1f5f9;
+}
+
+.ssi-label {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.ssi-platforms {
+  padding-top: 4px;
+  border-top: 1px dashed rgba(71, 85, 105, 0.45);
+}
+
+.ssi-platform-list {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+
+.ssi-range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ssi-value {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.ssi-elite {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fde68a;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(120, 53, 15, 0.2);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.ssi-sample {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.ssi-card-actions {
+  margin-top: 2px;
+}
+
+.ssi-btn-block {
+  width: 100%;
+}
+
+.ssi-empty {
+  margin: 0;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(71, 85, 105, 0.45);
+  color: #94a3b8;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.ssi-footnote {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* Size intelligence (footwear lanes) */
+.ssi-size-intel {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  background: rgba(52, 211, 153, 0.06);
+}
+
+.ssi-size-intel--casual {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ssi-size-intel-mark {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.ssi-size-intel-casual-text {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #d1fae5;
+  line-height: 1.45;
+}
+
+.ssi-size-intel-kicker {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+  margin-bottom: 6px;
+}
+
+.ssi-size-intel-line {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  color: #ecfdf5;
+  line-height: 1.4;
+}
+
+.ssi-size-intel-strong {
+  font-weight: 900;
+  color: #a7f3d0;
+}
+
+.ssi-size-intel-alert {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fde68a;
+  line-height: 1.35;
+}
+
+.ssi-size-intel-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #86efac;
+  opacity: 0.9;
+  line-height: 1.35;
+}

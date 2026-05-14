@@ -115,6 +115,8 @@ const paymentRoutes     = require('./routes/payments');
 const localDealsRoutes  = require('./routes/localDeals');
 const communityRoutes   = require('./routes/community');
 const alertsRoutes      = require('./routes/alerts');
+const projectAlertsRoutes = require('./routes/projectAlerts');
+const buildWarsRoutes = require('./routes/buildWars');
 const ebayRoutes        = require("./routes/ebay");
 const ebayAuthRoutes    = require('./routes/ebayAuth');
 const mcpRoutes         = require('./routes/mcp');
@@ -131,7 +133,22 @@ const entitlementRoutes = require('./routes/entitlementRoutes');
 const offersRoutes = require('./routes/offers');
 const businessOffersRoutes = require('./routes/businessOffers');
 const creatorRoutes = require('./routes/creators');
+const savvyShopRoutes = require('./routes/savvyShop');
 const partyRoutes = require('./routes/parties');
+const subscribeRoutes = require('./routes/subscribe');
+const flipRewardsRoutes = require('./routes/flipRewards');
+const marketValueRoutes = require('./routes/marketValue');
+const analyticsIngestRoutes = require('./routes/analyticsIngest');
+const { logProcessCrash } = require('./services/structuredLog');
+
+process.on('uncaughtException', (err) => {
+  logProcessCrash('PROCESS_UNCAUGHT_EXCEPTION', err);
+});
+process.on('unhandledRejection', (reason) => {
+  const e =
+    reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : JSON.stringify(reason));
+  logProcessCrash('PROCESS_UNHANDLED_REJECTION', e);
+});
 
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
@@ -146,6 +163,8 @@ app.use('/api/payments',    paymentRoutes);
 app.use('/api/local-deals', localDealsRoutes);
 app.use('/api/community',   communityRoutes);
 app.use('/api/alerts',      alertsRoutes);
+app.use('/api/project-alerts', projectAlertsRoutes);
+app.use('/api/build-wars', buildWarsRoutes);
 app.use("/api/ebay", ebayRoutes);
 app.use('/api/ebay-auth', ebayAuthRoutes);
 app.use('/api/mcp', mcpRoutes);
@@ -162,7 +181,12 @@ app.use('/api/entitlements', entitlementRoutes);
 app.use('/api/offers', offersRoutes);
 app.use('/api/business-offers', businessOffersRoutes);
 app.use('/api/creators', creatorRoutes);
+app.use('/api/savvy-shop', savvyShopRoutes);
 app.use('/api/parties', partyRoutes);
+app.use('/api/subscribe', subscribeRoutes);
+app.use('/api/flip-rewards', flipRewardsRoutes);
+app.use('/api/market-value', marketValueRoutes);
+app.use('/api/analytics', analyticsIngestRoutes);
 
 // health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));

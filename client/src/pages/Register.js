@@ -3,31 +3,73 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
+import { recordDailyLogin } from '../lib/final10PowerEngine';
+import { recordBattlePassXp } from '../lib/battlePassEngine';
+import { triggerDailyLoginReward, triggerStreakReward } from '../lib/rewardEngine';
+import { buildSignupAttributionPayload, getAttribution } from '../lib/attribution';
+import { hasCompletedOnboarding } from '../lib/onboardingPreferences';
+import { ANALYTICS_EVENTS, trackEvent } from '../lib/analytics';
+import { parseApiError } from '../lib/apiErrorParsing';
+import LoadingState from '../components/ui/states/LoadingState';
 
 export default function Register() {
   const { register } = useAuth();
   const nav = useNavigate();
   const [qs] = useSearchParams();
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     username: '', firstName: '', lastName: '',
     email: '', password: '', referralCode: ''
   });
 
-  // auto-fill ref code if coming from ?ref=XYZ
+  // auto-fill ref/creator code if coming from a deep link or stored attribution
   useEffect(() => {
-    const ref = qs.get('ref');
-    if (ref) setForm(f => ({ ...f, referralCode: ref }));
+    trackEvent(ANALYTICS_EVENTS.SIGNUP_STARTED, { path: '/register' });
+  }, []);
+
+  useEffect(() => {
+    const refFromUrl = qs.get('ref');
+    const stored = getAttribution();
+    const codeFromUrl = qs.get('code') || qs.get('promo');
+    const code =
+      codeFromUrl ||
+      stored?.creatorCode ||
+      refFromUrl ||
+      stored?.referralCode ||
+      '';
+    if (code) setForm(f => ({ ...f, referralCode: code }));
   }, [qs]);
+
+  const attribution = getAttribution();
 
   async function onSubmit(e) {
     e.preventDefault();
     setErr('');
+    setBusy(true);
     try {
-      await register(form);
-      nav('/'); // go to dashboard
+      const attributionPayload = buildSignupAttributionPayload();
+      const payload = attributionPayload
+        ? { ...form, attribution: attributionPayload }
+        : form;
+      await register(payload);
+      trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, { method: 'email' });
+      const loginPower = recordDailyLogin();
+      if (loginPower.changed) {
+        recordBattlePassXp('daily_login');
+        triggerDailyLoginReward(20);
+        triggerStreakReward(loginPower.streakDays);
+      }
+      // Send the freshly-registered user straight into the "Instant Best
+      // Move" preference flow so we never drop them onto a generic
+      // homepage. If they've already completed it (e.g. previous visit on
+      // the same device), fall through to the dashboard.
+      nav(hasCompletedOnboarding() ? '/' : '/onboarding/preferences', { replace: true });
     } catch (e) {
-      setErr(e?.response?.data?.message || 'Registration failed');
+      const { message } = parseApiError(e);
+      setErr(message || 'Registration failed. Please try again.');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -39,7 +81,28 @@ export default function Register() {
       </div>
       
       <h1 className="text-3xl font-bold mb-4 text-center">Join FINAL10</h1>
-      {err && <div className="mb-3 text-red-400">{err}</div>}
+      {attribution?.creatorHandle ? (
+        <div className="mb-4 p-3 rounded-lg border border-purple-400/40 bg-purple-900/30 text-purple-100 text-sm">
+          You're joining through{' '}
+          <strong className="text-purple-200">@{attribution.creatorHandle}</strong>
+          {attribution.creatorCode ? (
+            <>
+              {' '}— code{' '}
+              <span className="font-mono bg-white/10 px-1.5 py-0.5 rounded">
+                {attribution.creatorCode}
+              </span>{' '}
+              will auto-apply.
+            </>
+          ) : (
+            '. Their picks will be highlighted in your feed.'
+          )}
+        </div>
+      ) : null}
+      {err ? (
+        <div className="mb-3 rounded-lg border border-red-500/35 bg-red-950/40 px-3 py-2 text-sm text-red-200" role="alert">
+          {err}
+        </div>
+      ) : null}
       <form onSubmit={onSubmit} className="space-y-3">
         <input className="w-full p-3 rounded bg-gray-900" placeholder="Username" name="username" id="username"
                value={form.username} onChange={e=>setForm({...form, username:e.target.value})}/>
@@ -55,8 +118,19 @@ export default function Register() {
                value={form.password} onChange={e=>setForm({...form, password:e.target.value})}/>
         <input className="w-full p-3 rounded bg-gray-900" placeholder="Referral code (optional)" name="referralCode" id="referralCode"
                value={form.referralCode} onChange={e=>setForm({...form, referralCode:e.target.value})}/>
-        <button className="w-full p-3 rounded bg-yellow-400 text-black font-semibold">Sign up</button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full p-3 rounded bg-yellow-400 text-black font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {busy ? 'Creating account…' : 'Sign up'}
+        </button>
       </form>
+      {busy ? (
+        <div className="mt-4 flex justify-center">
+          <LoadingState variant="inline" label="Creating your account…" />
+        </div>
+      ) : null}
       <p className="mt-3 text-sm text-gray-400">Already have an account? <Link className="underline" to="/login">Login</Link></p>
     </div>
   );

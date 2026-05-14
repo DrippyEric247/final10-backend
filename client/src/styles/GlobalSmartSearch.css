@@ -1,0 +1,343 @@
+/* GlobalSmartSearch — shared search bar across Trending, Auctions, Quick
+ * Snipes, and Savvy Offers. Visual language matches the Final10 dark UI: deep
+ * panel surface, purple/amber accent, soft glow on focus.
+ */
+
+.gss-wrap {
+  position: relative;
+  width: 100%;
+  margin: 0 0 18px 0;
+  z-index: 30;
+  color: #e6e9ff;
+}
+
+.gss-subtext {
+  margin: 10px auto 0;
+  max-width: 720px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #a8add6;
+  text-align: center;
+}
+
+.gss-filter-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8b92c0;
+}
+
+.gss-chip.is-locked {
+  opacity: 0.78;
+  cursor: pointer;
+  border-style: dashed;
+  border-color: rgba(250, 204, 21, 0.35);
+  color: #dfe3ff;
+}
+
+.gss-chip.is-locked:hover {
+  border-color: rgba(250, 204, 21, 0.55);
+  background: rgba(250, 204, 21, 0.1);
+  color: #fff8e7;
+}
+
+.gss-wrap[data-size="hero"] .gss-bar {
+  padding: 14px 16px;
+  border-radius: 16px;
+}
+
+.gss-wrap[data-size="hero"] .gss-input {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.gss-wrap[data-size="hero"] .gss-bar-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.gss-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(15, 18, 34, 0.92), rgba(11, 14, 28, 0.92));
+  border: 1px solid rgba(124, 131, 255, 0.28);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(8, 10, 24, 0.45);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.gss-bar:focus-within {
+  border-color: rgba(168, 174, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(124, 131, 255, 0.18), 0 8px 22px rgba(8, 10, 24, 0.55);
+}
+
+.gss-bar-icon {
+  width: 18px;
+  height: 18px;
+  color: #a7adff;
+  flex-shrink: 0;
+}
+
+.gss-bar-icon--spin {
+  animation: gss-bar-spin 0.85s linear infinite;
+}
+
+@keyframes gss-bar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gss-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: #f1f3ff;
+  font-size: 15px;
+  line-height: 1.3;
+  padding: 4px 2px;
+  min-width: 0;
+}
+
+.gss-input::placeholder {
+  color: #8d93b9;
+}
+
+.gss-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.gss-submit-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.22), rgba(124, 131, 255, 0.25));
+  color: #fffbeb;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.gss-submit-btn:hover {
+  border-color: rgba(253, 224, 71, 0.65);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.32), rgba(124, 131, 255, 0.35));
+}
+
+.gss-submit-btn:active {
+  transform: scale(0.98);
+}
+
+.gss-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cfd4ff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.gss-icon-btn:hover {
+  background: rgba(124, 131, 255, 0.18);
+  border-color: rgba(124, 131, 255, 0.45);
+  color: #fff;
+}
+
+.gss-icon-btn.is-active {
+  background: linear-gradient(135deg, rgba(124, 131, 255, 0.4), rgba(120, 255, 214, 0.18));
+  border-color: rgba(124, 131, 255, 0.6);
+  color: #fff;
+}
+
+.gss-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #facc15;
+  color: #1a1300;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* Active filter chips beneath the bar */
+.gss-active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Savvy AI clarification strip */
+.gss-clarify {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.14), rgba(244, 114, 182, 0.12));
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  color: #fff8d8;
+  font-size: 14px;
+}
+
+.gss-clarify-icon {
+  color: #facc15;
+  flex-shrink: 0;
+}
+
+.gss-clarify-text {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.gss-clarify-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gss-chip-ai {
+  background: rgba(250, 204, 21, 0.18);
+  border-color: rgba(250, 204, 21, 0.55);
+  color: #fff5c9;
+}
+
+.gss-chip-ai:hover {
+  background: rgba(250, 204, 21, 0.3);
+}
+
+/* Dropdown panel: filters + recents + suggestions */
+.gss-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  padding: 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(13, 16, 32, 0.98), rgba(10, 12, 26, 0.98));
+  border: 1px solid rgba(124, 131, 255, 0.28);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.gss-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gss-section-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa0d4;
+  font-weight: 700;
+}
+
+.gss-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(124, 131, 255, 0.2);
+}
+
+.gss-filter-group:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.gss-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Chip — neutral, used in dropdown + recents + active chip pills */
+.gss-chip {
+  border: 1px solid rgba(124, 131, 255, 0.35);
+  background: rgba(124, 131, 255, 0.08);
+  color: #d3d8ff;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.gss-chip:hover {
+  background: rgba(124, 131, 255, 0.22);
+  color: #fff;
+  border-color: rgba(124, 131, 255, 0.6);
+}
+
+.gss-chip.is-active {
+  background: linear-gradient(135deg, rgba(124, 131, 255, 0.45), rgba(120, 255, 214, 0.25));
+  border-color: rgba(168, 174, 255, 0.7);
+  color: #fff;
+}
+
+/* Quick-suggestion pills under the bar (always visible) */
+.gss-quicksuggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.gss-pill {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #b9c1f0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.gss-pill:hover {
+  background: rgba(124, 131, 255, 0.18);
+  border-color: rgba(124, 131, 255, 0.45);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .gss-bar {
+    padding: 9px 10px;
+  }
+  .gss-input {
+    font-size: 14px;
+  }
+  .gss-dropdown {
+    padding: 12px;
+  }
+}

@@ -10,7 +10,7 @@ function PointsPage() {
   // Fetch user points
   const fetchPoints = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/points", {
+      const res = await fetch("/api/points", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -27,7 +27,10 @@ function PointsPage() {
       const data = await res.json();
       setPoints(data.points);
     } catch (err) {
-      console.error(err);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error(err);
+      }
       setMessage("Network error. Please try again.");
     }
   };
@@ -35,7 +38,7 @@ function PointsPage() {
   // Claim daily reward
   const claimDailyReward = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/points/daily-claim", {
+      const res = await fetch("/api/points/daily-claim", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -55,7 +58,10 @@ function PointsPage() {
       setPoints(data.points);
       setMessage(data.message);
     } catch (err) {
-      console.error(err);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error(err);
+      }
       setMessage("Network error. Please try again.");
     }
   };

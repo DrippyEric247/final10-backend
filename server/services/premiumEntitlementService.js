@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const PremiumEntitlement = require('../models/PremiumEntitlement');
 const User = require('../models/User');
+const { monetizationFromEntitlement } = require('./creatorEliteAccessService');
 const { isProduction } = require('../config/envValidation');
 const { envFlag } = require('../config/envValidation');
 
@@ -40,6 +41,14 @@ function toUserObjectId(userId) {
   return new mongoose.Types.ObjectId(s);
 }
 
+function hasFoundingTesterAccess(user) {
+  if (!user) return false;
+  const flagged = Boolean(user.betaTester || user.foundingAccess);
+  if (!flagged) return false;
+  if (!user.betaAccessExpiresAt) return true;
+  return new Date(user.betaAccessExpiresAt) > new Date();
+}
+
 async function getEntitlementByUserId(userId) {
   const uid = toUserObjectId(userId);
   if (!uid) return null;
@@ -64,7 +73,24 @@ async function ensureEntitlementRow(userId) {
 /**
  * Public payload for GET /api/entitlements/me
  */
-function toMeResponse(doc) {
+function toMeResponse(doc, user = null) {
+  const foundingTesterAccess = hasFoundingTesterAccess(user);
+  if (foundingTesterAccess) {
+    return {
+      isPremium: true,
+      premiumStatus: 'active',
+      premiumTier: 'elite',
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      trialEndsAt: null,
+      provider: 'beta',
+      creatorMonetization: monetizationFromEntitlement(doc),
+      foundingTesterAccess: true,
+      betaTester: Boolean(user?.betaTester),
+      foundingAccess: Boolean(user?.foundingAccess),
+      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+    };
+  }
   if (!doc) {
     return {
       isPremium: false,
@@ -74,6 +100,11 @@ function toMeResponse(doc) {
       cancelAtPeriodEnd: false,
       trialEndsAt: null,
       provider: 'stripe',
+      creatorMonetization: monetizationFromEntitlement(null),
+      foundingTesterAccess: false,
+      betaTester: Boolean(user?.betaTester),
+      foundingAccess: Boolean(user?.foundingAccess),
+      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
     };
   }
   const isPremium = premiumStatusGrantsBattlePassAccess(doc);
@@ -85,6 +116,11 @@ function toMeResponse(doc) {
     cancelAtPeriodEnd: Boolean(doc.cancelAtPeriodEnd),
     trialEndsAt: doc.trialEndsAt || null,
     provider: doc.provider || 'stripe',
+    creatorMonetization: monetizationFromEntitlement(doc),
+    foundingTesterAccess: false,
+    betaTester: Boolean(user?.betaTester),
+    foundingAccess: Boolean(user?.foundingAccess),
+    betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
   };
 }
 
@@ -96,7 +132,10 @@ async function upsertFromStripeSubscription(userId, subscription, customerId) {
   if (!uid) throw new Error('Invalid userId for entitlement upsert');
   const sub = subscription || {};
   const status = mapStripeSubscriptionStatus(sub.status);
-  const tier = sub.metadata?.premiumTier === 'vip' ? 'vip' : 'premium';
+  const metaTier = String(sub.metadata?.premiumTier || sub.metadata?.tier || '').toLowerCase();
+  let tier = 'premium';
+  if (metaTier === 'elite') tier = 'elite';
+  else if (metaTier === 'vip') tier = 'vip';
   const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
   const cps = sub.current_period_start ? new Date(sub.current_period_start * 1000) : null;
   const cpe = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
@@ -151,6 +190,9 @@ async function markEntitlementStatus(userId, premiumStatus, extra = {}) {
  */
 function canSelfServeBattlePassPremiumUnlock(user, entitlementLean) {
   if (!user) return { ok: false, reason: 'no_user' };
+  if (hasFoundingTesterAccess(user)) {
+    return { ok: true, reason: 'founding_tester_access' };
+  }
   if (!isProduction()) {
     return { ok: true, reason: 'non_production' };
   }

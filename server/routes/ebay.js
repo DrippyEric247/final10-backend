@@ -1,7 +1,4 @@
 const express = require('express');
-const fetchModule = require('node-fetch');
-const fetch = fetchModule.default || fetchModule;
-const { getEbayAppToken } = require('../services/ebayAuthService');
 const {
   normalizeEbayItemSummary,
   toLegacyAuctionShape,
@@ -10,11 +7,19 @@ const {
 const { placeProxyBidForUser } = require('../services/ebayOfferService');
 const auth = require('../middleware/auth');
 const { validateRequest } = require('../middleware/validateRequest');
-const { ebaySearchLimiter, ebayBidLimiter } = require('../middleware/rateLimits');
+const { ebaySearchLimiter, ebayBidLimiter, ebaySellerTrendsLimiter } = require('../middleware/rateLimits');
 const ebaySchemas = require('../validation/schemas');
 const { isProduction } = require('../config/envValidation');
 const { refreshScanDeck, issueBidFlowTokens } = require('../services/progressionTrustService');
 const { logEbayProviderError } = require('../services/structuredLog');
+const { safeBuildEbaySellerTrendsPayload } = require('../services/ebaySellerTrendsService');
+const { ebayBrowseGet } = require('../services/ebayBrowseClient');
+const ebaySearchMemoryCache = require('../services/ebaySearchMemoryCache');
+const {
+  enrichItemsWithMarketValue,
+  getMarketValue,
+  attachMarketValue,
+} = require('../services/marketValueService');
 
 const router = express.Router();
 
@@ -73,26 +78,6 @@ function pickFinal10Items(items) {
   );
 }
 
-async function ebayBrowseGet(path, params = {}) {
-  const token = await getEbayAppToken();
-  const query = new URLSearchParams(params).toString();
-  const url = query
-    ? `https://api.ebay.com/buy/browse/v1/${path}?${query}`
-    : `https://api.ebay.com/buy/browse/v1/${path}`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    console.error('eBay API failed:', data);
-    throw new Error(`eBay API failed: ${response.status}`);
-  }
-  return data;
-}
-
 async function loadEbayBrowseSearch(req, {
   searchQuery,
   limit,
@@ -135,8 +120,8 @@ async function loadEbayBrowseSearch(req, {
     console.log('eBay item count:', data?.itemSummaries?.length);
     console.log('First item:', data?.itemSummaries?.[0]);
   } catch (apiError) {
-    logEbayProviderError('/ebay/browse/search', apiError.response?.status, apiError.code || apiError.message);
-    console.log('eBay API failed:', apiError.response?.status, apiError.response?.data || apiError.message);
+    logEbayProviderError('/ebay/browse/search', apiError.status, apiError.code || apiError.message);
+    console.warn('eBay Browse search failed:', apiError.status, apiError.message);
     throw apiError;
   }
 
@@ -156,6 +141,7 @@ async function loadEbayBrowseSearch(req, {
 
 // GET /api/ebay/search?q=...
 router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQuery, 'query'), async (req, res) => {
+  let cacheRowKey = '';
   try {
     const {
       q = '',
@@ -197,6 +183,19 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
     const finalSort = String(sort || sortOrder || '').trim() || (listingMode === 'auction' ? 'EndTimeSoonest' : 'bestMatch');
     const endingSoonOnly = String(endingSoonOnlyRaw).toLowerCase() === 'true';
 
+    cacheRowKey = ebaySearchMemoryCache.searchKey([
+      searchQuery,
+      limit,
+      offset,
+      finalSort,
+      listingMode,
+      catRaw,
+      String(minPrice || ''),
+      String(maxPrice || ''),
+      String(conditionIds || ''),
+      endingSoonOnly ? '1' : '0',
+    ]);
+
     const data = await loadEbayBrowseSearch(req, {
       searchQuery,
       limit,
@@ -218,6 +217,12 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
       items = items.filter((it) => it.isBuyNow);
     }
 
+    try {
+      await enrichItemsWithMarketValue(items, { fallbackQuery: searchQuery });
+    } catch (e) {
+      console.warn('marketValue enrichment failed', e.message || e);
+    }
+
     const final10 = pickFinal10Items(items).map(toLegacyAuctionShape);
     const legacyItems = items.map(toLegacyAuctionShape);
 
@@ -233,8 +238,9 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
       }
     }
 
-    res.json({
+    const body = {
       success: true,
+      stale: false,
       items: legacyItems,
       normalizedItems: items,
       final10,
@@ -247,21 +253,52 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
         offset,
         hasNextPage
       }
-    });
+    };
+    if (cacheRowKey) {
+      ebaySearchMemoryCache.remember(cacheRowKey, {
+        items: legacyItems,
+        normalizedItems: items,
+        final10,
+        listingMode,
+        pagination: body.pagination,
+      });
+    }
+    res.json(body);
   } catch (err) {
-    console.error('eBay search error', err.response?.data || err.message);
-    res.status(500).json({
+    console.error('eBay search route error', err.status || '', err.message);
+    const stale = cacheRowKey ? ebaySearchMemoryCache.recall(cacheRowKey) : null;
+    if (stale && Array.isArray(stale.items) && stale.items.length) {
+      return res.status(200).json({
+        success: true,
+        stale: true,
+        warning:
+          err.message ||
+          'Showing saved marketplace results from your last successful search.',
+        code: err.code || 'EBAY_STALE_CACHE',
+        items: stale.items,
+        normalizedItems: stale.normalizedItems || stale.items,
+        final10: Array.isArray(stale.final10) ? stale.final10 : [],
+        listingMode: stale.listingMode || 'mixed',
+        pagination: stale.pagination || null,
+      });
+    }
+    const status = err.status === 429 ? 429 : 503;
+    return res.status(status).json({
       success: false,
-      error: 'ebay_search_failed',
+      code: err.code || 'EBAY_SEARCH_UNAVAILABLE',
+      message:
+        err.message ||
+        'Market results could not be loaded. Try again in a moment.',
       items: [],
       final10: [],
-      pagination: null
+      pagination: null,
     });
   }
 });
 
 // GET /api/ebay/final10?q=... — ending within 10 minutes, ≤3 bids (sniper picks)
 router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal10Query, 'query'), async (req, res) => {
+  let cacheRowKey = '';
   try {
     const {
       q = '',
@@ -289,6 +326,15 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
     const offset = Math.max(0, parseInt(offsetRaw, 10) || 0);
     const poolLimit = Math.min(200, Math.max(outLimit * 5, 50));
 
+    cacheRowKey = ebaySearchMemoryCache.final10Key([
+      searchQuery,
+      outLimit,
+      offset,
+      catRaw,
+      String(minPrice || ''),
+      String(maxPrice || ''),
+    ]);
+
     const data = await loadEbayBrowseSearch(req, {
       searchQuery,
       limit: poolLimit,
@@ -305,6 +351,12 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
     let items = (data.itemSummaries || []).map(normalizeEbayItemSummary);
     let final10Items = pickFinal10Items(items).slice(0, outLimit);
 
+    try {
+      await enrichItemsWithMarketValue(final10Items, { fallbackQuery: searchQuery });
+    } catch (e) {
+      console.warn('marketValue enrichment (final10) failed', e.message || e);
+    }
+
     if (req.user) {
       try {
         await refreshScanDeck(req.user._id, collectListingIdsFromNormalized(final10Items));
@@ -313,18 +365,46 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
       }
     }
 
-    res.json({
+    const shaped = final10Items.map(toLegacyAuctionShape);
+    const body = {
       success: true,
-      items: final10Items.map(toLegacyAuctionShape),
+      stale: false,
+      items: shaped,
       normalizedItems: final10Items,
-      query: searchQuery
-    });
+      query: searchQuery,
+    };
+    if (cacheRowKey) {
+      ebaySearchMemoryCache.remember(cacheRowKey, {
+        items: shaped,
+        normalizedItems: final10Items,
+        query: searchQuery,
+      });
+    }
+    res.json(body);
   } catch (err) {
-    console.error('eBay final10 error', err.response?.data || err.message);
-    res.status(500).json({
+    console.error('eBay final10 route error', err.status || '', err.message);
+    const stale = cacheRowKey ? ebaySearchMemoryCache.recall(cacheRowKey) : null;
+    if (stale && Array.isArray(stale.items) && stale.items.length) {
+      return res.status(200).json({
+        success: true,
+        stale: true,
+        warning:
+          err.message ||
+          'Showing saved sniper picks from your last successful search.',
+        code: err.code || 'EBAY_STALE_CACHE',
+        items: stale.items,
+        normalizedItems: stale.normalizedItems || stale.items,
+        query: stale.query || '',
+      });
+    }
+    const status = err.status === 429 ? 429 : 503;
+    return res.status(status).json({
       success: false,
-      error: 'ebay_final10_failed',
-      items: []
+      code: err.code || 'EBAY_FINAL10_UNAVAILABLE',
+      message:
+        err.message ||
+        'Sniper picks could not be refreshed right now. Try again shortly.',
+      items: [],
     });
   }
 });
@@ -344,9 +424,13 @@ router.get('/item/:id', async (req, res) => {
       const priceNum = Number(it.price?.value);
       const item = {
         id: it.itemId,
+        itemId: it.itemId,
         title: it.title,
         image: it.image?.imageUrl,
         currentBid: it.price?.value,
+        currentBidPrice: it.price?.value,
+        buyNowPrice: it.price?.value,
+        price: it.price?.value,
         startingPrice: Number.isFinite(priceNum) ? (priceNum * 0.5).toFixed(2) : it.price?.value,
         currency: it.price?.currency,
         itemUrl: it.itemWebUrl,
@@ -357,35 +441,59 @@ router.get('/item/:id', async (req, res) => {
         description: it.shortDescription || it.description || 'No description available.',
         bidCount: it.bidCount || 0,
         timeRemaining: Math.floor((new Date(it.itemEndDate) - new Date()) / 1000),
+        secondsRemaining: Math.max(
+          0,
+          Math.floor((new Date(it.itemEndDate) - new Date()) / 1000)
+        ),
+        isAuction: Array.isArray(it.buyingOptions) && it.buyingOptions.includes('AUCTION'),
+        isBuyNow: Array.isArray(it.buyingOptions) && it.buyingOptions.includes('FIXED_PRICE'),
         dealPotential: Math.floor(Math.random() * 40) + 60, // Random 60-100%
         competitionLevel: it.bidCount > 10 ? 'High' : it.bidCount > 5 ? 'Medium' : 'Low',
         trendingScore: Math.floor(Math.random() * 30) + 70, // Random 70-100%
         bids: [] // Real eBay API doesn't provide bid history in item details
       };
 
+      try {
+        const stats = await getMarketValue({
+          q: String(it.title || '').split(/\s+/).slice(0, 6).join(' '),
+        });
+        attachMarketValue(item, stats);
+      } catch (e) {
+        console.warn('marketValue lookup (item) failed', e.message || e);
+      }
+
       res.json({ item });
     } catch (apiError) {
-      logEbayProviderError('/ebay/item', apiError.response?.status, apiError.code || apiError.message);
+      logEbayProviderError('/ebay/item', apiError.status, apiError.code || apiError.message);
       throw apiError;
     }
   } catch (err) {
-    console.error('eBay item error', err.response?.data || err.message);
-    res.status(500).json({ error: 'ebay_item_failed' });
+    console.error('eBay item error', err.status || '', err.message);
+    const status = err.status === 429 ? 429 : err.status === 404 ? 404 : 503;
+    res.status(status).json({
+      code: err.code || 'ebay_item_failed',
+      message:
+        err.message ||
+        'This listing could not be loaded from the marketplace. Try opening it on eBay.',
+      item: null,
+    });
   }
 });
 
 // GET /api/ebay/trending
 router.get('/trending', async (req, res) => {
+  let trendingItems = [];
+  let categories = [];
   try {
     const { category = 'all', limit = 20 } = req.query;
-    
+
     // Check if user is authenticated
     if (!req.user && process.env.DISABLE_EBAY_AUTH !== 'true') {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    let trendingItems = [];
-    let categories = [];
+    trendingItems = [];
+    categories = [];
 
     // Use real eBay API with app token only
     const cat = String(category || 'all').toLowerCase();
@@ -447,10 +555,41 @@ router.get('/trending', async (req, res) => {
       categories
     });
   } catch (err) {
-    console.error('eBay trending error', err.response?.data || err.message);
-    res.status(500).json({ error: 'ebay_trending_failed' });
+    console.error('eBay trending error', err.status || '', err.message);
+    const lim = Math.min(Math.max(parseInt(req.query?.limit, 10) || 20, 1), 50);
+    res.status(200).json({
+      code: 'ebay_trending_partial',
+      message:
+        err.message ||
+        'Some trending picks could not be refreshed. Try another category.',
+      items: Array.isArray(trendingItems) ? trendingItems.slice(0, lim) : [],
+      categories: Array.isArray(categories) && categories.length
+        ? categories
+        : ['electronics', 'fashion', 'home', 'sports', 'collectibles'].map((bucket) => ({
+            _id: bucket,
+            count: 0,
+          })),
+    });
   }
 });
+
+// GET /api/ebay/seller-trends — Browse active listings only (not sold/completed)
+router.get(
+  '/seller-trends',
+  ebaySellerTrendsLimiter,
+  validateRequest(ebaySchemas.ebaySellerTrendsQuery, 'query'),
+  async (req, res) => {
+    try {
+      const tz = String(req.query.tz || '').trim() || undefined;
+      const payload = await safeBuildEbaySellerTrendsPayload({ timeZone: tz });
+      res.json(payload);
+    } catch (err) {
+      console.error('eBay seller-trends route error', err?.message || err);
+      const payload = await safeBuildEbaySellerTrendsPayload();
+      res.json(payload);
+    }
+  }
+);
 
 // GET /api/ebay/categories
 router.get('/categories', async (req, res) => {

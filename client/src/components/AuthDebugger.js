@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const AuthDebugger = () => {
-  const { user, token, loading, error, logout } = useAuth();
+function AuthDebuggerInner() {
+  const { user, loading, error, logout } = useAuth();
   const [debugInfo, setDebugInfo] = useState(null);
 
   const checkAuthStatus = () => {
@@ -57,7 +57,7 @@ const AuthDebugger = () => {
   }
 
   return (
-    <div style={{
+    <div className="auth-debugger-panel" style={{
       position: 'fixed',
       top: '80px',
       right: '10px',
@@ -123,8 +123,13 @@ const AuthDebugger = () => {
       )}
     </div>
   );
-};
+}
 
-export default AuthDebugger;
+export default function AuthDebugger() {
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+  return <AuthDebuggerInner />;
+}
 
 

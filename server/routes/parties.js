@@ -19,6 +19,7 @@ const Party = require('../models/Party');
 const User = require('../models/User');
 const PartySessionEvent = require('../models/PartySessionEvent');
 const partyService = require('../services/partyService');
+const { isProduction } = require('../config/envValidation');
 
 const router = express.Router();
 
@@ -213,9 +214,15 @@ router.post('/:id/start', auth, async (req, res) => {
   } catch (err) {
     console.error('parties.start.error', err);
     const code = err.code === 'COOLDOWN' || err.code === 'NOT_ENOUGH_MEMBERS' ? 400 : 500;
+    const safeMsg =
+      code === 400 && err.message
+        ? err.message
+        : isProduction()
+          ? 'Failed to start session'
+          : err.message || 'Failed to start session';
     return res.status(code).json({
       code: err.code || 'START_FAILED',
-      message: err.message || 'Failed to start session',
+      message: safeMsg,
     });
   }
 });
@@ -289,7 +296,15 @@ router.post('/:id/events', auth, async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'NOT_ACTIVE' || err.code === 'NOT_MEMBER' || err.code === 'INVALID_EVENT') {
-      return res.status(400).json({ code: err.code, message: err.message });
+      const byCode = {
+        NOT_ACTIVE: 'This squad session is not active.',
+        NOT_MEMBER: 'You are not a member of this squad.',
+        INVALID_EVENT: 'That action is not valid right now.',
+      };
+      return res.status(400).json({
+        code: err.code,
+        message: byCode[err.code] || 'Request could not be completed.',
+      });
     }
     console.error('parties.events.error', err);
     return res.status(500).json({ code: 'EVENT_FAILED', message: 'Failed to record event' });

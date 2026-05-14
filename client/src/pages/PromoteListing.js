@@ -1,30 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft,
   Star,
   TrendingUp,
   Target,
-  Clock,
-  DollarSign,
   Eye,
   MousePointer,
   Zap,
   Check,
-  AlertCircle,
   Crown,
   Sparkles
 } from 'lucide-react';
 import promotionService from '../services/promotionService';
 import { useAuth } from '../context/AuthContext';
+import { pushAssistantSignal } from '../lib/assistantSignals';
+import SellerTrendAlerts from '../components/seller/SellerTrendAlerts';
+import SellerTrendBadge from '../components/seller/SellerTrendBadge';
+import { getSellerBonusForCategory } from '../lib/sellerTrendEngine';
+import { emitSellerEarnToast } from '../lib/dualEarn';
+import SavvyAlertButton from '../components/alerts/SavvyAlertButton';
+import { LISTING_ASSISTANT_STORAGE_KEY } from '../lib/listThisItemAssistantEngine';
+import { extractSellerListingIdFromPaste, registerFlipListing } from '../services/flipRewardsService';
 
 const PromoteListing = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  
+  const location = useLocation();
+
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [listingData, setListingData] = useState({
     listingType: 'ebay',
@@ -36,6 +41,61 @@ const PromoteListing = () => {
   });
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [flipRewardContext, setFlipRewardContext] = useState(null);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    let incoming = location.state?.listingAssistant;
+    const fromRouterState = !!incoming;
+    if (!incoming) {
+      try {
+        const raw = sessionStorage.getItem(LISTING_ASSISTANT_STORAGE_KEY);
+        if (raw) incoming = JSON.parse(raw);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (!incoming || typeof incoming.title !== 'string') return undefined;
+    if (incoming.flipRewardContext) {
+      setFlipRewardContext(incoming.flipRewardContext);
+    }
+    const kw = Array.isArray(incoming.targetKeywords)
+      ? incoming.targetKeywords.map((k) => String(k || '').trim()).filter(Boolean)
+      : [];
+    try {
+      sessionStorage.removeItem(LISTING_ASSISTANT_STORAGE_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+    const draftHint = incoming.title.length > 72 ? `${incoming.title.slice(0, 69)}…` : incoming.title;
+    setListingData((prev) => ({
+      ...prev,
+      targetCategory: incoming.targetCategory || prev.targetCategory,
+      targetKeywords: kw.length ? kw : prev.targetKeywords,
+      listingId:
+        prev.listingId && String(prev.listingId).trim() !== ''
+          ? prev.listingId
+          : `Paste your listing URL · ${draftHint}`,
+    }));
+    if (fromRouterState) {
+      navigate('/promote-listing', { replace: true, state: {} });
+    }
+    return undefined;
+  }, [user, location.state, navigate]);
+
+  useEffect(() => {
+    if (!user || step !== 1) return undefined;
+    const id = window.setTimeout(() => {
+      pushAssistantSignal({
+        id: "promote-package-coach",
+        tone: "promo",
+        title: "Package strategy",
+        body: "Longer runs stack impressions; pair with sharp titles when clocks are tight.",
+        priority: 0,
+      });
+    }, 5000);
+    return () => clearTimeout(id);
+  }, [user, step]);
 
   // Fetch promotion packages
   const { data: packages, isLoading: packagesLoading } = useQuery({
@@ -52,12 +112,16 @@ const PromoteListing = () => {
   });
 
   // Create promotion mutation
+  // Live trending-category bonus for the category the seller is promoting
+  // into. Re-computed on every category change and re-checked on submit so
+  // the reward is always based on real, up-to-the-second trend data.
+  const sellerBonus = useMemo(
+    () => getSellerBonusForCategory(listingData.targetCategory),
+    [listingData.targetCategory]
+  );
+
   const createPromotionMutation = useMutation({
     mutationFn: (promotionData) => promotionService.createPromotion(promotionData),
-    onSuccess: (data) => {
-      // Navigate to payment or success page
-      navigate(`/promotion/${data.promotion._id}/payment`);
-    },
     onError: (error) => {
       console.error('Error creating promotion:', error);
       setIsProcessing(false);
@@ -83,12 +147,41 @@ const PromoteListing = () => {
     setIsProcessing(true);
     
     try {
-      await createPromotionMutation.mutateAsync({
+      const data = await createPromotionMutation.mutateAsync({
         ...listingData,
         packageId: selectedPackage._id
       });
+      const finalBonus = getSellerBonusForCategory(listingData.targetCategory);
+      if (finalBonus.trending && finalBonus.bonusSavvy > 0) {
+        emitSellerEarnToast(finalBonus.bonusSavvy, 'listing_activity');
+      }
+      const lid = extractSellerListingIdFromPaste(listingData.listingId);
+      if (lid && flipRewardContext) {
+        try {
+          const r = await registerFlipListing({
+            sellerListingId: lid,
+            listingType: listingData.listingType || 'ebay',
+            buyPrice: flipRewardContext.buyPrice,
+            suggestedSellMin: flipRewardContext.suggestedSellMin,
+            suggestedSellMax: flipRewardContext.suggestedSellMax,
+            predictedDaysToSell: flipRewardContext.predictedDaysToSell,
+            flipScore: flipRewardContext.flipScore,
+            fromAiSuggestion: Boolean(flipRewardContext.fromAiSuggestion),
+            dealItemId: flipRewardContext.dealItemId,
+            promotedListingId: data.promotion?._id,
+          });
+          if (r.listingBonusAwarded > 0) {
+            emitSellerEarnToast(r.listingBonusAwarded, 'listing_activity');
+          }
+        } catch (frErr) {
+          console.error('Flip rewards register:', frErr);
+        }
+      }
+      navigate(`/promotion/${data.promotion._id}/payment`);
     } catch (error) {
       console.error('Error:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -154,6 +247,26 @@ const PromoteListing = () => {
             </div>
           </div>
         </motion.div>
+
+        {/* Real-data seller trend alerts — silent when nothing's trending
+            so we never nag new sellers with empty signal. */}
+        <div className="mb-6">
+          <SellerTrendAlerts />
+          <div className="mt-3">
+            <SavvyAlertButton
+              tone="seller"
+              label="Alert me when it’s right"
+              payload={{
+                name: `Promote listing signal • ${listingData.targetCategory || "all"}`,
+                keywords: [String(listingData.targetCategory || "all")],
+                minConfidence: 70,
+                persona: "seller",
+                kind: "seller_posting_window",
+                context: { source: "promote_listing", category: listingData.targetCategory },
+              }}
+            />
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -336,13 +449,15 @@ const PromoteListing = () => {
                       >
                         <option value="all">All Categories</option>
                         <option value="electronics">Electronics</option>
+                        <option value="gaming">Gaming</option>
+                        <option value="tech">Tech</option>
+                        <option value="sneakers">Sneakers</option>
                         <option value="fashion">Fashion</option>
-                        <option value="home">Home & Garden</option>
-                        <option value="automotive">Automotive</option>
-                        <option value="sports">Sports</option>
-                        <option value="toys">Toys</option>
-                        <option value="books">Books</option>
+                        <option value="collectibles">Collectibles</option>
+                        <option value="home">Home &amp; Garden</option>
+                        <option value="auto">Automotive</option>
                       </select>
+                      <SellerTrendBadge bonus={sellerBonus} />
                     </div>
 
                     <div>

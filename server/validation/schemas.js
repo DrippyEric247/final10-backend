@@ -106,3 +106,8 @@ exports.ebayBidPlaceBody = Joi.object({
   maxAmount: Joi.alternatives().try(Joi.number().positive().max(1e9), Joi.string().pattern(/^\d+(\.\d+)?$/)).required(),
   currency: Joi.string().trim().length(3).uppercase().required(),
 });
+
+exports.ebaySellerTrendsQuery = Joi.object({
+  /** IANA timezone for “best time to list” from listing end-time histogram */
+  tz: Joi.string().trim().max(64).optional(),
+}).unknown(false);

@@ -15,8 +15,11 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { FINAL10_TIERS, getMostPopularTierId } from '../lib/final10SubscriptionTiers';
 
 const Pricing = () => {
+  const mostPopularTier = getMostPopularTierId();
+
   return (
     <div className="min-h-screen bg-gray-900 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -35,132 +38,82 @@ const Pricing = () => {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-            {/* Free Tier */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-gray-800 rounded-2xl p-8 border border-gray-700 relative"
-            >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="bg-blue-500/20 p-4 rounded-xl">
-                  <Zap className="h-8 w-8 text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Free Tier</h2>
-                  <p className="text-gray-400">Perfect for getting started</p>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-16">
+            {FINAL10_TIERS.map((tier, idx) => {
+              const isPro = tier.id === "pro" || tier.id === "elite";
+              const isPopular = tier.id === mostPopularTier;
+              return (
+                <motion.div
+                  key={tier.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + idx * 0.08 }}
+                  className={`rounded-2xl p-8 border relative ${
+                    isPro
+                      ? "bg-gradient-to-br from-amber-500/18 via-purple-600/16 to-pink-600/18 border-amber-400/50 shadow-[0_0_34px_rgba(250,204,21,0.18)]"
+                      : tier.id === "core"
+                      ? "bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/35"
+                      : "bg-gray-800 border-gray-700"
+                  }`}
+                  style={isPro ? { animation: "pulse 3.1s ease-in-out infinite" } : undefined}
+                >
+                  {isPopular ? (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full text-sm font-semibold">
+                        Most Popular
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className={`p-4 rounded-xl ${isPro ? "bg-amber-400/20" : tier.id === "core" ? "bg-purple-500/20" : "bg-blue-500/20"}`}>
+                      {isPro ? (
+                        <Shield className="h-8 w-8 text-amber-300" />
+                      ) : tier.id === "core" ? (
+                        <Crown className="h-8 w-8 text-purple-300" />
+                      ) : (
+                        <Zap className="h-8 w-8 text-blue-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">{tier.name}</h2>
+                      <p className="text-gray-300">{tier.description}</p>
+                    </div>
+                  </div>
 
-              <div className="mb-8">
-                <div className="text-4xl font-bold text-white mb-2">$0</div>
-                <div className="text-gray-400">Forever free</div>
-              </div>
+                  <div className="mb-8">
+                    <div className="text-4xl font-bold text-white mb-2">{tier.priceLabel}</div>
+                    <div className="text-gray-300">{tier.subLabel}</div>
+                  </div>
 
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300">5 searches per day</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300">Basic auction browsing</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300">Standard filters</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300">Daily tasks & points</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300">Community features</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300">Basic support</span>
-                </div>
-              </div>
+                  <div className="space-y-4 mb-8">
+                    {tier.features.map((feature) => (
+                      <div key={feature} className="flex items-center gap-3">
+                        <Check className="h-5 w-5 text-green-400" />
+                        <span className={`text-gray-200 ${feature === tier.savvyMultiplier ? "font-semibold" : ""}`}>
+                          {feature}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
 
-              <Link 
-                to="/register" 
-                className="w-full btn btn-outline block text-center"
-              >
-                Get Started Free
-              </Link>
-            </motion.div>
-
-            {/* Premium Tier */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl p-8 border border-purple-500/30 relative"
-            >
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full text-sm font-semibold">
-                  Most Popular
-                </span>
-              </div>
-
-              <div className="flex items-center gap-4 mb-6">
-                <div className="bg-purple-500/20 p-4 rounded-xl">
-                  <Crown className="h-8 w-8 text-purple-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Premium</h2>
-                  <p className="text-gray-400">For serious auction hunters</p>
-                </div>
-              </div>
-
-              <div className="mb-8">
-                <div className="text-4xl font-bold text-white mb-2">$7<span className="text-lg text-gray-400">/month</span></div>
-                <div className="text-gray-400">Cancel anytime</div>
-              </div>
-
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">Unlimited searches</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">Premium auction access</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">Advanced filters & AI insights</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">Priority support</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">Exclusive deals & discounts</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">Early access to new features</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-gray-300 font-semibold">100 bonus points on upgrade</span>
-                </div>
-              </div>
-
-              <Link 
-                to="/premium" 
-                className="w-full btn btn-primary block text-center"
-              >
-                <Crown className="w-5 h-5 inline mr-2" />
-                Upgrade to Premium
-                <ArrowRight className="w-5 h-5 inline ml-2" />
-              </Link>
-            </motion.div>
+                  <Link
+                    to={tier.ctaPath}
+                    className={`w-full block text-center ${
+                      tier.id === "free" ? "btn btn-outline" : "btn btn-primary"
+                    }`}
+                  >
+                    {tier.id !== "free" ? <Crown className="w-5 h-5 inline mr-2" /> : null}
+                    {tier.ctaLabel}
+                    {tier.id !== "free" ? <ArrowRight className="w-5 h-5 inline ml-2" /> : null}
+                  </Link>
+                  {tier.id === "free" ? (
+                    <p className="text-xs text-gray-400 mt-3 text-center">
+                      Free stays fully usable. Upgrade only for speed and advantage.
+                    </p>
+                  ) : null}
+                </motion.div>
+              );
+            })}
           </div>
 
           {/* Multi-App Subscription Future */}

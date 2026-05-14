@@ -159,6 +159,43 @@ class PromotionService {
     }
   }
 
+  // ===== WATCH / PRIVATE OFFERS =====
+
+  async watchListing(listingId, payload = {}) {
+    const response = await api.post(`/api/promotions/watch/${encodeURIComponent(listingId)}`, payload);
+    return response.data;
+  }
+
+  async muteListingOffers(listingId, muted) {
+    const response = await api.put(`/api/promotions/watch-mute/${encodeURIComponent(listingId)}`, { muted });
+    return response.data;
+  }
+
+  async getInterestedBuyers(promotionId) {
+    const response = await api.get(`/api/promotions/${promotionId}/interested-buyers`);
+    return response.data;
+  }
+
+  async previewPrivateOffer(promotionId, payload) {
+    const response = await api.post(`/api/promotions/${promotionId}/private-offers/preview`, payload);
+    return response.data;
+  }
+
+  async sendPrivateOffer(promotionId, payload) {
+    const response = await api.post(`/api/promotions/${promotionId}/private-offers/send`, payload);
+    return response.data;
+  }
+
+  async getPrivateOfferInbox() {
+    const response = await api.get('/api/promotions/private-offers/inbox');
+    return response.data;
+  }
+
+  async claimPrivateOffer(offerId) {
+    const response = await api.post(`/api/promotions/private-offers/${encodeURIComponent(offerId)}/claim`);
+    return response.data;
+  }
+
   // ===== ADMIN ENDPOINTS =====
   
   async getAllPromotions(status = null, page = 1, limit = 20) {

@@ -1,0 +1,328 @@
+/* Full-screen calling card unlock — premium / COD-style */
+
+.f10-cc-unlock-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483640;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  pointer-events: auto;
+}
+
+.f10-cc-unlock-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: radial-gradient(ellipse 120% 90% at 50% 40%, rgba(15, 23, 42, 0.55), rgba(2, 6, 23, 0.92));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.f10-cc-unlock-stage {
+  position: relative;
+  z-index: 2;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  pointer-events: none;
+}
+
+.f10-cc-unlock-stage > * {
+  pointer-events: auto;
+}
+
+.f10-cc-unlock-particles {
+  position: absolute;
+  inset: -12% -20%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.f10-cc-unlock-dust,
+.f10-cc-unlock-spark {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.f10-cc-unlock-dust {
+  width: 4px;
+  height: 4px;
+  left: 18%;
+  top: 22%;
+  background: rgba(253, 224, 71, 0.45);
+  box-shadow: 40px 60px 0 rgba(129, 140, 248, 0.25), 120px 20px 0 rgba(52, 211, 153, 0.2);
+  animation: f10-cc-dust 3.2s ease-in-out infinite;
+}
+
+.f10-cc-unlock-dust--2 {
+  left: 62%;
+  top: 38%;
+  animation-delay: 0.6s;
+}
+
+.f10-cc-unlock-dust--3 {
+  left: 44%;
+  top: 68%;
+  animation-delay: 1.1s;
+}
+
+@keyframes f10-cc-dust {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateY(-14px) scale(1.1);
+  }
+}
+
+.f10-cc-unlock-spark {
+  width: 120px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(253, 224, 71, 0.9), transparent);
+  filter: blur(0.5px);
+  opacity: 0.75;
+}
+
+.f10-cc-unlock-spark--a {
+  left: -10%;
+  top: 18%;
+  transform: rotate(-18deg);
+  animation: f10-cc-spark 2.4s ease-in-out infinite;
+}
+
+.f10-cc-unlock-spark--b {
+  right: -8%;
+  top: 42%;
+  transform: rotate(12deg);
+  animation: f10-cc-spark 2.8s ease-in-out infinite 0.3s;
+}
+
+.f10-cc-unlock-spark--c {
+  left: 10%;
+  bottom: 8%;
+  transform: rotate(8deg);
+  animation: f10-cc-spark 2.6s ease-in-out infinite 0.6s;
+}
+
+.f10-cc-unlock-spark--d {
+  right: 4%;
+  bottom: 22%;
+  transform: rotate(-10deg);
+  animation: f10-cc-spark 3s ease-in-out infinite 0.2s;
+}
+
+@keyframes f10-cc-spark {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.f10-cc-unlock-card-shell {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: 360px;
+  transform-origin: 50% 50%;
+}
+
+.f10-cc-unlock-card-glow {
+  position: absolute;
+  inset: -14px -18px -18px -18px;
+  border-radius: 22px;
+  background: radial-gradient(circle at 50% 40%, rgba(129, 140, 248, 0.35), transparent 62%);
+  filter: blur(8px);
+  opacity: 0.85;
+  z-index: 0;
+  pointer-events: none;
+  animation: f10-cc-glow-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes f10-cc-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.02);
+  }
+}
+
+.f10-cc-unlock-sweep-host {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.f10-cc-unlock-sweep {
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 65%
+  );
+  animation: f10-cc-sweep 2.8s ease-in-out infinite;
+}
+
+@keyframes f10-cc-sweep {
+  0% {
+    transform: translateX(-30%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(40%) skewX(-12deg);
+  }
+}
+
+.f10-cc-unlock-card.f10-ccard {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-height: 168px;
+}
+
+.f10-cc-unlock-copy {
+  text-align: center;
+  max-width: 380px;
+}
+
+.f10-cc-unlock-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  text-shadow: 0 0 18px rgba(129, 140, 248, 0.45);
+}
+
+.f10-cc-unlock-name {
+  margin: 0 0 10px;
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+  line-height: 1.15;
+}
+
+.f10-cc-unlock-reason {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.f10-cc-unlock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+.f10-cc-unlock-btn {
+  min-width: 120px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.f10-cc-unlock-btn--primary {
+  border-color: rgba(129, 140, 248, 0.55);
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.45), rgba(52, 211, 153, 0.22));
+  color: #f8fafc;
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.25);
+}
+
+.f10-cc-unlock-btn--ghost {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.f10-cc-unlock-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* Rarity ambience on root */
+.f10-cc-unlock--common .f10-cc-unlock-card-glow {
+  background: radial-gradient(circle at 50% 40%, rgba(148, 163, 184, 0.28), transparent 62%);
+}
+
+.f10-cc-unlock--rare .f10-cc-unlock-card-glow {
+  background: radial-gradient(circle at 50% 40%, rgba(129, 140, 248, 0.45), transparent 65%);
+  animation: f10-cc-rare-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes f10-cc-rare-pulse {
+  0%,
+  100% {
+    filter: blur(8px) hue-rotate(0deg);
+  }
+  50% {
+    filter: blur(10px) hue-rotate(25deg);
+  }
+}
+
+.f10-cc-unlock--epic .f10-cc-unlock-card-glow {
+  background: radial-gradient(circle at 50% 35%, rgba(192, 132, 252, 0.5), rgba(52, 211, 153, 0.15), transparent 68%);
+}
+
+.f10-cc-unlock-root.f10-cc-unlock--legendary.f10-cc-unlock--burst::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(253, 224, 71, 0.12), transparent 55%);
+  animation: f10-cc-burst-fade 1.4s ease-out forwards;
+}
+
+@keyframes f10-cc-burst-fade {
+  from {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-cc-unlock-card-glow,
+  .f10-cc-unlock-sweep,
+  .f10-cc-unlock-dust,
+  .f10-cc-unlock-spark {
+    animation: none !important;
+  }
+}

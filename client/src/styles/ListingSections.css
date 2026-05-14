@@ -1,0 +1,171 @@
+/* Shared Best Move section styling — used by Auctions, Quick Snipes, Trending. */
+
+.f10-best-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.f10-best-section {
+  position: relative;
+  border-radius: 18px;
+  padding: 18px clamp(12px, 2vw, 20px) 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
+}
+
+.f10-best-section--bestMove {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.12) 0%,
+    rgba(251, 191, 36, 0.03) 100%
+  );
+  box-shadow: 0 0 32px -18px rgba(251, 191, 36, 0.55);
+}
+
+.f10-best-section--worthWatching {
+  border-color: rgba(56, 189, 248, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(56, 189, 248, 0.08) 0%,
+    rgba(56, 189, 248, 0.015) 100%
+  );
+}
+
+.f10-best-section--risky {
+  border-color: rgba(244, 63, 94, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgba(244, 63, 94, 0.08) 0%,
+    rgba(244, 63, 94, 0.015) 100%
+  );
+}
+
+.f10-best-section__hd {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.f10-best-section__title {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  font-weight: 700;
+  color: #fafafa;
+  letter-spacing: 0.01em;
+}
+
+.f10-best-section__sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.f10-best-section__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.f10-best-section__empty {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.55);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* -------------------------------------------------------------------------
+   Move tier chip — per-card label
+   ------------------------------------------------------------------------- */
+
+.f10-move-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.f10-move-tier--high {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.f10-move-tier--medium {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fcd34d;
+}
+
+.f10-move-tier--low {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.5);
+  color: #fda4af;
+}
+
+.f10-move-tier--unverified {
+  background: rgba(71, 85, 105, 0.35);
+  border-color: rgba(148, 163, 184, 0.55);
+  color: #e2e8f0;
+}
+
+/* Positioned chip variants — sit nicely on top of existing card styles. */
+.auction-move-tier-chip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+.chip.chip-move-tier {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Light mode — maintain legibility when app background is bright. */
+@media (prefers-color-scheme: light) {
+  .f10-best-section {
+    border-color: rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .f10-best-section--bestMove {
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.18) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border-color: rgba(217, 119, 6, 0.4);
+  }
+
+  .f10-best-section--worthWatching {
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.14) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border-color: rgba(14, 165, 233, 0.35);
+  }
+
+  .f10-best-section--risky {
+    background: linear-gradient(180deg, rgba(244, 63, 94, 0.14) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border-color: rgba(225, 29, 72, 0.38);
+  }
+
+  .f10-best-section__title {
+    color: #0f172a;
+  }
+
+  .f10-best-section__sub {
+    color: rgba(15, 23, 42, 0.65);
+  }
+}

@@ -27,6 +27,8 @@ const PromotionDashboard = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedPromotion, setSelectedPromotion] = useState(null);
+  const [offerDraft, setOfferDraft] = useState({ discountPercent: 10, durationHours: 6, quantityLimit: '' });
+  const [offerPreview, setOfferPreview] = useState(null);
 
   // Fetch user's promotions
   const { data: promotions, isLoading: promotionsLoading } = useQuery({
@@ -61,6 +63,20 @@ const PromotionDashboard = () => {
     mutationFn: (promotionId) => promotionService.cancelPromotion(promotionId),
     onSuccess: () => {
       queryClient.invalidateQueries(['user-promotions']);
+    }
+  });
+
+  const previewOfferMutation = useMutation({
+    mutationFn: ({ promotionId, payload }) => promotionService.previewPrivateOffer(promotionId, payload),
+    onSuccess: (data) => setOfferPreview(data?.preview || null),
+  });
+
+  const sendOfferMutation = useMutation({
+    mutationFn: ({ promotionId, payload }) => promotionService.sendPrivateOffer(promotionId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['user-promotions']);
+      setOfferPreview(null);
+      setSelectedPromotion(null);
     }
   });
 
@@ -274,6 +290,16 @@ const PromotionDashboard = () => {
                           </div>
                         </div>
 
+                        <div className="mb-4 rounded-lg border border-purple-600/40 bg-purple-900/20 p-3">
+                          <div className="text-sm text-purple-200 font-semibold">Interested Buyers</div>
+                          <div className="text-xs text-gray-300">
+                            {(promotion.watchers?.length || 0)} watchers
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            Recent activity: {(promotion.watcherActivity || []).slice(-3).length} actions
+                          </div>
+                        </div>
+
                         <div className="flex space-x-2">
                           <button
                             onClick={() => pauseMutation.mutate(promotion._id)}
@@ -287,13 +313,86 @@ const PromotionDashboard = () => {
                             onClick={() => setSelectedPromotion(promotion)}
                             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                           >
-                            View Details
+                            Send Offer to Watchers
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
+
+                {selectedPromotion && (
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h3 className="text-lg font-bold mb-3">Private Offer Builder</h3>
+                    <p className="text-sm text-gray-400 mb-4">
+                      Configure a targeted discount for watchers on listing {selectedPromotion.listingId}.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                      <input
+                        type="number"
+                        min={5}
+                        max={20}
+                        value={offerDraft.discountPercent}
+                        onChange={(e) => setOfferDraft((d) => ({ ...d, discountPercent: Number(e.target.value) }))}
+                        className="bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                        placeholder="Discount % (5-20)"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={24}
+                        value={offerDraft.durationHours}
+                        onChange={(e) => setOfferDraft((d) => ({ ...d, durationHours: Number(e.target.value) }))}
+                        className="bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                        placeholder="Duration (1-24h)"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={offerDraft.quantityLimit}
+                        onChange={(e) => setOfferDraft((d) => ({ ...d, quantityLimit: e.target.value }))}
+                        className="bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                        placeholder="Quantity limit (optional)"
+                      />
+                    </div>
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        className="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg"
+                        onClick={() => previewOfferMutation.mutate({
+                          promotionId: selectedPromotion._id,
+                          payload: {
+                            discountPercent: offerDraft.discountPercent,
+                            durationHours: offerDraft.durationHours,
+                            quantityLimit: offerDraft.quantityLimit ? Number(offerDraft.quantityLimit) : undefined,
+                          }
+                        })}
+                      >
+                        Preview Offer
+                      </button>
+                      <button
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
+                        onClick={() => sendOfferMutation.mutate({
+                          promotionId: selectedPromotion._id,
+                          payload: {
+                            discountPercent: offerDraft.discountPercent,
+                            durationHours: offerDraft.durationHours,
+                            quantityLimit: offerDraft.quantityLimit ? Number(offerDraft.quantityLimit) : undefined,
+                            title: selectedPromotion.promotionPackage?.name || selectedPromotion.listingType,
+                          }
+                        })}
+                      >
+                        Send Offer to Watchers
+                      </button>
+                    </div>
+                    {offerPreview && (
+                      <div className="rounded-lg border border-green-600/40 bg-green-900/20 p-3 text-sm">
+                        Preview: {offerPreview.discountPercent}% off for {offerPreview.durationHours}h
+                        {offerPreview.quantityLimit ? ` • limit ${offerPreview.quantityLimit}` : ''} •
+                        expires {new Date(offerPreview.expiresAt).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Performance Chart Placeholder */}
                 <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { getTierConfig, normalizeTier, normalizeBilling } = require('../config/subscriptionPlans');
 
 const userSchema = new mongoose.Schema({
   firstName: String,
@@ -29,6 +30,19 @@ const userSchema = new mongoose.Schema({
   referralDay:         { type: String, default: null },          // 'YYYY-MM-DD'
   referralCountToday:  { type: Number, default: 0 },
 
+  // Savvy Points — flip rewards daily cap (free tier), UTC day key
+  flipRewardsDay: { type: String, default: null },
+  flipRewardsPointsToday: { type: Number, default: 0 },
+
+  /** Savvy Shop / creator rewards daily cap (UTC), free tier */
+  creatorRewardsDay: { type: String, default: null },
+  creatorRewardsPointsToday: { type: Number, default: 0 },
+
+  /** Flip Score gamification (Savvy flip rewards) */
+  flipBestScoreEver: { type: Number, default: null },
+  flipTotalCompleted: { type: Number, default: 0 },
+  flipScoreLifetimeSum: { type: Number, default: 0 },
+
   // ---- creator attribution (Phase B) ----
   // creatorId: server-side User._id of the creator that drove this signup.
   creatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
@@ -50,6 +64,40 @@ const userSchema = new mongoose.Schema({
   // ---- social fabric (Phase C) ----
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // Buyer-side watch + private-offer controls.
+  watchlist: [{
+    listingId: { type: String, index: true },
+    title: { type: String, default: '' },
+    image: { type: String, default: '' },
+    url: { type: String, default: '' },
+    sellerId: { type: String, default: '' },
+    watchedAt: { type: Date, default: Date.now },
+    mutedOffers: { type: Boolean, default: false },
+    savvyAwardedAt: { type: Date, default: null },
+  }],
+  privateOfferInbox: [{
+    offerId: { type: String, index: true },
+    listingId: { type: String, index: true },
+    promotionId: { type: mongoose.Schema.Types.ObjectId, ref: 'PromotedListing', default: null },
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    title: { type: String, default: '' },
+    image: { type: String, default: '' },
+    discountPercent: { type: Number, default: 0 },
+    quantityLimit: { type: Number, default: null },
+    expiresAt: { type: Date, required: true },
+    sentAt: { type: Date, default: Date.now },
+    claimedAt: { type: Date, default: null },
+    status: { type: String, enum: ['sent', 'claimed', 'expired'], default: 'sent' },
+  }],
+  notifications: [{
+    kind: { type: String, default: 'system' },
+    title: { type: String, default: '' },
+    body: { type: String, default: '' },
+    listingId: { type: String, default: '' },
+    offerId: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now },
+    readAt: { type: Date, default: null },
+  }],
   // pinnedWins: ordered list of Auction ids the user has chosen to showcase.
   pinnedWins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Auction' }],
   // weeklyStats: rolling weekly totals for compare cards. Reset by cron/usage.
@@ -61,11 +109,37 @@ const userSchema = new mongoose.Schema({
   },
 
   // ---- subscription & search limits ----
+  betaTester: { type: Boolean, default: false },
+  foundingAccess: { type: Boolean, default: false },
+  betaAccessExpiresAt: { type: Date, default: null },
   membershipTier: { 
     type: String, 
     enum: ['free', 'premium', 'pro'], 
     default: 'free' 
   },
+  subscription: {
+    tier: { type: String, enum: ['free', 'core', 'pro', 'elite'], default: 'free' },
+    billing: { type: String, enum: ['monthly', 'yearly'], default: 'monthly' },
+    multiplier: { type: Number, default: 1.0 },
+    monthlyPriceLocked: { type: Number, default: 0 },
+    yearlyPriceLocked: { type: Number, default: 0 },
+    renewalDate: { type: Date, default: null },
+    earlyAdopter: { type: Boolean, default: false },
+    badge: { type: String, default: '' },
+  },
+  earlyAdopterLocked: { type: Boolean, default: false },
+  earlyAdopterOriginalPrice: {
+    monthlyPrice: { type: Number, default: 0 },
+    yearlyPrice: { type: Number, default: 0 },
+    tier: { type: String, default: '' },
+  },
+  subscriptionMetrics: [{
+    event: { type: String, default: '' },
+    tier: { type: String, default: '' },
+    billing: { type: String, default: '' },
+    meta: { type: mongoose.Schema.Types.Mixed, default: {} },
+    createdAt: { type: Date, default: Date.now },
+  }],
   subscriptionExpires: Date,
   /** Last Stripe payment intent applied to premium (idempotent confirm). */
   lastProcessedPremiumPaymentIntentId: { type: String, default: null },
@@ -172,9 +246,19 @@ userSchema.pre('save', function syncPremiumTier(next) {
   next();
 });
 
+userSchema.methods.hasFoundingTesterAccess = function hasFoundingTesterAccess() {
+  const hasFlag = Boolean(this.betaTester || this.foundingAccess);
+  if (!hasFlag) return false;
+  if (!this.betaAccessExpiresAt) return true;
+  return new Date(this.betaAccessExpiresAt) > new Date();
+};
+
 // Method to check if user can perform a search
 userSchema.methods.canSearch = function() {
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  if (this.hasFoundingTesterAccess()) {
+    return { canSearch: true, remaining: 'unlimited' };
+  }
   
   // Premium and Pro users have unlimited searches
   if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
@@ -214,6 +298,9 @@ userSchema.methods.canSearch = function() {
 // Method to increment search count
 userSchema.methods.incrementSearchCount = function() {
   const today = new Date().toISOString().split('T')[0];
+  if (this.hasFoundingTesterAccess()) {
+    return;
+  }
   
   // Don't increment for premium users
   if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
@@ -248,6 +335,9 @@ userSchema.methods.isSubscriptionActive = function() {
 // Method to check if user can watch ads
 userSchema.methods.canWatchAd = function() {
   const today = new Date().toISOString().split('T')[0];
+  if (this.hasFoundingTesterAccess()) {
+    return { canWatch: false, reason: 'Founding testers already have full unlimited access' };
+  }
   
   // Premium users don't need to watch ads
   if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
@@ -275,6 +365,10 @@ userSchema.methods.canWatchAd = function() {
 // Method to record ad completion
 userSchema.methods.completeAdWatch = function() {
   const today = new Date().toISOString().split('T')[0];
+  if (this.hasFoundingTesterAccess()) {
+    this.adWatching.adsWatchedToday += 1;
+    return this.save();
+  }
   
   // Check if it's a new day (reset counter)
   if (this.adWatching.day !== today) {
@@ -419,6 +513,9 @@ userSchema.methods.completeDailyLogin = async function() {
     this.dailyTasks.completed.dailyLogin = true;
     this.dailyTasks.pointsEarned += 50;
     this.points += 50;
+    const tier = normalizeTier(this.subscription?.tier || this.membershipTier || 'free');
+    const dailyBonus = Number(getTierConfig(tier).dailyLoginBonus) || 0.5;
+    this.savvyPoints = Number(this.savvyPoints || 0) + dailyBonus;
     
     // Award XP for daily login
     await this.awardXP(25, 'daily_login');
@@ -427,6 +524,13 @@ userSchema.methods.completeDailyLogin = async function() {
     return this.save();
   }
   return Promise.resolve(this);
+};
+
+userSchema.methods.getSubscriptionTierConfig = function() {
+  const tier = normalizeTier(this.subscription?.tier || this.membershipTier || 'free');
+  const billing = normalizeBilling(this.subscription?.billing || 'monthly');
+  const cfg = getTierConfig(tier);
+  return { ...cfg, tier, billing };
 };
 
 // Method to complete search product task

@@ -30,7 +30,11 @@ const ebaySearchLimiter = rateLimit({
   max: 90,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { code: 'RATE_LIMIT', message: 'Too many search requests.' },
+  message: {
+    code: 'RATE_LIMIT',
+    message:
+      'Too many marketplace searches right now. Please wait about a minute, then try again.',
+  },
 });
 
 const ebayBidLimiter = rateLimit({
@@ -38,7 +42,31 @@ const ebayBidLimiter = rateLimit({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { code: 'RATE_LIMIT', message: 'Too many bid attempts.' },
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Too many bid attempts from your session. Pause briefly and retry.',
+  },
+});
+
+/** Browse-backed seller trends runs several internal searches — keep separate from product search. */
+const ebaySellerTrendsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Seller trend refresh limit reached. Try again in a minute.',
+  },
+});
+
+/** True Market Value comp lookups — heavier than search, so bucketed separately. */
+const marketValueLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { code: 'RATE_LIMIT', message: 'Too many market value lookups.' },
 });
 
 /** Reserved for POST /api/auth/password-reset when implemented */
@@ -57,4 +85,6 @@ module.exports = {
   progressionEventsLimiter,
   ebaySearchLimiter,
   ebayBidLimiter,
+  ebaySellerTrendsLimiter,
+  marketValueLimiter,
 };

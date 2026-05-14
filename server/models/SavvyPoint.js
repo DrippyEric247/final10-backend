@@ -24,7 +24,8 @@ const savvyPointSchema = new mongoose.Schema({
       'app_share',
       'product_share',
       'search_task',
-      'ad_watch'
+      'ad_watch',
+      'alert_trigger'
     ],
     required: true
   },
@@ -58,11 +59,16 @@ savvyPointSchema.statics.awardPoints = async function(userId, points, type, note
       note: note
     });
     await savvyPoint.save();
-    
-    // Update user's total points
-    await User.findByIdAndUpdate(userId, {
-      $inc: { points: points * multiplier }
-    });
+
+    const amt = points * multiplier;
+    const inc = { points: amt };
+    if (type === 'alert_trigger') {
+      inc.savvyPoints = amt;
+      inc.lifetimePointsEarned = amt;
+      inc.pointsBalance = amt;
+    }
+
+    await User.findByIdAndUpdate(userId, { $inc: inc });
     
     return savvyPoint;
   } catch (error) {

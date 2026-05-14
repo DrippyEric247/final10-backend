@@ -1,0 +1,545 @@
+/* Savvy Wallet — premium docked panel (glass, neon, motion-safe fallbacks) */
+
+.savvy-wallet-bubble {
+  position: relative;
+  width: min(292px, calc(100vw - 88px));
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  color: #e2e8f0;
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.82), rgba(30, 27, 75, 0.55));
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 18px 48px rgba(0, 0, 0, 0.45),
+    0 0 40px rgba(99, 102, 241, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+  isolation: isolate;
+  transition: box-shadow 0.35s ease, transform 0.25s ease, border-color 0.35s ease;
+}
+
+.savvy-wallet-bubble:hover {
+  transform: translateY(-1px);
+  border-color: rgba(167, 139, 250, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 22px 56px rgba(0, 0, 0, 0.5),
+    0 0 52px rgba(129, 140, 248, 0.28);
+}
+
+.savvy-wallet-bubble.is-pulse {
+  animation: savvy-wallet-pulse 0.52s ease-out 1;
+}
+
+.savvy-wallet-bubble.is-mult-flash .savvy-wallet-meta-v.is-hot {
+  animation: savvy-mult-flash 0.38s ease-out 1;
+}
+
+@keyframes savvy-wallet-pulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+      0 18px 48px rgba(0, 0, 0, 0.45),
+      0 0 40px rgba(99, 102, 241, 0.18);
+  }
+  40% {
+    box-shadow:
+      0 0 0 1px rgba(253, 224, 71, 0.12) inset,
+      0 22px 60px rgba(0, 0, 0, 0.55),
+      0 0 72px rgba(52, 211, 153, 0.35);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+      0 18px 48px rgba(0, 0, 0, 0.45),
+      0 0 40px rgba(99, 102, 241, 0.18);
+  }
+}
+
+@keyframes savvy-mult-flash {
+  0%,
+  100% {
+    color: #c7d2fe;
+    text-shadow: none;
+  }
+  50% {
+    color: #fef3c7;
+    text-shadow: 0 0 12px rgba(250, 204, 21, 0.55);
+  }
+}
+
+.savvy-wallet-bubble-border {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(129, 140, 248, 0.35), rgba(52, 211, 153, 0.12), rgba(99, 102, 241, 0.35));
+  opacity: 0.45;
+  z-index: 0;
+  animation: savvy-wallet-border-drift 7s linear infinite;
+}
+
+@keyframes savvy-wallet-border-drift {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.savvy-wallet-bubble-shimmer {
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 60%
+  );
+  animation: savvy-wallet-shimmer 4.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes savvy-wallet-shimmer {
+  0% {
+    transform: translateX(-12%) rotate(8deg);
+  }
+  100% {
+    transform: translateX(18%) rotate(8deg);
+  }
+}
+
+.savvy-wallet-hd,
+.savvy-wallet-balance,
+.savvy-wallet-meta,
+.savvy-wallet-progress,
+.savvy-wallet-mini-feed,
+.savvy-wallet-actions,
+.savvy-wallet-drawer {
+  position: relative;
+  z-index: 2;
+}
+
+.savvy-wallet-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.savvy-wallet-ico {
+  font-size: 1rem;
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.35));
+}
+
+.savvy-wallet-title {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c7d2fe;
+}
+
+.savvy-wallet-badge-tier {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #a7f3d0;
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.savvy-wallet-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.savvy-wallet-balance-num {
+  font-size: 1.65rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #f8fafc;
+  text-shadow: 0 0 24px rgba(129, 140, 248, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.savvy-wallet-balance-sub {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.savvy-wallet-float-lbl {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #fef9c3;
+  text-shadow: 0 0 14px rgba(250, 204, 21, 0.45);
+  pointer-events: none;
+}
+
+.savvy-wallet-float-lbl--LEGENDARY {
+  color: #fef3c7;
+  text-shadow: 0 0 22px rgba(251, 191, 36, 0.65);
+}
+
+.savvy-wallet-float-lbl--EPIC {
+  color: #e9d5ff;
+  text-shadow: 0 0 18px rgba(192, 132, 252, 0.55);
+}
+
+.savvy-wallet-float-lbl--RARE {
+  color: #ddd6fe;
+  text-shadow: 0 0 16px rgba(167, 139, 250, 0.5);
+}
+
+.savvy-wallet-float-epic {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+}
+
+.savvy-wallet-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+}
+
+.savvy-wallet-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.savvy-wallet-meta-k {
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.62rem;
+}
+
+.savvy-wallet-meta-v {
+  font-weight: 800;
+  color: #c7d2fe;
+}
+
+.savvy-wallet-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.savvy-wallet-progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  overflow: hidden;
+}
+
+.savvy-wallet-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.85), rgba(129, 140, 248, 0.95));
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.45);
+}
+
+.savvy-wallet-mini-feed {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(71, 85, 105, 0.45);
+}
+
+.savvy-wallet-feed-hd {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.savvy-wallet-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.savvy-wallet-feed-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.savvy-wallet-feed-item--normal {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.savvy-wallet-feed-item--good {
+  border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.savvy-wallet-feed-item--rare {
+  border: 1px solid rgba(167, 139, 250, 0.35);
+}
+
+.savvy-wallet-feed-item--epic,
+.savvy-wallet-feed-item--legendary {
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.savvy-wallet-feed-amt {
+  font-weight: 900;
+  color: #fef3c7;
+}
+
+.savvy-wallet-feed-type {
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: capitalize;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savvy-wallet-feed-empty {
+  font-size: 0.72rem;
+  color: #64748b;
+  padding: 4px 0;
+}
+
+.savvy-wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.savvy-wallet-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  background: rgba(99, 102, 241, 0.18);
+  color: #e0e7ff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.savvy-wallet-btn--ghost {
+  flex: 0 0 auto;
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(71, 85, 105, 0.55);
+  color: #94a3b8;
+}
+
+.savvy-wallet-drawer {
+  margin-top: 10px;
+  padding: 10px 10px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: rgba(2, 6, 23, 0.45);
+}
+
+.savvy-wallet-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.72rem;
+  margin-bottom: 6px;
+}
+
+.savvy-wallet-stat-k {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.savvy-wallet-stat-v {
+  font-weight: 900;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.savvy-wallet-drawer-note {
+  margin: 6px 0 0;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.savvy-wallet-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.savvy-wallet-particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(129, 140, 248, 0.35);
+  opacity: 0.5;
+  animation: savvy-p-float 5.5s ease-in-out infinite;
+}
+
+.savvy-wallet-particle--0 {
+  left: 12%;
+  bottom: 18%;
+  animation-delay: 0s;
+}
+.savvy-wallet-particle--1 {
+  left: 42%;
+  bottom: 8%;
+  animation-delay: 0.8s;
+  background: rgba(52, 211, 153, 0.35);
+}
+.savvy-wallet-particle--2 {
+  left: 72%;
+  bottom: 22%;
+  animation-delay: 1.4s;
+}
+.savvy-wallet-particle--3 {
+  left: 88%;
+  bottom: 12%;
+  animation-delay: 2s;
+  background: rgba(250, 204, 21, 0.25);
+}
+
+@keyframes savvy-p-float {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-10px);
+    opacity: 0.75;
+  }
+}
+
+/* Flying coin */
+.savvy-fly-coin-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #fef3c7;
+  background: radial-gradient(circle at 30% 25%, rgba(254, 243, 199, 0.35), rgba(30, 27, 75, 0.92));
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.35);
+}
+
+.savvy-fly-coin-tag {
+  position: absolute;
+  left: 50%;
+  top: -22px;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: #fef9c3;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.savvy-fly-coin--GOOD .savvy-fly-coin-inner {
+  box-shadow: 0 0 22px rgba(250, 204, 21, 0.45);
+}
+
+.savvy-fly-coin--RARE .savvy-fly-coin-inner {
+  border-color: rgba(167, 139, 250, 0.65);
+  box-shadow: 0 0 26px rgba(167, 139, 250, 0.55);
+  color: #ede9fe;
+}
+
+.savvy-fly-coin--EPIC .savvy-fly-coin-inner {
+  background: radial-gradient(circle at 30% 25%, rgba(196, 181, 253, 0.45), rgba(49, 46, 129, 0.95));
+  border-color: rgba(192, 132, 252, 0.65);
+  box-shadow: 0 0 28px rgba(192, 132, 252, 0.55);
+}
+
+.savvy-fly-coin--LEGENDARY .savvy-fly-coin-inner {
+  animation: savvy-fly-legend 0.88s linear infinite;
+  border-color: rgba(253, 224, 71, 0.75);
+}
+
+@keyframes savvy-fly-legend {
+  0% {
+    filter: hue-rotate(0deg) drop-shadow(0 0 12px rgba(251, 191, 36, 0.55));
+  }
+  100% {
+    filter: hue-rotate(320deg) drop-shadow(0 0 16px rgba(52, 211, 153, 0.45));
+  }
+}
+
+.savvy-fly-coin--NORMAL .savvy-fly-coin-inner {
+  filter: grayscale(0.15);
+}
+
+/* Legendary screen wash */
+.savvy-wallet-legend-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483550;
+  pointer-events: none;
+  background: radial-gradient(circle at 70% 80%, rgba(251, 191, 36, 0.12), transparent 55%);
+  animation: savvy-legend-glow-fade 1.35s ease-out forwards;
+}
+
+@keyframes savvy-legend-glow-fade {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .savvy-wallet-bubble-border,
+  .savvy-wallet-bubble-shimmer,
+  .savvy-wallet-particle,
+  .savvy-fly-coin--LEGENDARY .savvy-fly-coin-inner {
+    animation: none !important;
+  }
+}

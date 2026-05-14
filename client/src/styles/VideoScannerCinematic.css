@@ -1,0 +1,255 @@
+.scanner-cinematic {
+  position: relative;
+  background:
+    radial-gradient(900px 540px at 6% -15%, rgba(124, 58, 237, 0.24), transparent 58%),
+    radial-gradient(900px 540px at 98% 0%, rgba(56, 189, 248, 0.2), transparent 55%),
+    linear-gradient(180deg, #070910 0%, #090d19 54%, #06080f 100%);
+}
+
+.scanner-overlay-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(100, 116, 139, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 116, 139, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  z-index: 0;
+  mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 78%);
+}
+
+.scanner-overlay-scanline {
+  position: fixed;
+  inset: -20% 0 auto 0;
+  height: 24%;
+  background: linear-gradient(to bottom, transparent 0%, rgba(125, 211, 252, 0.08) 48%, transparent 100%);
+  animation: scannerSweep 8s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.scanner-wrap { position: relative; z-index: 1; }
+
+.scanner-hero {
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  background: linear-gradient(140deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.9));
+  box-shadow: 0 24px 66px rgba(2, 6, 23, 0.5), 0 0 44px rgba(99, 102, 241, 0.2);
+}
+
+.scanner-radar,
+.scanner-radar-ring,
+.scanner-eye-pulse {
+  position: absolute;
+  border-radius: 999px;
+}
+
+.scanner-radar { right: -36px; top: -24px; width: 220px; height: 220px; border: 1px solid rgba(125, 211, 252, 0.5); opacity: .45; }
+.scanner-radar-ring { right: -28px; top: -16px; width: 204px; height: 204px; border: 1px dashed rgba(196, 181, 253, 0.7); animation: spinSlow 8s linear infinite; }
+.scanner-eye-pulse { right: 54px; top: 58px; width: 28px; height: 28px; background: rgba(56, 189, 248, 0.75); box-shadow: 0 0 28px rgba(56, 189, 248, 0.8); animation: eyePulse 2s ease-in-out infinite; }
+
+.scanner-vision-active {
+  display: inline-flex;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: rgba(15, 23, 42, 0.65);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.scanner-dock {
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.72), rgba(17, 24, 39, 0.92));
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.scanner-dock.is-active {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 28px rgba(139, 92, 246, 0.42);
+}
+
+.scanner-input {
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  background: rgba(2, 6, 23, 0.75);
+  color: #f8fafc;
+  padding: 14px 16px;
+  outline: none;
+}
+
+.scanner-input:focus {
+  border-color: rgba(56, 189, 248, 0.72);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15);
+}
+
+.scanner-unlock-btn {
+  border: none;
+  border-radius: 14px;
+  padding: 0 20px;
+  min-height: 52px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #06080f;
+  background: linear-gradient(120deg, #f59e0b, #a855f7, #22d3ee);
+  box-shadow: 0 0 26px rgba(168, 85, 247, 0.35);
+}
+
+.scanner-unlock-btn:disabled { opacity: .56; cursor: not-allowed; }
+
+.scanner-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.scanner-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #8b5cf6, #f59e0b);
+}
+
+.scanner-waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+
+.scanner-waveform-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+}
+
+.scanner-waveform span {
+  width: 4px;
+  border-radius: 999px;
+  height: 4px;
+  background: rgba(103, 232, 249, 0.92);
+  animation: waveform 0.9s ease-in-out infinite;
+}
+
+.scanner-error {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.25);
+  color: #fecaca;
+}
+
+.scanner-reveal-banner {
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background: linear-gradient(130deg, rgba(15, 23, 42, 0.72), rgba(30, 58, 138, 0.24), rgba(124, 58, 237, 0.28));
+  box-shadow: 0 0 34px rgba(34, 211, 238, 0.18);
+}
+
+.scanner-card {
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.95), rgba(10, 15, 28, 0.96));
+  box-shadow: 0 16px 46px rgba(2, 6, 23, 0.5);
+}
+
+.scanner-card-media { min-height: 220px; }
+.scanner-card-tag,
+.scanner-card-conf {
+  position: absolute;
+  top: 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+.scanner-card-tag { left: 12px; color: #fef9c3; border: 1px solid rgba(251, 191, 36, 0.45); background: rgba(120, 53, 15, 0.55); }
+.scanner-card-conf { right: 12px; color: #dbeafe; border: 1px solid rgba(56, 189, 248, 0.45); background: rgba(8, 47, 73, 0.55); }
+
+.scanner-lock-reticle {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(34, 211, 238, 0.85);
+  border-radius: 999px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.5);
+  animation: reticlePulse 2s ease-in-out infinite;
+}
+
+.scanner-lock-reticle::before,
+.scanner-lock-reticle::after {
+  content: "";
+  position: absolute;
+  background: rgba(34, 211, 238, 0.9);
+}
+.scanner-lock-reticle::before { width: 2px; height: 76px; left: 27px; top: -10px; }
+.scanner-lock-reticle::after { height: 2px; width: 76px; top: 27px; left: -10px; }
+
+.scanner-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.scanner-stat-row > span {
+  min-width: 0;
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+
+.scanner-under-market {
+  color: #86efac;
+  font-weight: 800;
+}
+
+.scanner-buy-matrix {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.scanner-buy-row {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.scanner-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-weight: 800;
+  color: #06111f;
+  text-decoration: none;
+  background: linear-gradient(120deg, #67e8f9, #a78bfa, #facc15);
+}
+
+@keyframes scannerSweep {
+  0% { transform: translateY(-120%); }
+  100% { transform: translateY(620%); }
+}
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes eyePulse {
+  0%, 100% { transform: scale(0.92); opacity: .55; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
+@keyframes waveform {
+  0%, 100% { height: 4px; opacity: .7; }
+  50% { height: 16px; opacity: 1; }
+}
+@keyframes reticlePulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.95); opacity: .7; }
+  50% { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+}

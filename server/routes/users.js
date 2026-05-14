@@ -2,6 +2,10 @@ const express = require('express');
 const User = require('../models/User');
 const Auction = require('../models/Auction');
 const SavvyPoint = require('../models/SavvyPoint');
+const Alert = require('../models/Alert');
+const ProjectAlert = require('../models/ProjectAlert');
+const BuildWarsEntry = require('../models/BuildWarsEntry');
+const BuildWarsVote = require('../models/BuildWarsVote');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -485,6 +489,49 @@ router.put('/me/pinned-wins', auth, async (req, res) => {
   } catch (error) {
     console.error('Set pinned wins error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete authenticated user's account and related account data.
+router.delete('/me', auth, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { confirmation } = req.body || {};
+    if (String(confirmation || '').toUpperCase() !== 'DELETE') {
+      return res.status(400).json({ message: 'Confirmation text must be DELETE' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const buildWarEntryIds = await BuildWarsEntry.find({ user: user._id }).distinct('_id');
+    await BuildWarsVote.deleteMany({
+      $or: [{ voter: user._id }, { entry: { $in: buildWarEntryIds } }],
+    });
+    await BuildWarsEntry.deleteMany({ user: user._id });
+
+    await Promise.all([
+      Alert.deleteMany({ user: user._id }),
+      ProjectAlert.deleteMany({ user: user._id }),
+      SavvyPoint.deleteMany({ user: user._id }),
+      User.updateMany(
+        { followers: user._id },
+        { $pull: { followers: user._id } }
+      ),
+      User.updateMany(
+        { following: user._id },
+        { $pull: { following: user._id } }
+      ),
+    ]);
+
+    await User.deleteOne({ _id: user._id });
+
+    return res.json({ ok: true, message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 

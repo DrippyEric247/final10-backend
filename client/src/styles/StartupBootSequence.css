@@ -1,0 +1,164 @@
+.startup-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483587;
+  background: radial-gradient(circle at 50% 30%, rgba(25, 35, 60, 0.82), rgba(2, 6, 23, 0.98) 55%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.startup-boot__stage {
+  position: relative;
+  width: min(92vw, 560px);
+  min-height: 260px;
+  border-radius: 20px;
+  border: 1px solid rgba(71, 85, 105, 0.6);
+  background: linear-gradient(145deg, rgba(3, 7, 18, 0.9), rgba(15, 23, 42, 0.92));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(56, 189, 248, 0.12);
+  overflow: hidden;
+}
+
+.startup-boot__content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  padding: 22px 20px;
+  text-align: center;
+}
+
+.startup-boot__content--product {
+  gap: 12px;
+}
+
+.startup-boot__title {
+  margin: 12px 0 0;
+  font-size: clamp(1.5rem, 5vw, 2.1rem);
+  color: #f8fafc;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.startup-boot__subtitle {
+  margin: 6px 0 0;
+  color: #93c5fd;
+  opacity: 0.9;
+  font-size: 0.88rem;
+}
+
+.startup-boot__bg-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.2;
+  filter: saturate(1.08) contrast(1.02);
+}
+
+.startup-boot__halo {
+  position: absolute;
+  inset: 12% 18%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0) 72%);
+  animation: startup-halo 640ms ease-out;
+}
+
+.startup-boot__sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -38%;
+  width: 34%;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0), rgba(56, 189, 248, 0.26), rgba(56, 189, 248, 0));
+  filter: blur(2px);
+  animation: startup-sweep 640ms ease-out;
+}
+
+.startup-boot__product-logo {
+  width: min(64vw, 320px);
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(250, 204, 21, 0.22);
+}
+
+.startup-boot__pulse-ring {
+  position: absolute;
+  inset: 20% 17%;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  animation: startup-ring 700ms ease-out;
+}
+
+.startup-boot--savvy .startup-boot__stage {
+  animation: startup-stage-in 260ms ease-out;
+}
+
+.startup-boot--product .startup-boot__stage {
+  animation: startup-product-in 260ms ease-out;
+}
+
+@keyframes startup-stage-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes startup-product-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes startup-sweep {
+  from {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400%);
+    opacity: 0;
+  }
+}
+
+@keyframes startup-halo {
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes startup-ring {
+  from {
+    transform: scale(0.74);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+

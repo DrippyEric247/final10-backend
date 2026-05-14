@@ -1,0 +1,176 @@
+/* Task row: energy sweep when a task flips to complete */
+.f10-task-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.f10-task-row.f10-task-sweep-active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 150, 0.42),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+  animation: f10-task-sweep 0.58s ease forwards;
+}
+
+@keyframes f10-task-sweep {
+  to {
+    left: 100%;
+  }
+}
+
+/* Daily cleared: full-screen subtle glow + label (non-blocking) */
+.f10-daily-cleared-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: f10-daily-cleared-fade 2.2s ease forwards;
+}
+
+@keyframes f10-daily-cleared-fade {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.f10-daily-cleared-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 85% 70% at 50% 45%,
+    rgba(52, 211, 153, 0.14) 0%,
+    rgba(167, 139, 250, 0.08) 42%,
+    transparent 72%
+  );
+  animation: f10-daily-cleared-glow 0.55s ease-out;
+}
+
+@keyframes f10-daily-cleared-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.f10-daily-cleared-label {
+  position: relative;
+  z-index: 2;
+  font-size: clamp(1.1rem, 3.5vw, 1.65rem);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ecfdf5;
+  text-shadow:
+    0 0 24px rgba(52, 211, 153, 0.55),
+    0 0 48px rgba(167, 139, 250, 0.25);
+  animation: f10-daily-cleared-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+
+@keyframes f10-daily-cleared-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Tiny confetti burst — short, no layout impact */
+.f10-daily-cleared-burst {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 0;
+  height: 0;
+  z-index: 1;
+}
+
+.f10-daily-cleared-burst span {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: f10-confetti-dot 0.55s ease-out forwards;
+}
+
+.f10-daily-cleared-burst span:nth-child(1) {
+  background: rgba(253, 224, 71, 0.95);
+  animation-delay: 0.04s;
+  --f10-dx: -42px;
+  --f10-dy: -28px;
+}
+
+.f10-daily-cleared-burst span:nth-child(2) {
+  background: rgba(52, 211, 153, 0.95);
+  animation-delay: 0.06s;
+  --f10-dx: 48px;
+  --f10-dy: -22px;
+}
+
+.f10-daily-cleared-burst span:nth-child(3) {
+  background: rgba(167, 139, 250, 0.95);
+  animation-delay: 0.05s;
+  --f10-dx: -18px;
+  --f10-dy: 40px;
+}
+
+.f10-daily-cleared-burst span:nth-child(4) {
+  background: rgba(244, 114, 182, 0.9);
+  animation-delay: 0.07s;
+  --f10-dx: 36px;
+  --f10-dy: 34px;
+}
+
+.f10-daily-cleared-burst span:nth-child(5) {
+  background: rgba(34, 211, 238, 0.9);
+  animation-delay: 0.03s;
+  --f10-dx: 0px;
+  --f10-dy: -46px;
+}
+
+@keyframes f10-confetti-dot {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--f10-dx, 0px)),
+        calc(-50% + var(--f10-dy, 0px))
+      )
+      scale(0.5);
+  }
+}

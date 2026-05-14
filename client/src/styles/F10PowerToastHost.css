@@ -1,0 +1,53 @@
+.f10-power-toast-host {
+  position: fixed;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147482000;
+  pointer-events: none;
+  max-width: min(92vw, 360px);
+}
+
+.f10-power-toast {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(253, 224, 71, 0.28);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(253, 224, 71, 0.12);
+  animation: f10-power-toast-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.f10-power-toast-main {
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: #fef9c3;
+  text-shadow: 0 0 18px rgba(253, 224, 71, 0.35);
+}
+
+.f10-power-toast-praise {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(167, 243, 208, 0.95);
+  text-align: center;
+  line-height: 1.3;
+}
+
+@keyframes f10-power-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

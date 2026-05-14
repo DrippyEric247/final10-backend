@@ -1,0 +1,240 @@
+/* -------------------------------------------------------------------------- */
+/*  Follow button                                                             */
+/* -------------------------------------------------------------------------- */
+
+.follow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+  line-height: 1.1;
+}
+
+.follow-btn--sm {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+.follow-btn.is-not-following {
+  background: linear-gradient(120deg, #facc15, #f59e0b);
+  color: #0f172a;
+  border-color: rgba(250, 204, 21, 0.5);
+}
+
+.follow-btn.is-not-following:hover {
+  filter: brightness(1.05);
+}
+
+.follow-btn.is-following {
+  background: rgba(15, 23, 42, 0.6);
+  color: #cbd5e1;
+  border-color: rgba(100, 116, 139, 0.5);
+}
+
+.follow-btn.is-following:hover {
+  background: rgba(127, 29, 29, 0.5);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.follow-btn[aria-busy="true"] {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Weekly compare card                                                       */
+/* -------------------------------------------------------------------------- */
+
+.weekly-compare {
+  border-radius: 14px;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: linear-gradient(150deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.92));
+  padding: 14px 16px;
+  color: #e2e8f0;
+}
+
+.weekly-compare--loading,
+.weekly-compare--error {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.weekly-compare-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.weekly-compare-title {
+  font-weight: 800;
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.weekly-compare-week {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.weekly-compare-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.weekly-compare-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.weekly-compare-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.weekly-compare-numbers {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.weekly-compare-numbers .is-up {
+  color: #4ade80;
+}
+
+.weekly-compare-vs {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.weekly-compare-footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Pinned wins                                                               */
+/* -------------------------------------------------------------------------- */
+
+.pinned-wins {
+  margin-top: 8px;
+}
+
+.pinned-wins--loading,
+.pinned-wins--empty {
+  padding: 14px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(100, 116, 139, 0.45);
+}
+
+.pinned-wins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.pinned-wins-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pinned-wins-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: rgba(15, 23, 42, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pinned-wins-img--placeholder {
+  font-size: 2rem;
+  color: #facc15;
+}
+
+.pinned-wins-meta {
+  padding: 8px 10px;
+}
+
+.pinned-wins-title {
+  font-weight: 700;
+  color: #f1f5f9;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pinned-wins-price {
+  font-size: 0.82rem;
+  color: #4ade80;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Recommended-by-creator tag                                                */
+/* -------------------------------------------------------------------------- */
+
+.recommended-by-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: #ede9fe;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.1;
+  transition: filter 0.15s ease;
+}
+
+.recommended-by-tag:hover {
+  filter: brightness(1.1);
+}
+
+.recommended-by-tag--compact {
+  padding: 2px 8px;
+  font-size: 0.72rem;
+}
+
+.recommended-by-tag-icon {
+  filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.6));
+}

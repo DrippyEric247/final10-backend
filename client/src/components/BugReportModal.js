@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Bug, AlertTriangle, AlertCircle, AlertOctagon, Send, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const BugReportModal = ({ isOpen, onClose }) => {
+const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
@@ -48,6 +48,11 @@ const BugReportModal = ({ isOpen, onClose }) => {
       });
 
       if (response.ok) {
+        try {
+          onReportSubmitted?.();
+        } catch {
+          /* ignore */
+        }
         setSubmitSuccess(true);
         setTimeout(() => {
           setSubmitSuccess(false);

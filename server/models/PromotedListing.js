@@ -115,6 +115,22 @@ const promotedListingSchema = new mongoose.Schema({
   // Metadata
   notes: { type: String },
   tags: [String],
+  watchers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  watcherActivity: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    action: { type: String, enum: ['watch', 'claim_offer'], default: 'watch' },
+    at: { type: Date, default: Date.now },
+  }],
+  privateOffers: [{
+    offerId: { type: String, required: true },
+    discountPercent: { type: Number, min: 5, max: 20, required: true },
+    quantityLimit: { type: Number, min: 1, default: null },
+    durationHours: { type: Number, min: 1, max: 24, required: true },
+    watcherCountAtSend: { type: Number, default: 0 },
+    sentAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date, required: true },
+    conversions: { type: Number, default: 0 },
+  }],
   
   // Admin controls
   adminNotes: { type: String },

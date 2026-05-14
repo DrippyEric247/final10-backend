@@ -77,6 +77,73 @@ function logPaymentFailure(route, message, code) {
   error('PAYMENT_FAILURE', { route, message, code });
 }
 
+/** Browser / mobile client telemetry (sanitized; never store secrets). */
+function logClientAnalytics(events, meta = {}) {
+  const list = Array.isArray(events) ? events.slice(0, 25) : [];
+  info('CLIENT_ANALYTICS_BATCH', {
+    count: list.length,
+    events: list,
+    ...meta,
+  });
+}
+
+function logClientCrash(payload, meta = {}) {
+  const safePayload =
+    isProduction() && payload && typeof payload === 'object'
+      ? { ...payload, stack: undefined, componentStack: undefined }
+      : payload;
+  error('CLIENT_CRASH_REPORT', {
+    ...safePayload,
+    ...meta,
+  });
+}
+
+function logClientApiFailure(payload = {}, meta = {}) {
+  warn('CLIENT_API_FAILURE', {
+    path: payload.path,
+    method: payload.method,
+    status: payload.status,
+    code: payload.code,
+    message: payload.message,
+    category: payload.category || 'general',
+    ...meta,
+  });
+}
+
+function logClientAuthError(payload = {}, meta = {}) {
+  warn('CLIENT_AUTH_ERROR', {
+    path: payload.path,
+    method: payload.method,
+    status: payload.status,
+    code: payload.code,
+    message: payload.message,
+    ...meta,
+  });
+}
+
+function logClientEbayFailure(payload = {}, meta = {}) {
+  warn('CLIENT_EBAY_FAILURE', {
+    path: payload.path,
+    method: payload.method,
+    status: payload.status,
+    code: payload.code,
+    message: payload.message,
+    ...meta,
+  });
+}
+
+function logProcessCrash(kind, errOrReason) {
+  const isErr = errOrReason instanceof Error;
+  const row = {
+    message: isErr ? errOrReason.message : String(errOrReason),
+    name: isErr ? errOrReason.name : undefined,
+  };
+  if (!isProduction() && isErr) {
+    row.stack = errOrReason.stack;
+  }
+  emit('critical', kind, row);
+}
+
 module.exports = {
   emit,
   info,
@@ -87,4 +154,10 @@ module.exports = {
   logProgressionFailure,
   logEbayProviderError,
   logPaymentFailure,
+  logClientAnalytics,
+  logClientCrash,
+  logClientApiFailure,
+  logClientAuthError,
+  logClientEbayFailure,
+  logProcessCrash,
 };

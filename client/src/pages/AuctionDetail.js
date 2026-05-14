@@ -3,12 +3,23 @@ import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, Users, TrendingUp, Zap, Award, Share2, Loader2 } from 'lucide-react';
 import ebayService from '../services/ebayService';
+import SavvyAlertButton from '../components/alerts/SavvyAlertButton';
+import {
+  SAVVY_CREDIT_EVENT,
+  applyCreditToOrder,
+  getApplicableCreditForPrice,
+  getSavvyCreditState,
+} from '../lib/savvyCredits';
 
 const AuctionDetail = () => {
   const { id } = useParams();
   const [auction, setAuction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [creditState, setCreditState] = useState(() => getSavvyCreditState());
+  const [useSavvyCredit, setUseSavvyCredit] = useState(false);
+  const [creditAppliedCents, setCreditAppliedCents] = useState(0);
+  const [creditMessage, setCreditMessage] = useState("");
 
   useEffect(() => {
     const fetchAuctionDetails = async () => {
@@ -30,6 +41,12 @@ const AuctionDetail = () => {
       fetchAuctionDetails();
     }
   }, [id]);
+
+  useEffect(() => {
+    const sync = () => setCreditState(getSavvyCreditState());
+    window.addEventListener(SAVVY_CREDIT_EVENT, sync);
+    return () => window.removeEventListener(SAVVY_CREDIT_EVENT, sync);
+  }, []);
 
   if (loading) {
     return (
@@ -63,6 +80,10 @@ const AuctionDetail = () => {
     const remainingSeconds = seconds % 60;
     return `${minutes}m ${remainingSeconds}s`;
   };
+
+  const currentBid = Number(auction?.currentBid || 0);
+  const applicableCents = getApplicableCreditForPrice(currentBid, creditState.creditCents);
+  const previewAfterCredit = Math.max(0, currentBid - applicableCents / 100);
 
   return (
     <div className="min-h-screen bg-gray-900 pt-20">
@@ -121,13 +142,51 @@ const AuctionDetail = () => {
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="text-3xl font-bold text-white">${auction.currentBid || '0.00'}</div>
+                  <div className="text-3xl font-bold text-white">${(useSavvyCredit ? previewAfterCredit : currentBid || 0).toFixed(2)}</div>
                   <div className="text-gray-400">Current Bid</div>
+                  {useSavvyCredit && applicableCents > 0 ? (
+                    <div className="text-amber-300 text-sm mt-1">Savvy credit applied: -${(creditAppliedCents / 100).toFixed(2)}</div>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <div className="text-lg text-gray-400">Starting: ${auction.startingPrice || '0.00'}</div>
                   <div className="text-sm text-gray-500">{auction.bidCount || 0} bids</div>
                 </div>
+              </div>
+
+              <div className="mb-3 p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm text-white font-medium">Apply Savvy Credit</div>
+                    <div className="text-xs text-gray-300">
+                      Available: ${(creditState.creditCents / 100).toFixed(2)} • Max per order ${(applicableCents / 100).toFixed(2)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      if (useSavvyCredit) {
+                        setUseSavvyCredit(false);
+                        setCreditAppliedCents(0);
+                        setCreditMessage("");
+                        return;
+                      }
+                      const applied = applyCreditToOrder(currentBid, applicableCents);
+                      if (!applied.ok) {
+                        setCreditMessage(applied.reason || "Could not apply credit");
+                        return;
+                      }
+                      setCreditAppliedCents(applied.appliedCents);
+                      setUseSavvyCredit(true);
+                      setCreditState(applied.creditState);
+                      setCreditMessage(`Applied $${(applied.appliedCents / 100).toFixed(2)} Savvy credit`);
+                    }}
+                  >
+                    {useSavvyCredit ? "Remove" : "Apply"}
+                  </button>
+                </div>
+                {creditMessage ? <div className="text-xs text-yellow-200 mt-2">{creditMessage}</div> : null}
               </div>
               
               <div className="space-y-3">
@@ -170,6 +229,20 @@ const AuctionDetail = () => {
                 <Users className="w-4 h-4" />
                 Watch
               </button>
+              <div className="flex-1">
+                <SavvyAlertButton
+                  label="Track this"
+                  payload={{
+                    name: `${auction.title || "Auction"} • detail watch`,
+                    keywords: [String(auction.title || "").slice(0, 40)],
+                    maxPrice: Number(auction.currentBid || 0) || undefined,
+                    minConfidence: 75,
+                    persona: "buyer",
+                    kind: "ending_soon",
+                    context: { source: "auction_detail", auctionId: String(id || "") },
+                  }}
+                />
+              </div>
               <button className="btn-secondary flex-1 flex items-center justify-center gap-2">
                 <Share2 className="w-4 h-4" />
                 Share

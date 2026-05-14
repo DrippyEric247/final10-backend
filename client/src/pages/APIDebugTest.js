@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, AlertCircle, Loader2, Server, Database, Key } from 'lucide-react';
-import api from '../services/authService';
-import ebayService from '../services/ebayService';
+import { buildApiUrl, getApiBaseUrl } from '../lib/runtimeApi';
 
 const APIDebugTest = () => {
   const [testResults, setTestResults] = useState({});
@@ -29,7 +28,7 @@ const APIDebugTest = () => {
 
   const testBasicConnectivity = async () => {
     try {
-      const response = await fetch('/api/health', {
+      const response = await fetch(buildApiUrl('/health'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -44,7 +43,7 @@ const APIDebugTest = () => {
           details: {
             status: response.status,
             statusText: response.statusText,
-            url: '/api/health'
+            url: buildApiUrl('/health')
           }
         }
       }));
@@ -66,7 +65,7 @@ const APIDebugTest = () => {
   const testAuthEndpoint = async () => {
     try {
       const token = localStorage.getItem('f10_token');
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch(buildApiUrl('/auth/me'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -116,7 +115,7 @@ const APIDebugTest = () => {
 
   const testEbaySearchEndpoint = async () => {
     try {
-      const response = await fetch('/api/ebay/search?limit=1', {
+      const response = await fetch(buildApiUrl('/ebay/search?limit=1'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('f10_token')}`,
@@ -403,7 +402,7 @@ const APIDebugTest = () => {
               </div>
               <div>
                 <p className="text-gray-400">API Base URL:</p>
-                <p className="text-white font-mono">{process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}</p>
+                <p className="text-white font-mono">{getApiBaseUrl()}</p>
               </div>
               <div>
                 <p className="text-gray-400">Token Present:</p>

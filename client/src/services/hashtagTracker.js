@@ -3,7 +3,8 @@
 
 class HashtagTrackerService {
   constructor() {
-    this.baseURL = 'http://localhost:5000/api';
+    /** Same-origin API base (works behind proxy and in production). */
+    this.baseURL = '/api';
     this.hashtags = [
       '#StayEarning',
       '#StaySavvy', 
@@ -241,6 +242,9 @@ export default hashtagTrackerService;
 
 // Export class for testing
 export { HashtagTrackerService };
+
+
+
 
 
 

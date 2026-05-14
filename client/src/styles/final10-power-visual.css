@@ -1,0 +1,84 @@
+/* Driven by Final10PowerContext: --f10-power-intensity 0–1, body.f10-power-tier-* */
+
+.bg-app {
+  transition: box-shadow 0.6s ease;
+}
+
+.f10-power-tier-active .bg-app,
+.f10-power-tier-locked_in .bg-app,
+.f10-power-tier-heating_up .bg-app,
+.f10-power-tier-elite .bg-app,
+.f10-power-tier-savvy_god .bg-app {
+  box-shadow: inset 0 0 calc(80px + var(--f10-power-intensity, 0) * 120px)
+    rgba(139, 92, 246, calc(0.04 + var(--f10-power-intensity, 0) * 0.08));
+}
+
+.f10-loadout-emblem-display {
+  transition: filter 0.45s ease, box-shadow 0.45s ease;
+  filter: drop-shadow(
+    0 0 calc(8px + var(--f10-power-intensity, 0) * 28px)
+      rgba(251, 191, 36, calc(0.2 + var(--f10-power-intensity, 0) * 0.55))
+  );
+}
+
+.f10-power-tier-elite .f10-loadout-emblem-display,
+.f10-power-tier-savvy_god .f10-loadout-emblem-display {
+  filter: drop-shadow(0 0 calc(14px + var(--f10-power-intensity, 0) * 32px)
+      rgba(253, 224, 71, 0.65))
+    drop-shadow(0 0 calc(28px + var(--f10-power-intensity, 0) * 40px)
+      rgba(167, 139, 250, 0.4));
+}
+
+.f10-loadout-card-preview {
+  transition: box-shadow 0.45s ease;
+  box-shadow:
+    0 0 calc(12px + var(--f10-power-intensity, 0) * 32px)
+      rgba(167, 139, 250, calc(0.15 + var(--f10-power-intensity, 0) * 0.42)),
+    0 0 calc(24px + var(--f10-power-intensity, 0) * 48px)
+      rgba(34, 197, 94, calc(0.06 + var(--f10-power-intensity, 0) * 0.16)),
+    inset 0 0 0 1px rgba(253, 224, 71, calc(0.04 + var(--f10-power-intensity, 0) * 0.12));
+}
+
+.f10-power-tier-savvy_god .f10-loadout-card-preview {
+  animation: f10-power-card-elite-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes f10-power-card-elite-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 28px rgba(253, 224, 71, 0.22),
+      0 0 52px rgba(167, 139, 250, 0.28),
+      inset 0 0 0 1px rgba(253, 224, 71, 0.14);
+  }
+  50% {
+    box-shadow:
+      0 0 40px rgba(253, 224, 71, 0.32),
+      0 0 72px rgba(139, 92, 246, 0.22),
+      inset 0 0 0 1px rgba(253, 224, 71, 0.22);
+  }
+}
+
+.f10-loadout-card-preview::after {
+  opacity: calc(0.35 + var(--f10-power-intensity, 0) * 0.45);
+}
+
+.f10-profile-with-power .f10-profile-header {
+  transition: box-shadow 0.5s ease;
+  box-shadow: 0 12px 40px
+    rgba(0, 0, 0, 0.35),
+    0 0 calc(24px + var(--f10-power-intensity, 0) * 48px)
+      rgba(139, 92, 246, calc(0.08 + var(--f10-power-intensity, 0) * 0.16));
+}
+
+/* Universal bar: scale glow with tier (read in one glance) */
+.f10-power-tier-base .f10-universal-boost-bar .f10-ubp-fill {
+  filter: brightness(0.94);
+}
+
+.f10-power-tier-elite .f10-universal-boost-bar .f10-ubp-fill,
+.f10-power-tier-savvy_god .f10-universal-boost-bar .f10-ubp-fill {
+  filter: brightness(1.06);
+  box-shadow: 0 0 calc(10px + var(--f10-power-intensity, 0) * 22px)
+    rgba(253, 224, 71, calc(0.35 + var(--f10-power-intensity, 0) * 0.25));
+}
