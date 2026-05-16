@@ -18,7 +18,7 @@ const compression = require('compression');
 const cron = require('node-cron');
 const rateLimit = require('express-rate-limit');
 const AuctionAggregator = require('./services/AuctionAggregator');
-const { securityHeaders, cacheControl, cookieSecurity, corsConfig, rateLimitConfig, cspConfig } = require('./middleware/security');
+const { securityHeaders, cacheControl, cookieSecurity, rateLimitConfig, cspConfig } = require('./middleware/security');
 // SavvyShield Proactive Investigation System
 // Only starts when activated by superadmin through dashboard
 const shieldProactiveInvestigation = require('./services/shieldProactiveInvestigation');
@@ -53,10 +53,6 @@ app.use(cookieSecurity);
 const limiter = rateLimit(rateLimitConfig);
 app.use('/api/', limiter);
 
-// --- CORS (enhanced security) ---
-app.use(cors(corsConfig));
-app.options('*', cors(corsConfig));
-
 const { stripeWebhookHandler } = require('./routes/stripeWebhook');
 
 app.post(
@@ -67,34 +63,13 @@ app.post(
   }
 );
 
-// Additional CORS handling for preflight requests (enhanced)
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000', 
-    'http://localhost:3001',
-    'https://final10-client.onrender.com',
-    'https://final10-client-production.up.railway.app',
-    'https://final10-production.up.railway.app'
-  ];
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
+app.use(cors({
+  origin: [
+    'https://final10-backend-qf59.vercel.app',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 
 // --- BODY PARSERS (must be before routes) ---
 app.use(express.json());
