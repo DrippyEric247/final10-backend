@@ -1,3 +1,5 @@
+import { buildApiUrl } from "../lib/runtimeApi";
+
 // Utility function to clear invalid authentication data
 export function clearInvalidAuth() {
   try {
@@ -44,7 +46,7 @@ export async function validateCurrentToken() {
     }
     
     // Test the token by making a request to /auth/me
-    const response = await fetch('/api/auth/me', {
+    const response = await fetch(buildApiUrl("/auth/me"), {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',

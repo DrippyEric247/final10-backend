@@ -1,5 +1,6 @@
 // Debug 500 Error Script
 // Run this in your browser console to debug the API issue
+import { buildApiUrl } from "../lib/runtimeApi";
 
 async function debug500Error() {
   console.log('🔍 Debugging 500 Error...');
@@ -15,7 +16,7 @@ async function debug500Error() {
   // Test 1: Check if backend is running
   console.log('\n1️⃣ Testing backend connectivity...');
   try {
-    const healthResponse = await fetch('/api/health');
+    const healthResponse = await fetch(buildApiUrl('/health');
     console.log('Health check status:', healthResponse.status);
     if (healthResponse.ok) {
       console.log('✅ Backend is running');
@@ -31,7 +32,7 @@ async function debug500Error() {
   // Test 2: Test auth endpoint
   console.log('\n2️⃣ Testing auth endpoint...');
   try {
-    const authResponse = await fetch('/api/auth/me', {
+    const authResponse = await fetch(buildApiUrl('/auth/me'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -53,7 +54,7 @@ async function debug500Error() {
   // Test 3: Test eBay search endpoint directly
   console.log('\n3️⃣ Testing eBay search endpoint...');
   try {
-    const searchResponse = await fetch('/api/ebay/search?limit=1', {
+    const searchResponse = await fetch(buildApiUrl('/ebay/search?limit=1'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -86,7 +87,7 @@ async function debug500Error() {
   // Test 4: Test with different parameters
   console.log('\n4️⃣ Testing with minimal parameters...');
   try {
-    const minimalResponse = await fetch('/api/ebay/search', {
+    const minimalResponse = await fetch(buildApiUrl('/ebay/search'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'

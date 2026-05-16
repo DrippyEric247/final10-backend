@@ -23,9 +23,9 @@ import type { TrustScoreResult } from "../types/trustScore";
 import { getInterestConfig, labelForInterest } from "./onboardingInterests";
 import type { InterestId } from "./onboardingPreferences";
 import { getBestListingImageUrl } from "./listingImageUrl";
+import { buildApiUrl } from "./runtimeApi";
 
-const API_ROOT = (process.env.REACT_APP_API_URL || "/api").replace(/\/$/, "");
-const API_BASE = `${API_ROOT}/ebay`;
+const ebayApi = (path: string) => buildApiUrl(`/ebay${path.startsWith("/") ? path : `/${path}`}`);
 const DEFAULT_PER_CATEGORY_LIMIT = 20;
 const MIN_ACCEPTABLE_SCORE = 50;
 const HIGH_TRUST_FLOOR = 60;
@@ -220,7 +220,7 @@ async function searchInterest(
   } catch {
     /* ignore */
   }
-  const res = await fetch(`${API_BASE}/search?${params.toString()}`, {
+  const res = await fetch(`${ebayApi("/search")}?${params.toString()}`, {
     headers,
     signal,
   });
@@ -261,7 +261,7 @@ async function searchQuickSnipesGlobal(
     query: q,
     limit,
   });
-  const res = await fetch(`${API_BASE}/final10?${params.toString()}`, {
+  const res = await fetch(`${ebayApi("/final10")}?${params.toString()}`, {
     headers,
     signal,
   });
@@ -298,7 +298,7 @@ async function searchTrendingGlobal(
     category,
     limit,
   });
-  const res = await fetch(`${API_BASE}/trending?${params.toString()}`, {
+  const res = await fetch(`${ebayApi("/trending")}?${params.toString()}`, {
     headers,
     signal,
   });

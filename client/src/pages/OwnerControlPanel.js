@@ -23,6 +23,7 @@ import {
   Send
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { buildApiUrl } from '../lib/runtimeApi';
 
 const OwnerControlPanel = () => {
   const { user } = useAuth();
@@ -46,7 +47,7 @@ const OwnerControlPanel = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/owner/stats', {
+      const response = await fetch(buildApiUrl('/owner/stats'), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
@@ -61,7 +62,7 @@ const OwnerControlPanel = () => {
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/owner/search-users?query=${encodeURIComponent(searchQuery)}`, {
+      const response = await fetch(buildApiUrl(`/owner/search-users?query=${encodeURIComponent(searchQuery)}`), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
@@ -75,7 +76,7 @@ const OwnerControlPanel = () => {
 
   const fetchUserDetails = async (userId) => {
     try {
-      const response = await fetch(`/api/owner/user/${userId}`, {
+      const response = await fetch(buildApiUrl(`/owner/user/${userId}`), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
@@ -95,18 +96,18 @@ const OwnerControlPanel = () => {
       
       switch (grantType) {
         case 'points':
-          endpoint = '/api/owner/grant-points';
+          endpoint = buildApiUrl('/owner/grant-points');
           payload.points = parseInt(grantAmount);
           break;
         case 'lifetime':
-          endpoint = '/api/owner/grant-lifetime-subscription';
+          endpoint = buildApiUrl('/owner/grant-lifetime-subscription');
           break;
         case 'premium':
-          endpoint = '/api/owner/grant-premium-subscription';
+          endpoint = buildApiUrl('/owner/grant-premium-subscription');
           payload.durationMonths = parseInt(grantAmount);
           break;
         case 'founding':
-          endpoint = '/api/owner/grant-founding-access';
+          endpoint = buildApiUrl('/owner/grant-founding-access');
           payload.email = selectedUser.email;
           payload.betaTester = true;
           payload.foundingAccess = true;

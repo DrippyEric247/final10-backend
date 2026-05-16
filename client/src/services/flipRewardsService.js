@@ -21,7 +21,7 @@ export function extractSellerListingIdFromPaste(raw) {
  * @param {string} [body.promotedListingId]
  */
 export async function registerFlipListing(body) {
-  const res = await api.post('/api/flip-rewards/register-listing', body);
+  const res = await api.post('/flip-rewards/register-listing', body);
   return res.data;
 }
 
@@ -35,11 +35,11 @@ export async function registerFlipListing(body) {
  * @param {string} [body.idempotencyKey]
  */
 export async function confirmFlipSale(body) {
-  const res = await api.post('/api/flip-rewards/confirm-sale', body);
+  const res = await api.post('/flip-rewards/confirm-sale', body);
   return res.data;
 }
 
 export async function cancelFlipListingTracking(body) {
-  const res = await api.post('/api/flip-rewards/cancel-listing', body);
+  const res = await api.post('/flip-rewards/cancel-listing', body);
   return res.data;
 }

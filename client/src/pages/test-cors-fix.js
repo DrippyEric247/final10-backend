@@ -1,5 +1,6 @@
 // Test CORS fix
 // Run this in your browser console to test CORS
+import { buildApiUrl } from "../lib/runtimeApi";
 
 async function testCorsFix() {
   console.log('🔧 Testing CORS Fix...');
@@ -13,7 +14,7 @@ async function testCorsFix() {
   // Test 1: Simple OPTIONS request (preflight)
   console.log('\n1️⃣ Testing CORS Preflight (OPTIONS)...');
   try {
-    const optionsResponse = await fetch('/api/ebay/search', {
+    const optionsResponse = await fetch(buildApiUrl('/ebay/search'), {
       method: 'OPTIONS',
       headers: {
         'Origin': window.location.origin,
@@ -42,7 +43,7 @@ async function testCorsFix() {
   // Test 2: Actual GET request
   console.log('\n2️⃣ Testing Actual GET Request...');
   try {
-    const getResponse = await fetch('/api/ebay/search?limit=1', {
+    const getResponse = await fetch(buildApiUrl('/ebay/search?limit=1'), {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -71,13 +72,13 @@ async function testCorsFix() {
   // Test 3: Test with different endpoints
   console.log('\n3️⃣ Testing Other Endpoints...');
   const endpoints = [
-    '/api/ebay/trending?limit=1',
-    '/api/ebay/categories'
+    '/ebay/trending?limit=1',
+    '/ebay/categories'
   ];
   
   for (const endpoint of endpoints) {
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(buildApiUrl(endpoint), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

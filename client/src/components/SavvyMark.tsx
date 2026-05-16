@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import savvyProductLogo from "../assets/final10-product-logo.png";
 import "../styles/SavvyMark.css";
 
 type SavvyMarkVariant = "icon" | "brand" | "product";
@@ -13,8 +14,7 @@ type SavvyMarkProps = {
 };
 
 const BRAND_TEXT = "Savvy";
-const LOCAL_UPLOAD_LOGO_URI =
-  "file:///C:/Users/ericv/.cursor/projects/c-Users-ericv-final10-client-src-pages/assets/c__Users_ericv_AppData_Roaming_Cursor_User_workspaceStorage_1e4c09db96f332e332faf9480177bab5_images_ChatGPT_Image_Apr_27__2026__04_08_18_PM-71effd12-b4d3-4443-9888-60105a103c6c.png";
+const PUBLIC_LOGO_URL = `${process.env.PUBLIC_URL || ""}/assets/final10-logo.png`;
 
 export default function SavvyMark({
   variant,
@@ -31,8 +31,8 @@ export default function SavvyMark({
     () =>
       [
         process.env.REACT_APP_SAVVY_LOGO_URL || "",
-        "/savvy-final10-logo.png",
-        LOCAL_UPLOAD_LOGO_URI,
+        savvyProductLogo,
+        PUBLIC_LOGO_URL,
       ].filter(Boolean),
     []
   );

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import { getApiOrigin } from '../lib/runtimeApi';
 
 const SocketContext = createContext();
 
@@ -19,7 +20,7 @@ export const SocketProvider = ({ children }) => {
     const token = localStorage.getItem('f10_token') || localStorage.getItem('token');
 
     if (token && typeof window !== 'undefined') {
-      const url = process.env.REACT_APP_SERVER_URL || window.location.origin;
+      const url = process.env.REACT_APP_SERVER_URL || getApiOrigin() || window.location.origin;
       const newSocket = io(url, {
         auth: {
           token,

@@ -38,7 +38,7 @@ import SavvyBalanceCard from '../components/profile/SavvyBalanceCard';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import { trackPointsEarned } from '../lib/analytics';
-import { getApiBaseUrl } from '../lib/runtimeApi';
+import { buildApiUrl } from '../lib/runtimeApi';
 import { useSavvyPoints } from '../store/savvyStore';
 import ProgramBadge from '../components/programs/ProgramBadge';
 import { getEquippedCallingCardId, getEquippedEmblemId } from '../lib/customizationCatalog';
@@ -826,7 +826,7 @@ const Profile = () => {
   // Handle eBay OAuth connection
   const handleConnectEbay = () => {
     // Real browser navigation so redirects/CORS work properly
-    window.location.href = `${getApiBaseUrl()}/ebay-auth/start`;
+    window.location.href = buildApiUrl("/ebay-auth/start");
   };
 
   const [rivalryTick, setRivalryTick] = useState(0);

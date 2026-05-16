@@ -1,3 +1,5 @@
+import { buildApiUrl } from "./runtimeApi";
+
 /**
  * Captures window errors + React error boundary reports and POSTs to `/api/analytics/crash`.
  */
@@ -25,7 +27,7 @@ export function reportCrash(payload) {
     source: "client",
   });
   try {
-    fetch(`${window.location.origin}/api/analytics/crash`, {
+    fetch(buildApiUrl("/analytics/crash"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

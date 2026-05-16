@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Bug, AlertTriangle, AlertCircle, AlertOctagon, Send, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { buildApiUrl } from '../lib/runtimeApi';
 
 const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
   const { user } = useAuth();
@@ -31,7 +32,7 @@ const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/bug-reports', {
+      const response = await fetch(buildApiUrl('/bug-reports'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

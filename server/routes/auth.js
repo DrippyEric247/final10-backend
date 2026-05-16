@@ -47,8 +47,9 @@ function endOfToday() {
 
 /**
  * POST /api/auth/signup
+ * POST /api/auth/register (alias)
  */
-router.post('/signup', authSignupLimiter, validateRequest(schemas.authSignupBody), async (req, res, next) => {
+async function handleSignup(req, res, next) {
   try {
     const { firstName, lastName, username, email, password, referralCode } = req.body;
     // Phase B: client-supplied attribution payload (creator deep links, etc.).
@@ -213,7 +214,11 @@ router.post('/signup', authSignupLimiter, validateRequest(schemas.authSignupBody
   } catch (err) {
     return next(err);
   }
-});
+}
+
+const signupMiddleware = [authSignupLimiter, validateRequest(schemas.authSignupBody), handleSignup];
+router.post('/signup', signupMiddleware);
+router.post('/register', signupMiddleware);
 
 /**
  * POST /api/auth/login

@@ -147,7 +147,7 @@ export async function loginUser({ email, password }) {
   return data.user;
 }
 export async function registerUser(payload) {
-  const { data } = await api.post("/auth/signup", payload);
+  const { data } = await api.post("/auth/register", payload);
   setAuthToken(data.token);
   return data.user;
 }

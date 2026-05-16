@@ -1,3 +1,5 @@
+import { buildApiUrl } from "./runtimeApi";
+
 /**
  * Product analytics — fans out to GA4 (optional), PostHog/Segment-style globals,
  * and Final10 `/api/analytics/event` for structured server logs.
@@ -98,7 +100,7 @@ function sendToBackend(name, props) {
     sessionId: getTelemetrySessionId(),
   });
   try {
-    fetch(`${window.location.origin}/api/analytics/event`, {
+    fetch(buildApiUrl("/analytics/event"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

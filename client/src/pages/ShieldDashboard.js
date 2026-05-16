@@ -22,6 +22,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { buildApiUrl } from '../lib/runtimeApi';
 
 const ShieldDashboard = () => {
   const { user } = useAuth();
@@ -49,21 +50,21 @@ const ShieldDashboard = () => {
       setLoading(true);
       
       // Fetch stats
-      const statsResponse = await fetch(`/api/shield/stats?days=${filters.days}`, {
+      const statsResponse = await fetch(buildApiUrl(`/shield/stats?days=${filters.days}`), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const statsData = await statsResponse.json();
       setStats(statsData.stats);
 
       // Fetch events
-      const eventsResponse = await fetch(`/api/shield/events?days=${filters.days}&limit=50`, {
+      const eventsResponse = await fetch(buildApiUrl(`/shield/events?days=${filters.days}&limit=50`), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const eventsData = await eventsResponse.json();
       setEvents(eventsData.events || []);
 
       // Fetch enforcements
-      const enforcementsResponse = await fetch(`/api/shield/enforcements?days=${filters.days}&limit=50`, {
+      const enforcementsResponse = await fetch(buildApiUrl(`/shield/enforcements?days=${filters.days}&limit=50`), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const enforcementsData = await enforcementsResponse.json();
@@ -78,7 +79,7 @@ const ShieldDashboard = () => {
 
   const handleApproveEnforcement = async (enforcementId) => {
     try {
-      const response = await fetch(`/api/shield/enforcements/${enforcementId}/approve`, {
+      const response = await fetch(buildApiUrl(`/shield/enforcements/${enforcementId}/approve`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ const ShieldDashboard = () => {
 
   const handleRejectEnforcement = async (enforcementId) => {
     try {
-      const response = await fetch(`/api/shield/enforcements/${enforcementId}/reject`, {
+      const response = await fetch(buildApiUrl(`/shield/enforcements/${enforcementId}/reject`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ const ShieldDashboard = () => {
 
   const handleStartProactive = async () => {
     try {
-      const response = await fetch('/api/shield/start-proactive', {
+      const response = await fetch(buildApiUrl('/shield/start-proactive'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

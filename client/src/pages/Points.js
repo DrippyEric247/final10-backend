@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { buildApiUrl } from "../lib/runtimeApi";
 
 function PointsPage() {
   const [points, setPoints] = useState(0);
@@ -10,7 +11,7 @@ function PointsPage() {
   // Fetch user points
   const fetchPoints = async () => {
     try {
-      const res = await fetch("/api/points", {
+      const res = await fetch(buildApiUrl("/points"), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -38,7 +39,7 @@ function PointsPage() {
   // Claim daily reward
   const claimDailyReward = async () => {
     try {
-      const res = await fetch("/api/points/daily-claim", {
+      const res = await fetch(buildApiUrl("/points/daily-claim"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

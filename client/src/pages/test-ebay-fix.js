@@ -1,5 +1,6 @@
 // Test script to verify eBay API fix
 // Run this in your browser console after the fixes are applied
+import { buildApiUrl } from "../lib/runtimeApi";
 
 async function testEbayFix() {
   console.log('🔧 Testing eBay API Fix...');
@@ -15,7 +16,7 @@ async function testEbayFix() {
   // Test 1: Basic eBay search endpoint
   console.log('\n1️⃣ Testing eBay search endpoint...');
   try {
-    const response = await fetch('/api/ebay/search?limit=5', {
+    const response = await fetch(buildApiUrl('/ebay/search?limit=5'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -42,7 +43,7 @@ async function testEbayFix() {
   // Test 2: Trending endpoint
   console.log('\n2️⃣ Testing eBay trending endpoint...');
   try {
-    const response = await fetch('/api/ebay/trending?limit=3', {
+    const response = await fetch(buildApiUrl('/ebay/trending?limit=3'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -69,7 +70,7 @@ async function testEbayFix() {
   // Test 3: Categories endpoint
   console.log('\n3️⃣ Testing eBay categories endpoint...');
   try {
-    const response = await fetch('/api/ebay/categories', {
+    const response = await fetch(buildApiUrl('/ebay/categories'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'

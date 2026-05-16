@@ -1,5 +1,6 @@
 // Comprehensive 500 Error Debug Script
 // Run this in your browser console to debug persistent 500 errors
+import { buildApiUrl } from "../lib/runtimeApi";
 
 async function debugPersistent500() {
   console.log('🔍 Debugging Persistent 500 Errors...');
@@ -16,7 +17,7 @@ async function debugPersistent500() {
   // Test 1: Check if backend is running
   console.log('\n1️⃣ Testing Backend Connectivity...');
   try {
-    const healthResponse = await fetch('/api/health');
+    const healthResponse = await fetch(buildApiUrl('/health');
     console.log('Health check status:', healthResponse.status);
     if (healthResponse.ok) {
       console.log('✅ Backend is running');
@@ -32,7 +33,7 @@ async function debugPersistent500() {
   // Test 2: Test auth endpoint
   console.log('\n2️⃣ Testing Authentication...');
   try {
-    const authResponse = await fetch('/api/auth/me', {
+    const authResponse = await fetch(buildApiUrl('/auth/me'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -56,7 +57,7 @@ async function debugPersistent500() {
   // Test 3: Test eBay search with detailed error info
   console.log('\n3️⃣ Testing eBay Search Endpoint...');
   try {
-    const searchResponse = await fetch('/api/ebay/search?limit=1', {
+    const searchResponse = await fetch(buildApiUrl('/ebay/search?limit=1'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -92,16 +93,16 @@ async function debugPersistent500() {
   // Test 4: Test with different parameters
   console.log('\n4️⃣ Testing with Different Parameters...');
   const testParams = [
-    '/api/ebay/search',
-    '/api/ebay/search?limit=5',
-    '/api/ebay/search?q=test',
-    '/api/ebay/trending',
-    '/api/ebay/categories'
+    '/ebay/search',
+    '/ebay/search?limit=5',
+    '/ebay/search?q=test',
+    '/ebay/trending',
+    '/ebay/categories'
   ];
   
   for (const endpoint of testParams) {
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(buildApiUrl(endpoint), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -116,7 +117,7 @@ async function debugPersistent500() {
   // Test 5: Check for CORS issues
   console.log('\n5️⃣ Testing CORS and Headers...');
   try {
-    const corsResponse = await fetch('/api/ebay/search?limit=1', {
+    const corsResponse = await fetch(buildApiUrl('/ebay/search?limit=1'), {
       method: 'OPTIONS',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -6,7 +6,7 @@ class PromotionService {
   async getPackages(type = null) {
     try {
       const params = type ? { type } : {};
-      const response = await api.get('/api/promotions/packages', { params });
+      const response = await api.get('/promotions/packages', { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching promotion packages:', error);
@@ -16,7 +16,7 @@ class PromotionService {
 
   async getPopularPackages() {
     try {
-      const response = await api.get('/api/promotions/packages/popular');
+      const response = await api.get('/promotions/packages/popular');
       return response.data;
     } catch (error) {
       console.error('Error fetching popular packages:', error);
@@ -26,7 +26,7 @@ class PromotionService {
 
   async getRecommendedPackages() {
     try {
-      const response = await api.get('/api/promotions/packages/recommended');
+      const response = await api.get('/promotions/packages/recommended');
       return response.data;
     } catch (error) {
       console.error('Error fetching recommended packages:', error);
@@ -38,7 +38,7 @@ class PromotionService {
   
   async createPromotion(promotionData) {
     try {
-      const response = await api.post('/api/promotions/create', promotionData);
+      const response = await api.post('/promotions/create', promotionData);
       return response.data;
     } catch (error) {
       console.error('Error creating promotion:', error);
@@ -50,7 +50,7 @@ class PromotionService {
   
   async createPaymentIntent(promotionId) {
     try {
-      const response = await api.post('/api/promotions/payment/create-intent', {
+      const response = await api.post('/promotions/payment/create-intent', {
         promotionId
       });
       return response.data;
@@ -62,7 +62,7 @@ class PromotionService {
 
   async confirmPayment(paymentData) {
     try {
-      const response = await api.post('/api/promotions/payment/confirm', paymentData);
+      const response = await api.post('/promotions/payment/confirm', paymentData);
       return response.data;
     } catch (error) {
       console.error('Error confirming payment:', error);
@@ -75,7 +75,7 @@ class PromotionService {
   async getMyPromotions(status = null) {
     try {
       const params = status ? { status } : {};
-      const response = await api.get('/api/promotions/my-promotions', { params });
+      const response = await api.get('/promotions/my-promotions', { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching user promotions:', error);
@@ -85,7 +85,7 @@ class PromotionService {
 
   async getPromotion(promotionId) {
     try {
-      const response = await api.get(`/api/promotions/${promotionId}`);
+      const response = await api.get(`/promotions/${promotionId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching promotion:', error);
@@ -95,7 +95,7 @@ class PromotionService {
 
   async updatePromotion(promotionId, updateData) {
     try {
-      const response = await api.put(`/api/promotions/${promotionId}`, updateData);
+      const response = await api.put(`/promotions/${promotionId}`, updateData);
       return response.data;
     } catch (error) {
       console.error('Error updating promotion:', error);
@@ -105,7 +105,7 @@ class PromotionService {
 
   async pausePromotion(promotionId) {
     try {
-      const response = await api.put(`/api/promotions/${promotionId}/pause`);
+      const response = await api.put(`/promotions/${promotionId}/pause`);
       return response.data;
     } catch (error) {
       console.error('Error pausing promotion:', error);
@@ -115,7 +115,7 @@ class PromotionService {
 
   async resumePromotion(promotionId) {
     try {
-      const response = await api.put(`/api/promotions/${promotionId}/resume`);
+      const response = await api.put(`/promotions/${promotionId}/resume`);
       return response.data;
     } catch (error) {
       console.error('Error resuming promotion:', error);
@@ -125,7 +125,7 @@ class PromotionService {
 
   async cancelPromotion(promotionId) {
     try {
-      const response = await api.put(`/api/promotions/${promotionId}/cancel`);
+      const response = await api.put(`/promotions/${promotionId}/cancel`);
       return response.data;
     } catch (error) {
       console.error('Error cancelling promotion:', error);
@@ -137,7 +137,7 @@ class PromotionService {
   
   async getTrendingFeed(category = 'all', limit = 20) {
     try {
-      const response = await api.get('/api/promotions/trending/feed', {
+      const response = await api.get('/promotions/trending/feed', {
         params: { category, limit }
       });
       return response.data;
@@ -151,7 +151,7 @@ class PromotionService {
   
   async getAnalytics() {
     try {
-      const response = await api.get('/api/promotions/analytics/overview');
+      const response = await api.get('/promotions/analytics/overview');
       return response.data;
     } catch (error) {
       console.error('Error fetching analytics:', error);
@@ -162,37 +162,37 @@ class PromotionService {
   // ===== WATCH / PRIVATE OFFERS =====
 
   async watchListing(listingId, payload = {}) {
-    const response = await api.post(`/api/promotions/watch/${encodeURIComponent(listingId)}`, payload);
+    const response = await api.post(`/promotions/watch/${encodeURIComponent(listingId)}`, payload);
     return response.data;
   }
 
   async muteListingOffers(listingId, muted) {
-    const response = await api.put(`/api/promotions/watch-mute/${encodeURIComponent(listingId)}`, { muted });
+    const response = await api.put(`/promotions/watch-mute/${encodeURIComponent(listingId)}`, { muted });
     return response.data;
   }
 
   async getInterestedBuyers(promotionId) {
-    const response = await api.get(`/api/promotions/${promotionId}/interested-buyers`);
+    const response = await api.get(`/promotions/${promotionId}/interested-buyers`);
     return response.data;
   }
 
   async previewPrivateOffer(promotionId, payload) {
-    const response = await api.post(`/api/promotions/${promotionId}/private-offers/preview`, payload);
+    const response = await api.post(`/promotions/${promotionId}/private-offers/preview`, payload);
     return response.data;
   }
 
   async sendPrivateOffer(promotionId, payload) {
-    const response = await api.post(`/api/promotions/${promotionId}/private-offers/send`, payload);
+    const response = await api.post(`/promotions/${promotionId}/private-offers/send`, payload);
     return response.data;
   }
 
   async getPrivateOfferInbox() {
-    const response = await api.get('/api/promotions/private-offers/inbox');
+    const response = await api.get('/promotions/private-offers/inbox');
     return response.data;
   }
 
   async claimPrivateOffer(offerId) {
-    const response = await api.post(`/api/promotions/private-offers/${encodeURIComponent(offerId)}/claim`);
+    const response = await api.post(`/promotions/private-offers/${encodeURIComponent(offerId)}/claim`);
     return response.data;
   }
 
@@ -203,7 +203,7 @@ class PromotionService {
       const params = { page, limit };
       if (status) params.status = status;
       
-      const response = await api.get('/api/promotions/admin/all', { params });
+      const response = await api.get('/promotions/admin/all', { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching all promotions:', error);

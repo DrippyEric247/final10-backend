@@ -1,3 +1,5 @@
+import { buildApiUrl } from "./runtimeApi";
+
 /**
  * Creator / referral attribution capture.
  *
@@ -188,18 +190,7 @@ export async function recordCreatorClick(
   const a = getAttribution();
   if (!a || !a.creatorHandle) return;
   try {
-    const apiBaseRaw =
-      typeof window !== "undefined" &&
-      (window as { __APP_CONFIG__?: Record<string, unknown> }).__APP_CONFIG__
-        ? String(
-            (window as { __APP_CONFIG__?: Record<string, unknown> }).__APP_CONFIG__?.VITE_API_URL ||
-              (window as { __APP_CONFIG__?: Record<string, unknown> }).__APP_CONFIG__?.REACT_APP_API_URL ||
-              ""
-          ).replace(/\/+$/, "")
-        : "";
-    const envBaseRaw = String(process.env.REACT_APP_API_URL || process.env.VITE_API_URL || "").replace(/\/+$/, "");
-    const base = apiBaseRaw || envBaseRaw || "/api";
-    const clickUrl = /\/api$/.test(base) ? `${base}/creators/click` : `${base}/api/creators/click`;
+    const clickUrl = buildApiUrl("/creators/click");
     await fetcher(clickUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,5 +1,6 @@
 // Quick OAuth Scope Test Script
 // Run this in your browser console to test OAuth permissions
+import { buildApiUrl } from "../lib/runtimeApi";
 
 async function testOAuthScope() {
   console.log('🔍 Testing OAuth Scope...');
@@ -14,7 +15,7 @@ async function testOAuthScope() {
   
   // Test 1: Token Validity
   try {
-    const response = await fetch('/api/auth/me', {
+    const response = await fetch(buildApiUrl('/auth/me'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -33,7 +34,7 @@ async function testOAuthScope() {
   
   // Test 2: Browse Permission (Search Items)
   try {
-    const response = await fetch('/api/ebay/search?limit=5', {
+    const response = await fetch(buildApiUrl('/ebay/search?limit=5'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -54,7 +55,7 @@ async function testOAuthScope() {
   
   // Test 3: Search Permission
   try {
-    const response = await fetch('/api/ebay/search?keywords=test&limit=3', {
+    const response = await fetch(buildApiUrl('/ebay/search?keywords=test&limit=3'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -75,7 +76,7 @@ async function testOAuthScope() {
   
   // Test 4: Buy Permission (Test endpoint accessibility)
   try {
-    const response = await fetch('/api/ebay/bid', {
+    const response = await fetch(buildApiUrl('/ebay/bid'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -103,7 +104,7 @@ async function testOAuthScope() {
   // Test 5: Rate Limiting
   try {
     const promises = Array(5).fill().map(() => 
-      fetch('/api/ebay/search?limit=1', {
+      fetch(buildApiUrl('/ebay/search?limit=1'), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

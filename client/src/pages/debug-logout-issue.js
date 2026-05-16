@@ -1,5 +1,6 @@
 // Debug script to identify why auction tab logs user out
 // Run this in your browser console
+import { buildApiUrl } from "../lib/runtimeApi";
 
 async function debugLogoutIssue() {
   console.log('🔍 Debugging Logout Issue on Auction Tab...');
@@ -17,7 +18,7 @@ async function debugLogoutIssue() {
   // Test 1: Check auth status before going to auction tab
   console.log('\n1️⃣ Testing Auth Status Before Auction Tab...');
   try {
-    const authResponse = await fetch('/api/auth/me', {
+    const authResponse = await fetch(buildApiUrl('/auth/me'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -41,7 +42,7 @@ async function debugLogoutIssue() {
   // Test 2: Test eBay search endpoint (what auction tab calls)
   console.log('\n2️⃣ Testing eBay Search Endpoint (Auction Tab Call)...');
   try {
-    const searchResponse = await fetch('/api/ebay/search?limit=1', {
+    const searchResponse = await fetch(buildApiUrl('/ebay/search?limit=1'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -76,7 +77,7 @@ async function debugLogoutIssue() {
   // Test 4: Check auth status after eBay call
   console.log('\n4️⃣ Testing Auth Status After eBay Call...');
   try {
-    const authResponseAfter = await fetch('/api/auth/me', {
+    const authResponseAfter = await fetch(buildApiUrl('/auth/me'), {
       headers: {
         'Authorization': `Bearer ${tokenAfter}`,
         'Content-Type': 'application/json'
