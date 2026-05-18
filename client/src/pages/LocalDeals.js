@@ -258,6 +258,7 @@ const LocalDeals = () => {
   const runBoostedSearch = (raw) => {
     const q = String(raw || '').trim();
     if (!q) return;
+    setCategoryId('');
     setHuntLaneLoadingMessage(null);
     if (tryConsumeBoostedCredit()) {
       setQuery(q);
@@ -278,6 +279,7 @@ const LocalDeals = () => {
   const runNormalSearch = (raw) => {
     const q = String(raw || '').trim();
     if (!q) return;
+    setCategoryId('');
     setHuntLaneLoadingMessage(null);
     setBoostedActive(false);
     setQuery(q);
@@ -553,12 +555,10 @@ const LocalDeals = () => {
   const runHunt = (raw, source = 'hunt', opts = {}) => {
     const q = String(raw || '').trim();
     if (!q) return;
-    const { ebayCategoryId, loadingMessage } = opts;
+    const { loadingMessage } = opts;
     searchInputUserEditedRef.current = false;
     setSearchInput(q);
-    if (ebayCategoryId !== undefined) {
-      setCategoryId(String(ebayCategoryId));
-    }
+    setCategoryId('');
     runBoostedSearch(q);
     setHuntLaneLoadingMessage(loadingMessage ?? null);
     requestAnimationFrame(() => {

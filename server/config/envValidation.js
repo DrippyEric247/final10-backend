@@ -168,6 +168,8 @@ function printSecurityStartupReport() {
     `- SHIELD_WEBHOOK_SECRET configured: ${Boolean(process.env.SHIELD_WEBHOOK_SECRET)}`,
     `- RENDER_API_KEY configured: ${Boolean(process.env.RENDER_API_KEY)}`,
     `- eBay app credentials (Browse): ${Boolean(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET)}`,
+    `- eBay env: ${process.env.EBAY_ENV || 'production'}`,
+    `- EBAY_REDIRECT_URI configured: ${Boolean(process.env.EBAY_REDIRECT_URI)}`,
     `- Stripe secret key: ${String(process.env.STRIPE_SECRET_KEY || '').startsWith('sk_') && !looksLikePlaceholder(process.env.STRIPE_SECRET_KEY)}`,
     `- FINAL10_REQUIRE_EBAY_APP_CREDENTIALS: ${envFlag('FINAL10_REQUIRE_EBAY_APP_CREDENTIALS')}`,
     `- FINAL10_REQUIRE_STRIPE: ${envFlag('FINAL10_REQUIRE_STRIPE')}`,

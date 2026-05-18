@@ -19,6 +19,8 @@ const userSchema = new mongoose.Schema({
     endsAt: Date
   },
   lastDailyClaim: { type: String, default: null },    // YYYY-MM-DD format
+  lastLoginDay: { type: String, default: null },      // UTC YYYY-MM-DD for streak
+  loginStreakDays: { type: Number, default: 0 },
   lastActive: Date,
 
   // ---- referrals ----
@@ -505,25 +507,11 @@ userSchema.methods.getDailyTasks = function() {
   };
 };
 
-// Method to complete daily login task
+// Method to complete daily login task (Savvy grants via savvyRewardService)
 userSchema.methods.completeDailyLogin = async function() {
-  this.resetDailyTasks();
-  
-  if (!this.dailyTasks.completed.dailyLogin) {
-    this.dailyTasks.completed.dailyLogin = true;
-    this.dailyTasks.pointsEarned += 50;
-    this.points += 50;
-    const tier = normalizeTier(this.subscription?.tier || this.membershipTier || 'free');
-    const dailyBonus = Number(getTierConfig(tier).dailyLoginBonus) || 0.5;
-    this.savvyPoints = Number(this.savvyPoints || 0) + dailyBonus;
-    
-    // Award XP for daily login
-    await this.awardXP(25, 'daily_login');
-    await this.updateLevelStats('totalDaysActive');
-    
-    return this.save();
-  }
-  return Promise.resolve(this);
+  const { claimDailyLoginReward } = require('../services/savvyRewardService');
+  await claimDailyLoginReward(this);
+  return this;
 };
 
 userSchema.methods.getSubscriptionTierConfig = function() {

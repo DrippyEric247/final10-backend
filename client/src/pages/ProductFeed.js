@@ -180,7 +180,7 @@ async function fetchFeed({ pageParam, queryKey }) {
         const q = querySeed[(rotation + cat.length) % querySeed.length];
         const data = await ebayService.searchItems({
           q,
-          categoryId: cat,
+          categoryId: /^\d+$/.test(String(cat)) ? cat : undefined,
           listingMode: "mixed",
           page,
           limit: 6,
@@ -202,7 +202,7 @@ async function fetchFeed({ pageParam, queryKey }) {
       const q = qSeeds[rotation % qSeeds.length];
       const data = await ebayService.searchItems({
         q,
-        categoryId: selectedCategory,
+        categoryId: /^\d+$/.test(String(selectedCategory)) ? selectedCategory : undefined,
         listingMode: "mixed",
         page,
         limit: 24,

@@ -222,9 +222,21 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
   console.log(`🌟 Savvy Universe Empire is LIVE!`);
-  console.log('eBay auth mode: dynamic app token');
+  const { logEbayAuthStartupCheck, getEbayAppToken } = require('./services/ebayAuthService');
+  logEbayAuthStartupCheck();
+  getEbayAppToken()
+    .then((token) => {
+      console.log(
+        token
+          ? 'eBay app token: warmed successfully'
+          : 'eBay app token: unavailable — Browse routes will use mock fallback'
+      );
+    })
+    .catch((err) => {
+      console.warn('eBay app token warm-up error:', err.message);
+    });
+  console.log('eBay auth mode: dynamic app token with retry + mock fallback');
   console.log(`eBay env: ${process.env.EBAY_ENV || 'production'}`);
-  console.log('mock fallback: disabled');
   printSecurityStartupReport();
 });
 

@@ -14,6 +14,11 @@ const { refreshScanDeck, issueBidFlowTokens } = require('../services/progression
 const { logEbayProviderError } = require('../services/structuredLog');
 const { safeBuildEbaySellerTrendsPayload } = require('../services/ebaySellerTrendsService');
 const { ebayBrowseGet } = require('../services/ebayBrowseClient');
+const { getEbayAuthStatus, getEbayAppToken } = require('../services/ebayAuthService');
+const {
+  buildMockBrowseResponse,
+  MOCK_FALLBACK_WARNING,
+} = require('../services/ebayMockBrowseService');
 const ebaySearchMemoryCache = require('../services/ebaySearchMemoryCache');
 const {
   enrichItemsWithMarketValue,
@@ -118,10 +123,21 @@ async function loadEbayBrowseSearch(req, {
     data = await ebayBrowseGet('item_summary/search', params);
     console.log('eBay API success');
     console.log('eBay item count:', data?.itemSummaries?.length);
-    console.log('First item:', data?.itemSummaries?.[0]);
   } catch (apiError) {
     logEbayProviderError('/ebay/browse/search', apiError.status, apiError.code || apiError.message);
     console.warn('eBay Browse search failed:', apiError.status, apiError.message);
+    const useMock =
+      apiError.code === 'EBAY_TOKEN_UNAVAILABLE' ||
+      apiError.status === 401 ||
+      apiError.status === 403;
+    if (useMock) {
+      console.warn('eBay Browse: using mock/trending fallback for query:', searchQuery);
+      return buildMockBrowseResponse({
+        searchQuery,
+        limit,
+        listingMode,
+      });
+    }
     throw apiError;
   }
 
@@ -241,6 +257,8 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
     const body = {
       success: true,
       stale: false,
+      mock: Boolean(data.mock),
+      warning: data.mock ? MOCK_FALLBACK_WARNING : undefined,
       items: legacyItems,
       normalizedItems: items,
       final10,
@@ -282,6 +300,36 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
         pagination: stale.pagination || null,
       });
     }
+    try {
+      const mockData = buildMockBrowseResponse({
+        searchQuery: String(req.query?.q || req.query?.keywords || 'electronics').trim() || 'electronics',
+        limit: Math.min(Math.max(parseInt(req.query?.limit, 10) || 20, 1), 200),
+        listingMode: String(req.query?.listingMode || 'mixed'),
+      });
+      let items = (mockData.itemSummaries || []).map(normalizeEbayItemSummary);
+      const legacyItems = items.map(toLegacyAuctionShape);
+      return res.status(200).json({
+        success: true,
+        mock: true,
+        warning: MOCK_FALLBACK_WARNING,
+        code: err.code || 'EBAY_SEARCH_MOCK_FALLBACK',
+        items: legacyItems,
+        normalizedItems: items,
+        final10: pickFinal10Items(items).map(toLegacyAuctionShape),
+        listingMode: String(req.query?.listingMode || 'mixed'),
+        pagination: {
+          current: 1,
+          pages: 1,
+          total: items.length,
+          limit: items.length,
+          offset: 0,
+          hasNextPage: false,
+        },
+      });
+    } catch (mockErr) {
+      console.error('eBay mock fallback failed', mockErr.message);
+    }
+
     const status = err.status === 429 ? 429 : 503;
     return res.status(status).json({
       success: false,
@@ -369,6 +417,8 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
     const body = {
       success: true,
       stale: false,
+      mock: Boolean(data.mock),
+      warning: data.mock ? MOCK_FALLBACK_WARNING : undefined,
       items: shaped,
       normalizedItems: final10Items,
       query: searchQuery,
@@ -480,6 +530,36 @@ router.get('/item/:id', async (req, res) => {
   }
 });
 
+// GET /api/ebay/auth-status — credential + token health (no secrets)
+router.get('/auth-status', async (req, res) => {
+  try {
+    const status = getEbayAuthStatus();
+    let tokenOk = false;
+    let tokenError = null;
+    if (status.credentialsConfigured) {
+      try {
+        const token = await getEbayAppToken();
+        tokenOk = Boolean(token);
+        if (!token) tokenError = status.lastFailureReason || 'token_request_failed';
+      } catch (e) {
+        tokenError = e.message;
+      }
+    } else {
+      tokenError = 'missing_ebay_credentials';
+    }
+    res.json({
+      ...status,
+      tokenOk,
+      tokenError,
+    });
+  } catch (err) {
+    res.status(500).json({
+      tokenOk: false,
+      tokenError: err.message,
+    });
+  }
+});
+
 // GET /api/ebay/trending
 router.get('/trending', async (req, res) => {
   let trendingItems = [];
@@ -550,19 +630,64 @@ router.get('/trending', async (req, res) => {
 
     categories = trendingQueries.map((bucket) => ({ _id: bucket, count: Math.floor(Math.random() * 100) + 50 }));
 
-    res.json({ 
+    if (!trendingItems.length) {
+      const mock = buildMockBrowseResponse({
+        searchQuery: trendingQueries[0] || 'electronics',
+        limit: Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50),
+        listingMode: 'mixed',
+      });
+      trendingItems = (mock.itemSummaries || []).map((it) => ({
+        id: it.itemId,
+        title: it.title,
+        image: it.image?.imageUrl,
+        currentBid: it.price?.value,
+        currency: it.price?.currency,
+        endTime: it.itemEndDate,
+        bidCount: it.bidCount,
+        itemUrl: it.itemWebUrl,
+        platform: 'eBay',
+        timeRemaining: Math.floor((new Date(it.itemEndDate) - new Date()) / 1000),
+        aiScore: {
+          dealPotential: 72,
+          trendingScore: 68,
+          competitionLevel: 'low',
+        },
+      }));
+    }
+
+    res.json({
       items: trendingItems.slice(0, limit),
-      categories
+      categories,
+      mock: trendingItems.some((it) => String(it.id || '').includes('f10-mock')),
+      warning: trendingItems.some((it) => String(it.id || '').includes('f10-mock'))
+        ? MOCK_FALLBACK_WARNING
+        : undefined,
     });
   } catch (err) {
     console.error('eBay trending error', err.status || '', err.message);
     const lim = Math.min(Math.max(parseInt(req.query?.limit, 10) || 20, 1), 50);
+    const mock = buildMockBrowseResponse({ searchQuery: 'electronics', limit: lim });
+    const mockItems = (mock.itemSummaries || []).map((it) => ({
+      id: it.itemId,
+      title: it.title,
+      image: it.image?.imageUrl,
+      currentBid: it.price?.value,
+      currency: it.price?.currency,
+      endTime: it.itemEndDate,
+      bidCount: it.bidCount,
+      itemUrl: it.itemWebUrl,
+      platform: 'eBay',
+      timeRemaining: Math.floor((new Date(it.itemEndDate) - new Date()) / 1000),
+      aiScore: { dealPotential: 70, trendingScore: 65, competitionLevel: 'low' },
+    }));
     res.status(200).json({
       code: 'ebay_trending_partial',
+      mock: true,
+      warning: MOCK_FALLBACK_WARNING,
       message:
         err.message ||
         'Some trending picks could not be refreshed. Try another category.',
-      items: Array.isArray(trendingItems) ? trendingItems.slice(0, lim) : [],
+      items: mockItems.length ? mockItems : (Array.isArray(trendingItems) ? trendingItems.slice(0, lim) : []),
       categories: Array.isArray(categories) && categories.length
         ? categories
         : ['electronics', 'fashion', 'home', 'sports', 'collectibles'].map((bucket) => ({

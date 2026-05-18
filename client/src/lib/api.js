@@ -176,9 +176,10 @@ export async function redeemPointsDiscount(body) {
   return data;
 }
 
+/** Server-authoritative daily Savvy claim. Returns `added`, `newBalance`, `reward` log payload. */
 export async function claimDailyLogin() {
   const { data } = await api.post("/auctions/claim-daily-login");
-  return data; // { newBalance, added } or { message }
+  return data;
 }
 
 /** ---- Alerts ---- **/

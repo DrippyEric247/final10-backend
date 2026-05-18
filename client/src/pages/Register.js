@@ -3,9 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
+import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
 import { triggerDailyLoginReward, triggerStreakReward } from '../lib/rewardEngine';
+import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
+import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { buildSignupAttributionPayload, getAttribution } from '../lib/attribution';
 import { hasCompletedOnboarding } from '../lib/onboardingPreferences';
 import { ANALYTICS_EVENTS, trackEvent } from '../lib/analytics';
@@ -13,7 +16,7 @@ import { parseApiError } from '../lib/apiErrorParsing';
 import LoadingState from '../components/ui/states/LoadingState';
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, refreshProfile } = useAuth();
   const nav = useNavigate();
   const [qs] = useSearchParams();
   const [err, setErr] = useState('');
@@ -55,9 +58,24 @@ export default function Register() {
       await register(payload);
       trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, { method: 'email' });
       const loginPower = recordDailyLogin();
+      try {
+        const claim = await claimDailyLogin();
+        const added = Number(claim?.added ?? claim?.savvyPointsEarned);
+        if (Number.isFinite(added) && added > 0) {
+          recordBattlePassXp('daily_login');
+          triggerDailyLoginReward(undefined, claim.reward);
+          notifyWalletFromLegacyReward({ amount: added, source: 'daily_login' });
+          await refreshProfile();
+          try {
+            window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* already claimed */
+      }
       if (loginPower.changed) {
-        recordBattlePassXp('daily_login');
-        triggerDailyLoginReward(20);
         triggerStreakReward(loginPower.streakDays);
       }
       // Send the freshly-registered user straight into the "Instant Best

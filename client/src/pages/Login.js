@@ -3,15 +3,18 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
+import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
 import { triggerDailyLoginReward, triggerStreakReward } from '../lib/rewardEngine';
+import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
+import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { hasCompletedOnboarding } from '../lib/onboardingPreferences';
 import { parseApiError } from '../lib/apiErrorParsing';
 import LoadingState from '../components/ui/states/LoadingState';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, refreshProfile } = useAuth();
   const nav = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [err, setErr] = useState('');
@@ -26,9 +29,24 @@ export default function Login() {
       // later, branch here on identifier type and call the matching endpoint.
       await login({ email: form.email.trim(), password: form.password });
       const loginPower = recordDailyLogin();
+      try {
+        const claim = await claimDailyLogin();
+        const added = Number(claim?.added ?? claim?.savvyPointsEarned);
+        if (Number.isFinite(added) && added > 0) {
+          recordBattlePassXp('daily_login');
+          triggerDailyLoginReward(undefined, claim.reward);
+          notifyWalletFromLegacyReward({ amount: added, source: 'daily_login' });
+          await refreshProfile();
+          try {
+            window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* already claimed or network — wallet stays on server balance */
+      }
       if (loginPower.changed) {
-        recordBattlePassXp('daily_login');
-        triggerDailyLoginReward(20);
         triggerStreakReward(loginPower.streakDays);
       }
       nav(hasCompletedOnboarding() ? '/' : '/onboarding/preferences', { replace: true });

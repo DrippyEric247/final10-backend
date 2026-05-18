@@ -39,7 +39,8 @@ import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import { trackPointsEarned } from '../lib/analytics';
 import { buildApiUrl } from '../lib/runtimeApi';
-import { useSavvyPoints } from '../store/savvyStore';
+import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
+import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import ProgramBadge from '../components/programs/ProgramBadge';
 import { getEquippedCallingCardId, getEquippedEmblemId } from '../lib/customizationCatalog';
 import {
@@ -791,27 +792,45 @@ const Profile = () => {
   // Mutations for task actions
   const claimLoginMutation = useMutation({
     mutationFn: claimDailyLogin,
-    onSuccess: (data) => {
-      console.log('Daily login claimed successfully:', data);
-      const added = Number(data?.added);
+    onSuccess: async (data) => {
+      const added = Number(data?.added ?? data?.savvyPointsEarned ?? data?.pointsEarned);
+      const serverReward = data?.reward || null;
+
       if (Number.isFinite(added) && added > 0) {
-        trackPointsEarned(added, 'daily_login_claim');
+        trackPointsEarned(added, 'daily_login_claim', {
+          multiplier: serverReward?.multiplier,
+          streakDays: data?.streakDays,
+        });
+        recordBattlePassXp('daily_login');
+        const reward = triggerDailyLoginReward(undefined, serverReward);
+        notifyWalletFromLegacyReward({
+          amount: added,
+          source: 'daily_login',
+        });
+        setShowSuccessMessage(`${reward?.title || `+${added} Savvy`} earned!`);
+      } else if (data?.alreadyClaimed) {
+        setShowSuccessMessage('Daily login already claimed today');
       }
-      recordBattlePassXp('daily_login');
-      const reward = triggerDailyLoginReward(20);
+
       setPointsUpdating(true);
-      setShowSuccessMessage(`${reward.title} earned!`);
-      // Invalidate all related queries to refresh the UI
       queryClient.invalidateQueries(['dailyTasks']);
       queryClient.invalidateQueries(['levelInfo']);
       queryClient.invalidateQueries(['levelStats']);
       queryClient.invalidateQueries(['milestones']);
-      // Force refetch of daily tasks to get updated points
-      queryClient.refetchQueries(['dailyTasks']).finally(() => {
-        void refreshProfile();
-        setPointsUpdating(false);
+
+      try {
+        window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+      } catch {
+        /* ignore */
+      }
+
+      await queryClient.refetchQueries(['dailyTasks']);
+      await refreshProfile();
+      await savvyLive.syncPoints?.();
+      setPointsUpdating(false);
+      if (Number.isFinite(added) && added > 0) {
         setTimeout(() => setShowSuccessMessage(''), 3000);
-      });
+      }
     },
     onError: (error) => {
       console.error('Daily login claim failed:', error);

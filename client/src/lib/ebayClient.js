@@ -60,8 +60,18 @@ async function getWithRetry(path, config = {}) {
   throw lastErr;
 }
 
+export function normalizeEbayCategoryParam(categoryId) {
+  const cat = String(categoryId || "").trim();
+  if (!cat || cat === "all") return undefined;
+  return /^\d+$/.test(cat) ? cat : undefined;
+}
+
 export async function fetchEbaySearch(params, axiosConfig = {}) {
-  return getWithRetry("/ebay/search", { ...axiosConfig, params });
+  const merged = { ...params };
+  if ("categoryId" in merged) {
+    merged.categoryId = normalizeEbayCategoryParam(merged.categoryId);
+  }
+  return getWithRetry("/ebay/search", { ...axiosConfig, params: merged });
 }
 
 export async function fetchEbayFinal10(params, axiosConfig = {}) {

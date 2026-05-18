@@ -386,25 +386,13 @@ export default function Auctions() {
       }
       const myId = activeAuctionFetchRef.current.id;
 
-      try {
-        if (!isInterval) {
-          setRefreshPhase("refreshing");
-        }
-        if (needsMainLoader) {
-          setLoading(true);
-        }
-        if (needsSearchLine) {
-          setSearchMarketPending(true);
-        }
-        setError("");
+      const hasKeyword = Boolean(String(marketSearchKeywords || "").trim());
+      const cat = String(smartIntent.categories[0] || "").trim();
+      const ck = cacheKeyForAuctions(auctionsFetchQuery, !hasKeyword && cat ? cat : "");
+      const searchParams = { q: auctionsFetchQuery, limit: 50 };
+      if (!hasKeyword && cat) searchParams.categoryId = cat;
 
-        const hasKeyword = Boolean(String(marketSearchKeywords || "").trim());
-        const cat = String(smartIntent.categories[0] || "").trim();
-        const ck = cacheKeyForAuctions(auctionsFetchQuery, !hasKeyword && cat ? cat : "");
-        const searchParams = { q: auctionsFetchQuery, limit: 50 };
-        if (!hasKeyword && cat) searchParams.categoryId = cat;
-
-        const commitSniperResults = (sniper, raw, { banner = null, writeCache = true } = {}) => {
+      const commitSniperResults = (sniper, raw, { banner = null, writeCache = true } = {}) => {
           if (myId !== activeAuctionFetchRef.current.id) return;
           setMarketBanner(banner);
 
@@ -448,6 +436,18 @@ export default function Auctions() {
           }
         };
 
+      try {
+        if (!isInterval) {
+          setRefreshPhase("refreshing");
+        }
+        if (needsMainLoader) {
+          setLoading(true);
+        }
+        if (needsSearchLine) {
+          setSearchMarketPending(true);
+        }
+        setError("");
+
         let searchData = null;
         let usedDeviceCache = false;
 
@@ -475,7 +475,10 @@ export default function Auctions() {
 
           let banner = null;
           if (searchData.warning) banner = searchData.warning;
-          else if (searchData.stale) banner = "Showing cached marketplace results.";
+          else if (searchData.mock) {
+            banner =
+              "Live eBay inventory is temporarily unavailable. Showing sample deals until marketplace auth is restored.";
+          } else if (searchData.stale) banner = "Showing cached marketplace results.";
 
           let raw = searchData.items || [];
           let sniper = raw.filter(isSniperItem);
@@ -520,12 +523,33 @@ export default function Auctions() {
       } catch (err) {
         if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return;
         const msg = ebayFriendlyMessage(err);
+        const cached = readAuctionSearchCache(
+          cacheKeyForAuctions(auctionsFetchQuery, !hasKeyword && cat ? cat : "")
+        );
+        if (cached?.items?.length) {
+          let sniper = cached.items.filter(isSniperItem);
+          if (sniper.length === 0 && cached.items.length > 0) sniper = cached.items.slice(0, 30);
+          commitSniperResults(sniper, cached.items, {
+            banner: `${msg} Showing saved results from this device.`,
+            writeCache: false,
+          });
+          setRefreshPhase("live");
+          if (needsMainLoader) {
+            setLoading(false);
+            initialAuctionsLoadDoneRef.current = true;
+          }
+          if (needsSearchLine) setSearchMarketPending(false);
+          return;
+        }
         if (isInterval) {
           setMarketBanner(`${msg} Still showing your last successful refresh.`);
           setRefreshPhase("live");
           return;
         }
-        setError(msg);
+        setMarketBanner(
+          "Marketplace search is temporarily unavailable. Try again in a moment — sample deals may appear when auth is restored."
+        );
+        setError(null);
         setRefreshPhase("live");
       } finally {
         if (needsMainLoader) {

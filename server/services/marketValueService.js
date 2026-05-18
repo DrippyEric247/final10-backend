@@ -219,8 +219,16 @@ function buildEmptyResult({ q, source, reason }) {
 
 async function ebayBrowseSearch(params) {
   const token = await getEbayAppToken();
+  if (!token) {
+    const err = new Error('eBay app token unavailable');
+    err.status = 503;
+    err.code = 'EBAY_TOKEN_UNAVAILABLE';
+    throw err;
+  }
+  const { getEbayOAuthConfig } = require('./ebayAuthService');
+  const { browseBase } = getEbayOAuthConfig();
   const query = new URLSearchParams(params).toString();
-  const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?${query}`;
+  const url = `${browseBase}/item_summary/search?${query}`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,

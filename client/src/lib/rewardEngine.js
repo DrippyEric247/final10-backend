@@ -1,3 +1,4 @@
+import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
 import { getUniversalBoostState } from "./universalBoostProgress";
 import { buildDailyLoginReward } from "./tierMultiplier";
 
@@ -31,7 +32,7 @@ export const REWARD_PRESETS = {
   },
   daily_login: {
     icon: "🎁",
-    title: "+20 Savvy",
+    title: `+${DAILY_LOGIN_BASE_SAVVY} Savvy`,
     subtitle: "Daily reward claimed",
     accent: "points",
     durationMs: 1600,
@@ -109,7 +110,19 @@ export function triggerActionReward(type, overrides = {}) {
   triggerReward(detail);
 }
 
-export function triggerDailyLoginReward(baseReward = 20) {
+/** Visual toast only — pass `serverReward` from claim API when available. */
+export function triggerDailyLoginReward(baseReward = DAILY_LOGIN_BASE_SAVVY, serverReward = null) {
+  const amount = Number(serverReward?.amount);
+  if (Number.isFinite(amount) && amount > 0) {
+    triggerActionReward("daily_login", {
+      title: `+${amount} Savvy`,
+      subtitle: serverReward.streakBonus
+        ? `Includes +${serverReward.streakBonus} streak bonus`
+        : "Daily reward claimed",
+      foot: serverReward.multiplier ? `${serverReward.multiplier}x tier multiplier` : undefined,
+    });
+    return { amount, ...serverReward };
+  }
   const reward = buildDailyLoginReward(baseReward);
   triggerActionReward("daily_login", {
     title: reward.title,

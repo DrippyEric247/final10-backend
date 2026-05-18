@@ -235,6 +235,17 @@
   letter-spacing: -0.015em;
 }
 
+.onboard-move-widened-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.08);
+  color: #a5f3fc;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 .onboard-move-subhead {
   margin: 0 auto 16px;
   text-align: center;

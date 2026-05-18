@@ -82,39 +82,29 @@ router.post('/redeem', auth, async (req, res) => {
 });
 
 // ---- POST /api/points/daily-claim ----
-// claims daily reward points
+// Delegates to the same Savvy daily-login grant as /auctions/claim-daily-login
 router.post('/daily-claim', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Check if user already claimed today
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    if (user.lastDailyClaim === today) {
+    const { claimDailyLoginReward } = require('../services/savvyRewardService');
+    const result = await claimDailyLoginReward(user);
+
+    if (result.alreadyClaimed) {
       return res.status(400).json({ error: 'Daily reward already claimed today' });
     }
 
-    // Award daily points (100 points)
-    const dailyPoints = 100;
-    user.pointsBalance = (user.pointsBalance || 0) + dailyPoints;
-    user.lifetimePointsEarned = (user.lifetimePointsEarned || 0) + dailyPoints;
-    user.lastDailyClaim = today;
-    await user.save();
+    const savvyEarned = Number(result.savvyPointsEarned) || 0;
 
-    // Add to ledger
-    await Points.create({
-      userId: user._id,
-      type: 'earn',
-      amount: dailyPoints,
-      source: 'daily_claim',
-      refId: today,
-      idempotencyKey: `daily_claim_${user._id}_${today}`
-    });
-
-    res.json({ 
-      success: true, 
-      pointsAwarded: dailyPoints, 
-      newBalance: user.pointsBalance 
+    res.json({
+      success: true,
+      pointsAwarded: savvyEarned,
+      savvyPointsEarned: savvyEarned,
+      added: savvyEarned,
+      newBalance: result.newBalance ?? user.savvyPoints,
+      reward: result.reward,
+      message: savvyEarned > 0 ? `+${savvyEarned} Savvy claimed` : 'No reward granted',
     });
   } catch (err) {
     console.error('Daily claim error:', err);

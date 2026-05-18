@@ -4,6 +4,7 @@ import {
   getDevSimulateExpiredSubscription,
   saveFinal10DevOverride,
 } from "./devOverride";
+import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
 
 const TIER_STORAGE_KEY = "f10_subscription_tier_v1";
 
@@ -220,7 +221,7 @@ export function applyTierMultiplier(amount, tier = getEffectiveSubscriptionTier(
   return Math.round(base * getTierMultiplier(tier));
 }
 
-export function buildDailyLoginReward(baseReward = 20, tier = getEffectiveSubscriptionTier()) {
+export function buildDailyLoginReward(baseReward = DAILY_LOGIN_BASE_SAVVY, tier = getEffectiveSubscriptionTier()) {
   const amount = applyTierMultiplier(baseReward, tier);
   if (tier === "elite") {
     return {

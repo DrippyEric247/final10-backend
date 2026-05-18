@@ -5,6 +5,7 @@ const SUBSCRIPTION_TIERS = Object.freeze({
     monthlyPrice: 0,
     yearlyPrice: 0,
     multiplier: 1.0,
+    /** Legacy label — not wallet points; Savvy daily grant uses `multiplier` in savvyRewards.js */
     dailyLoginBonus: 0.5,
     bestMovesPerDay: 3,
     alertsMax: 3,

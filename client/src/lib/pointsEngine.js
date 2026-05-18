@@ -4,6 +4,8 @@
  * Server-authoritative Savvy still comes from auth profile; this layer is UX + telemetry.
  */
 
+import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
+
 export const WALLET_AWARD_EVENT = "f10:savvy-wallet-award";
 
 const STORAGE_KEY = "f10_savvy_wallet_v1";
@@ -24,7 +26,7 @@ export const POINT_ACTION_DEFAULTS = {
   savvywins_post: { amount: 30, rarity: "GOOD" },
   trusted_purchase: { amount: 40, rarity: "RARE" },
   watch_item: { amount: 10, rarity: "NORMAL" },
-  daily_login: { amount: 15, rarity: "GOOD" },
+  daily_login: { amount: DAILY_LOGIN_BASE_SAVVY, rarity: "GOOD" },
   generic: { amount: 10, rarity: "NORMAL" },
 };
 

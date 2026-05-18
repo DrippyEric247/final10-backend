@@ -543,7 +543,7 @@ router.post('/watch-ad', auth, async (req, res) => {
   }
 });
 
-// Claim daily login points
+// Claim daily login Savvy (authoritative wallet grant)
 router.post('/claim-daily-login', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -551,18 +551,28 @@ router.post('/claim-daily-login', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const beforePoints = user.points;
-    await user.completeDailyLogin();
-    const afterPoints = user.points;
-    const pointsEarned = afterPoints - beforePoints;
-    
+    const { claimDailyLoginReward } = require('../services/savvyRewardService');
+    const result = await claimDailyLoginReward(user);
     const dailyTasks = user.getDailyTasks();
-    
+
+    const savvyEarned = Number(result.savvyPointsEarned) || 0;
+    const msg =
+      savvyEarned > 0
+        ? `Daily login claimed! +${savvyEarned} Savvy`
+        : 'Daily login already claimed today';
+
     res.json({
-      message: pointsEarned > 0 ? `Daily login claimed! +${pointsEarned} points` : 'Daily login already claimed today',
-      pointsEarned,
-      totalPoints: user.points,
-      dailyTasks
+      message: msg,
+      savvyPointsEarned: savvyEarned,
+      added: savvyEarned,
+      pointsEarned: savvyEarned,
+      newBalance: result.newBalance ?? user.savvyPoints,
+      totalPoints: user.savvyPoints,
+      legacyPointsEarned: result.legacyPointsEarned || 0,
+      alreadyClaimed: Boolean(result.alreadyClaimed),
+      streakDays: result.streakDays ?? user.loginStreakDays,
+      reward: result.reward,
+      dailyTasks,
     });
   } catch (error) {
     console.error('Claim daily login error:', error);

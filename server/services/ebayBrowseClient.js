@@ -3,7 +3,8 @@
  */
 const fetchModule = require('node-fetch');
 const fetch = fetchModule.default || fetchModule;
-const { getEbayAppToken } = require('./ebayAuthService');
+const { getEbayAppToken, getEbayOAuthConfig, clearEbayAppTokenCache } = require('./ebayAuthService');
+const { warn } = require('./structuredLog');
 
 const MAX_ATTEMPTS = 4;
 const BASE_DELAY_MS = 450;
@@ -54,21 +55,38 @@ function messageForStatus(status, body) {
   return 'Market results could not be loaded.';
 }
 
+function tokenUnavailableError() {
+  return Object.assign(
+    new Error(
+      'Marketplace credentials are temporarily unavailable. Showing sample deals.'
+    ),
+    {
+      status: 503,
+      code: 'EBAY_TOKEN_UNAVAILABLE',
+    }
+  );
+}
+
 /**
  * GET Buy Browse JSON with retries on 429 and 5xx.
  * @param {string} path - relative to buy/browse/v1 (e.g. item_summary/search)
  * @param {Record<string, string|number>} params - query params
  */
 async function ebayBrowseGet(path, params = {}) {
+  const { browseBase } = getEbayOAuthConfig();
   const query = new URLSearchParams(params).toString();
   const url = query
-    ? `https://api.ebay.com/buy/browse/v1/${path}?${query}`
-    : `https://api.ebay.com/buy/browse/v1/${path}`;
+    ? `${browseBase}/${path}?${query}`
+    : `${browseBase}/${path}`;
 
   let lastErr;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-    const token = await getEbayAppToken();
+    const token = await getEbayAppToken({ forceRefresh: attempt > 0 });
+    if (!token) {
+      throw tokenUnavailableError();
+    }
+
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -81,6 +99,11 @@ async function ebayBrowseGet(path, params = {}) {
 
     if (response.ok) {
       return data;
+    }
+
+    if (response.status === 401) {
+      clearEbayAppTokenCache();
+      warn('EBAY_BROWSE_UNAUTHORIZED', { path, attempt: attempt + 1 });
     }
 
     const retryAfterSec = parseInt(response.headers.get('retry-after'), 10);
@@ -103,4 +126,4 @@ async function ebayBrowseGet(path, params = {}) {
   throw lastErr;
 }
 
-module.exports = { ebayBrowseGet, messageForStatus };
+module.exports = { ebayBrowseGet, messageForStatus, tokenUnavailableError };

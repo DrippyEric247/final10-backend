@@ -17,6 +17,7 @@ import {
 } from "../lib/onboardingPreferences";
 import { onboardingAnalytics } from "../lib/onboardingAnalytics";
 import { ANALYTICS_EVENTS, trackEvent, trackPointsEarned } from "../lib/analytics";
+import { ONBOARDING_FIRST_MOVE_SAVVY } from "../config/savvyRewards";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
 import "../styles/OnboardingBestMove.css";
@@ -28,12 +29,11 @@ const LOADING_STAGES = [
 ];
 
 const FIRST_MOVE_BONUS_KEY = "f10_first_best_move_bonus_granted_v1";
-const FIRST_MOVE_BONUS_POINTS = 25;
+const FIRST_MOVE_BONUS_POINTS = ONBOARDING_FIRST_MOVE_SAVVY;
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; data: InstantBestMoveResult }
-  | { kind: "error"; message: string };
+  | { kind: "ready"; data: InstantBestMoveResult };
 
 function formatCurrency(value: number | string | null | undefined): string {
   const n = Number(value);
@@ -225,9 +225,23 @@ export default function OnboardingBestMove() {
       }
     } catch (err) {
       if (controller.signal.aborted) return;
-      const message =
-        err instanceof Error ? err.message : "Something went wrong";
-      setState({ kind: "error", message });
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.warn("[OnboardingBestMove] fetch error, using widened fallback", err);
+      }
+      const data = await fetchInstantBestMove(interests, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      setState({ kind: "ready", data });
+      setSelectedAltIdx(null);
+      if (data.pick) {
+        recordFirstBestMove(
+          data.pick.interest,
+          String(data.pick.listing.itemId ?? data.pick.listing.id ?? "")
+        );
+        markOnboardingCompleted();
+      }
     }
   }, [interests]);
 
@@ -370,10 +384,6 @@ export default function OnboardingBestMove() {
           <LoadingPanel stage={LOADING_STAGES[stageIdx]} />
         ) : null}
 
-        {state.kind === "error" ? (
-          <ErrorPanel message={state.message} onRetry={runFetch} onSkip={handleSkip} />
-        ) : null}
-
         {state.kind === "ready" && !readyData?.pick ? (
           <FallbackPanel
             interests={interests}
@@ -395,6 +405,7 @@ export default function OnboardingBestMove() {
             matchLabel={readyData?.matchLabel ?? "Exact Match"}
             matchMessage={readyData?.matchMessage ?? "High trust. Strong value. No guesswork."}
             pickedReason={readyData?.pickedReason ?? ""}
+            widenedSearch={readyData?.widenedSearch}
             hasAlternates={(readyData?.alternates.length ?? 0) > 0}
             totalCandidates={readyData?.totalCandidates ?? 0}
             bonusPoints={FIRST_MOVE_BONUS_POINTS}
@@ -430,38 +441,6 @@ function LoadingPanel({ stage }: { stage: string }) {
   );
 }
 
-function ErrorPanel({
-  message,
-  onRetry,
-  onSkip,
-}: {
-  message: string;
-  onRetry: () => void;
-  onSkip: () => void;
-}) {
-  return (
-    <div className="onboard-move-error">
-      <div className="onboard-move-eyebrow">Final10 · retry</div>
-      <h2 id="onboard-move-title" className="onboard-move-error-title">
-        Couldn&apos;t pull your Best Move
-      </h2>
-      <p className="onboard-move-error-body">
-        Live deals are temporarily unreachable. This usually clears up in a moment.
-      </p>
-      {process.env.NODE_ENV !== "production" ? (
-        <div className="onboard-move-error-meta">{message}</div>
-      ) : null}
-      <div className="onboard-move-actions">
-        <button type="button" className="onboard-move-btn ghost" onClick={onSkip}>
-          Skip for now
-        </button>
-        <button type="button" className="onboard-move-btn primary" onClick={onRetry}>
-          Try again
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function FallbackPanel({
   interests,
@@ -543,6 +522,7 @@ function ResultPanel({
   matchLabel,
   matchMessage,
   pickedReason,
+  widenedSearch,
   hasAlternates,
   totalCandidates,
   bonusPoints,
@@ -558,6 +538,7 @@ function ResultPanel({
   matchLabel: InstantBestMoveResult["matchLabel"];
   matchMessage: string;
   pickedReason: string;
+  widenedSearch?: boolean;
   hasAlternates: boolean;
   totalCandidates: number;
   bonusPoints: number;
@@ -619,6 +600,11 @@ function ResultPanel({
       <p className="onboard-move-subhead">
         {matchMessage}
       </p>
+      {widenedSearch ? (
+        <p className="onboard-move-widened-note" role="status">
+          Savvy widened the search to find a safer Best Move.
+        </p>
+      ) : null}
 
       <article
         className={`onboard-move-card onboard-move-card-jackpot ${
