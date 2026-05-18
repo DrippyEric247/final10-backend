@@ -1418,6 +1418,18 @@
   color: #fff;
 }
 
+@media (max-width: 767px) {
+  .f10-assistant-dock {
+    gap: 8px;
+  }
+
+  /* Wallet HUD is fixed above the Savvy AI orb — keep dock column tight */
+  .f10-assistant-dock .savvy-wallet-bubble--mobile {
+    position: fixed;
+    margin: 0;
+  }
+}
+
 @media (max-width: 480px) {
   .f10-assistant-dock {
     right: max(8px, env(safe-area-inset-right));

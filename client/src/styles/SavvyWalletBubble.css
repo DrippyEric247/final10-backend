@@ -535,11 +535,267 @@
   }
 }
 
+/* ── Mobile HUD: compact pill + upward sheet ── */
+.savvy-wallet-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482050;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: rgba(2, 6, 23, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.savvy-wallet-bubble--mobile {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px);
+  z-index: 2147482100;
+  width: min(168px, calc(100vw - 20px));
+  max-width: 170px;
+  pointer-events: auto;
+  transform-origin: bottom right;
+}
+
+.savvy-wallet-bubble--mobile.is-collapsed {
+  width: min(168px, calc(100vw - 20px));
+  max-width: 170px;
+  padding: 0;
+  border-radius: 999px;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.savvy-wallet-bubble--mobile.is-collapsed .savvy-wallet-bubble-border,
+.savvy-wallet-bubble--mobile.is-collapsed .savvy-wallet-particles {
+  display: none;
+}
+
+.savvy-wallet-bubble--mobile.is-collapsed:hover {
+  transform: none;
+}
+
+.savvy-wallet-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 11px 8px 9px;
+  border: 1px solid rgba(129, 140, 248, 0.42);
+  border-radius: 999px;
+  cursor: pointer;
+  color: #e2e8f0;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.78), rgba(49, 46, 129, 0.62));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    0 0 28px rgba(99, 102, 241, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  z-index: 2;
+}
+
+.savvy-wallet-pill:active {
+  transform: scale(0.98);
+}
+
+.savvy-wallet-pill-orb {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #fef3c7;
+  background: radial-gradient(circle at 30% 25%, rgba(167, 139, 250, 0.45), rgba(30, 27, 75, 0.95));
+  box-shadow: 0 0 14px rgba(129, 140, 248, 0.35);
+}
+
+.savvy-wallet-pill-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.savvy-wallet-pill-amt {
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.savvy-wallet-pill-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.savvy-wallet-pill-chips {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.savvy-wallet-pill-chip {
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.22);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #c7d2fe;
+}
+
+.savvy-wallet-pill-chip.is-hot {
+  color: #fef3c7;
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.savvy-wallet-pill-chip--streak {
+  background: rgba(120, 53, 15, 0.35);
+  border-color: rgba(251, 146, 60, 0.4);
+  color: #fed7aa;
+}
+
+.savvy-wallet-pill-float {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  font-weight: 900;
+  color: #fef9c3;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.65);
+}
+
+.savvy-wallet-bubble--mobile.is-expanded {
+  width: min(320px, calc(100vw - 16px));
+  max-width: none;
+  max-height: 45vh;
+  padding: 0;
+  border-radius: 18px 18px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: savvy-wallet-sheet-in 0.38s cubic-bezier(0.22, 0.82, 0.22, 1);
+}
+
+@keyframes savvy-wallet-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.savvy-wallet-sheet {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 45vh;
+}
+
+.savvy-wallet-sheet-handle {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+  cursor: grab;
+  touch-action: none;
+}
+
+.savvy-wallet-sheet-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.savvy-wallet-sheet-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 12px 10px;
+}
+
+.savvy-wallet-sheet-body {
+  padding-bottom: 4px;
+}
+
+.savvy-wallet-sheet-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  background: rgba(15, 23, 42, 0.65);
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.savvy-wallet-bubble--mobile.is-expanded .savvy-wallet-balance-num {
+  font-size: 1.35rem;
+}
+
+.savvy-wallet-bubble--mobile.is-expanded .savvy-wallet-hd {
+  padding-right: 28px;
+}
+
+.savvy-wallet-bubble--mobile.is-pulse .savvy-wallet-pill {
+  animation: savvy-wallet-pulse 0.52s ease-out 1;
+}
+
+.savvy-wallet-desktop {
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 767px) {
+  .savvy-wallet-bubble:not(.savvy-wallet-bubble--mobile) {
+    width: min(168px, calc(100vw - 20px));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .savvy-wallet-bubble-border,
   .savvy-wallet-bubble-shimmer,
   .savvy-wallet-particle,
-  .savvy-fly-coin--LEGENDARY .savvy-fly-coin-inner {
+  .savvy-fly-coin--LEGENDARY .savvy-fly-coin-inner,
+  .savvy-wallet-bubble--mobile.is-expanded {
     animation: none !important;
   }
 }
