@@ -72,8 +72,8 @@ async function ensureEntitlementRow(userId) {
  * Public payload for GET /api/entitlements/me
  */
 function toMeResponse(doc, user = null) {
-  const foundingTesterAccess = hasFoundingTesterAccess(user);
-  if (foundingTesterAccess) {
+  const founding = hasFoundingTesterAccess(user);
+  if (founding) {
     return {
       isPremium: true,
       premiumStatus: 'active',

@@ -27,7 +27,7 @@ import {
   getTierForQuickSnipesBoost,
   setCurrentSubscriptionTier,
 } from '../lib/tierMultiplier';
-import { isBetaTester } from '../lib/betaTesterAccess';
+import { isBetaTester, FOUNDING_TESTER_BADGE } from '../lib/betaTesterAccess';
 import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trackBetaTesterUsage } from '../lib/analytics';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
@@ -210,6 +210,7 @@ const LocalDeals = () => {
   const subscriptionTier = getEffectiveSubscriptionTier();
   const quickSnipesBoostTier = getTierForQuickSnipesBoost();
   const tierInfo = getAdvantageTier(subscriptionTier);
+  const tierLabel = isBetaTester() ? FOUNDING_TESTER_BADGE : tierInfo.label;
   const boostedCap = getBestMoveBoostedCap(quickSnipesBoostTier);
   const boostedRemaining = Number.isFinite(boostedCap)
     ? Math.max(0, boostedCap - boostedUsed)
@@ -620,7 +621,7 @@ const LocalDeals = () => {
             </button>
           </div>
           <div className="mt-3 text-xs text-slate-300">
-            ⚡ {tierInfo.label} · Boosted opportunities left: {Number.isFinite(boostedCap) ? `${Math.max(0, boostedRemaining)} / ${boostedCap}` : 'Unlimited'} · {formatTierMultiplierLabel(subscriptionTier)} Savvy
+            ⚡ {tierLabel} · Boosted opportunities left: {Number.isFinite(boostedCap) ? `${Math.max(0, boostedRemaining)} / ${boostedCap}` : 'Unlimited'} · {formatTierMultiplierLabel(subscriptionTier)} Savvy
           </div>
         </div>
 

@@ -118,7 +118,11 @@ export default function App() {
   const entIsBeta = Boolean(entitlement?.isBetaTester);
   const entFoundingAccess = Boolean(entitlement?.foundingTesterAccess);
   const isFoundingTester = useMemo(
-    () => isBetaTester(user, { isBetaTester: entIsBeta, foundingTesterAccess: entFoundingAccess }),
+    () =>
+      isBetaTester(user, {
+        isBetaTester: entIsBeta || Boolean(user?.isBetaTester),
+        foundingTesterAccess: entFoundingAccess || Boolean(user?.foundingTesterAccess),
+      }),
     [user, entIsBeta, entFoundingAccess]
   );
   const [authLogoutBusy, setAuthLogoutBusy] = React.useState(false);

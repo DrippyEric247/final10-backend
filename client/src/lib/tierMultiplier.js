@@ -4,7 +4,7 @@ import {
   getDevSimulateExpiredSubscription,
   saveFinal10DevOverride,
 } from "./devOverride";
-import { isBetaTester } from "./betaTesterAccess";
+import { isBetaTester, getScoutMissionTier } from "./betaTesterAccess";
 import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
 
 const TIER_STORAGE_KEY = "f10_subscription_tier_v1";
@@ -177,6 +177,7 @@ export function clearDevSubscriptionTierOverride() {
 
 /** Tier used for caps, gating, and dev tools (prefers dev override when enabled). */
 export function getEffectiveSubscriptionTier() {
+  if (isBetaTester()) return "elite";
   if (isNonProductionBuild() && getDevSimulateExpiredSubscription()) {
     return "free";
   }
@@ -268,9 +269,24 @@ export function getAlertLimit(tier = getEffectiveSubscriptionTier()) {
 
 /** Project Alerts caps & feature flags (must stay aligned with server `subscriptionPlans`). */
 export function getProjectAlertCapabilities(tier = getEffectiveSubscriptionTier()) {
-  const adv = getAdvantageTier(tier);
+  const missionTier = getScoutMissionTier(tier);
+  if (isBetaTester()) {
+    return {
+      tier: "elite",
+      enabled: true,
+      maxActiveProjects: Number.POSITIVE_INFINITY,
+      maxItemsPerProject: Number.POSITIVE_INFINITY,
+      bundleSavings: true,
+      priceTargetPerItem: true,
+      aiPartsList: true,
+      voiceProjectCreation: true,
+      allPartsReadyNotify: true,
+      priorityProjectAlerts: true,
+    };
+  }
+  const adv = getAdvantageTier(missionTier);
   return {
-    tier,
+    tier: missionTier,
     enabled: Boolean(adv.projectAlertsEnabled),
     maxActiveProjects: adv.projectActiveMax,
     maxItemsPerProject: adv.projectItemsMaxPerProject,
