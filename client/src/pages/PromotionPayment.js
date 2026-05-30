@@ -240,11 +240,13 @@ const PromotionPayment = () => {
     }
   });
 
+  const { mutate: createPaymentIntent } = createPaymentIntentMutation;
+
   useEffect(() => {
     if (promotion && promotion.status === 'pending') {
-      createPaymentIntentMutation.mutate();
+      createPaymentIntent();
     }
-  }, [promotion]);
+  }, [promotion, createPaymentIntent]);
 
   const handlePaymentSuccess = (paymentIntent) => {
     confirmPaymentMutation.mutate({

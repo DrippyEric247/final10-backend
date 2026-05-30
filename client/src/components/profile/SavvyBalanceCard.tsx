@@ -22,11 +22,15 @@ export default function SavvyBalanceCard({
   const [recentGain, setRecentGain] = useState(0);
   const [isHotGlow, setIsHotGlow] = useState(false);
   const prevBalanceRef = useRef<number>(Math.max(0, Math.round(balance || 0)));
+  const animFromRef = useRef<number>(Math.max(0, Math.round(balance || 0)));
 
   useEffect(() => {
     const target = Math.max(0, Math.round(balance || 0));
-    const start = displayBalance;
-    if (start === target) return;
+    const start = animFromRef.current;
+    if (start === target) {
+      setDisplayBalance(target);
+      return;
+    }
     const delta = target - start;
     const dur = 520;
     const t0 = performance.now();
@@ -34,12 +38,14 @@ export default function SavvyBalanceCard({
     const tick = (ts: number) => {
       const p = Math.min(1, (ts - t0) / dur);
       const eased = 1 - Math.pow(1 - p, 3);
-      setDisplayBalance(Math.round(start + delta * eased));
+      const next = Math.round(start + delta * eased);
+      setDisplayBalance(next);
+      animFromRef.current = next;
       if (p < 1) raf = window.requestAnimationFrame(tick);
+      else animFromRef.current = target;
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [balance]);
 
   useEffect(() => {
@@ -62,7 +68,7 @@ export default function SavvyBalanceCard({
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [balance]);
 
   const statusText = useMemo(() => {
     if (streakLabel) return streakLabel;

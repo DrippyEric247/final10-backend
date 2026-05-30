@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BATTLE_PASS_ACTION_EVENT } from "../lib/battlePassActionBus";
-import { BP_UPDATE_EVENT, BATTLE_PASS_SEASON } from "../lib/battlePassConfig";
+import { BP_UPDATE_EVENT } from "../lib/battlePassConfig";
 import { getBattlePassProgress } from "../lib/battlePassEngine";
 import { POWER_TOAST_EVENT } from "../lib/final10PowerFeedback";
 import {
@@ -182,7 +182,7 @@ export function useSmartCoach(enabled: boolean) {
     } else {
       premiumViewLoggedRef.current = false;
     }
-  }, [enabled, location.pathname]);
+  }, [enabled, location.pathname, updateBehavior]);
 
   useEffect(() => {
     if (!enabled) return;

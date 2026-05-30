@@ -1,14 +1,9 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { notifyUniversalProgressRefresh } from "../lib/universalBoostProgress";
 import { recordSkillGem } from "../lib/final10PowerEngine";
-import { POWER_UX } from "../lib/final10PowerConfig";
-import { emitPowerToast } from "../lib/final10PowerFeedback";
 import { pushAssistantSignal } from "../lib/assistantSignals";
 import { reportDealsForAlerts } from "../lib/smartDealAlerts";
 import { trackCategoryView, trackItemClick } from "../lib/userBehavior";
-import { recordBattlePassXp } from "../lib/battlePassEngine";
-import { triggerActionReward } from "../lib/rewardEngine";
 import { SCOUT_LABELS, SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import ListingIntentAnchor from "../components/ListingIntentAnchor";
 import SavvyRewardBadge from "../components/rewards/SavvyRewardBadge";

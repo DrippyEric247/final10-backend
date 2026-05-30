@@ -63,13 +63,13 @@ export default function SmartAlertCreationWizard({
   onDoneEdit,
 }) {
   const navigate = useNavigate();
-  const [tierRev, setTierRev] = useState(0);
+  const [, setTierRev] = useState(0);
   useEffect(() => {
     const h = () => setTierRev((n) => n + 1);
     window.addEventListener("f10:subscription-tier-updated", h);
     return () => window.removeEventListener("f10:subscription-tier-updated", h);
   }, []);
-  const caps = useMemo(() => getAlertCreationCapabilities(), [tierRev]);
+  const caps = getAlertCreationCapabilities();
   const isKeywordControlled = keywordProp !== undefined && typeof onKeywordChange === "function";
   const [internalKeyword, setInternalKeyword] = useState("");
   const keyword = isKeywordControlled ? keywordProp : internalKeyword;

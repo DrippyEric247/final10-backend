@@ -53,9 +53,8 @@ type Props = {
 
 export default function ProjectAlertsPanel({ onAlertsMayHaveChanged }: Props) {
   const navigate = useNavigate();
-  const [tierTick, bump] = useReducer((n) => n + 1, 0);
-  void tierTick;
-  const caps = useMemo(() => getProjectAlertCapabilities(), [tierTick]);
+  const [, bump] = useReducer((n) => n + 1, 0);
+  const caps = getProjectAlertCapabilities();
 
   useEffect(() => {
     const h = () => bump();

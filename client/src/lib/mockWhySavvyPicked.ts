@@ -114,7 +114,6 @@ export function buildWhySavvyPickedModel(params: {
   }
 
   const confScore = Number(decision.confidenceScore) || 0;
-  const aiConf = Number(trustResult.aiConfidence) || confScore || trust;
   if (decision.confidence === 'high' || confScore >= 72) {
     reasons.push(SCOUT_COPY.bestMove.confidenceHigh);
   } else if (decision.confidence === 'medium') {

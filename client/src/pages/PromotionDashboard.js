@@ -5,7 +5,6 @@ import {
   TrendingUp,
   Eye,
   MousePointer,
-  DollarSign,
   Clock,
   Play,
   Pause,
@@ -13,10 +12,8 @@ import {
   Plus,
   BarChart3,
   Target,
-  Star,
   AlertCircle,
-  CheckCircle,
-  Zap
+  CheckCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import promotionService from '../services/promotionService';
@@ -107,11 +104,6 @@ const PromotionDashboard = () => {
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
     return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-  };
-
-  const calculateROI = (spent, revenue) => {
-    if (!spent || spent === 0) return 0;
-    return ((revenue - spent) / spent) * 100;
   };
 
   if (!user) {

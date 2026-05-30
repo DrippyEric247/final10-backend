@@ -210,7 +210,7 @@ export default function TourOverlay({ tour, onFinish }: TourOverlayProps) {
 
   useEffect(() => {
     trackTourEvent("tour_shown", tour.id, { hasDemo: Boolean(tour.demo) });
-  }, [tour.id]);
+  }, [tour.id, tour.demo]);
 
   const finish = useCallback(
     (reason: "dismissed" | "primary" | "action") => {

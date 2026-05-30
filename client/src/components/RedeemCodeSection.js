@@ -78,8 +78,6 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
       // Check if it's an easter egg code first
       const upperCode = code.toUpperCase();
       if (easterEggCodes[upperCode]) {
-        const easterEgg = easterEggCodes[upperCode];
-        
         // Award points for easter egg code
         const response = await easterEggService.redeemCode(upperCode);
 

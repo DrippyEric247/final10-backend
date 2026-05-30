@@ -4,12 +4,10 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   Zap, 
-  Star, 
   TrendingUp, 
   Plus,
   Eye,
   MousePointer,
-  Target,
   Lightbulb,
   Megaphone,
   Coins
@@ -105,13 +103,6 @@ export default function Trending() {
     refetchOnWindowFocus: false,
   });
 
-  // Get promotion packages for quick promotion
-  const { data: packages } = useQuery({
-    queryKey: ["promotion-packages"],
-    queryFn: () => promotionService.getPackages(),
-    enabled: !!user,
-  });
-
   // Combine data based on active tab
   const getDisplayData = () => {
     const normalizePromoted = (item) => ({
@@ -156,13 +147,16 @@ export default function Trending() {
   const isLoading = promotedStatus === 'loading' || organicStatus === 'loading';
   const error = promotedError || organicData?.error;
 
-  const stats = {
+  const stats = useMemo(() => ({
     featured: displayData.filter((item) => item.isPromoted && item.promotionTier === "featured").length,
     promoted: displayData.filter((item) => item.isPromoted).length,
     totalImpressions: displayData.reduce((sum, item) => sum + (item.promotionMetrics?.impressions || 0), 0),
     totalClicks: displayData.reduce((sum, item) => sum + (item.promotionMetrics?.clicks || 0), 0),
-  };
-  const activePromotions = myPromotionsData?.promotions || myPromotionsData?.items || [];
+  }), [displayData]);
+  const activePromotions = useMemo(
+    () => myPromotionsData?.promotions || myPromotionsData?.items || [],
+    [myPromotionsData]
+  );
   const visibility = getVisibilityMetrics(activePromotions.length);
 
   const earnings = useMemo(

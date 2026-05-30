@@ -1,24 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Shield, 
   AlertTriangle, 
-  Users, 
   Activity, 
   Eye, 
   CheckCircle, 
   XCircle, 
   Clock, 
-  TrendingUp,
-  AlertCircle,
   Zap,
-  Lock,
-  Unlock,
-  Ban,
-  UserCheck,
   BarChart3,
-  Filter,
-  Search,
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -31,21 +22,14 @@ const ShieldDashboard = () => {
   const [events, setEvents] = useState([]);
   const [enforcements, setEnforcements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
+  const [filters] = useState({
     days: 7,
     risk_score_min: 0,
     app: 'all',
     status: 'all'
   });
 
-  useEffect(() => {
-    if (user?.role !== 'admin') {
-      return;
-    }
-    fetchDashboardData();
-  }, [user, filters]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -75,7 +59,14 @@ const ShieldDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') {
+      return;
+    }
+    fetchDashboardData();
+  }, [user, fetchDashboardData]);
 
   const handleApproveEnforcement = async (enforcementId) => {
     try {

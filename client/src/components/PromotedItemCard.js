@@ -5,12 +5,9 @@ import {
   TrendingUp, 
   Eye, 
   MousePointer, 
-  Users, 
-  Clock,
-  Award,
-  Zap,
   Crown,
-  Target
+  Target,
+  Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ListingCardImage from './listings/ListingCardImage';

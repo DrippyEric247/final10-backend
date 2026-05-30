@@ -292,7 +292,6 @@ export function SavvyPointsProvider({ children }) {
       displaySavvy,
       multiplier,
       wallet.streak,
-      walletTick,
       lifetimeEarned,
       recentTransactions,
       recentFeed,

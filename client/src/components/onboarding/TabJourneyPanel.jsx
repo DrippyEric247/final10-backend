@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { getTabJourneySnapshot, observeTabJourney } from "../../lib/tabJourney";
 
@@ -6,12 +6,9 @@ export default function TabJourneyPanel() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(true);
   const [pulse, setPulse] = useState(false);
-  const [rev, setRev] = useState(0);
+  const [, setRev] = useState(0);
 
-  const snapshot = useMemo(
-    () => getTabJourneySnapshot(location.pathname),
-    [location.pathname, rev]
-  );
+  const snapshot = getTabJourneySnapshot(location.pathname);
 
   useEffect(() => {
     const unsub = observeTabJourney(() => setRev((n) => n + 1));

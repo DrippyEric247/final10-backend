@@ -10,8 +10,6 @@ import {
   CreditCard,
   Smartphone,
   DollarSign,
-  Users,
-  Globe,
   TrendingUp
 } from 'lucide-react';
 import { Link } from 'react-router-dom';

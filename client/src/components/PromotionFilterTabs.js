@@ -7,8 +7,7 @@ import {
   Zap,
   Filter,
   Eye,
-  MousePointer,
-  Users
+  MousePointer
 } from 'lucide-react';
 
 const PromotionFilterTabs = ({ activeTab, onTabChange, stats = {} }) => {

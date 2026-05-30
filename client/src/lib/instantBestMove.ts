@@ -944,7 +944,6 @@ export async function fetchInstantBestMove(
       options.signal,
       options.perCategoryLimit
     );
-    const beforeGlobal = allCandidates.length;
     mergeCandidates(allCandidates, seen, quickSnipesItems, primary);
     mergeCandidates(allCandidates, seen, trendingGlobalItems, primary);
     ranked = rankCandidates(allCandidates);
