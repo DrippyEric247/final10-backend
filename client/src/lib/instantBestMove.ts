@@ -40,7 +40,7 @@ export const DEFAULT_TRENDING_QUERIES = [
 ] as const;
 
 export const WIDENED_SEARCH_MESSAGE =
-  "Savvy widened the search to find a safer Best Move.";
+  "Savvy Scout widened the search to find a safer Best Move.";
 
 type SearchFilters = {
   listingMode?: string;
@@ -978,7 +978,7 @@ export async function fetchInstantBestMove(
     return buildSuccessResult(mock, [mock, ...ranked.slice(0, 3)], {
       matchType: "cached_fallback",
       matchLabel: "Savvy Pick",
-      matchMessage: "Live inventory is thin — here’s a safe starter Best Move while Savvy keeps scanning.",
+      matchMessage: "Live inventory is thin — Savvy Scout selected a safe starter Best Move while scanning new lanes.",
       pickedReason: "Cached safe deal so you always get a trusted first move.",
       searchedInterests,
       emptyInterests,

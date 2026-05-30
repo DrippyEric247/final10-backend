@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const fetch = require('node-fetch');
 const auth = require('../middleware/auth');
+const User = require('../models/User');
+const { isBetaTester, logBetaUsage, BETA_FEEDBACK_SAVVY_BONUS } = require('../services/betaTesterService');
+const { grantSavvyReward } = require('../services/savvyRewardService');
+
+function isQualityFeedback({ title, steps, expected, actual }) {
+  const t = String(title || '').trim();
+  const s = String(steps || '').trim();
+  const e = String(expected || '').trim();
+  const a = String(actual || '').trim();
+  return t.length >= 10 && s.length >= 40 && e.length >= 8 && a.length >= 8;
+}
 
 // Apply auth middleware to all routes
 router.use(auth);
@@ -114,9 +125,40 @@ router.post('/', async (req, res) => {
       githubIssue: githubIssue?.number
     });
 
+    let feedbackBonus = null;
+    const reporterId = req.user?.id || userId;
+    if (reporterId && isQualityFeedback({ title, steps, expected, actual })) {
+      try {
+        const reporter = await User.findById(reporterId);
+        if (reporter && isBetaTester(reporter) && !reporter.betaFeedbackBonusGrantedAt) {
+          const grant = await grantSavvyReward(reporter, {
+            rewardType: 'beta_feedback',
+            amount: BETA_FEEDBACK_SAVVY_BONUS,
+            idempotencyKey: `beta_feedback:${reporter._id}`,
+            note: 'Quality beta feedback bonus',
+            meta: { page, severity },
+          });
+          if (grant.granted) {
+            reporter.betaFeedbackBonusGrantedAt = new Date();
+            await reporter.save();
+            void logBetaUsage(reporter._id, 'feedback_bonus', { amount: BETA_FEEDBACK_SAVVY_BONUS });
+            feedbackBonus = {
+              savvyAwarded: BETA_FEEDBACK_SAVVY_BONUS,
+              newBalance: grant.newBalance,
+            };
+          }
+        }
+      } catch (bonusErr) {
+        console.warn('[bugReports] feedback bonus skipped:', bonusErr?.message);
+      }
+    }
+
     res.json({
       success: true,
-      message: 'Bug report submitted successfully',
+      message: feedbackBonus
+        ? `Bug report submitted. +${BETA_FEEDBACK_SAVVY_BONUS} Savvy awarded for quality feedback!`
+        : 'Bug report submitted successfully',
+      feedbackBonus,
       githubIssue: githubIssue ? {
         number: githubIssue.number,
         url: githubIssue.html_url

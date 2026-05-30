@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import businessOffersService from "../services/businessOffersService";
 import { incrementJourneyStep } from "../lib/tabJourney";
+import { SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import "../styles/BusinessOffersOptimizer.css";
 
 const HERO_LINES = [
@@ -138,7 +139,7 @@ export default function BusinessOffersDashboard() {
 
   const notices = [
     "Deal detected: Grocery stack optimized across 3 retailers.",
-    "Savvy AI optimized your purchase route for this week.",
+    `${SAVVY_SCOUT.shortTitle} optimized your purchase route for this week.`,
     "Points spike: +420 projected from current build.",
     "Low shipping window opened for your tech bundle.",
   ];
@@ -194,7 +195,7 @@ export default function BusinessOffersDashboard() {
         </section>
 
         <section className="optimizer-panel rounded-2xl p-5">
-          <h2 className="text-sm uppercase tracking-[0.16em] text-violet-200 font-bold">Savvy AI Request Builder</h2>
+          <h2 className="text-sm uppercase tracking-[0.16em] text-violet-200 font-bold">{SAVVY_SCOUT.shortTitle} Request Builder</h2>
           <div className="mt-3 flex flex-col md:flex-row gap-3">
             <input
               value={command}
@@ -255,7 +256,7 @@ export default function BusinessOffersDashboard() {
               </tbody>
             </table>
           </div>
-          <div className="mt-3 text-sm text-emerald-200 font-semibold">Savvy AI optimized your purchase route.</div>
+          <div className="mt-3 text-sm text-emerald-200 font-semibold">{SAVVY_SCOUT.shortTitle} optimized your purchase route.</div>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">

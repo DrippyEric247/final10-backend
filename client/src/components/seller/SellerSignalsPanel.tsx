@@ -154,7 +154,7 @@ export default function SellerSignalsPanel({
               What categories do you sell or want to learn?
             </h2>
             <p className="ssi-modal-sub">
-              Pick everything that matters — we weight your feed, filters, and Savvy AI reads toward these lanes.
+              Pick everything that matters — we weight your feed, filters, and Savvy Scout reads toward these lanes.
             </p>
             <div className="ssi-chip-grid">
               {SELLER_SIGNAL_CATEGORY_OPTIONS.map((c) => (

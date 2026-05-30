@@ -5,6 +5,7 @@ import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
 import { filterAutocompleteSuggestions, normalizeKeyword } from "../lib/smartAlertWizardEngine";
+import { SAVVY_SCOUT, SCOUT_LABELS, SCOUT_COPY } from "../config/savvyScoutBranding";
 import "../styles/AlertsCommandCenter.css";
 
 const SIGNAL_LINES = [
@@ -21,7 +22,7 @@ const HUNTER_STATES = [
   "Seller panic conditions detected.",
   "Low competition window opening.",
   "Price pressure detected.",
-  "AI sweep active.",
+  SCOUT_COPY.alerts.sweepActive,
   "Trust spike identified.",
   "Target locked.",
 ];
@@ -181,7 +182,7 @@ export default function Alerts() {
             <div className="mt-2 text-xs text-slate-300">{success}% tactical opportunity confidence</div>
           </div>
           <aside className="rounded-2xl border border-fuchsia-300/35 bg-slate-950/65 p-5">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">Savvy Tactical Assistant</h3>
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">{SAVVY_SCOUT.shortTitle}</h3>
             <ul className="space-y-2 text-sm text-slate-200">
               <li>• Shift to lower-bid lanes for cleaner entries.</li>
               <li>• Avoid overheated markets with rising bid pressure.</li>
@@ -214,7 +215,7 @@ export default function Alerts() {
                     <div className="min-w-0">
                       <div className="font-bold text-white truncate">{alertName(a)}</div>
                       <div className="text-xs text-fuchsia-200 mb-1">{rarityFromAlert(a)} • {HUNTER_STATES[index % HUNTER_STATES.length]}</div>
-                      <div className="text-xs text-gray-300">Target {alertTarget(a)} · Trust {alertTrust(a)} · AI confidence {Math.round(Number(a?.minConfidence || 70))}%</div>
+                      <div className="text-xs text-gray-300">Target {alertTarget(a)} · Trust {alertTrust(a)} · {SCOUT_LABELS.confidence} {Math.round(Number(a?.minConfidence || 70))}%</div>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
@@ -249,6 +250,7 @@ import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
 import { filterAutocompleteSuggestions, normalizeKeyword } from "../lib/smartAlertWizardEngine";
+import { SAVVY_SCOUT, SCOUT_LABELS, SCOUT_COPY } from "../config/savvyScoutBranding";
 import "../styles/AlertsCommandCenter.css";
 
 function formatAlertTarget(a) {
@@ -303,7 +305,7 @@ const HUNTER_STATES = [
   "Seller panic conditions detected.",
   "Low competition window opening.",
   "Price pressure detected.",
-  "AI sweep active.",
+  SCOUT_COPY.alerts.sweepActive,
   "Trust spike identified.",
   "Target locked.",
 ];
@@ -527,7 +529,7 @@ export default function Alerts() {
             <div className="mt-2 text-xs text-slate-300">{successScore}% tactical opportunity confidence</div>
           </div>
           <aside className="rounded-2xl border border-fuchsia-300/35 bg-slate-950/65 p-5">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">Savvy Tactical Assistant</h3>
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">{SAVVY_SCOUT.shortTitle}</h3>
             <ul className="space-y-2 text-sm text-slate-200">
               <li>• Shift to lower-bid lanes for cleaner entries.</li>
               <li>• Avoid overheated markets with rising bid pressure.</li>
@@ -586,11 +588,11 @@ export default function Alerts() {
                         <div>
                           <dt className="inline text-gray-600">Scan status </dt>
                           <dd className="inline text-gray-300 font-semibold">
-                            {a.status === "triggered" ? "Target hit" : a.isActive ? "AI sweep active" : "Monitoring paused"}
+                            {a.status === "triggered" ? SCOUT_COPY.alerts.targetHit : a.isActive ? SCOUT_COPY.alerts.sweepActive : SCOUT_COPY.alerts.monitoringPaused}
                           </dd>
                         </div>
                         <div>
-                          <dt className="inline text-gray-600">AI confidence </dt>
+                          <dt className="inline text-gray-600">{SCOUT_LABELS.confidence} </dt>
                           <dd className="inline text-gray-300 font-semibold">{Math.round(Number(a?.minConfidence || 70))}%</dd>
                         </div>
                       </dl>
@@ -660,6 +662,7 @@ import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
 import { filterAutocompleteSuggestions, normalizeKeyword } from "../lib/smartAlertWizardEngine";
+import { SAVVY_SCOUT, SCOUT_LABELS, SCOUT_COPY } from "../config/savvyScoutBranding";
 import "../styles/AlertsCommandCenter.css";
 
 function formatAlertTarget(a) {
@@ -714,7 +717,7 @@ const HUNTER_STATES = [
   "Seller panic conditions detected.",
   "Low competition window opening.",
   "Price pressure detected.",
-  "AI sweep active.",
+  SCOUT_COPY.alerts.sweepActive,
   "Trust spike identified.",
   "Target locked.",
 ];
@@ -940,7 +943,7 @@ export default function Alerts() {
             <div className="mt-2 text-xs text-slate-300">{successScore}% tactical opportunity confidence</div>
           </div>
           <aside className="rounded-2xl border border-fuchsia-300/35 bg-slate-950/65 p-5">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">Savvy Tactical Assistant</h3>
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">{SAVVY_SCOUT.shortTitle}</h3>
             <ul className="space-y-2 text-sm text-slate-200">
               <li>• Shift to lower-bid lanes for cleaner entries.</li>
               <li>• Avoid overheated markets with rising bid pressure.</li>
@@ -999,11 +1002,11 @@ export default function Alerts() {
                         <div>
                           <dt className="inline text-gray-600">Scan status </dt>
                           <dd className="inline text-gray-300 font-semibold">
-                            {a.status === "triggered" ? "Target hit" : a.isActive ? "AI sweep active" : "Monitoring paused"}
+                            {a.status === "triggered" ? SCOUT_COPY.alerts.targetHit : a.isActive ? SCOUT_COPY.alerts.sweepActive : SCOUT_COPY.alerts.monitoringPaused}
                           </dd>
                         </div>
                         <div>
-                          <dt className="inline text-gray-600">AI confidence </dt>
+                          <dt className="inline text-gray-600">{SCOUT_LABELS.confidence} </dt>
                           <dd className="inline text-gray-300 font-semibold">{Math.round(Number(a?.minConfidence || 70))}%</dd>
                         </div>
                       </dl>
@@ -1074,6 +1077,7 @@ import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
 import { filterAutocompleteSuggestions, normalizeKeyword } from "../lib/smartAlertWizardEngine";
+import { SAVVY_SCOUT, SCOUT_LABELS, SCOUT_COPY } from "../config/savvyScoutBranding";
 
 function formatAlertTarget(a) {
   if (a?.maxPrice != null && Number.isFinite(Number(a.maxPrice))) {

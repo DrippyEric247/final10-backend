@@ -409,6 +409,54 @@ router.post('/grant-founding-access', requireSuperAdmin, async (req, res) => {
 });
 
 /**
+ * POST /api/owner/revoke-founding-access
+ * Disable Founding Tester / beta status for a user.
+ */
+router.post('/revoke-founding-access', requireSuperAdmin, async (req, res) => {
+  try {
+    const { email = '', userId = '', reason = 'Owner revoked Founding Tester access' } = req.body || {};
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail && !userId) {
+      return res.status(400).json({ message: 'Email or userId is required' });
+    }
+    const query = normalizedEmail ? { email: normalizedEmail } : { _id: userId };
+    const user = await User.findOne(query);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.betaTester = false;
+    user.foundingAccess = false;
+    user.betaAccessExpiresAt = null;
+    user.ownerGrants = user.ownerGrants || [];
+    user.ownerGrants.push({
+      type: 'beta_revoked',
+      amount: null,
+      reason,
+      grantedBy: req.superAdmin.username,
+      grantedAt: new Date(),
+    });
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: `Founding Tester access revoked for ${user.username}`,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        betaTester: false,
+        foundingAccess: false,
+        isBetaTester: false,
+      },
+    });
+  } catch (error) {
+    console.error('Error revoking founding access:', error);
+    return res.status(500).json({ message: 'Failed to revoke founding access' });
+  }
+});
+
+/**
  * GET /api/owner/user/:userId/grants
  * Get owner grants history for a user
  */

@@ -3,6 +3,7 @@ const Alert = require('../models/Alert');
 const auth = require('../middleware/auth');  // your JWT middleware
 const User = require('../models/User');
 const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
+const { isBetaTester, getTierConfigForUser, logBetaUsage } = require('../services/betaTesterService');
 
 // Get my alerts
 router.get('/', auth, async (req, res) => {
@@ -29,10 +30,9 @@ router.post('/', auth, async (req, res) => {
     context = {},
   } = req.body;
   if (!name || !Array.isArray(keywords)) return res.status(400).json({ message: 'Invalid payload' });
-  const user = await User.findById(req.user.id).select('subscription membershipTier');
+  const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
   if (!user) return res.status(404).json({ message: 'User not found' });
-  const tier = normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
-  const tierCfg = getTierConfig(tier);
+  const tierCfg = getTierConfigForUser(user);
   const existingCount = await Alert.countDocuments({ user: req.user.id });
   if (Number.isFinite(tierCfg.alertsMax) && existingCount >= tierCfg.alertsMax) {
     return res.status(403).json({
@@ -55,9 +55,15 @@ router.post('/', auth, async (req, res) => {
     context: {
       ...context,
       alertsSpeed: tierCfg.alertsSpeed,
-      subscriptionTier: tier,
+      subscriptionTier: isBetaTester(user)
+        ? 'elite'
+        : normalizeTier(user.subscription?.tier || user.membershipTier || 'free'),
     },
   });
+
+  if (isBetaTester(user)) {
+    void logBetaUsage(user._id, 'alert_created', { name: String(name).slice(0, 80) });
+  }
 
   res.status(201).json(alert);
 });

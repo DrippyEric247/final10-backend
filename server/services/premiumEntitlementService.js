@@ -41,12 +41,10 @@ function toUserObjectId(userId) {
   return new mongoose.Types.ObjectId(s);
 }
 
+const { isBetaTester: checkBetaTester, logBetaUsage } = require('../services/betaTesterService');
+
 function hasFoundingTesterAccess(user) {
-  if (!user) return false;
-  const flagged = Boolean(user.betaTester || user.foundingAccess);
-  if (!flagged) return false;
-  if (!user.betaAccessExpiresAt) return true;
-  return new Date(user.betaAccessExpiresAt) > new Date();
+  return checkBetaTester(user);
 }
 
 async function getEntitlementByUserId(userId) {
@@ -86,6 +84,7 @@ function toMeResponse(doc, user = null) {
       provider: 'beta',
       creatorMonetization: monetizationFromEntitlement(doc),
       foundingTesterAccess: true,
+      isBetaTester: true,
       betaTester: Boolean(user?.betaTester),
       foundingAccess: Boolean(user?.foundingAccess),
       betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
@@ -102,6 +101,7 @@ function toMeResponse(doc, user = null) {
       provider: 'stripe',
       creatorMonetization: monetizationFromEntitlement(null),
       foundingTesterAccess: false,
+      isBetaTester: false,
       betaTester: Boolean(user?.betaTester),
       foundingAccess: Boolean(user?.foundingAccess),
       betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
@@ -118,6 +118,7 @@ function toMeResponse(doc, user = null) {
     provider: doc.provider || 'stripe',
     creatorMonetization: monetizationFromEntitlement(doc),
     foundingTesterAccess: false,
+    isBetaTester: false,
     betaTester: Boolean(user?.betaTester),
     foundingAccess: Boolean(user?.foundingAccess),
     betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
@@ -240,4 +241,6 @@ module.exports = {
   markEntitlementStatus,
   canSelfServeBattlePassPremiumUnlock,
   assertPremiumRewardAllowed,
+  isBetaTester: checkBetaTester,
+  hasFoundingTesterAccess,
 };

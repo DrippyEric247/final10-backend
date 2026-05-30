@@ -114,6 +114,8 @@ const userSchema = new mongoose.Schema({
   betaTester: { type: Boolean, default: false },
   foundingAccess: { type: Boolean, default: false },
   betaAccessExpiresAt: { type: Date, default: null },
+  /** One-time Savvy bonus for quality beta feedback (bug report). */
+  betaFeedbackBonusGrantedAt: { type: Date, default: null },
   membershipTier: { 
     type: String, 
     enum: ['free', 'premium', 'pro'], 

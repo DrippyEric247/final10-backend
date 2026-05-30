@@ -18,6 +18,7 @@ export const ANALYTICS_EVENTS = Object.freeze({
   UPGRADE_CLICKED: "upgrade_clicked",
   DEMO_STARTED: "demo_started",
   DEMO_COMPLETED: "demo_completed",
+  BETA_TESTER_ACTION: "beta_tester_action",
 });
 
 const ANON_KEY = "f10_telemetry_anon_v1";
@@ -167,6 +168,15 @@ export function trackQuickSnipeSearch(extra = {}) {
 export function trackUpgradeClicked(source, extra = {}) {
   if (!source) return;
   trackEvent(ANALYTICS_EVENTS.UPGRADE_CLICKED, { source, ...extra });
+}
+
+/** Log beta tester feature usage (persisted server-side for founding testers). */
+export function trackBetaTesterUsage(action, extra = {}) {
+  if (!action) return;
+  trackEvent(`beta_tester_${String(action).slice(0, 64)}`, {
+    action,
+    ...extra,
+  });
 }
 
 /** Load gtag.js when REACT_APP_GA_MEASUREMENT_ID is set. Call once from App mount. */

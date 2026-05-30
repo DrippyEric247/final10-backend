@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { SCOUT_LABELS } from '../../config/savvyScoutBranding';
 import { buildWhySavvyPickedModel } from '../../lib/mockWhySavvyPicked';
 import AIConfidenceBar from './AIConfidenceBar';
 import MarketSignalCard from './MarketSignalCard';
@@ -8,7 +9,7 @@ import TrustBreakdown from './TrustBreakdown';
 import '../../styles/why-savvy-picked.css';
 
 /**
- * Expandable “Why Savvy AI picked this” — mock copy from `mockWhySavvyPicked.ts`.
+ * Expandable “Why Savvy Scout picked this” — mock copy from `mockWhySavvyPicked.ts`.
  */
 export default function WhyPickedPanel({ item, trustResult, decision, effectiveSavings }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +34,7 @@ export default function WhyPickedPanel({ item, trustResult, decision, effectiveS
         onClick={() => setOpen((v) => !v)}
       >
         <span className="wsp-toggle__glow" aria-hidden />
-        <span className="wsp-toggle__label">🧠 Why Savvy AI Picked This</span>
+        <span className="wsp-toggle__label">{SCOUT_LABELS.whyPickedToggle}</span>
         <span className="wsp-toggle__chev">{open ? '▲' : '▼'}</span>
       </button>
 
@@ -77,7 +78,7 @@ export default function WhyPickedPanel({ item, trustResult, decision, effectiveS
               {model.showTrustPanel ? <TrustBreakdown bullets={model.trustBullets} /> : null}
 
               <div className="wsp-summary">
-                <div className="wsp-summary__title">⚡ Savvy AI Summary</div>
+                <div className="wsp-summary__title">{SCOUT_LABELS.summary}</div>
                 <p className="wsp-summary__text">{model.summary}</p>
               </div>
             </div>

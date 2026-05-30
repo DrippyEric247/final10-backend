@@ -1,6 +1,8 @@
 const express = require('express');
 const optionalAuth = require('../middleware/optionalAuth');
 const { isProduction } = require('../config/envValidation');
+const User = require('../models/User');
+const { isBetaTester, logBetaUsage } = require('../services/betaTesterService');
 const {
   logClientAnalytics,
   logClientCrash,
@@ -59,6 +61,24 @@ router.post('/event', optionalAuth, (req, res) => {
     ip: req.ip,
     ua: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 400) : '',
   });
+
+  if (req.telemetryUserId) {
+    void (async () => {
+      try {
+        const betaEvents = events.filter((e) => String(e.name || '').startsWith('beta_tester_'));
+        if (betaEvents.length === 0) return;
+        const user = await User.findById(req.telemetryUserId).select(
+          'betaTester foundingAccess betaAccessExpiresAt'
+        );
+        if (!isBetaTester(user)) return;
+        for (const evt of betaEvents) {
+          await logBetaUsage(req.telemetryUserId, String(evt.name).slice(0, 80), evt.props || {});
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }
 
   // Route high-value client failure signals into dedicated structured log events.
   events.forEach((evt) => {

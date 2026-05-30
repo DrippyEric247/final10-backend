@@ -84,6 +84,8 @@ import AppTelemetry from "./components/AppTelemetry";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import { useEntitlement } from "./hooks/useEntitlement";
 import { setCurrentSubscriptionTier } from "./lib/tierMultiplier";
+import { isBetaTester, registerBetaTesterGetter } from "./lib/betaTesterAccess";
+import FoundingTesterBadge from "./components/beta/FoundingTesterBadge";
 
 /* Protect any route by requiring a token/user */
 function ProtectedRoute({ children }) {
@@ -136,11 +138,16 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
+    registerBetaTesterGetter(() => isBetaTester(user, entitlement));
+    return () => registerBetaTesterGetter(null);
+  }, [user, entitlement]);
+
+  useEffect(() => {
     if (!user) return;
-    if (user.foundingTesterAccess || user.betaTester || user.foundingAccess) {
+    if (isBetaTester(user, entitlement)) {
       setCurrentSubscriptionTier("elite");
     }
-  }, [user]);
+  }, [user, entitlement]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -198,11 +205,7 @@ export default function App() {
             
             {/* Login/Logout Section */}
             <div className="flex gap-3 app-auth-buttons">
-              {user?.foundingTesterAccess || entitlement?.foundingTesterAccess ? (
-                <div className="rounded-lg border border-amber-300/50 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-100">
-                  Founding Tester Access · You&apos;re testing the full Savvy experience.
-                </div>
-              ) : null}
+              {isBetaTester(user, entitlement) ? <FoundingTesterBadge /> : null}
               {!user ? (
                 <>
                   <Link to="/login" className="btn btn-ghost">Login</Link>

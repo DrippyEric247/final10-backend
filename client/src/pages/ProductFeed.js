@@ -9,6 +9,7 @@ import { reportDealsForAlerts } from "../lib/smartDealAlerts";
 import { trackCategoryView, trackItemClick } from "../lib/userBehavior";
 import { recordBattlePassXp } from "../lib/battlePassEngine";
 import { triggerActionReward } from "../lib/rewardEngine";
+import { SCOUT_LABELS, SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import ListingIntentAnchor from "../components/ListingIntentAnchor";
 import SavvyRewardBadge from "../components/rewards/SavvyRewardBadge";
 import { evaluateTrustScore, trustScoreInputFromListing } from "../lib/trustScoreEngine";
@@ -423,7 +424,7 @@ export default function ProductFeed() {
 
   const smartSections = useMemo(() => {
     const sectionMap = {
-      ai: { title: "🧠 Savvy AI Recommendations", minTier: 0 },
+      ai: { title: SCOUT_LABELS.recommendations, minTier: 0 },
       bundle: { title: "🔥 Bundle & Save More", minTier: 1 },
       lowComp: { title: "⚡ Low Competition Add-ons", minTier: 1 },
       premium: { title: "💎 Premium Pairings", minTier: 2 },
@@ -442,7 +443,7 @@ export default function ProductFeed() {
   const setupRemaining = Math.max(0, setupGoalCount - smartCartItems.length);
   const smartCartCoachLine = setupRemaining > 0
     ? `You are ${setupRemaining} item${setupRemaining === 1 ? "" : "s"} away from completing your ${smartCartFocusCategory} setup.`
-    : `Setup complete. Savvy AI is now optimizing timing and hidden opportunities.`;
+    : `Setup complete. ${SAVVY_SCOUT.shortTitle} is now optimizing timing and hidden opportunities.`;
 
   const addToSmartCart = useCallback((it) => {
     const id = String(it?.id || it?.itemId || "");

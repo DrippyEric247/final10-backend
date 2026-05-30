@@ -26,12 +26,10 @@ function signUserToken(user) {
   return jwt.sign({ sub, id: user._id, userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
+const { isBetaTester: checkBetaTester } = require('../services/betaTesterService');
+
 function hasFoundingTesterAccess(user) {
-  if (!user) return false;
-  const flagged = Boolean(user.betaTester || user.foundingAccess);
-  if (!flagged) return false;
-  if (!user.betaAccessExpiresAt) return true;
-  return new Date(user.betaAccessExpiresAt) > new Date();
+  return checkBetaTester(user);
 }
 
 function startOfToday() {
@@ -209,6 +207,7 @@ async function handleSignup(req, res, next) {
         foundingAccess: Boolean(user.foundingAccess),
         betaAccessExpiresAt: user.betaAccessExpiresAt || null,
         foundingTesterAccess: hasFoundingTesterAccess(user),
+        isBetaTester: hasFoundingTesterAccess(user),
       },
     });
   } catch (err) {
@@ -249,6 +248,7 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
         foundingAccess: Boolean(user.foundingAccess),
         betaAccessExpiresAt: user.betaAccessExpiresAt || null,
         foundingTesterAccess: hasFoundingTesterAccess(user),
+        isBetaTester: hasFoundingTesterAccess(user),
       },
     });
   } catch (err) {
@@ -315,6 +315,7 @@ router.get('/me', auth, async (req, res, next) => {
       foundingAccess: Boolean(user.foundingAccess),
       betaAccessExpiresAt: user.betaAccessExpiresAt || null,
       foundingTesterAccess: hasFoundingTesterAccess(user),
+      isBetaTester: hasFoundingTesterAccess(user),
     });
   } catch (err) {
     return next(err);

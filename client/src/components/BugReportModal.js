@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Bug, AlertTriangle, AlertCircle, AlertOctagon, Send, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { isBetaTester } from '../lib/betaTesterAccess';
 import { buildApiUrl } from '../lib/runtimeApi';
 
 const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
   const { user } = useAuth();
+  const foundingTester = isBetaTester(user);
   const [formData, setFormData] = useState({
     title: '',
     steps: '',
@@ -49,12 +51,18 @@ const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
       });
 
       if (response.ok) {
+        const data = await response.json();
         try {
-          onReportSubmitted?.();
+          onReportSubmitted?.(data);
         } catch {
           /* ignore */
         }
-        setSubmitSuccess(true);
+        if (data?.feedbackBonus?.savvyAwarded) {
+          setSubmitSuccess(true);
+          alert(`Thanks! +${data.feedbackBonus.savvyAwarded} Savvy awarded for quality feedback.`);
+        } else {
+          setSubmitSuccess(true);
+        }
         setTimeout(() => {
           setSubmitSuccess(false);
           onClose();
@@ -96,6 +104,11 @@ const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
             <div>
               <h2 className="text-xl font-bold text-white">Report a Bug</h2>
               <p className="text-sm text-gray-400">Help us improve Final10 by reporting issues</p>
+              {foundingTester ? (
+                <p className="text-xs text-amber-200/90 mt-1">
+                  Founding Testers: detailed reports (title, steps, expected & actual) can earn +100 Savvy once.
+                </p>
+              ) : null}
             </div>
           </div>
           <button

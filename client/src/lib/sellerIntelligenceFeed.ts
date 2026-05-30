@@ -456,8 +456,8 @@ export function buildSavvyAiInsight(
   const pct = 8 + (hashStr(top.productLabel + String(week)) % 14);
   const faster = top.trendDirection !== "down";
   return faster
-    ? `Savvy AI noticed ${top.productLabel} is moving ~${pct}% faster vs last week on your watchlist lanes.`
-    : `Savvy AI is tracking ${top.productLabel} — bids are selective; tighten photos & price band.`;
+    ? `Savvy Scout noticed ${top.productLabel} is moving ~${pct}% faster vs last week on your watchlist lanes.`
+    : `Savvy Scout is tracking ${top.productLabel} — bids are selective; tighten photos & price band.`;
 }
 
 export const SIGNAL_TYPE_LABELS: Record<SignalIntelType, string> = {

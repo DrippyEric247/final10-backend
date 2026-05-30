@@ -22,6 +22,7 @@ import type { ListAssistantSeed } from "../lib/listThisItemAssistantEngine";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
 import { getEbaySellerTrends, getEntitlementsMe } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import "../styles/SellerTrendIntel.css";
 
 type EbayTrendComponents = {
@@ -208,7 +209,7 @@ export default function SellerTrendsDashboard() {
           <h1 className="seller-trends-title">Personal AI seller intelligence</h1>
           <p className="seller-trends-sub">
             A clean, actionable pulse — <strong>StockX sharpness</strong>, <strong>TikTok velocity</strong>, and{" "}
-            <strong>Bloomberg-grade lanes</strong> without chart noise. Your categories steer the feed; Savvy AI
+            <strong>Bloomberg-grade lanes</strong> without chart noise. Your categories steer the feed; {SAVVY_SCOUT.shortTitle}
             narrates the move.
           </p>
         </div>

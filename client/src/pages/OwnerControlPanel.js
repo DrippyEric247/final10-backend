@@ -86,9 +86,43 @@ const OwnerControlPanel = () => {
     }
   };
 
+  const revokeFoundingAccess = async () => {
+    if (!selectedUser) return;
+    if (!window.confirm(`Revoke Founding Tester access for ${selectedUser.username}?`)) return;
+    try {
+      const response = await fetch(buildApiUrl('/owner/revoke-founding-access'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          email: selectedUser.email,
+          reason: grantReason || 'Owner revoked Founding Tester access',
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(`✅ ${data.message}`);
+        fetchUserDetails(selectedUser.id);
+        fetchStats();
+      } else {
+        alert(`❌ ${data.message || 'Failed to revoke'}`);
+      }
+    } catch (error) {
+      console.error('Error revoking founding access:', error);
+      alert('❌ Failed to revoke founding access');
+    }
+  };
+
   const handleGrant = async () => {
     if (!selectedUser) return;
     if ((grantType === 'points' || grantType === 'premium') && !grantAmount) return;
+    if (grantType === 'revoke_founding') {
+      await revokeFoundingAccess();
+      setShowGrantModal(false);
+      return;
+    }
     
     try {
       let endpoint = '';
@@ -281,6 +315,11 @@ const OwnerControlPanel = () => {
                             <h4 className="text-lg font-semibold text-white">{user.username}</h4>
                             <p className="text-gray-400">{user.email}</p>
                             <div className="flex items-center space-x-4 mt-2">
+                              {(user.betaTester || user.foundingAccess) && (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/40">
+                                  Founding Tester
+                                </span>
+                              )}
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getMembershipBadge(user.membershipTier, user.isPremium, user.hasLifetimeSub)}`}>
                                 {user.hasLifetimeSub ? 'Lifetime' : user.membershipTier}
                               </span>
@@ -350,6 +389,20 @@ const OwnerControlPanel = () => {
                       </p>
                     </div>
                     
+                    <div className="bg-gray-700 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-400 mb-2">Founding Tester</h4>
+                      <p className="text-white font-semibold">
+                        {selectedUser.betaTester || selectedUser.foundingAccess ? 'Active' : 'Off'}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        {selectedUser.betaAccessExpiresAt
+                          ? `Expires ${new Date(selectedUser.betaAccessExpiresAt).toLocaleDateString()}`
+                          : selectedUser.betaTester || selectedUser.foundingAccess
+                            ? 'No expiry — unlimited access'
+                            : 'Standard limits apply'}
+                      </p>
+                    </div>
+
                     <div className="bg-gray-700 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-gray-400 mb-2">Member Since</h4>
                       <p className="text-white font-semibold">
@@ -518,7 +571,8 @@ const OwnerControlPanel = () => {
                   <option value="points">Points</option>
                   <option value="lifetime">Lifetime Subscription</option>
                   <option value="premium">Premium Subscription</option>
-                  <option value="founding">Founding Tester Access</option>
+                  <option value="founding">Enable Founding Tester</option>
+                  <option value="revoke_founding">Disable Founding Tester</option>
                 </select>
               </div>
               

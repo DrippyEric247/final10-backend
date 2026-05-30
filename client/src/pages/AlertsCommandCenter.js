@@ -5,6 +5,7 @@ import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
 import { filterAutocompleteSuggestions, normalizeKeyword } from "../lib/smartAlertWizardEngine";
+import { SAVVY_SCOUT, SCOUT_LABELS, SCOUT_COPY } from "../config/savvyScoutBranding";
 import LoadingState from "../components/ui/states/LoadingState";
 import ErrorState from "../components/ui/states/ErrorState";
 import EmptyState from "../components/ui/states/EmptyState";
@@ -24,7 +25,7 @@ const HUNTER_STATES = [
   "Seller panic conditions detected.",
   "Low competition window opening.",
   "Price pressure detected.",
-  "AI sweep active.",
+  SCOUT_COPY.alerts.sweepActive,
   "Trust spike identified.",
   "Target locked.",
 ];
@@ -140,7 +141,7 @@ export default function AlertsCommandCenter() {
             <div className="h-3 rounded-full bg-slate-800 overflow-hidden"><div className="h-full bg-gradient-to-r from-fuchsia-500 via-sky-400 to-emerald-400" style={{ width: `${success}%` }} /></div>
           </div>
           <aside className="rounded-2xl border border-fuchsia-300/35 bg-slate-950/65 p-5">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">Savvy Tactical Assistant</h3>
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-fuchsia-200 mb-2">{SAVVY_SCOUT.shortTitle}</h3>
             <ul className="space-y-2 text-sm text-slate-200">
               <li>• Shift to lower-bid lanes for cleaner entries.</li>
               <li>• Avoid overheated markets with rising bid pressure.</li>
@@ -196,7 +197,7 @@ export default function AlertsCommandCenter() {
                   <div className="min-w-0">
                     <div className="font-bold text-white truncate">{name(a)}</div>
                     <div className="text-xs text-fuchsia-200 mb-1">{rarity(a)} • {HUNTER_STATES[i % HUNTER_STATES.length]}</div>
-                    <div className="text-xs text-gray-300">Target {target(a)} · AI confidence {Math.round(Number(a?.minConfidence || 70))}%</div>
+                    <div className="text-xs text-gray-300">Target {target(a)} · {SCOUT_LABELS.confidence} {Math.round(Number(a?.minConfidence || 70))}%</div>
                     {(a.matches || []).length > 0 ? (
                       <div className="mt-2 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-2 py-1.5 text-[11px] text-emerald-100">
                         <div className="font-bold text-emerald-200/95">

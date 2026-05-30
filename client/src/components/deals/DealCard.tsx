@@ -25,6 +25,7 @@ import {
   shouldTriggerReadyToBuy,
 } from '../../lib/savvyAiSystem';
 import '../../styles/DualEarnChip.css';
+import { SCOUT_COPY, SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import BestMoveDealCard from './BestMoveDealCard';
 import AuctionOpportunityCard from './AuctionOpportunityCard';
 import BuyNowDealCard from './BuyNowDealCard';
@@ -556,10 +557,10 @@ export function DealCardShell({
           <div className="mt-3 rounded-xl border border-cyan-300/35 bg-cyan-500/10 px-3 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-emerald-300/40 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-bold text-emerald-200">
-                Savvy AI Active
+                {SCOUT_COPY.dealCard.scoutActive}
               </span>
               <span className="rounded-full border border-cyan-300/40 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-bold text-cyan-100">
-                Monitoring for you
+                {SCOUT_COPY.dealCard.monitoring}
               </span>
             </div>
             <div className="mt-2 text-sm font-extrabold text-white">Perfect match found</div>
@@ -620,7 +621,7 @@ export function DealCardShell({
           </div>
         ) : aiCaps.hasReadyToBuyFlow ? null : (
           <div className="mt-3 rounded-xl border border-purple-400/25 bg-purple-500/8 px-3 py-2 text-xs text-purple-100">
-            Savvy AI Active - execution AI unlocks on Savvy Pro.
+            {SAVVY_SCOUT.shortTitle} Active — execution unlocks on Savvy Pro.
           </div>
         )}
 

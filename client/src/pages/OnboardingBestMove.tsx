@@ -5,6 +5,7 @@ import { createAlert } from "../lib/api";
 import {
   fetchInstantBestMove,
   interestLabelList,
+  WIDENED_SEARCH_MESSAGE,
   type InstantBestMoveCandidate,
   type InstantBestMoveResult,
 } from "../lib/instantBestMove";
@@ -25,7 +26,7 @@ import "../styles/OnboardingBestMove.css";
 const LOADING_STAGES = [
   "Scanning deals...",
   "Checking trust...",
-  "Finding your Best Move...",
+  "Savvy Scout is scanning for your Best Move…",
 ];
 
 const FIRST_MOVE_BONUS_KEY = "f10_first_best_move_bonus_granted_v1";
@@ -602,7 +603,7 @@ function ResultPanel({
       </p>
       {widenedSearch ? (
         <p className="onboard-move-widened-note" role="status">
-          Savvy widened the search to find a safer Best Move.
+          {WIDENED_SEARCH_MESSAGE}
         </p>
       ) : null}
 

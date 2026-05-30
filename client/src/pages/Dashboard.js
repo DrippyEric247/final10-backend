@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import FirstSixtyLanding from '../components/onboarding/FirstSixtyLanding';
 import AttributionBanner from '../components/onboarding/AttributionBanner';
 import BuildWarsBanner from '../components/BuildWarsBanner';
+import { SCOUT_LABELS, SAVVY_SCOUT } from '../config/savvyScoutBranding';
 import "../styles/LiveSavvyNetwork.css";
 
 const Dashboard = () => {
@@ -33,7 +34,7 @@ const Dashboard = () => {
     "1,248 active scans",
     "483 deals under market",
     "91 low competition auctions",
-    "Savvy AI confidence rising",
+    `${SAVVY_SCOUT.shortTitle} confidence rising`,
   ]), []);
 
   const goalMetrics = useMemo(() => ([
@@ -64,7 +65,7 @@ const Dashboard = () => {
   ]), []);
 
   const liveAlerts = useMemo(() => ([
-    { text: "Savvy AI found 22% under-market PS5.", time: "Just now", rarity: "rare" },
+    { text: `${SAVVY_SCOUT.shortTitle} found 22% under-market PS5.`, time: "Just now", rarity: "rare" },
     { text: "Jordan demand spiking in size 10.5.", time: "12s ago", rarity: "epic" },
     { text: "Low competition detected in camera auctions.", time: "34s ago", rarity: "common" },
     { text: "Seller panic detected on RTX listings.", time: "1m ago", rarity: "legendary" },
@@ -204,7 +205,7 @@ const Dashboard = () => {
                     <div className="lsn-market-row"><span>Save</span><strong>{item.save}</strong></div>
                     <div className="lsn-market-row"><span>Trust</span><strong>{item.trust}%</strong></div>
                     <div className="lsn-market-row"><span>Competition</span><strong>{item.comp}</strong></div>
-                    <div className="lsn-market-row"><span>AI Confidence</span><strong>{item.ai}%</strong></div>
+                    <div className="lsn-market-row"><span>{SCOUT_LABELS.confidenceTitle}</span><strong>{item.ai}%</strong></div>
                     <div className="lsn-market-time">Ends in {item.time}</div>
                   </div>
                 );

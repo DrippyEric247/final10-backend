@@ -10,6 +10,7 @@ import { emitPowerToast } from '../lib/final10PowerFeedback';
 import { evaluateBestMove } from '../lib/bestMoveEngine';
 import { evaluateTrustScore, trustScoreInputFromListing } from '../lib/trustScoreEngine';
 import { scoreListing } from '../lib/listingSectionsEngine';
+import { SCOUT_COPY, SCOUT_LABELS } from '../config/savvyScoutBranding';
 import GlobalSmartSearch from '../components/search/GlobalSmartSearch';
 import { useSearchIntent } from '../context/SearchIntentContext';
 import { filterItemsByIntent } from '../lib/smartSearch';
@@ -26,7 +27,8 @@ import {
   getTierForQuickSnipesBoost,
   setCurrentSubscriptionTier,
 } from '../lib/tierMultiplier';
-import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked } from '../lib/analytics';
+import { isBetaTester } from '../lib/betaTesterAccess';
+import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trackBetaTesterUsage } from '../lib/analytics';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import EmptyState from '../components/ui/states/EmptyState';
@@ -236,6 +238,11 @@ const LocalDeals = () => {
 
   /** Consumes one boosted credit when capped; returns whether boosted mode is on. */
   const tryConsumeBoostedCredit = useCallback(() => {
+    if (isBetaTester()) {
+      setBoostedActive(true);
+      trackBetaTesterUsage("best_move_boost", { unlimited: true });
+      return true;
+    }
     const tier = getTierForQuickSnipesBoost();
     const cap = getBestMoveBoostedCap(tier);
     if (!Number.isFinite(cap)) {
@@ -690,7 +697,7 @@ const LocalDeals = () => {
         </section>
 
         <section className="qscc-glass rounded-2xl p-5 sm:p-6">
-          <h3 className="text-2xl font-black text-white mb-4">🧠 Savvy AI Opportunities</h3>
+          <h3 className="text-2xl font-black text-white mb-4">{SCOUT_LABELS.opportunities}</h3>
           <div className="grid gap-3 md:grid-cols-2">
             {AI_OPPORTUNITIES.map((line, idx) => (
               <motion.div key={line} className="qscc-opportunity-card rounded-xl p-4 text-violet-100" animate={{ opacity: [0.88, 1, 0.88] }} transition={{ duration: 2.4, repeat: Infinity, delay: idx * 0.18 }}>
@@ -747,7 +754,7 @@ const LocalDeals = () => {
         {!listings.isLoading && !listings.error && hasSearchContext && visibleItems.length === 0 ? (
           <EmptyState
             title="No matches for this hunt"
-            description="Try broader keywords, another category, or a boosted Best Move search."
+            description={`${SCOUT_COPY.empty.searchingLanes} Try broader keywords, another category, or a boosted Best Move search.`}
             className="text-left items-stretch qscc-glass border-slate-600/40"
             action={
               <button type="button" className="f10-state__retry" onClick={() => void listings.refetch()}>

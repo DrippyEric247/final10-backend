@@ -1,5 +1,6 @@
 import React from 'react';
 import type { TrustScoreResult } from '../../types/trustScore';
+import { SCOUT_LABELS } from '../../config/savvyScoutBranding';
 import '../../styles/SavvyTrustPanel.css';
 
 const SELLER_BADGE: Record<
@@ -38,7 +39,7 @@ export default function SavvyTrustPanel({ trust, className = '' }: SavvyTrustPan
           <span className="savvy-trust-panel__score">· {trust.sellerTrustScore}/100</span>
         </span>
         <span className="savvy-trust-panel__ai">
-          AI confidence <strong>{trust.aiConfidence}%</strong>
+          {SCOUT_LABELS.confidence} <strong>{trust.aiConfidence}%</strong>
         </span>
       </div>
 

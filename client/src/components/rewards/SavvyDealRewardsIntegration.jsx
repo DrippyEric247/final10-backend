@@ -12,6 +12,7 @@ import {
   readMockStreak,
   readMockWalletBalance,
 } from '../../lib/mockSavvyDealRewards';
+import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import '../../styles/savvy-deal-rewards.css';
 import WhyPickedPanel from '../ai/WhyPickedPanel';
 
@@ -274,7 +275,7 @@ export default function SavvyDealRewardsIntegration({
             <strong>{mockModel.marketFitScore}</strong>
           </div>
           <div>
-            <span>Savvy AI</span>
+            <span>{SAVVY_SCOUT.shortTitle}</span>
             <strong>{mockModel.savvyAiScore}</strong>
           </div>
           <div className="sdr-scores__reward">

@@ -498,7 +498,7 @@ function effectiveHeadline(alert: SimulatedAlert): {
             ? "💎"
             : "⚡";
       return {
-        headline: `${prefix} Savvy AI Boost · ${alert.title}`,
+        headline: `${prefix} Savvy Scout Boost · ${alert.title}`,
         body: `+${alert.savingsPercent}% off · trust ${alert.trustScore} · ${alert.source}`,
         premiumGated: false,
       };

@@ -82,9 +82,15 @@ async function grantSavvyReward(user, {
   user.lifetimePointsEarned = Number(user.lifetimePointsEarned || 0) + savvyAmount;
 
   try {
+    const pointType =
+      rewardType === SAVVY_REWARD_TYPES.STREAK_BONUS || rewardType === 'beta_feedback'
+        ? 'bonus'
+        : rewardType === SAVVY_REWARD_TYPES.DAILY_LOGIN
+          ? 'daily_login'
+          : 'bonus';
     await SavvyPoint.create({
       user_id: user._id,
-      type: rewardType === SAVVY_REWARD_TYPES.STREAK_BONUS ? 'bonus' : rewardType,
+      type: pointType,
       amount: savvyAmount,
       note: note || `${rewardType} +${savvyAmount}`,
     });

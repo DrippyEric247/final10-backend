@@ -6,7 +6,7 @@
  *   • Debounced (300 ms) text input wired into the shared `SearchIntent`.
  *   • Filter dropdown (Category / Trust Level / Best Move).
  *   • Quick suggestion chips beneath the bar.
- *   • Savvy AI clarification prompt for vague queries.
+ *   • Savvy Scout clarification prompt for vague queries.
  *   • Recent-queries cache (localStorage) so users can jump tabs without
  *     re-typing.
  */
@@ -529,7 +529,7 @@ export default function GlobalSmartSearch({
         </div>
       ) : null}
 
-      {/* Savvy AI clarification — appears for vague queries */}
+      {/* Savvy Scout clarification — appears for vague queries */}
       {clarification ? (
         <div className="gss-clarify" role="status" aria-live="polite">
           <Sparkles size={16} className="gss-clarify-icon" />

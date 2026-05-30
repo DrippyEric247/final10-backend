@@ -4,6 +4,7 @@ import {
   getDevSimulateExpiredSubscription,
   saveFinal10DevOverride,
 } from "./devOverride";
+import { isBetaTester } from "./betaTesterAccess";
 import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
 
 const TIER_STORAGE_KEY = "f10_subscription_tier_v1";
@@ -256,10 +257,12 @@ export function buildDailyLoginReward(baseReward = DAILY_LOGIN_BASE_SAVVY, tier 
 }
 
 export function getBestMoveBoostedCap(tier = getEffectiveSubscriptionTier()) {
+  if (isBetaTester()) return Number.POSITIVE_INFINITY;
   return getAdvantageTier(tier).bestMoveBoostedPerDay;
 }
 
 export function getAlertLimit(tier = getEffectiveSubscriptionTier()) {
+  if (isBetaTester()) return Number.POSITIVE_INFINITY;
   return getAdvantageTier(tier).alertsMax;
 }
 

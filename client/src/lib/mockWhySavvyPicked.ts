@@ -1,5 +1,7 @@
+import { SCOUT_COPY } from '../config/savvyScoutBranding';
+
 /**
- * Mock "Why Savvy AI picked this" copy — replace with model/API later.
+ * Mock "Why Savvy Scout picked this" copy — replace with model/API later.
  */
 
 export type AiConfidenceTier = 'low' | 'medium' | 'high' | 'elite';
@@ -114,9 +116,9 @@ export function buildWhySavvyPickedModel(params: {
   const confScore = Number(decision.confidenceScore) || 0;
   const aiConf = Number(trustResult.aiConfidence) || confScore || trust;
   if (decision.confidence === 'high' || confScore >= 72) {
-    reasons.push('Savvy AI confidence: High');
+    reasons.push(SCOUT_COPY.bestMove.confidenceHigh);
   } else if (decision.confidence === 'medium') {
-    reasons.push('Savvy AI confidence: Medium');
+    reasons.push(SCOUT_COPY.bestMove.confidenceMedium);
   }
 
   reasons.push('Best Move score favorable for this profile');
@@ -184,10 +186,10 @@ export function buildWhySavvyPickedModel(params: {
 
   const summary =
     trustResult.safeToRecommend && under > 50
-      ? 'This listing shows strong value relative to competition, seller trust, and current market pricing. Savvy AI believes this is a favorable low-risk opportunity.'
+      ? 'This listing shows strong value relative to competition, seller trust, and current market pricing. Savvy Scout believes this is a favorable low-risk opportunity.'
       : trust >= 55
         ? 'Signals skew positive on trust and timing; review price and photos, then move if it fits your lane.'
-        : 'Mixed signals — Savvy AI still surfaced this for visibility; verify seller and comps before committing.';
+        : 'Mixed signals — Savvy Scout still surfaced this for visibility; verify seller and comps before committing.';
 
   return {
     reasons: uniq.slice(0, 12),

@@ -5,6 +5,7 @@ import { emitBuyerEarnToast } from "../../lib/dualEarn";
 import ListingCardImage from "../listings/ListingCardImage";
 import { formatPrice, formatTime } from "./DealCard";
 import "../../styles/QuickSnipesHeroCard.css";
+import { SCOUT_LABELS } from "../../config/savvyScoutBranding";
 
 /** Center-hero countdown: MM:SS under 1h, HH:MM:SS under 24h, else compact days. */
 function formatHeroCountdown(totalSeconds) {
@@ -252,7 +253,7 @@ export default function QuickSnipesHeroCard({
             <span className={`qs-hero__trust-pill qs-hero__trust-pill--${trustEdge.tier}`}>{trustEdge.text}</span>
             <span className={`qs-hero__comp-pill qs-hero__comp-pill--${compEdge.tier}`}>{compEdge.text}</span>
             <span className="qs-hero__ai-confidence">
-              AI confidence <strong>{trustResult.aiConfidence}%</strong>
+              {SCOUT_LABELS.confidence} <strong>{trustResult.aiConfidence}%</strong>
             </span>
           </div>
           {trustResult.savvyWarningHeadline ? (

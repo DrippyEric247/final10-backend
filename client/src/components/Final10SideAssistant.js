@@ -25,6 +25,7 @@ import {
   DEV_SUBSCRIPTION_TOOLS_EVENT,
   getEffectiveSubscriptionTier,
 } from "../lib/tierMultiplier";
+import { SAVVY_SCOUT, SCOUT_COPY } from "../config/savvyScoutBranding";
 import {
   buildVoiceAlertPayload,
   getSavvyAiCapabilities,
@@ -845,7 +846,7 @@ export default function Final10SideAssistant() {
               await createSavvyAlert(payload);
               return {
                 kind: "monitoring",
-                verdict: mkVerdict("Monitoring for you", "strong"),
+                verdict: mkVerdict(SCOUT_COPY.assistant.monitoringBadge, "strong"),
                 reason: parsed.maxPrice
                   ? `Alert set for ${parsed.item || parsed.query} under $${Math.round(parsed.maxPrice)}.`
                   : `Alert set for ${parsed.item || parsed.query}.`,
@@ -1016,7 +1017,7 @@ export default function Final10SideAssistant() {
               await createSavvyAlert(payload);
               answer = {
                 kind: "monitoring",
-                verdict: mkVerdict("Monitoring for you", "strong"),
+                verdict: mkVerdict(SCOUT_COPY.assistant.monitoringBadge, "strong"),
                 reason: Number.isFinite(lastVoiceIntentRef.current?.maxPrice)
                   ? `Done. I'll watch ${lastVoiceIntentRef.current.item || lastVoiceIntentRef.current.query} under $${Math.round(lastVoiceIntentRef.current.maxPrice)} and ping you on drops.`
                   : `Done. I'll watch ${lastVoiceIntentRef.current.item || lastVoiceIntentRef.current.query} and ping you on drops.`,
@@ -1449,7 +1450,7 @@ export default function Final10SideAssistant() {
             ×
           </button>
           <div className="f10-assistant-coach-toast-eyebrow">
-            {coachToast.eyebrow || "Deal coach"}
+            {coachToast.eyebrow || SCOUT_COPY.assistant.coachEyebrow}
           </div>
           <div className="f10-assistant-coach-toast-title">{coachToast.title}</div>
           <p className="f10-assistant-coach-toast-body">{coachToast.body}</p>
@@ -1458,7 +1459,7 @@ export default function Final10SideAssistant() {
       {expanded ? (
         <div className="f10-assistant-panel f10-assistant-panel--ai">
           <div className="f10-assistant-panel-hd">
-            <h3>Savvy AI · Win Lane</h3>
+            <h3>{SAVVY_SCOUT.winLane}</h3>
             <button
               type="button"
               onClick={() => setExpanded(false)}
@@ -1476,7 +1477,7 @@ export default function Final10SideAssistant() {
               className={`f10-assistant-tab ${activeTab === "ask" ? "f10-assistant-tab--active" : ""}`}
               onClick={() => setActiveTab("ask")}
             >
-              Ask Savvy
+              {SAVVY_SCOUT.ask}
             </button>
             <button
               type="button"
@@ -1496,10 +1497,10 @@ export default function Final10SideAssistant() {
             <div className="f10-assistant-panel-bd f10-assistant-ai-bd">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
-                  Savvy AI Active
+                  {SAVVY_SCOUT.shortTitle} Active
                 </span>
                 <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-100">
-                  Monitoring for you
+                  {SCOUT_COPY.assistant.monitoringBadge}
                 </span>
                 <span className="rounded-full border border-purple-400/40 bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-100">
                   Tier: {aiCaps.tierLabel}
@@ -1511,11 +1512,11 @@ export default function Final10SideAssistant() {
               {suggestions.length > 0 || suggestionsLoading ? (
                 <section
                   className="f10-assistant-ai-picks"
-                  aria-label="Savvy's proactive picks"
+                  aria-label="Savvy Scout's proactive picks"
                 >
                   <div className="f10-assistant-ai-picks-hd">
                     <span className="f10-assistant-ai-picks-eyebrow">
-                      ✦ Savvy's picks
+                      {SCOUT_COPY.assistant.picksEyebrow}
                     </span>
                     <button
                       type="button"
@@ -1588,18 +1589,18 @@ export default function Final10SideAssistant() {
                   ref={inputRef}
                   type="text"
                   className="f10-assistant-ai-input"
-                  placeholder={listening ? "Listening…" : "Ask Savvy AI..."}
+                  placeholder={listening ? "Listening…" : SAVVY_SCOUT.askPlaceholder}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   disabled={aiBusy}
-                  aria-label="Ask Savvy AI"
+                  aria-label="Ask Savvy Scout"
                   autoComplete="off"
                 />
                 <button
                   type="submit"
                   className="f10-assistant-ai-send"
                   disabled={!draft.trim() || aiBusy}
-                  aria-label="Send to Savvy AI"
+                  aria-label="Send to Savvy Scout"
                 >
                   {aiBusy ? "…" : "Ask"}
                 </button>
@@ -1715,7 +1716,7 @@ export default function Final10SideAssistant() {
                     </div>
                     {row.pending ? (
                       <div className="f10-assistant-ai-a f10-assistant-ai-a--pending">
-                        Savvy is thinking…
+                        {SCOUT_COPY.assistant.thinking}
                       </div>
                     ) : row.answer ? (
                       <AnswerBubble
@@ -1794,12 +1795,13 @@ export default function Final10SideAssistant() {
         className={`f10-assistant-toggle ${unread > 0 ? "f10-assistant-toggle--pulse" : ""}`}
         onClick={() => (expanded ? setExpanded(false) : openPanel())}
         aria-expanded={expanded}
-        aria-label={expanded ? "Close Savvy AI" : "Open Savvy AI"}
+        aria-label={expanded ? `Close ${SAVVY_SCOUT.shortTitle}` : `Open ${SAVVY_SCOUT.shortTitle}`}
+        title={expanded ? undefined : SAVVY_SCOUT.ask}
       >
         <span aria-hidden style={{ fontSize: "16px" }}>
           ✦
         </span>
-        <span className="f10-assistant-toggle-label">Savvy AI</span>
+        <span className="f10-assistant-toggle-label">{SAVVY_SCOUT.shortTitle}</span>
         {unread > 0 && !expanded ? (
           <span className="f10-assistant-badge">{unread > 9 ? "9+" : unread}</span>
         ) : null}

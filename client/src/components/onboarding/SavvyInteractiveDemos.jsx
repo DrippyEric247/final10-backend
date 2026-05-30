@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import "../../styles/SavvyInteractiveDemos.css";
 import { ANALYTICS_EVENTS, trackEvent } from "../../lib/analytics";
+import { SAVVY_SCOUT } from "../../config/savvyScoutBranding";
 
 const FIRST_RUN_DONE_KEY = "f10_first_run_savvy_done_v1";
 const DEMO_SEEN_KEY = "f10_interactive_demo_seen_v1";
@@ -338,7 +339,7 @@ export default function SavvyInteractiveDemos({ enabled }) {
               />
             ) : null}
             <motion.div className="savvy-guided-panel" initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-              <div className="savvy-guided-title">Savvy AI Guide · {routeGuide.label}</div>
+              <div className="savvy-guided-title">{SAVVY_SCOUT.shortTitle} Guide · {routeGuide.label}</div>
               <p>
                 Watch this area first. Savvy highlights the highest-leverage move and automates the hard comparison work.
                 One action here starts your momentum loop.

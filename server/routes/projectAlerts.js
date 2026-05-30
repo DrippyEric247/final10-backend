@@ -4,9 +4,10 @@ const User = require('../models/User');
 const Alert = require('../models/Alert');
 const ProjectAlert = require('../models/ProjectAlert');
 const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
+const { isBetaTester, getTierConfigForUser } = require('../services/betaTesterService');
 
-function projectCaps(tier) {
-  return getTierConfig(tier);
+function projectCaps(user) {
+  return getTierConfigForUser(user);
 }
 
 function countActiveProjects(userId) {
@@ -17,8 +18,12 @@ function countActiveProjects(userId) {
 }
 
 async function assertProjectEnabled(user) {
+  if (isBetaTester(user)) {
+    const cfg = getTierConfigForUser(user);
+    return { tier: 'elite', cfg };
+  }
   const tier = normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
-  const cfg = projectCaps(tier);
+  const cfg = projectCaps(user);
   if (!cfg.projectAlertsEnabled) {
     const err = new Error('Project alerts require a Core or higher subscription');
     err.status = 403;
@@ -38,7 +43,7 @@ router.get('/', auth, async (req, res, next) => {
 
 router.post('/', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('subscription membershipTier');
+    const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
     if (!user) return res.status(404).json({ message: 'User not found' });
     const { cfg } = await assertProjectEnabled(user);
 
@@ -108,7 +113,7 @@ router.post('/', auth, async (req, res, next) => {
 
 router.patch('/:id', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('subscription membershipTier');
+    const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
     const { cfg } = await assertProjectEnabled(user);
 
     const project = await ProjectAlert.findOne({ _id: req.params.id, user: req.user.id });
@@ -158,7 +163,7 @@ router.delete('/:id', auth, async (req, res, next) => {
 
 router.post('/:id/items', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('subscription membershipTier');
+    const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
     const { cfg } = await assertProjectEnabled(user);
 
     const project = await ProjectAlert.findOne({ _id: req.params.id, user: req.user.id });
@@ -197,7 +202,7 @@ router.post('/:id/items', auth, async (req, res, next) => {
 
 router.patch('/:id/items/:itemId', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('subscription membershipTier');
+    const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
     const { cfg } = await assertProjectEnabled(user);
 
     const project = await ProjectAlert.findOne({ _id: req.params.id, user: req.user.id });
@@ -232,7 +237,7 @@ router.patch('/:id/items/:itemId', auth, async (req, res, next) => {
 
 router.delete('/:id/items/:itemId', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('subscription membershipTier');
+    const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
     await assertProjectEnabled(user);
 
     const project = await ProjectAlert.findOne({ _id: req.params.id, user: req.user.id });
@@ -256,7 +261,7 @@ router.delete('/:id/items/:itemId', auth, async (req, res, next) => {
 
 router.post('/:id/spawn-missing-alerts', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('subscription membershipTier');
+    const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
     const { tier, cfg } = await assertProjectEnabled(user);
 
     const project = await ProjectAlert.findOne({ _id: req.params.id, user: req.user.id });

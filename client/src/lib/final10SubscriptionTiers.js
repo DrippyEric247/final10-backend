@@ -8,7 +8,7 @@ export const FINAL10_TIERS = Object.freeze([
     savvyMultiplier: "1.0x Savvy multiplier",
     features: [
       "Basic alerts (delayed)",
-      "Text-based Savvy AI assistant",
+      "Text-based Savvy Scout assistant",
       "AI alert suggestions + deal explanations",
       "Limited snipes per day",
       "1.0x Savvy multiplier",

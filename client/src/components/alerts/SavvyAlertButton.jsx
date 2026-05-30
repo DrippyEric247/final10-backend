@@ -14,6 +14,7 @@ import {
   parseNaturalLanguageAlert,
 } from "../../lib/aiAlertParser";
 import { trackUpgradeClicked } from "../../lib/analytics";
+import { SCOUT_LABELS } from "../../config/savvyScoutBranding";
 
 function getSpeechRecognitionCtor() {
   if (typeof window === "undefined") return null;
@@ -306,7 +307,7 @@ export default function SavvyAlertButton({
                     : "border-gray-600/60 bg-gray-900/60"
                 }`}
               >
-                <div className="text-lg font-bold text-purple-100">Text AI Alert</div>
+                <div className="text-lg font-bold text-purple-100">{SCOUT_LABELS.textAlert}</div>
                 <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-purple-200/90">Savvy+ · $7</p>
                 <p className="mt-2 text-sm text-purple-50/95">
                   Type what you want: we parse item, price cap, trust hints, and categories — then faster checks than
@@ -341,7 +342,7 @@ export default function SavvyAlertButton({
                     : "border-gray-600/60 bg-gray-900/60"
                 }`}
               >
-                <div className="text-lg font-bold text-yellow-100">Voice AI Alert</div>
+                <div className="text-lg font-bold text-yellow-100">{SCOUT_LABELS.voiceAlert}</div>
                 <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-yellow-200/90">
                   Savvy Pro · $14
                 </p>

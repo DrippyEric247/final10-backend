@@ -174,7 +174,7 @@ export function coachBeforeSave(item, ctx) {
     pushDealCoachToast(
       {
         tone: "coach",
-        title: "Stronger AI signal nearby",
+        title: "Stronger Savvy Scout signal nearby",
         body: `${shortTitle(stronger.title)} scores higher on deal edge before you lock this.`,
       },
       `save-ai-${id}`,
@@ -384,7 +384,7 @@ export function coachBeforePromote(item, sortedItems, promotedIds) {
       {
         tone: "promo",
         title: "Promote higher-edge first",
-        body: `${shortTitle(betterFirst.title)} has a stronger AI score for the same boost slot.`,
+        body: `${shortTitle(betterFirst.title)} has a stronger Savvy Scout score for the same boost slot.`,
       },
       `promo-ai-${id}`,
       120000
@@ -552,7 +552,7 @@ export function buildProactiveOptimizationHint(item, ctx) {
       payload: {
         tone: "coach",
         title: "Higher edge nearby",
-        body: `${shortTitle(stronger.title)} — AI likes it more before you commit.`,
+        body: `${shortTitle(stronger.title)} — Savvy Scout likes it more before you commit.`,
       },
       dedupeKey: `intent-opt-ai-${id}`,
     };

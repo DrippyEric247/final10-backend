@@ -13,6 +13,7 @@ export type EntitlementMe = {
   trialEndsAt: string | null;
   provider: string;
   foundingTesterAccess?: boolean;
+  isBetaTester?: boolean;
   betaTester?: boolean;
   foundingAccess?: boolean;
   betaAccessExpiresAt?: string | null;
@@ -27,6 +28,7 @@ const DEFAULT_ENTITLEMENT: EntitlementMe = {
   trialEndsAt: null,
   provider: "stripe",
   foundingTesterAccess: false,
+  isBetaTester: false,
   betaTester: false,
   foundingAccess: false,
   betaAccessExpiresAt: null,

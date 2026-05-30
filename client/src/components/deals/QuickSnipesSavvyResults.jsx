@@ -4,6 +4,7 @@ import ListingModeTabs from '../ebay/ListingModeTabs';
 import { scoreListing } from '../../lib/listingSectionsEngine';
 import { emitPowerToast } from '../../lib/final10PowerFeedback';
 import { trackQuickSnipeAction } from '../../lib/analytics';
+import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import QuickSnipeSavvyRewards from './QuickSnipeSavvyRewards';
 
 const TRENDING_SNEAKERS = [
@@ -298,7 +299,7 @@ export default function QuickSnipesSavvyResults({
         <div>
           <p className="text-xs font-black tracking-[0.22em] text-cyan-300/90 uppercase mb-2">Savvy Deal Intelligence</p>
           <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
-            Savvy AI found{' '}
+            {SAVVY_SCOUT.shortTitle} found{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-fuchsia-400">{headerStats.count}</span>{' '}
             opportunities
           </h3>

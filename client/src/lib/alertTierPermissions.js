@@ -1,20 +1,23 @@
 import { getAdvantageTier, getEffectiveSubscriptionTier } from "./tierMultiplier";
+import { isBetaTester, getScoutMissionTier } from "./betaTesterAccess";
 
 /**
  * Alert creation & monitoring capabilities by subscription tier.
  * Client tier keys: free | core (Savvy+) | pro (Savvy Pro) | elite
  */
 export function getAlertCreationCapabilities(tier = getEffectiveSubscriptionTier()) {
-  const normalized = tier === "elite" ? "elite" : tier;
-  const textAi = normalized === "pro" || normalized === "elite";
-  const voiceAi = normalized === "elite";
-  const adv = getAdvantageTier(tier);
+  const missionTier = getScoutMissionTier(tier);
+  const normalized = missionTier === "elite" ? "elite" : missionTier;
+  const textAi = normalized === "pro" || normalized === "elite" || isBetaTester();
+  const voiceAi = normalized === "elite" || isBetaTester();
+  const adv = getAdvantageTier(missionTier);
+  const alertsMax = isBetaTester() ? Number.POSITIVE_INFINITY : adv.alertsMax;
   return {
     tier: normalized,
     manual: true,
     textAi,
     voiceAi,
-    alertsMax: adv.alertsMax,
+    alertsMax,
     alertsMode: adv.alertsMode,
     checkNote:
       normalized === "free"

@@ -11,6 +11,7 @@ import {
 } from "../../lib/pointsEngine";
 import { playSavvyWalletSound, playUiClick } from "../../lib/savvyWalletSound";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { SCOUT_COPY } from "../../config/savvyScoutBranding";
 import "../../styles/SavvyWalletBubble.css";
 
 const MOBILE_MQ = "(max-width: 767px)";
@@ -273,7 +274,7 @@ function WalletBody({
                   </motion.li>
                 ))}
                 {mergedRecent.length === 0 ? (
-                  <li className="savvy-wallet-feed-empty">Complete moves to fill this lane.</li>
+                  <li className="savvy-wallet-feed-empty">{SCOUT_COPY.wallet.feedEmpty}</li>
                 ) : null}
               </ul>
             </motion.div>
@@ -760,7 +761,7 @@ export default function SavvyWalletBubble() {
                   </li>
                 ))}
                 {mergedRecent.length === 0 ? (
-                  <li className="savvy-wallet-feed-empty">Complete moves to fill this lane.</li>
+                  <li className="savvy-wallet-feed-empty">{SCOUT_COPY.wallet.feedEmpty}</li>
                 ) : null}
               </ul>
             </div>

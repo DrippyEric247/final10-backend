@@ -1,5 +1,6 @@
 import { getDevFeatureTests, isDev } from "./devOverride";
 import { getAdvantageTier, getEffectiveSubscriptionTier } from "./tierMultiplier";
+import { isBetaTester, getScoutMissionTier } from "./betaTesterAccess";
 
 const SAVVY_AI_RULES_KEY = "f10_savvy_ai_rules_v1";
 const SAVVY_AI_PAYMENTS_KEY = "f10_savvy_ai_saved_payments_v1";
@@ -10,7 +11,10 @@ function toNum(v) {
 }
 
 export function getSavvyAiCapabilities(tier = getEffectiveSubscriptionTier()) {
-  let normalized = String(tier || "free").toLowerCase();
+  let normalized = getScoutMissionTier(String(tier || "free").toLowerCase());
+  if (isBetaTester()) {
+    normalized = "elite";
+  }
   if (isDev && getDevFeatureTests().premiumAiHints && normalized === "free") {
     normalized = "elite";
   }
