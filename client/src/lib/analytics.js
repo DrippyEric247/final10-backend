@@ -94,6 +94,8 @@ function fanOutThirdParty(name, props) {
 
 function sendToBackend(name, props) {
   if (!backendEnabled() || typeof window === "undefined") return;
+  const url = buildApiUrl("/analytics/event");
+  if (!url) return;
   const body = JSON.stringify({
     name,
     props,
@@ -101,7 +103,7 @@ function sendToBackend(name, props) {
     sessionId: getTelemetrySessionId(),
   });
   try {
-    fetch(buildApiUrl("/analytics/event"), {
+    fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

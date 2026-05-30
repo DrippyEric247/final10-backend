@@ -3,8 +3,12 @@ import { useEffect, useState } from 'react';
 import { buildApiUrl } from './runtimeApi';
 
 export function useAppConfig() {
-  const [cfg, setCfg] = useState(window.__APP_CONFIG__ || null);
-  const [loading, setLoading] = useState(!window.__APP_CONFIG__);
+  const [cfg, setCfg] = useState(() =>
+    typeof window !== "undefined" ? window.__APP_CONFIG__ || null : null
+  );
+  const [loading, setLoading] = useState(() =>
+    typeof window !== "undefined" ? !window.__APP_CONFIG__ : true
+  );
   const [error, setError] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
 
@@ -13,10 +17,17 @@ export function useAppConfig() {
       setLoading(false);
       return;
     }
+
+    const configUrl = buildApiUrl('/config/public');
+    if (!configUrl) {
+      setLoading(false);
+      return undefined;
+    }
+
     let active = true;
     setLoading(true);
     setError(null);
-    fetch(buildApiUrl('/config/public'))
+    fetch(configUrl)
       .then(async (r) => {
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}: ${r.statusText}`);
@@ -27,13 +38,13 @@ export function useAppConfig() {
         if (!active) return;
         setCfg(next);
       })
-      .catch((error) => {
+      .catch((fetchError) => {
         if (!active) return;
         if (process.env.NODE_ENV !== 'production') {
           // eslint-disable-next-line no-console
-          console.error('Failed to fetch app config:', error);
+          console.error('Failed to fetch app config:', fetchError);
         }
-        setError(error);
+        setError(fetchError);
         setCfg(null);
       })
       .finally(() => {
@@ -52,4 +63,3 @@ export function useAppConfig() {
     reload: () => setReloadTick((n) => n + 1),
   };
 }
-

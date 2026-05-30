@@ -4,12 +4,9 @@ import { parseApiError } from "./apiErrorParsing";
 import { trackEvent } from "./analytics";
 import { getApiBaseUrl } from "./runtimeApi";
 
-const API_BASE = getApiBaseUrl();
-
 const DEFAULT_TIMEOUT_MS = Math.min(Math.max(Number(process.env.REACT_APP_API_TIMEOUT_MS) || 28000, 8000), 120000);
 
 export const api = axios.create({
-  baseURL: API_BASE,
   timeout: DEFAULT_TIMEOUT_MS,
   headers: { "Content-Type": "application/json" },
 });
@@ -23,6 +20,9 @@ const TIME_WINDOW = 60000; // 1 minute
 // Request interceptor to track requests
 api.interceptors.request.use(
   (config) => {
+    const base = getApiBaseUrl();
+    if (base) config.baseURL = base;
+
     const now = Date.now();
     
     // Reset counter if time window has passed

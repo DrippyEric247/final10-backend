@@ -20,7 +20,9 @@ export const SocketProvider = ({ children }) => {
     const token = localStorage.getItem('f10_token') || localStorage.getItem('token');
 
     if (token && typeof window !== 'undefined') {
-      const url = process.env.REACT_APP_SERVER_URL || getApiOrigin() || window.location.origin;
+      const url = process.env.REACT_APP_SERVER_URL || getApiOrigin();
+      if (!url) return undefined;
+
       const newSocket = io(url, {
         auth: {
           token,

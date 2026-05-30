@@ -191,6 +191,7 @@ export async function recordCreatorClick(
   if (!a || !a.creatorHandle) return;
   try {
     const clickUrl = buildApiUrl("/creators/click");
+    if (!clickUrl) return;
     await fetcher(clickUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

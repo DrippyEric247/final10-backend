@@ -29,6 +29,9 @@ function sanitizeProps(obj, depth = 0) {
   return out;
 }
 
+router.options('/event', (_req, res) => res.sendStatus(204));
+router.options('/crash', (_req, res) => res.sendStatus(204));
+
 /**
  * POST /api/analytics/event
  * Body: { name: string, props?: object } OR { events: [{ name, props? }] }

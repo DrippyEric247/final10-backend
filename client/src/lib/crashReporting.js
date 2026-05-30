@@ -1,7 +1,8 @@
-import { buildApiUrl } from "./runtimeApi";
+import { buildCrashReportUrl } from "./runtimeApi";
 
 /**
- * Captures window errors + React error boundary reports and POSTs to `/api/analytics/crash`.
+ * Captures window errors + React error boundary reports and POSTs to the backend
+ * `${REACT_APP_API_URL}/api/analytics/crash` when configured.
  */
 
 function authHeaders() {
@@ -15,6 +16,10 @@ function authHeaders() {
 
 export function reportCrash(payload) {
   if (typeof window === "undefined") return;
+
+  const url = buildCrashReportUrl();
+  if (!url) return;
+
   const isProd = process.env.NODE_ENV === "production";
   const body = JSON.stringify({
     message: payload.message || "Error",
@@ -26,8 +31,9 @@ export function reportCrash(payload) {
     extra: payload.extra || {},
     source: "client",
   });
+
   try {
-    fetch(buildApiUrl("/analytics/crash"), {
+    fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

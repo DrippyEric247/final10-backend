@@ -3,12 +3,10 @@ import { devDiagApiFailure } from '../lib/devApiDiagnostics';
 import { parseApiError } from '../lib/apiErrorParsing';
 import { getApiBaseUrl } from '../lib/runtimeApi';
 
-const API_URL = getApiBaseUrl();
 const DEFAULT_TIMEOUT_MS = Math.min(Math.max(Number(process.env.REACT_APP_API_TIMEOUT_MS) || 28000, 8000), 120000);
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: API_URL,
   timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
@@ -18,6 +16,9 @@ const api = axios.create({
 // Add token to requests if available
 api.interceptors.request.use(
   (config) => {
+    const base = getApiBaseUrl();
+    if (base) config.baseURL = base;
+
     const token = localStorage.getItem('f10_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
