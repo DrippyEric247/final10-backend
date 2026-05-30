@@ -64,11 +64,27 @@ app.post(
 );
 
 app.use(cors({
-  origin: [
-    'https://final10-backend-qf59.vercel.app',
-    'http://localhost:3000'
-  ],
-  credentials: true
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+
+    const allowed = new Set([
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://final10-backend-qf59.vercel.app',
+      'https://final10-client.onrender.com',
+    ]);
+
+    for (const key of ['FRONTEND_URL', 'CLIENT_URL', 'REACT_APP_CLIENT_URL']) {
+      const value = String(process.env[key] || '').trim().replace(/\/+$/, '');
+      if (value) allowed.add(value);
+    }
+
+    if (allowed.has(origin)) return callback(null, true);
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return callback(null, true);
+
+    return callback(null, false);
+  },
+  credentials: true,
 }));
 
 // --- BODY PARSERS (must be before routes) ---

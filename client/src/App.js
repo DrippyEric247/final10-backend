@@ -23,7 +23,7 @@ import './styles/final10-power-visual.css';
 import './styles/final10-ftue.css';
 import './styles/states.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Routes, Route, Link, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { installRewardDevTools } from "./lib/rewardEngine";
@@ -115,6 +115,12 @@ const queryClient = new QueryClient({
 export default function App() {
   const { user, logout } = useAuth();
   const entitlement = useEntitlement(Boolean(user));
+  const entIsBeta = Boolean(entitlement?.isBetaTester);
+  const entFoundingAccess = Boolean(entitlement?.foundingTesterAccess);
+  const isFoundingTester = useMemo(
+    () => isBetaTester(user, { isBetaTester: entIsBeta, foundingTesterAccess: entFoundingAccess }),
+    [user, entIsBeta, entFoundingAccess]
+  );
   const [authLogoutBusy, setAuthLogoutBusy] = React.useState(false);
   const [showStartupBoot, setShowStartupBoot] = React.useState(() => shouldShowStartupBootSequence());
   useEffect(() => {
@@ -138,16 +144,14 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    registerBetaTesterGetter(() => isBetaTester(user, entitlement));
+    registerBetaTesterGetter(() => isFoundingTester);
     return () => registerBetaTesterGetter(null);
-  }, [user, entitlement]);
+  }, [isFoundingTester]);
 
   useEffect(() => {
-    if (!user) return;
-    if (isBetaTester(user, entitlement)) {
-      setCurrentSubscriptionTier("elite");
-    }
-  }, [user, entitlement]);
+    if (!user || !isFoundingTester) return;
+    setCurrentSubscriptionTier("elite");
+  }, [user, isFoundingTester]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -205,7 +209,7 @@ export default function App() {
             
             {/* Login/Logout Section */}
             <div className="flex gap-3 app-auth-buttons">
-              {isBetaTester(user, entitlement) ? <FoundingTesterBadge /> : null}
+              {isFoundingTester ? <FoundingTesterBadge /> : null}
               {!user ? (
                 <>
                   <Link to="/login" className="btn btn-ghost">Login</Link>

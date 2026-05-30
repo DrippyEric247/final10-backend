@@ -24,7 +24,7 @@ export default class AppErrorBoundary extends React.Component {
       name: error?.name,
       componentStack: info?.componentStack,
       extra: { boundary: "AppErrorBoundary" },
-    });
+    }, { force: true });
   }
 
   handleReload() {

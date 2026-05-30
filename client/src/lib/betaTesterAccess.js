@@ -8,16 +8,34 @@ export function registerBetaTesterGetter(fn) {
   betaGetter = typeof fn === "function" ? fn : () => false;
 }
 
-export function isBetaTester(user = null, entitlement = null) {
-  if (user) {
-    if (user.isBetaTester === true || user.foundingTesterAccess === true) return true;
-    if (user.betaTester || user.foundingAccess) {
-      if (!user.betaAccessExpiresAt) return true;
-      return new Date(user.betaAccessExpiresAt) > new Date();
-    }
+function evaluateBetaFromUser(user) {
+  if (!user) return false;
+  if (user.isBetaTester === true || user.foundingTesterAccess === true) return true;
+  if (user.betaTester || user.foundingAccess) {
+    if (!user.betaAccessExpiresAt) return true;
+    return new Date(user.betaAccessExpiresAt) > new Date();
   }
-  if (entitlement?.isBetaTester || entitlement?.foundingTesterAccess) return true;
-  return Boolean(betaGetter());
+  return false;
+}
+
+function evaluateBetaFromEntitlement(entitlement) {
+  if (!entitlement) return false;
+  return Boolean(entitlement.isBetaTester || entitlement.foundingTesterAccess);
+}
+
+/**
+ * When `user` and/or `entitlement` are passed, evaluate those only — never fall through
+ * to `betaGetter` (avoids infinite recursion with registerBetaTesterGetter).
+ */
+export function isBetaTester(user = null, entitlement = null) {
+  if (evaluateBetaFromUser(user)) return true;
+  if (evaluateBetaFromEntitlement(entitlement)) return true;
+  if (user != null || entitlement != null) return false;
+  try {
+    return Boolean(betaGetter());
+  } catch {
+    return false;
+  }
 }
 
 export const FOUNDING_TESTER_BADGE = "Founding Tester";
