@@ -1,10 +1,29 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
 
 let transport = null;
 let lastVerifyResult = null;
+let resendClient = null;
+
+function readResendApiKey() {
+  return String(process.env.RESEND_API_KEY || '').trim();
+}
+
+function getEmailFrom() {
+  return String(
+    process.env.EMAIL_FROM ||
+      process.env.SMTP_FROM ||
+      readSmtpAuth().user ||
+      ''
+  ).trim();
+}
+
+function isResendConfigured() {
+  return Boolean(readResendApiKey()) && Boolean(getEmailFrom());
+}
 
 function isGmailHost(host) {
   const h = String(host || '').trim().toLowerCase();
@@ -19,6 +38,28 @@ function readSmtpAuth() {
   };
 }
 
+function isSmtpConfigured() {
+  const auth = readSmtpAuth();
+  return Boolean(auth.host && auth.user && auth.pass);
+}
+
+function getEmailProvider() {
+  if (isResendConfigured()) return 'resend';
+  if (isSmtpConfigured()) return 'smtp';
+  return 'none';
+}
+
+function isEmailConfigured() {
+  return getEmailProvider() !== 'none';
+}
+
+function getResendClient() {
+  const key = readResendApiKey();
+  if (!key) return null;
+  if (!resendClient) resendClient = new Resend(key);
+  return resendClient;
+}
+
 function resolveSmtpTransportSettings() {
   const { host } = readSmtpAuth();
   const portRaw = String(process.env.SMTP_PORT || '').trim();
@@ -27,7 +68,6 @@ function resolveSmtpTransportSettings() {
   const timeoutMs =
     Math.max(Number(process.env.SMTP_TIMEOUT_MS || DEFAULT_SMTP_TIMEOUT_MS) || DEFAULT_SMTP_TIMEOUT_MS, 10000);
 
-  // Gmail / STARTTLS on 587: secure must be false; requireTLS true.
   let secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
   if (gmail || port === 587) {
     if (secure) {
@@ -52,12 +92,17 @@ function resolveSmtpTransportSettings() {
   };
 }
 
-function logSmtpDiagnostics(extra = {}) {
+function logEmailDiagnostics(extra = {}) {
   const auth = readSmtpAuth();
   const settings = resolveSmtpTransportSettings();
+  const provider = getEmailProvider();
   console.log(
-    '[email] SMTP diagnostics',
+    '[email] diagnostics',
     JSON.stringify({
+      provider,
+      resendApiKeyPresent: Boolean(readResendApiKey()),
+      emailFromPresent: Boolean(getEmailFrom()),
+      emailFromHint: getEmailFrom() ? getEmailFrom().replace(/(.{0,12}).+@/, '$1…@') : null,
       smtpHostPresent: Boolean(auth.host),
       smtpPort: settings.port,
       secure: settings.secure,
@@ -65,7 +110,7 @@ function logSmtpDiagnostics(extra = {}) {
       smtpUserPresent: Boolean(auth.user),
       smtpPassPresent: Boolean(auth.pass),
       timeoutMs: settings.connectionTimeout,
-      gmailMode: settings.gmail,
+      alertEmailEnabled: alertEmailEnabled(),
       ...extra,
     })
   );
@@ -74,17 +119,17 @@ function logSmtpDiagnostics(extra = {}) {
 function formatMailerError(err) {
   if (!err) {
     return {
-      errorCode: 'SMTP_ERROR',
+      errorCode: 'EMAIL_ERROR',
       errorReason: 'Unknown mailer error',
       smtpCommand: null,
       responseCode: null,
     };
   }
   return {
-    errorCode: err.code || err.errno || 'SMTP_ERROR',
+    errorCode: err.code || err.name || err.errno || 'EMAIL_ERROR',
     errorReason: err.message || String(err),
     smtpCommand: err.command || null,
-    responseCode: err.responseCode || null,
+    responseCode: err.statusCode || err.responseCode || null,
   };
 }
 
@@ -135,18 +180,18 @@ async function verifySmtpConnection({ log = true } = {}) {
   const tx = getTransport();
   if (!tx) {
     lastVerifyResult = { ok: false, verified: false, reason: 'smtp_not_configured' };
-    if (log) logSmtpDiagnostics({ connectionVerify: 'skipped_not_configured' });
+    if (log) logEmailDiagnostics({ connectionVerify: 'skipped_not_configured', provider: 'smtp' });
     return lastVerifyResult;
   }
 
-  if (log) logSmtpDiagnostics({ connectionVerify: 'starting' });
+  if (log) logEmailDiagnostics({ connectionVerify: 'starting', provider: 'smtp' });
 
   try {
     await tx.verify();
-    lastVerifyResult = { ok: true, verified: true, ...getSmtpTransportSettings() };
+    lastVerifyResult = { ok: true, verified: true, provider: 'smtp', ...getSmtpTransportSettings() };
     if (log) {
       console.log('[email] SMTP connection verify: success');
-      logSmtpDiagnostics({ connectionVerify: 'success' });
+      logEmailDiagnostics({ connectionVerify: 'success', provider: 'smtp' });
     }
     return lastVerifyResult;
   } catch (err) {
@@ -154,6 +199,7 @@ async function verifySmtpConnection({ log = true } = {}) {
     lastVerifyResult = {
       ok: false,
       verified: false,
+      provider: 'smtp',
       ...getSmtpTransportSettings(),
       ...mailerError,
     };
@@ -161,11 +207,9 @@ async function verifySmtpConnection({ log = true } = {}) {
       console.warn(
         '[email] SMTP connection verify: failed',
         JSON.stringify({
+          provider: 'smtp',
           connectionVerify: 'failed',
           ...mailerError,
-          smtpPort: lastVerifyResult.smtpPort,
-          secure: lastVerifyResult.secure,
-          requireTLS: lastVerifyResult.requireTLS,
         })
       );
     }
@@ -178,7 +222,6 @@ function alertEmailEnabled() {
   return String(process.env.ALERT_EMAIL_ENABLED || '').toLowerCase() === 'true';
 }
 
-/** Whether each SMTP env var is set (values never returned). */
 function getSmtpEnvPresence() {
   return {
     SMTP_HOST: Boolean(String(process.env.SMTP_HOST || '').trim()),
@@ -189,22 +232,35 @@ function getSmtpEnvPresence() {
   };
 }
 
+function getEmailEnvPresence() {
+  return {
+    RESEND_API_KEY: Boolean(readResendApiKey()),
+    EMAIL_FROM: Boolean(String(process.env.EMAIL_FROM || '').trim()),
+    ...getSmtpEnvPresence(),
+  };
+}
+
 function getEmailConfigStatus() {
   const auth = readSmtpAuth();
-  const smtpConfigured = Boolean(auth.host && auth.user && auth.pass);
-  const transportSettings = getSmtpTransportSettings();
+  const provider = getEmailProvider();
+  const emailConfigured = isEmailConfigured();
+  const from = getEmailFrom();
   return {
-    smtpConfigured,
+    emailConfigured,
+    provider,
+    resendConfigured: isResendConfigured(),
+    smtpConfigured: isSmtpConfigured(),
     alertEmailEnabled: alertEmailEnabled(),
+    emailFrom: from || null,
     smtpHost: auth.host ? auth.host.replace(/^(.{3}).+/, '$1…') : null,
-    smtpFrom: String(process.env.SMTP_FROM || auth.user || '').trim() || null,
-    mode: smtpConfigured && alertEmailEnabled() ? 'live' : 'log-only',
-    envPresent: getSmtpEnvPresence(),
-    transportSettings,
+    mode: emailConfigured && alertEmailEnabled() ? 'live' : 'log-only',
+    envPresent: getEmailEnvPresence(),
+    transportSettings: provider === 'smtp' ? getSmtpTransportSettings() : null,
     lastVerify: lastVerifyResult
       ? {
           ok: lastVerifyResult.ok,
           verified: lastVerifyResult.verified,
+          provider: lastVerifyResult.provider || null,
           errorCode: lastVerifyResult.errorCode || null,
           errorReason: lastVerifyResult.errorReason || null,
         }
@@ -212,15 +268,64 @@ function getEmailConfigStatus() {
   };
 }
 
-async function sendMailMessage({ to, subject, text, html, verifyFirst = false }) {
-  const tx = getTransport();
-  if (!tx || !to) {
-    console.log(`[email] (log-only) To: ${to || 'missing'} | ${subject}`);
+async function sendViaResend({ to, subject, text, html }) {
+  const client = getResendClient();
+  const from = getEmailFrom();
+  if (!client || !from) {
+    return { sent: false, logOnly: true, provider: 'resend', reason: 'resend_not_configured' };
+  }
+
+  logEmailDiagnostics({ provider: 'resend', action: 'send_start' });
+
+  try {
+    const { data, error } = await client.emails.send({
+      from,
+      to: [to],
+      subject,
+      text,
+      html,
+    });
+
+    if (error) {
+      const formatted = formatMailerError(error);
+      console.warn(
+        '[email] Resend send failed',
+        JSON.stringify({
+          provider: 'resend',
+          ...formatted,
+        })
+      );
+      return {
+        sent: false,
+        logOnly: false,
+        provider: 'resend',
+        reason: 'resend_send_failed',
+        ...formatted,
+      };
+    }
+
+    console.log(
+      '[email] Resend send success',
+      JSON.stringify({ provider: 'resend', to, messageId: data?.id || null })
+    );
+    return { sent: true, provider: 'resend', messageId: data?.id || null };
+  } catch (err) {
+    const formatted = formatMailerError(err);
+    console.warn('[email] Resend send exception', JSON.stringify({ provider: 'resend', ...formatted }));
     return {
       sent: false,
-      logOnly: true,
-      reason: !tx ? 'smtp_not_configured' : 'missing_recipient',
+      logOnly: false,
+      provider: 'resend',
+      reason: 'resend_send_failed',
+      ...formatted,
     };
+  }
+}
+
+async function sendViaSmtp({ to, subject, text, html, verifyFirst = false }) {
+  const tx = getTransport();
+  if (!tx) {
+    return { sent: false, logOnly: true, provider: 'smtp', reason: 'smtp_not_configured' };
   }
 
   if (verifyFirst) {
@@ -229,6 +334,7 @@ async function sendMailMessage({ to, subject, text, html, verifyFirst = false })
       return {
         sent: false,
         logOnly: false,
+        provider: 'smtp',
         reason: 'smtp_verify_failed',
         verify,
         ...formatMailerError(
@@ -242,41 +348,52 @@ async function sendMailMessage({ to, subject, text, html, verifyFirst = false })
 
   try {
     const info = await tx.sendMail({
-      from: String(process.env.SMTP_FROM || readSmtpAuth().user),
+      from: getEmailFrom() || String(process.env.SMTP_FROM || readSmtpAuth().user),
       to,
       subject,
       text,
       html,
     });
 
-    console.log('[email] sendMail success', JSON.stringify({ to, messageId: info.messageId || null }));
-    return { sent: true, messageId: info.messageId || null };
+    console.log(
+      '[email] SMTP send success',
+      JSON.stringify({ provider: 'smtp', to, messageId: info.messageId || null })
+    );
+    return { sent: true, provider: 'smtp', messageId: info.messageId || null };
   } catch (err) {
     const mailerError = formatMailerError(err);
-    console.warn(
-      '[email] sendMail failed',
-      JSON.stringify({
-        to,
-        ...mailerError,
-        smtpPort: getSmtpTransportSettings().smtpPort,
-        secure: getSmtpTransportSettings().secure,
-        requireTLS: getSmtpTransportSettings().requireTLS,
-      })
-    );
+    console.warn('[email] SMTP send failed', JSON.stringify({ provider: 'smtp', to, ...mailerError }));
     resetTransport();
     return {
       sent: false,
       logOnly: false,
+      provider: 'smtp',
       reason: 'smtp_send_failed',
       ...mailerError,
     };
   }
 }
 
-/**
- * Send alert match email when SMTP + ALERT_EMAIL_ENABLED are configured.
- * Logs only when email is not configured (beta-safe fallback).
- */
+async function sendMailMessage({ to, subject, text, html, verifyFirst = false }) {
+  if (!to) {
+    console.log(`[email] (log-only) To: missing | ${subject}`);
+    return { sent: false, logOnly: true, reason: 'missing_recipient' };
+  }
+
+  const provider = getEmailProvider();
+  logEmailDiagnostics({ action: 'send_route' });
+
+  if (provider === 'resend') {
+    return sendViaResend({ to, subject, text, html });
+  }
+  if (provider === 'smtp') {
+    return sendViaSmtp({ to, subject, text, html, verifyFirst });
+  }
+
+  console.log(`[email] (log-only) To: ${to} | ${subject}`);
+  return { sent: false, logOnly: true, reason: 'email_not_configured' };
+}
+
 async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl }) {
   const subject = `🎯 Savvy Scout Alert: ${alertName}`;
   const text = [
@@ -307,26 +424,32 @@ async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl }) 
   return sendMailMessage({ to, subject, text, html });
 }
 
-/**
- * Ops / user test message — sends whenever SMTP is configured (ignores ALERT_EMAIL_ENABLED).
- */
 async function sendTestEmail({ to }) {
   const subject = '🎯 Savvy Scout — Final10 test email';
+  const provider = getEmailProvider();
   const text = [
     'This is a test email from Final10 Savvy Scout alert delivery.',
     '',
-    'If you received this, SMTP is configured correctly on the server.',
+    `Provider: ${provider}`,
+    'If you received this, email delivery is configured correctly on the server.',
     `Time: ${new Date().toISOString()}`,
   ].join('\n');
   const html = `
     <p><strong>Savvy Scout</strong> test email from Final10.</p>
-    <p>If you received this, SMTP is configured correctly on the server.</p>
+    <p>Provider: <code>${provider}</code></p>
+    <p>If you received this, email delivery is configured correctly on the server.</p>
     <p><small>${new Date().toISOString()}</small></p>
   `;
 
-  const result = await sendMailMessage({ to, subject, text, html, verifyFirst: true });
+  const result = await sendMailMessage({
+    to,
+    subject,
+    text,
+    html,
+    verifyFirst: provider === 'smtp',
+  });
   if (result.sent) {
-    console.log(`[email] Test email sent to ${to}`);
+    console.log(`[email] Test email sent via ${result.provider || provider} to ${to}`);
   }
   return { ...result, config: getEmailConfigStatus() };
 }
@@ -337,7 +460,10 @@ module.exports = {
   alertEmailEnabled,
   getEmailConfigStatus,
   getSmtpEnvPresence,
+  getEmailEnvPresence,
   verifySmtpConnection,
   formatMailerError,
   getSmtpTransportSettings,
+  getEmailProvider,
+  isEmailConfigured,
 };

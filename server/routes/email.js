@@ -39,6 +39,9 @@ router.get('/status', (req, res, next) => {
 
 function smtpFailureStatus(result) {
   if (result.errorCode === 'ETIMEDOUT' || result.errorCode === 'ESOCKET') return 504;
+  if (result.provider === 'resend' && Number(result.responseCode) >= 400) {
+    return Number(result.responseCode) >= 500 ? 502 : 400;
+  }
   return 502;
 }
 

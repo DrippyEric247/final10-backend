@@ -187,8 +187,13 @@ app.use('/api/email', require('./routes/email'));
 
 // health
 app.get('/api/health', (_req, res) => {
-  const { getSmtpEnvPresence } = require('./services/emailService');
-  res.json({ ok: true, smtpEnvPresent: getSmtpEnvPresence() });
+  const { getEmailEnvPresence, getEmailProvider, isEmailConfigured } = require('./services/emailService');
+  res.json({
+    ok: true,
+    emailEnvPresent: getEmailEnvPresence(),
+    emailProvider: getEmailProvider(),
+    emailConfigured: isEmailConfigured(),
+  });
 });
 
 // --- DATABASE CONNECTION ---
