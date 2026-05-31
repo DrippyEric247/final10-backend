@@ -22,6 +22,17 @@ function alertEmailEnabled() {
   return String(process.env.ALERT_EMAIL_ENABLED || '').toLowerCase() === 'true';
 }
 
+/** Whether each SMTP env var is set (values never returned). */
+function getSmtpEnvPresence() {
+  return {
+    SMTP_HOST: Boolean(String(process.env.SMTP_HOST || '').trim()),
+    SMTP_PORT: Boolean(String(process.env.SMTP_PORT || '').trim()),
+    SMTP_USER: Boolean(String(process.env.SMTP_USER || '').trim()),
+    SMTP_PASS: Boolean(String(process.env.SMTP_PASS || '').trim()),
+    SMTP_FROM: Boolean(String(process.env.SMTP_FROM || '').trim()),
+  };
+}
+
 function getEmailConfigStatus() {
   const host = String(process.env.SMTP_HOST || '').trim();
   const user = String(process.env.SMTP_USER || '').trim();
@@ -33,6 +44,7 @@ function getEmailConfigStatus() {
     smtpHost: host ? host.replace(/^(.{3}).+/, '$1…') : null,
     smtpFrom: String(process.env.SMTP_FROM || process.env.SMTP_USER || '').trim() || null,
     mode: smtpConfigured && alertEmailEnabled() ? 'live' : 'log-only',
+    envPresent: getSmtpEnvPresence(),
   };
 }
 
@@ -117,4 +129,5 @@ module.exports = {
   sendTestEmail,
   alertEmailEnabled,
   getEmailConfigStatus,
+  getSmtpEnvPresence,
 };

@@ -186,7 +186,10 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/email', require('./routes/email'));
 
 // health
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => {
+  const { getSmtpEnvPresence } = require('./services/emailService');
+  res.json({ ok: true, smtpEnvPresent: getSmtpEnvPresence() });
+});
 
 // --- DATABASE CONNECTION ---
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/final10';
