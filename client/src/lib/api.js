@@ -208,6 +208,17 @@ export async function updateAlert(alertId, body) {
   return data;
 }
 
+/** ---- In-app notifications (Savvy Scout alert matches) ---- **/
+export async function getNotificationSummary() {
+  const { data } = await api.get("/notifications");
+  return data;
+}
+
+export async function markNotificationsRead(kind = null) {
+  const { data } = await api.patch("/notifications/read", kind ? { kind } : {});
+  return data;
+}
+
 /** ---- Project Alerts (premium) ---- **/
 export async function getProjectAlerts() {
   const { data } = await api.get("/project-alerts");

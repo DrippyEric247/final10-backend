@@ -132,6 +132,8 @@ const subscribeRoutes = require('./routes/subscribe');
 const flipRewardsRoutes = require('./routes/flipRewards');
 const marketValueRoutes = require('./routes/marketValue');
 const analyticsIngestRoutes = require('./routes/analyticsIngest');
+const notificationsRoutes = require('./routes/notifications');
+const { runSavvyScoutAlertScan } = require('./services/savvyScoutAlertScanner');
 const { logProcessCrash } = require('./services/structuredLog');
 
 process.on('uncaughtException', (err) => {
@@ -188,6 +190,8 @@ app.use('/api/subscribe', subscribeRoutes);
 app.use('/api/flip-rewards', flipRewardsRoutes);
 app.use('/api/market-value', marketValueRoutes);
 app.use('/api/analytics', analyticsIngestRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/email', require('./routes/email'));
 
 // health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -226,6 +230,17 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     });
     
     console.log('⏰ Scheduled auction refresh every 30 minutes');
+
+    // Savvy Scout alert sweep — active targets every 5 minutes
+    cron.schedule('*/5 * * * *', () => {
+      runSavvyScoutAlertScan().catch((err) => {
+        console.error('[SavvyScout] scheduled scan error:', err.message);
+      });
+    });
+    console.log('⏰ Savvy Scout alert scan every 5 minutes');
+    runSavvyScoutAlertScan().catch((err) => {
+      console.warn('[SavvyScout] initial scan error:', err.message);
+    });
   })
   .catch((error) => {
     console.error('❌ MongoDB connection error:', error);

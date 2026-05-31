@@ -1,15 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
 import { Bug, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isCosmeticsAdmin } from '../lib/adminCosmetics';
+import { getNotificationSummary, markNotificationsRead } from '../lib/api';
 
 const Navigation = () => {
   const location = useLocation();
   const [showBugReport, setShowBugReport] = useState(false);
+  const [alertUnreadCount, setAlertUnreadCount] = useState(0);
   const { user } = useAuth() || {};
   const canAdmin = isCosmeticsAdmin(user);
+
+  useEffect(() => {
+    if (!user) {
+      setAlertUnreadCount(0);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const refreshBadge = async () => {
+      try {
+        const data = await getNotificationSummary();
+        if (!cancelled) setAlertUnreadCount(Number(data?.alertUnreadCount) || 0);
+      } catch {
+        /* ignore — badge is best-effort */
+      }
+    };
+
+    void refreshBadge();
+    const id = window.setInterval(refreshBadge, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (location.pathname === '/alerts') {
+      setAlertUnreadCount(0);
+      markNotificationsRead('alert_match').catch(() => {});
+    }
+  }, [location.pathname]);
 
   const navItems = [
     { name: 'Home (Community)', path: '/', icon: '🏠' },
@@ -54,8 +87,19 @@ const Navigation = () => {
             to={item.path}
             className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
           >
-            <span className="nav-icon">
-              {item.bell ? <Bell className="nav-lucide-icon" size={17} strokeWidth={2.25} aria-hidden /> : item.icon}
+            <span className="nav-icon nav-icon-wrap">
+              {item.bell ? (
+                <>
+                  <Bell className="nav-lucide-icon" size={17} strokeWidth={2.25} aria-hidden />
+                  {item.path === '/alerts' && alertUnreadCount > 0 ? (
+                    <span className="nav-alert-badge" aria-label={`${alertUnreadCount} unread alert matches`}>
+                      {alertUnreadCount > 99 ? '99+' : alertUnreadCount}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                item.icon
+              )}
             </span>
             <span className="nav-label">{item.name}</span>
           </Link>

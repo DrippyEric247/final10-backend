@@ -100,6 +100,8 @@ const userSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     readAt: { type: Date, default: null },
   }],
+  /** Email when Savvy Scout matches an alert (requires ALERT_EMAIL_ENABLED + SMTP on server). */
+  alertEmailOnMatch: { type: Boolean, default: false },
   // pinnedWins: ordered list of Auction ids the user has chosen to showcase.
   pinnedWins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Auction' }],
   // weeklyStats: rolling weekly totals for compare cards. Reset by cron/usage.

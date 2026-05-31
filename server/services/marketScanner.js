@@ -3,7 +3,6 @@ const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 const Auction = require('../models/Auction');
 const Alert = require('../models/Alert');
-const User = require('../models/User');
 
 class MarketScanner {
   constructor() {
@@ -298,44 +297,8 @@ class MarketScanner {
 
   async sendAlertNotification(userId, auction, alert) {
     try {
-      const user = await User.findById(userId);
-      if (!user) return;
-
-      console.log(`Alert triggered for user ${user.username}: ${auction.title}`);
-
-      const title = `Deal alert: ${alert.name}`;
-      const body = String(auction.title || '').slice(0, 280);
-
-      await User.findByIdAndUpdate(userId, {
-        $push: {
-          notifications: {
-            $each: [
-              {
-                kind: 'alert_match',
-                title,
-                body,
-                listingId: String(auction._id),
-                offerId: '',
-                createdAt: new Date(),
-                readAt: null,
-              },
-            ],
-            $position: 0,
-            $slice: 100,
-          },
-        },
-      });
-
-      const SavvyPoint = require('../models/SavvyPoint');
-      await SavvyPoint.awardPoints(
-        userId,
-        5,
-        'alert_trigger',
-        `Alert "${alert.name}" found a match!`,
-        auction._id,
-        'Auction',
-        1
-      );
+      const { deliverAlertMatch } = require('./alertDeliveryService');
+      await deliverAlertMatch(userId, auction, alert);
     } catch (error) {
       console.error('Error sending alert notification:', error);
     }

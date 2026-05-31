@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { getAlerts, toggleAlert, deleteAlert } from "../lib/api";
+import { getAlerts, toggleAlert, deleteAlert, markNotificationsRead } from "../lib/api";
 import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
@@ -68,6 +68,9 @@ export default function AlertsCommandCenter() {
   };
 
   useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    markNotificationsRead("alert_match").catch(() => {});
+  }, []);
   useEffect(() => {
     const onClientReset = () => void load();
     window.addEventListener("f10:dev-alerts-client-reset", onClientReset);
