@@ -37,6 +37,26 @@ router.get('/status', (req, res, next) => {
   return auth(req, res, () => res.json(getEmailConfigStatus()));
 });
 
+function smtpFailureStatus(result) {
+  if (result.errorCode === 'ETIMEDOUT' || result.errorCode === 'ESOCKET') return 504;
+  return 502;
+}
+
+function jsonEmailTestResult(res, result, meta) {
+  if (!result.sent) {
+    return res.status(smtpFailureStatus(result)).json({
+      ok: false,
+      ...result,
+      ...meta,
+    });
+  }
+  return res.json({
+    ok: true,
+    ...result,
+    ...meta,
+  });
+}
+
 /**
  * POST /api/email/test
  * Send a test email. Body: { "to": "you@example.com" } (optional with JWT — defaults to your account email).
@@ -51,9 +71,7 @@ router.post('/test', async (req, res, next) => {
         return next(new HttpError(400, 'BAD_REQUEST', 'Body field "to" is required'));
       }
       const result = await sendTestEmail({ to: bodyTo });
-      return res.json({
-        ok: true,
-        ...result,
+      return jsonEmailTestResult(res, result, {
         recipient: bodyTo,
         via: 'owner-grant-secret',
       });
@@ -74,9 +92,7 @@ router.post('/test', async (req, res, next) => {
         }
 
         const result = await sendTestEmail({ to: recipient });
-        return res.json({
-          ok: true,
-          ...result,
+        return jsonEmailTestResult(res, result, {
           recipient,
           via: 'jwt',
         });
