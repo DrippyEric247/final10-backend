@@ -3,26 +3,28 @@ const { Resend } = require('resend');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
+const DEFAULT_RESEND_FROM = 'onboarding@resend.dev';
 
 let transport = null;
 let lastVerifyResult = null;
 let resendClient = null;
+let resendConnectedLogged = false;
 
 function readResendApiKey() {
   return String(process.env.RESEND_API_KEY || '').trim();
 }
 
 function getEmailFrom() {
-  return String(
-    process.env.EMAIL_FROM ||
-      process.env.SMTP_FROM ||
-      readSmtpAuth().user ||
-      ''
+  const explicit = String(
+    process.env.EMAIL_FROM || process.env.SMTP_FROM || readSmtpAuth().user || ''
   ).trim();
+  if (explicit) return explicit;
+  if (readResendApiKey()) return DEFAULT_RESEND_FROM;
+  return '';
 }
 
 function isResendConfigured() {
-  return Boolean(readResendApiKey()) && Boolean(getEmailFrom());
+  return Boolean(readResendApiKey());
 }
 
 function isGmailHost(host) {
@@ -56,8 +58,32 @@ function isEmailConfigured() {
 function getResendClient() {
   const key = readResendApiKey();
   if (!key) return null;
-  if (!resendClient) resendClient = new Resend(key);
+  if (!resendClient) {
+    resendClient = new Resend(key);
+    if (!resendConnectedLogged) {
+      console.log(
+        '[email] Resend connected',
+        JSON.stringify({
+          apiKeyPresent: true,
+          from: getEmailFrom(),
+        })
+      );
+      resendConnectedLogged = true;
+    }
+  }
   return resendClient;
+}
+
+function logEmailStartup() {
+  if (isResendConfigured()) {
+    getResendClient();
+    return;
+  }
+  if (isSmtpConfigured()) {
+    console.log('[email] Resend not configured — using SMTP fallback');
+    return;
+  }
+  console.log('[email] Email delivery not configured (set RESEND_API_KEY on Railway)');
 }
 
 function resolveSmtpTransportSettings() {
@@ -289,9 +315,10 @@ async function sendViaResend({ to, subject, text, html }) {
     if (error) {
       const formatted = formatMailerError(error);
       console.warn(
-        '[email] Resend send failed',
+        '[email] Email failed',
         JSON.stringify({
           provider: 'resend',
+          to,
           ...formatted,
         })
       );
@@ -305,13 +332,16 @@ async function sendViaResend({ to, subject, text, html }) {
     }
 
     console.log(
-      '[email] Resend send success',
+      '[email] Email sent',
       JSON.stringify({ provider: 'resend', to, messageId: data?.id || null })
     );
     return { sent: true, provider: 'resend', messageId: data?.id || null };
   } catch (err) {
     const formatted = formatMailerError(err);
-    console.warn('[email] Resend send exception', JSON.stringify({ provider: 'resend', ...formatted }));
+    console.warn(
+      '[email] Email failed',
+      JSON.stringify({ provider: 'resend', to, ...formatted })
+    );
     return {
       sent: false,
       logOnly: false,
@@ -466,4 +496,5 @@ module.exports = {
   getSmtpTransportSettings,
   getEmailProvider,
   isEmailConfigured,
+  logEmailStartup,
 };

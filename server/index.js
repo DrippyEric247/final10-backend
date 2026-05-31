@@ -269,6 +269,8 @@ app.listen(PORT, '0.0.0.0', () => {
       : '🔑 Owner grant bootstrap: disabled (OWNER_GRANT_SECRET not set)'
   );
   console.log(`🌟 Savvy Universe Empire is LIVE!`);
+  const { logEmailStartup } = require('./services/emailService');
+  logEmailStartup();
   const { logEbayAuthStartupCheck, getEbayAppToken } = require('./services/ebayAuthService');
   logEbayAuthStartupCheck();
   getEbayAppToken()
