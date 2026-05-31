@@ -118,6 +118,8 @@ const bugReportRoutes   = require('./routes/bugReports');
 const shieldRoutes      = require('./routes/shield');
 const { router: shieldEnforcementRouter, checkShieldStatus, checkFeatureAccess } = require('./routes/shieldEnforcement');
 const ownerControlRoutes = require('./routes/ownerControl');
+const { requireOwnerGrantAccess } = require('./middleware/requireOwnerGrantAccess');
+const { grantFoundingAccessHandler } = require('./handlers/grantFoundingAccess');
 const progressionRoutes = require('./routes/progressionRoutes');
 const cosmeticRoutes = require('./routes/cosmeticRoutes');
 const entitlementRoutes = require('./routes/entitlementRoutes');
@@ -165,6 +167,14 @@ app.use('/api/promotions', promotionRoutes);
 app.use('/api/bug-reports', bugReportRoutes);
 app.use('/api/shield', shieldRoutes);
 app.use('/final10', shieldEnforcementRouter);
+
+// Bootstrap founding grant — registered before /api/owner router (no JWT when secret matches)
+app.post(
+  '/api/owner/grant-founding-access',
+  requireOwnerGrantAccess,
+  grantFoundingAccessHandler
+);
+
 app.use('/api/owner', ownerControlRoutes);
 app.use('/api/progression', progressionRoutes);
 app.use('/api/cosmetics', cosmeticRoutes);
@@ -237,6 +247,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Final10 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
+  const grantSecretLen = String(process.env.OWNER_GRANT_SECRET || '').trim().length;
+  console.log(
+    grantSecretLen > 0
+      ? `🔑 Owner grant bootstrap: enabled (secret length ${grantSecretLen})`
+      : '🔑 Owner grant bootstrap: disabled (OWNER_GRANT_SECRET not set)'
+  );
   console.log(`🌟 Savvy Universe Empire is LIVE!`);
   const { logEbayAuthStartupCheck, getEbayAppToken } = require('./services/ebayAuthService');
   logEbayAuthStartupCheck();
