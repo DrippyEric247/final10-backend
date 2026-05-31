@@ -13,12 +13,18 @@ validateCoreEnv();
 const express = require('express');
 const { requestTelemetry } = require('./middleware/requestTelemetry');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const compression = require('compression');
 const cron = require('node-cron');
 const rateLimit = require('express-rate-limit');
 const AuctionAggregator = require('./services/AuctionAggregator');
-const { securityHeaders, cacheControl, cookieSecurity, rateLimitConfig, cspConfig } = require('./middleware/security');
+const {
+  securityHeaders,
+  cacheControl,
+  cookieSecurity,
+  createCorsMiddleware,
+  rateLimitConfig,
+  cspConfig,
+} = require('./middleware/security');
 // SavvyShield Proactive Investigation System
 // Only starts when activated by superadmin through dashboard
 const shieldProactiveInvestigation = require('./services/shieldProactiveInvestigation');
@@ -29,6 +35,11 @@ const app = express();
 
 // --- Trust Proxy (for rate limiting behind reverse proxies) ---
 app.set('trust proxy', 1);
+
+// --- CORS (before rate limits, security headers, and all /api routes) ---
+const corsMiddleware = createCorsMiddleware();
+app.use(corsMiddleware);
+app.options('*', corsMiddleware);
 
 // --- Compression Middleware (apply early) ---
 app.use(compression({
@@ -62,30 +73,6 @@ app.post(
     Promise.resolve(stripeWebhookHandler(req, res)).catch(next);
   }
 );
-
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-
-    const allowed = new Set([
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://final10-backend-qf59.vercel.app',
-      'https://final10-client.onrender.com',
-    ]);
-
-    for (const key of ['FRONTEND_URL', 'CLIENT_URL', 'REACT_APP_CLIENT_URL']) {
-      const value = String(process.env[key] || '').trim().replace(/\/+$/, '');
-      if (value) allowed.add(value);
-    }
-
-    if (allowed.has(origin)) return callback(null, true);
-    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return callback(null, true);
-
-    return callback(null, false);
-  },
-  credentials: true,
-}));
 
 // --- BODY PARSERS (must be before routes) ---
 app.use(express.json());
