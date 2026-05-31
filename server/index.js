@@ -60,8 +60,13 @@ app.use(securityHeaders);
 app.use(cacheControl);
 app.use(cookieSecurity);
 
-// --- Rate Limiting ---
-const limiter = rateLimit(rateLimitConfig);
+// --- Rate Limiting (skip OPTIONS + telemetry ingest) ---
+const limiter = rateLimit({
+  ...rateLimitConfig,
+  skip: (req) =>
+    req.method === 'OPTIONS' ||
+    req.path.startsWith('/analytics'),
+});
 app.use('/api/', limiter);
 
 const { stripeWebhookHandler } = require('./routes/stripeWebhook');

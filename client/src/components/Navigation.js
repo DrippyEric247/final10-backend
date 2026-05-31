@@ -38,11 +38,11 @@ const Navigation = () => {
   }, [user]);
 
   useEffect(() => {
-    if (location.pathname === '/alerts') {
+    if (user && location.pathname === '/alerts') {
       setAlertUnreadCount(0);
       markNotificationsRead('alert_match').catch(() => {});
     }
-  }, [location.pathname]);
+  }, [location.pathname, user]);
 
   const navItems = [
     { name: 'Home (Community)', path: '/', icon: '🏠' },

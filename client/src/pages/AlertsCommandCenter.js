@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getAlerts, toggleAlert, deleteAlert, markNotificationsRead } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { SAVVY_ALERT_EVENT } from "../lib/savvyAlerts";
 import ProjectAlertsPanel from "../components/projectAlerts/ProjectAlertsPanel";
 import SmartAlertCreationWizard from "../components/alerts/SmartAlertCreationWizard";
@@ -44,6 +45,7 @@ const target = (a) => (Number.isFinite(Number(a?.maxPrice)) ? `<= $${Number(a.ma
 const name = (a) => (a?.keywords?.length ? a.keywords.join(" · ") : a?.name || "Alert");
 
 export default function AlertsCommandCenter() {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -69,8 +71,9 @@ export default function AlertsCommandCenter() {
 
   useEffect(() => { void load(); }, []);
   useEffect(() => {
+    if (!user) return;
     markNotificationsRead("alert_match").catch(() => {});
-  }, []);
+  }, [user]);
   useEffect(() => {
     const onClientReset = () => void load();
     window.addEventListener("f10:dev-alerts-client-reset", onClientReset);

@@ -6,6 +6,7 @@ const {
 } = require('../services/ebayListingNormalizer');
 const { placeProxyBidForUser } = require('../services/ebayOfferService');
 const auth = require('../middleware/auth');
+const optionalUserAuth = require('../middleware/optionalUserAuth');
 const { validateRequest } = require('../middleware/validateRequest');
 const { ebaySearchLimiter, ebayBidLimiter, ebaySellerTrendsLimiter } = require('../middleware/rateLimits');
 const ebaySchemas = require('../validation/schemas');
@@ -49,25 +50,8 @@ const EBAY_CATEGORY_SLUG_KEYWORDS = {
   automotive: 'automotive',
 };
 
-// Apply authentication middleware to all eBay routes.
-//
-// `DISABLE_EBAY_AUTH=true` is a **development-only** convenience for poking
-// at Browse API responses without juggling JWTs. It is intentionally
-// ignored in production so this flag cannot accidentally (or maliciously)
-// bypass auth on the deployed API. The startup validator (envValidation.js)
-// also refuses to boot with this flag enabled in production.
-const EBAY_AUTH_BYPASS_ALLOWED =
-  !isProduction() && process.env.DISABLE_EBAY_AUTH === 'true';
-
-router.use((req, res, next) => {
-  if (EBAY_AUTH_BYPASS_ALLOWED) return next();
-  return auth(req, res, () => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    return next();
-  });
-});
+// Public browse routes attach req.user when a JWT is sent; bidding stays auth-gated below.
+router.use(optionalUserAuth);
 
 // CORS is handled globally in index.js
 
@@ -174,10 +158,6 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
       listingMode: listingModeRaw = 'mixed',
       endingSoonOnly: endingSoonOnlyRaw = 'false',
     } = req.query;
-
-    if (!req.user && process.env.DISABLE_EBAY_AUTH !== 'true') {
-      return res.status(401).json({ success: false, error: 'Authentication required' });
-    }
 
     const rawQ = String(q || keywords || '').trim();
     const catRaw = String(categoryId || '').trim();
@@ -358,10 +338,6 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
       maxPrice = ''
     } = req.query;
 
-    if (!req.user && process.env.DISABLE_EBAY_AUTH !== 'true') {
-      return res.status(401).json({ success: false, error: 'Authentication required', items: [] });
-    }
-
     const rawQ = String(q || keywords || '').trim();
     const catRaw = String(categoryId || '').trim();
     let searchQuery = rawQ || 'electronics';
@@ -462,11 +438,6 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
 // GET /api/ebay/item/:id
 router.get('/item/:id', async (req, res) => {
   try {
-    // Check if user is authenticated
-    if (!req.user && process.env.DISABLE_EBAY_AUTH !== 'true') {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
     try {
       const itemIdEnc = encodeURIComponent(req.params.id);
       const it = await ebayBrowseGet(`item/${itemIdEnc}`);
@@ -566,11 +537,6 @@ router.get('/trending', async (req, res) => {
   let categories = [];
   try {
     const { category = 'all', limit = 20 } = req.query;
-
-    // Check if user is authenticated
-    if (!req.user && process.env.DISABLE_EBAY_AUTH !== 'true') {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
 
     trendingItems = [];
     categories = [];
@@ -738,10 +704,10 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// POST /api/ebay/bids/place
-router.post('/bids/place', ebayBidLimiter, validateRequest(ebaySchemas.ebayBidPlaceBody), async (req, res) => {
+// POST /api/ebay/bids/place — requires login
+router.post('/bids/place', auth, ebayBidLimiter, validateRequest(ebaySchemas.ebayBidPlaceBody), async (req, res) => {
   try {
-    if (!req.user && process.env.DISABLE_EBAY_AUTH !== 'true') {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
         error: 'not_authenticated',
