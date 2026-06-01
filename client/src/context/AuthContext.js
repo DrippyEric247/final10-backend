@@ -1,11 +1,12 @@
 // client/src/context/AuthContext.js
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   loginUser,
   registerUser,
   setAuthToken,
   getMe,
   STORAGE_KEY,
+  resetAuthMeBootstrap,
 } from "../lib/api";
 import { parseApiError, userSafeErrorMessage } from "../lib/apiErrorParsing";
 import { getDevSavvyPointsOffset, isDev, FINAL10_DEV_OVERRIDE_EVENT } from "../lib/devOverride";
@@ -25,6 +26,7 @@ const defaultAuthValue = {
   },
   logout: () => {},
   refreshProfile: async () => null,
+  patchUser: () => {},
 };
 
 const AuthContext = createContext(defaultAuthValue);
@@ -130,13 +132,19 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    resetAuthMeBootstrap();
   };
 
-  const refreshProfile = async () => {
+  const patchUser = useCallback((partial) => {
+    if (!partial || typeof partial !== "object") return;
+    setUser((prev) => (prev ? withLoadout({ ...prev, ...partial }) : prev));
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     try {
-      const res = await getMe();
+      const res = await getMe({ force: true });
       const hydrated = withLoadout(res);
       setUser(hydrated);
       return hydrated;
@@ -148,7 +156,7 @@ export function AuthProvider({ children }) {
       }
       return null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     const onLoadout = () => {
@@ -160,7 +168,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, error, login, register, logout, refreshProfile }}
+      value={{ user, token, loading, error, login, register, logout, refreshProfile, patchUser }}
     >
       {children}
     </AuthContext.Provider>

@@ -5,6 +5,7 @@ import { Bug, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { hasAdminRole } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
+import { ApiCoolingDownError } from '../lib/apiRequestGate';
 
 const Navigation = () => {
   const location = useLocation();
@@ -24,8 +25,10 @@ const Navigation = () => {
       try {
         const data = await getNotificationSummary();
         if (!cancelled) setAlertUnreadCount(Number(data?.alertUnreadCount) || 0);
-      } catch {
-        /* ignore — badge is best-effort */
+      } catch (err) {
+        if (!(err instanceof ApiCoolingDownError) && err?.isCoolingDown !== true) {
+          /* ignore — badge is best-effort */
+        }
       }
     };
 

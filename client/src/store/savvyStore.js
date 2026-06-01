@@ -12,6 +12,8 @@ import React, {
   useState,
 } from "react";
 import { useAuth } from "../context/AuthContext";
+import { getMyPoints } from "../lib/api";
+import { ApiCoolingDownError } from "../lib/apiRequestGate";
 import {
   awardPoints as persistWalletAward,
   WALLET_AWARD_EVENT,
@@ -23,8 +25,7 @@ export const SAVVY_AUTH_REFRESH_REQUEST = "f10:savvy-auth-refresh-request";
 export const SAVVY_STORE_UPDATED = "f10:savvy-store-updated";
 
 const MAX_TX = 40;
-const POLL_MS = 90_000;
-const AUTH_REFRESH_DEBOUNCE_MS = 550;
+const POINTS_SYNC_DEBOUNCE_MS = 800;
 /** Human-readable labels for wallet / reward source keys */
 const TX_LABELS = {
   save_item: "Save Item",
@@ -82,35 +83,49 @@ function mergeRecentFeed(walletRecent, txRows) {
 }
 
 export function SavvyPointsProvider({ children }) {
-  const { user, loading, refreshProfile } = useAuth();
+  const { user, loading, patchUser } = useAuth();
   const [walletTick, setWalletTick] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState([]);
-  const refreshTimerRef = useRef(null);
-  const initialSyncUserRef = useRef(null);
+  const pointsSyncTimerRef = useRef(null);
 
   const bumpWallet = useCallback(() => setWalletTick((t) => t + 1), []);
 
-  const scheduleAuthRefresh = useCallback(() => {
-    if (typeof refreshProfile !== "function") return;
-    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null;
-      void refreshProfile().finally(() => {
-        try {
-          window.dispatchEvent(new CustomEvent(SAVVY_STORE_UPDATED));
-        } catch {
-          /* ignore */
-        }
-        bumpWallet();
-      });
-    }, AUTH_REFRESH_DEBOUNCE_MS);
-  }, [refreshProfile, bumpWallet]);
+  /** Sync Savvy balance via /points/me — avoids hammering /auth/me. */
+  const schedulePointsSync = useCallback(() => {
+    if (!user) return;
+    if (pointsSyncTimerRef.current) window.clearTimeout(pointsSyncTimerRef.current);
+    pointsSyncTimerRef.current = window.setTimeout(() => {
+      pointsSyncTimerRef.current = null;
+      void getMyPoints()
+        .then((me) => {
+          const balance = Math.max(0, Math.round(Number(me?.pointsBalance) || 0));
+          patchUser({
+            savvyPoints: balance,
+            lifetimePointsEarned: me?.lifetimePointsEarned,
+          });
+          try {
+            window.dispatchEvent(new CustomEvent(SAVVY_STORE_UPDATED));
+          } catch {
+            /* ignore */
+          }
+          bumpWallet();
+        })
+        .catch((err) => {
+          if (!(err instanceof ApiCoolingDownError) && err?.isCoolingDown !== true) {
+            if (process.env.NODE_ENV !== "production") {
+              // eslint-disable-next-line no-console
+              console.warn("points sync failed", err?.message);
+            }
+          }
+        });
+    }, POINTS_SYNC_DEBOUNCE_MS);
+  }, [user, patchUser, bumpWallet]);
 
   useEffect(() => {
-    const onRequest = () => scheduleAuthRefresh();
+    const onRequest = () => schedulePointsSync();
     window.addEventListener(SAVVY_AUTH_REFRESH_REQUEST, onRequest);
     return () => window.removeEventListener(SAVVY_AUTH_REFRESH_REQUEST, onRequest);
-  }, [scheduleAuthRefresh]);
+  }, [schedulePointsSync]);
 
   useEffect(() => {
     registerSavvyBalanceGetter(() =>
@@ -124,7 +139,7 @@ export function SavvyPointsProvider({ children }) {
       const d = e.detail || {};
       const amt = Math.max(1, Math.round(Number(d.amount) || 0));
 
-      scheduleAuthRefresh();
+      schedulePointsSync();
 
       if (!d.mirrorOnly && amt) {
         const type = String(d.type || "generic");
@@ -148,7 +163,7 @@ export function SavvyPointsProvider({ children }) {
     return () => {
       window.removeEventListener(WALLET_AWARD_EVENT, onAward);
     };
-  }, [bumpWallet, scheduleAuthRefresh]);
+  }, [bumpWallet, schedulePointsSync]);
 
   void walletTick;
   const wallet = getWalletSnapshot();
@@ -185,7 +200,7 @@ export function SavvyPointsProvider({ children }) {
     (amount, label = "Spend") => {
       const n = Math.abs(Math.round(Number(amount) || 0));
       if (!n) return;
-      scheduleAuthRefresh();
+      schedulePointsSync();
       setRecentTransactions((prev) =>
         [
           {
@@ -204,20 +219,33 @@ export function SavvyPointsProvider({ children }) {
         /* ignore */
       }
     },
-    [scheduleAuthRefresh]
+    [schedulePointsSync]
   );
 
   const syncPoints = useCallback(async () => {
-    if (typeof refreshProfile !== "function") return null;
-    const u = await refreshProfile();
-    bumpWallet();
+    if (!user) return null;
     try {
-      window.dispatchEvent(new CustomEvent(SAVVY_STORE_UPDATED));
-    } catch {
-      /* ignore */
+      const me = await getMyPoints();
+      const balance = Math.max(0, Math.round(Number(me?.pointsBalance) || 0));
+      patchUser({
+        savvyPoints: balance,
+        lifetimePointsEarned: me?.lifetimePointsEarned,
+      });
+      bumpWallet();
+      try {
+        window.dispatchEvent(new CustomEvent(SAVVY_STORE_UPDATED));
+      } catch {
+        /* ignore */
+      }
+      return me;
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.warn("syncPoints failed", err?.message);
+      }
+      return null;
     }
-    return u;
-  }, [refreshProfile, bumpWallet]);
+  }, [user, patchUser, bumpWallet]);
 
   const animatePointGain = useCallback((amount, opts = {}) => {
     const amt = Math.max(1, Math.round(Number(amount) || 0));
@@ -241,33 +269,14 @@ export function SavvyPointsProvider({ children }) {
   useEffect(() => {
     if (!user) {
       setRecentTransactions([]);
-      initialSyncUserRef.current = null;
       return undefined;
     }
-    const uid = String(user.id || user._id || "");
-    if (uid && initialSyncUserRef.current !== uid) {
-      initialSyncUserRef.current = uid;
-      if (!loading) scheduleAuthRefresh();
-    }
     return undefined;
-  }, [user, loading, scheduleAuthRefresh]);
-
-  useEffect(() => {
-    if (!user || loading) return undefined;
-    const onVis = () => {
-      if (document.visibilityState === "visible") scheduleAuthRefresh();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    const poll = window.setInterval(() => scheduleAuthRefresh(), POLL_MS);
-    return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      window.clearInterval(poll);
-    };
-  }, [user, loading, scheduleAuthRefresh]);
+  }, [user]);
 
   useEffect(
     () => () => {
-      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      if (pointsSyncTimerRef.current) window.clearTimeout(pointsSyncTimerRef.current);
     },
     []
   );

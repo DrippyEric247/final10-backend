@@ -62,7 +62,6 @@ export default function PointsPage() {
     setLoading(true);
     try {
       const me = await getMyPoints();
-      void refreshProfile();
       setLifetime(me.lifetimePointsEarned || 0);
       setBadges(me.badges || []);
       setHistory(me.recent || []);

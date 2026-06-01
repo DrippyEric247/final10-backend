@@ -8,8 +8,9 @@ import {
   claimDailyLogin,
   getLevelInfo,
   getMilestones,
+  getUserEbayStatus,
 } from '../lib/api';
-import api from '../services/authService';
+import { ApiCoolingDownError } from '../lib/apiRequestGate';
 import ProfilePageLayout from './ProfilePageLayout';
 import PremiumEntitlementCard from '../components/PremiumEntitlementCard';
 import { useEntitlement } from '../hooks/useEntitlement';
@@ -131,8 +132,6 @@ const Profile = () => {
   // Handle points earned from redeem codes
   const handlePointsEarned = (points) => {
     setPointsUpdating(true);
-    void refreshProfile();
-    // Refresh points data
     queryClient.invalidateQueries(['dailyTasks']);
     queryClient.invalidateQueries(['levelInfo']);
     queryClient.invalidateQueries(['levelStats']);
@@ -154,19 +153,15 @@ const Profile = () => {
     refetch: refetchTasks,
   } = useQuery({
     queryKey: ['dailyTasks'],
-    queryFn: getDailyTasks,
+    queryFn: () => getDailyTasks(),
     enabled: !!user,
-    refetchInterval: false, // Disable automatic refetching to prevent rate limiting
-    refetchOnWindowFocus: false, // Disable refetch on window focus
-    onSuccess: (data) => {
-      console.log('Daily tasks data received:', data);
-    },
-    onError: (error) => {
-      console.error('Daily tasks fetch error:', error);
-      if (error.status === 429) {
-        console.warn('Rate limited - will retry later');
-      }
-    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiCoolingDownError) &&
+      error?.isCoolingDown !== true &&
+      failureCount < 1,
   });
 
   // Fetch level information
@@ -177,16 +172,15 @@ const Profile = () => {
     refetch: refetchLevel,
   } = useQuery({
     queryKey: ['levelInfo'],
-    queryFn: getLevelInfo,
+    queryFn: () => getLevelInfo(),
     enabled: !!user,
-    refetchInterval: false, // Disable automatic refetching to prevent rate limiting
-    refetchOnWindowFocus: false, // Disable refetch on window focus
-    onError: (error) => {
-      console.error('Level info fetch error:', error);
-      if (error.status === 429) {
-        console.warn('Rate limited - will retry later');
-      }
-    },
+    staleTime: 60 * 1000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiCoolingDownError) &&
+      error?.isCoolingDown !== true &&
+      failureCount < 1,
   });
 
   useQuery({
@@ -781,12 +775,15 @@ const Profile = () => {
   // Fetch eBay connection status
   const { data: ebayStatus, isLoading: ebayStatusLoading } = useQuery({
     queryKey: ['ebayStatus', user?.id],
-    queryFn: async () => {
-      const response = await api.get(`/users/${user.id}/ebay-status`);
-      return response.data;
-    },
+    queryFn: () => getUserEbayStatus(user.id),
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds to check token status
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiCoolingDownError) &&
+      error?.isCoolingDown !== true &&
+      failureCount < 1,
   });
 
   // Mutations for task actions
@@ -824,7 +821,8 @@ const Profile = () => {
         /* ignore */
       }
 
-      await queryClient.refetchQueries(['dailyTasks']);
+      await queryClient.refetchQueries({ queryKey: ['dailyTasks'], exact: true });
+      await queryClient.refetchQueries({ queryKey: ['levelInfo'], exact: true });
       await refreshProfile();
       await savvyLive.syncPoints?.();
       setPointsUpdating(false);

@@ -27,8 +27,7 @@ import { getPowerSnapshot } from '../lib/final10PowerEngine';
 const PartyCtx = createContext(null);
 export const useParty = () => useContext(PartyCtx);
 
-const ACTIVE_POLL_MS = 10_000;
-const IDLE_POLL_MS = 45_000;
+const PARTY_POLL_MS = 60_000;
 
 export function PartyProvider({ children }) {
   const { user } = useAuth();
@@ -39,39 +38,45 @@ export function PartyProvider({ children }) {
   const [error, setError] = useState('');
   const pollRef = useRef(null);
 
-  const refresh = useCallback(async () => {
-    if (!user) {
+  const userId = user?.id || user?._id || null;
+
+  const refresh = useCallback(async (options = {}) => {
+    if (!userId) {
       setParty(null);
       setMembers([]);
       setLoading(false);
       return;
     }
     try {
-      const res = await getMyParty();
+      const res = await getMyParty(options);
       setParty(res?.party || null);
       setMembers(res?.members || []);
       setError('');
     } catch (e) {
-      setError(e?.message || 'Failed to load squad');
+      if (e?.isCoolingDown) {
+        setError('');
+      } else {
+        setError(e?.message || 'Failed to load squad');
+      }
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   useEffect(() => {
-    const interval =
-      party?.status === 'active' ? ACTIVE_POLL_MS : IDLE_POLL_MS;
     if (pollRef.current) clearInterval(pollRef.current);
-    if (!user) return;
-    pollRef.current = setInterval(refresh, interval);
+    if (!userId) return undefined;
+    pollRef.current = setInterval(() => {
+      void refresh();
+    }, PARTY_POLL_MS);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [party?.status, user, refresh]);
+  }, [userId, refresh]);
 
   const createParty = useCallback(
     async (name) => {

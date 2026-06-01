@@ -3,6 +3,18 @@ import { devDiagApiFailure } from "./devApiDiagnostics";
 import { parseApiError } from "./apiErrorParsing";
 import { trackEvent } from "./analytics";
 import { getApiBaseUrl } from "./runtimeApi";
+import {
+  gatedRequest,
+  markGlobalCooling,
+  resetAuthMeBootstrap,
+} from "./apiRequestGate";
+
+export {
+  ApiCoolingDownError,
+  getApiCoolingState,
+  subscribeApiCooling,
+  resetAuthMeBootstrap,
+} from "./apiRequestGate";
 
 const DEFAULT_TIMEOUT_MS = Math.min(Math.max(Number(process.env.REACT_APP_API_TIMEOUT_MS) || 28000, 8000), 120000);
 
@@ -11,48 +23,13 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Rate limiting handler - prevent excessive requests
-let requestCount = 0;
-let lastRequestTime = 0;
-const REQUEST_LIMIT = 30; // Max 30 requests per minute (increased from 10)
-const TIME_WINDOW = 60000; // 1 minute
-
-// Request interceptor to track requests
 api.interceptors.request.use(
   (config) => {
     const base = getApiBaseUrl();
     if (base) config.baseURL = base;
-
-    const now = Date.now();
-    
-    // Reset counter if time window has passed
-    if (now - lastRequestTime > TIME_WINDOW) {
-      requestCount = 0;
-      lastRequestTime = now;
-    }
-    
-    // Check if we're hitting rate limits
-    if (requestCount >= REQUEST_LIMIT) {
-      const timeUntilReset = TIME_WINDOW - (now - lastRequestTime);
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.warn(`Rate limit reached. Waiting ${Math.ceil(timeUntilReset / 1000)} seconds...`);
-      }
-      
-      // Instead of rejecting, add a small delay to prevent overwhelming the server
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(config);
-        }, Math.min(timeUntilReset, 5000)); // Max 5 second delay
-      });
-    }
-    
-    requestCount++;
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor to handle 429 errors
@@ -108,17 +85,17 @@ api.interceptors.response.use(
       devDiagApiFailure("network", { message: error.message, url: error.config?.url });
     }
     if (error.response?.status === 429) {
-      const retryAfter = error.response.headers['retry-after'] || 60;
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.warn(`Rate limited by server. Retry after ${retryAfter} seconds.`);
-      }
-      
-      // Create a more user-friendly error message
-      const rateLimitError = new Error(`Too many requests. Please wait ${retryAfter} seconds before trying again.`);
+      const retryAfter =
+        error.response.headers["retry-after"] ||
+        error.response.headers["Retry-After"] ||
+        60;
+      markGlobalCooling(retryAfter);
+      const rateLimitError = new Error(
+        `Too many requests. Cooling down for ${retryAfter} seconds.`
+      );
       rateLimitError.status = 429;
       rateLimitError.retryAfter = retryAfter;
-      
+      rateLimitError.isCoolingDown = true;
       return Promise.reject(rateLimitError);
     }
     
@@ -153,10 +130,17 @@ export async function registerUser(payload) {
 }
 
 
-/** NEW: get current user from token */
-export async function getMe() {
-  const { data } = await api.get("/auth/me");
-  return data; // { id, email, username, ... }
+/** GET /auth/me — once on app load; further calls need `{ force: true }` (manual refresh). */
+export async function getMe(options = {}) {
+  const { force = false } = options;
+  return gatedRequest(
+    "authMe",
+    async () => {
+      const { data } = await api.get("/auth/me");
+      return data;
+    },
+    { force, allowBootstrap: !force }
+  );
 }
 
 /** ---- Points ---- **/
@@ -209,9 +193,15 @@ export async function updateAlert(alertId, body) {
 }
 
 /** ---- In-app notifications (Savvy Scout alert matches) ---- **/
-export async function getNotificationSummary() {
-  const { data } = await api.get("/notifications");
-  return data;
+export async function getNotificationSummary(options = {}) {
+  return gatedRequest(
+    "notifications",
+    async () => {
+      const { data } = await api.get("/notifications");
+      return data;
+    },
+    { force: Boolean(options.force) }
+  );
 }
 
 export async function markNotificationsRead(kind = null) {
@@ -292,9 +282,15 @@ export async function claimBuildWarsRankReward() {
 }
 
 /** ---- Daily Tasks ---- **/
-export async function getDailyTasks() {
-  const { data } = await api.get("/auctions/daily-tasks");
-  return data;
+export async function getDailyTasks(options = {}) {
+  return gatedRequest(
+    "dailyTasks",
+    async () => {
+      const { data } = await api.get("/auctions/daily-tasks");
+      return data;
+    },
+    { force: Boolean(options.force) }
+  );
 }
 
 export async function watchAd() {
@@ -329,9 +325,15 @@ export async function completeSocialPost(platform, postUrl) {
 }
 
 /** ---- Level System ---- **/
-export async function getLevelInfo() {
-  const { data } = await api.get("/levels/me");
-  return data;
+export async function getLevelInfo(options = {}) {
+  return gatedRequest(
+    "levelsMe",
+    async () => {
+      const { data } = await api.get("/levels/me");
+      return data;
+    },
+    { force: Boolean(options.force) }
+  );
 }
 
 export async function getLevelLeaderboard(type = 'level', limit = 50) {
@@ -635,9 +637,29 @@ export async function createParty(name) {
   return data;
 }
 
-export async function getMyParty() {
-  const { data } = await api.get('/parties/me');
-  return data;
+export async function getMyParty(options = {}) {
+  return gatedRequest(
+    "partiesMe",
+    async () => {
+      const { data } = await api.get("/parties/me");
+      return data;
+    },
+    { force: Boolean(options.force) }
+  );
+}
+
+/** GET /users/:userId/ebay-status — throttled per user id. */
+export async function getUserEbayStatus(userId, options = {}) {
+  const uid = String(userId || "").trim();
+  if (!uid) throw new Error("userId required");
+  return gatedRequest(
+    `userEbay:${uid}`,
+    async () => {
+      const { data } = await api.get(`/users/${uid}/ebay-status`);
+      return data;
+    },
+    { force: Boolean(options.force) }
+  );
 }
 
 export async function getParty(partyId) {

@@ -10,10 +10,6 @@ function PointsPage() {
 
   const savvyBalance = Math.max(0, Math.round(Number(user?.savvyPoints) || 0));
 
-  useEffect(() => {
-    void refreshProfile?.();
-  }, [refreshProfile]);
-
   const claimDailyReward = async () => {
     setBusy(true);
     setMessage("");

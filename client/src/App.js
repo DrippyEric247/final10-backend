@@ -2,6 +2,7 @@ import ProductFeed from './pages/ProductFeed';
 import Trending from './pages/Trending';
 import VideoScanner from './components/VideoScanner';
 import Navigation from './components/Navigation';
+import ApiCoolingBanner from './components/ApiCoolingBanner';
 import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
 import Final10SideAssistant from './components/Final10SideAssistant';
@@ -106,8 +107,13 @@ function ProtectedRoute({ children }) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        if (error?.isCoolingDown || error?.status === 429) return false;
+        return failureCount < 1;
+      },
     },
   },
 });
@@ -175,6 +181,7 @@ export default function App() {
         
         {/* Use the new Navigation component */}
         <Navigation />
+        <ApiCoolingBanner />
         <UniversalBoostProgressBar />
         <Final10RewardHost />
         <CallingCardUnlockCeremony />
