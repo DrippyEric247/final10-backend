@@ -11,6 +11,8 @@
  * refreshes without a reload.
  */
 
+import { isSuperAdminUser } from "./adminAccess";
+
 const GRANTS_KEY = "f10_exclusive_grants_v1";
 const AUDIT_KEY = "f10_exclusive_audit_v1";
 const CURRENT_USER_KEY = "f10_current_user";
@@ -270,8 +272,9 @@ export function revokeCard({ userKey, itemId, revokedBy, note } = {}) {
  * reachable during development without a backend.
  */
 export function isCosmeticsAdmin(user) {
+  if (isSuperAdminUser(user)) return true;
   const role = String(user?.role || getCurrentUserSnapshot()?.role || "").toLowerCase();
-  if (role === "superadmin" || role === "owner") return true;
+  if (role === "owner") return true;
   const ls = safeLS();
   if (ls && ls.getItem("f10_dev_admin") === "1") return true;
   return false;

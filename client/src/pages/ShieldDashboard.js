@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { buildApiUrl } from '../lib/runtimeApi';
+import { isAdminUser, isSuperAdminUser } from '../lib/adminAccess';
 
 const ShieldDashboard = () => {
   const { user } = useAuth();
@@ -62,7 +63,7 @@ const ShieldDashboard = () => {
   }, [filters]);
 
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    if (!isAdminUser(user)) {
       return;
     }
     fetchDashboardData();
@@ -121,7 +122,7 @@ const ShieldDashboard = () => {
     }
   };
 
-  if (user?.role !== 'superadmin') {
+  if (!isSuperAdminUser(user)) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">

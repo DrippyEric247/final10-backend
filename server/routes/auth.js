@@ -32,6 +32,81 @@ function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
 }
 
+function serializeAuthUserPayload(user) {
+  const role = String(user.role || 'user');
+  const perms = user.adminPermissions || {};
+  const isSuperAdmin = role === 'superadmin';
+  const isAdmin = role === 'admin' || isSuperAdmin;
+  return {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role,
+    isSuperAdmin,
+    isAdmin,
+    adminPermissions: {
+      canManageShield: isSuperAdmin || Boolean(perms.canManageShield),
+      canManageUsers: isSuperAdmin || Boolean(perms.canManageUsers),
+      canManagePromotions: isSuperAdmin || Boolean(perms.canManagePromotions),
+      canManagePayments: isSuperAdmin || Boolean(perms.canManagePayments),
+      canViewAnalytics: isSuperAdmin || Boolean(perms.canViewAnalytics),
+    },
+  };
+}
+
+function serializeAuthMePayload(user) {
+  return {
+    ...serializeAuthUserPayload(user),
+    points: user.points,
+    referralCode: user.referralCode,
+    referredBy: user.referredBy || null,
+    premiumTier: user.premiumTier || user.membershipTier || 'free',
+    leaderboardScore: user.leaderboardScore ?? 0,
+    currentStreak: user.currentStreak ?? 0,
+    powerMultiplier: user.powerMultiplier ?? 1,
+    equippedCosmetics: user.equippedCosmetics || {
+      emblemId: 'sigil_starter',
+      callingCardId: 'card_default',
+      titleId: null,
+    },
+    creatorId: user.creatorId || null,
+    creatorHandle: user.creatorHandle || null,
+    attributedTo: user.attributedTo || null,
+    creatorCodeApplied: user.creatorCodeApplied || null,
+    followingCount: Array.isArray(user.following) ? user.following.length : 0,
+    followersCount: Array.isArray(user.followers) ? user.followers.length : 0,
+    pinnedWins: user.pinnedWins || [],
+    weeklyStats: user.weeklyStats || null,
+    subscription: user.subscription || {
+      tier: 'free',
+      billing: 'monthly',
+      multiplier: 1,
+      earlyAdopter: false,
+      renewalDate: null,
+    },
+    savvyPoints: Number(user.savvyPoints || 0),
+    flipBestScoreEver:
+      user.flipBestScoreEver != null && Number.isFinite(Number(user.flipBestScoreEver))
+        ? Math.round(Number(user.flipBestScoreEver) * 10) / 10
+        : null,
+    flipTotalCompleted: Number(user.flipTotalCompleted || 0),
+    flipAverageScore:
+      user.flipTotalCompleted > 0 && Number.isFinite(Number(user.flipScoreLifetimeSum))
+        ? Math.round((Number(user.flipScoreLifetimeSum) / Number(user.flipTotalCompleted)) * 10) / 10
+        : null,
+    badges: Array.isArray(user.badges) ? user.badges : [],
+    earlyAdopterLocked: Boolean(user.earlyAdopterLocked),
+    earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice || null,
+    betaTester: Boolean(user.betaTester),
+    foundingAccess: Boolean(user.foundingAccess),
+    betaAccessExpiresAt: user.betaAccessExpiresAt || null,
+    foundingTesterAccess: hasFoundingTesterAccess(user),
+    isBetaTester: hasFoundingTesterAccess(user),
+  };
+}
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -188,11 +263,7 @@ async function handleSignup(req, res, next) {
     return res.status(201).json({
       token,
       user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        ...serializeAuthUserPayload(user),
         points: user.points,
         referralCode: user.referralCode,
         referralCodeUsed: user.referralCodeUsed,
@@ -236,11 +307,7 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
     return res.json({
       token,
       user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        ...serializeAuthUserPayload(user),
         points: user.points,
         referralCode: user.referralCode,
         referredBy: user.referredBy || null,
@@ -264,59 +331,7 @@ router.get('/me', auth, async (req, res, next) => {
     const user = await User.findById(req.user._id || req.user.id).lean();
     if (!user) return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));
 
-    return res.json({
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      points: user.points,
-      referralCode: user.referralCode,
-      referredBy: user.referredBy || null,
-      premiumTier: user.premiumTier || user.membershipTier || 'free',
-      leaderboardScore: user.leaderboardScore ?? 0,
-      currentStreak: user.currentStreak ?? 0,
-      powerMultiplier: user.powerMultiplier ?? 1,
-      equippedCosmetics: user.equippedCosmetics || {
-        emblemId: 'sigil_starter',
-        callingCardId: 'card_default',
-        titleId: null,
-      },
-      // Phase B/C surfaces
-      creatorId: user.creatorId || null,
-      creatorHandle: user.creatorHandle || null,
-      attributedTo: user.attributedTo || null,
-      creatorCodeApplied: user.creatorCodeApplied || null,
-      followingCount: Array.isArray(user.following) ? user.following.length : 0,
-      followersCount: Array.isArray(user.followers) ? user.followers.length : 0,
-      pinnedWins: user.pinnedWins || [],
-      weeklyStats: user.weeklyStats || null,
-      subscription: user.subscription || {
-        tier: 'free',
-        billing: 'monthly',
-        multiplier: 1,
-        earlyAdopter: false,
-        renewalDate: null,
-      },
-      savvyPoints: Number(user.savvyPoints || 0),
-      flipBestScoreEver:
-        user.flipBestScoreEver != null && Number.isFinite(Number(user.flipBestScoreEver))
-          ? Math.round(Number(user.flipBestScoreEver) * 10) / 10
-          : null,
-      flipTotalCompleted: Number(user.flipTotalCompleted || 0),
-      flipAverageScore:
-        user.flipTotalCompleted > 0 && Number.isFinite(Number(user.flipScoreLifetimeSum))
-          ? Math.round((Number(user.flipScoreLifetimeSum) / Number(user.flipTotalCompleted)) * 10) / 10
-          : null,
-      badges: Array.isArray(user.badges) ? user.badges : [],
-      earlyAdopterLocked: Boolean(user.earlyAdopterLocked),
-      earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice || null,
-      betaTester: Boolean(user.betaTester),
-      foundingAccess: Boolean(user.foundingAccess),
-      betaAccessExpiresAt: user.betaAccessExpiresAt || null,
-      foundingTesterAccess: hasFoundingTesterAccess(user),
-      isBetaTester: hasFoundingTesterAccess(user),
-    });
+    return res.json(serializeAuthMePayload(user));
   } catch (err) {
     return next(err);
   }
