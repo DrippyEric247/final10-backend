@@ -112,6 +112,7 @@ const { router: shieldEnforcementRouter, checkShieldStatus, checkFeatureAccess }
 const ownerControlRoutes = require('./routes/ownerControl');
 const { requireOwnerGrantAccess } = require('./middleware/requireOwnerGrantAccess');
 const { grantFoundingAccessHandler } = require('./handlers/grantFoundingAccess');
+const { grantFounderAdminHandler } = require('./handlers/grantFounderAdminHandler');
 const progressionRoutes = require('./routes/progressionRoutes');
 const cosmeticRoutes = require('./routes/cosmeticRoutes');
 const entitlementRoutes = require('./routes/entitlementRoutes');
@@ -167,6 +168,12 @@ app.post(
   '/api/owner/grant-founding-access',
   requireOwnerGrantAccess,
   grantFoundingAccessHandler
+);
+
+app.post(
+  '/api/owner/grant-founder-admin',
+  requireOwnerGrantAccess,
+  grantFounderAdminHandler
 );
 
 app.use('/api/owner', ownerControlRoutes);
