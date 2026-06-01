@@ -445,7 +445,7 @@ export default function App() {
         <Route
           path="/owner-control"
           element={
-            <InternalRoute allowedRoles={["superadmin", "owner"]}>
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
               <OwnerControlPanel />
             </InternalRoute>
           }

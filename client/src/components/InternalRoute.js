@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { canAccessInternalRoute, isSuperAdminUser } from "../lib/adminAccess";
+import { canAccessInternalRoute } from "../lib/adminAccess";
 import SavvyMark from "./SavvyMark";
 
 /**
@@ -39,8 +39,7 @@ export default function InternalRoute({
   if (!user) return <Navigate to="/login" replace />;
 
   if (isProd) {
-    const isAllowed =
-      canAccessInternalRoute(user, allowedRoles) || isSuperAdminUser(user);
+    const isAllowed = canAccessInternalRoute(user, allowedRoles);
     if (!isAllowed) {
       return <Navigate to="/" replace />;
     }

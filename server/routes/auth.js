@@ -32,11 +32,16 @@ function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
 }
 
+function foundingTesterActiveFor(user) {
+  return hasFoundingTesterAccess(user);
+}
+
 function serializeAuthUserPayload(user) {
   const role = String(user.role || 'user');
   const perms = user.adminPermissions || {};
   const isSuperAdmin = role === 'superadmin';
   const isAdmin = role === 'admin' || isSuperAdmin;
+  const foundingTesterActive = foundingTesterActiveFor(user);
   return {
     id: user._id,
     username: user.username,
@@ -53,6 +58,10 @@ function serializeAuthUserPayload(user) {
       canManagePayments: isSuperAdmin || Boolean(perms.canManagePayments),
       canViewAnalytics: isSuperAdmin || Boolean(perms.canViewAnalytics),
     },
+    betaTester: Boolean(user.betaTester),
+    foundingAccess: Boolean(user.foundingAccess),
+    foundingTesterActive,
+    isBetaTester: foundingTesterActive,
   };
 }
 
@@ -99,11 +108,8 @@ function serializeAuthMePayload(user) {
     badges: Array.isArray(user.badges) ? user.badges : [],
     earlyAdopterLocked: Boolean(user.earlyAdopterLocked),
     earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice || null,
-    betaTester: Boolean(user.betaTester),
-    foundingAccess: Boolean(user.foundingAccess),
     betaAccessExpiresAt: user.betaAccessExpiresAt || null,
-    foundingTesterAccess: hasFoundingTesterAccess(user),
-    isBetaTester: hasFoundingTesterAccess(user),
+    foundingTesterAccess: foundingTesterActiveFor(user),
   };
 }
 

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { buildApiUrl } from '../lib/runtimeApi';
-import { isSuperAdminUser } from '../lib/adminAccess';
+import { hasAdminRole } from '../lib/adminAccess';
 
 const OwnerControlPanel = () => {
   const { user } = useAuth();
@@ -29,7 +29,7 @@ const OwnerControlPanel = () => {
   const [grantReason, setGrantReason] = useState('');
 
   useEffect(() => {
-    if (!isSuperAdminUser(user)) {
+    if (!hasAdminRole(user)) {
       return;
     }
     fetchStats();
@@ -167,7 +167,7 @@ const OwnerControlPanel = () => {
     }
   };
 
-  if (!isSuperAdminUser(user)) {
+  if (!hasAdminRole(user)) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">

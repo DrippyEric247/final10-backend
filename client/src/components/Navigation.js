@@ -3,8 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
 import { Bug, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { isCosmeticsAdmin } from '../lib/adminCosmetics';
-import { isAdminUser, isSuperAdminUser } from '../lib/adminAccess';
+import { hasAdminRole } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
 
 const Navigation = () => {
@@ -12,9 +11,7 @@ const Navigation = () => {
   const [showBugReport, setShowBugReport] = useState(false);
   const [alertUnreadCount, setAlertUnreadCount] = useState(0);
   const { user } = useAuth() || {};
-  const canAdmin = isCosmeticsAdmin(user);
-  const showOperatorNav = isAdminUser(user);
-  const showSuperadminNav = isSuperAdminUser(user);
+  const showAdminNav = hasAdminRole(user);
 
   useEffect(() => {
     if (!user) {
@@ -70,20 +67,11 @@ const Navigation = () => {
     { name: 'Build Wars', path: '/build-wars', icon: '⚔️' },
     { name: 'Battle Pass', path: '/battle-pass', icon: '🎯' },
     { name: 'Customize', path: '/customization', icon: '🎖️' },
-    ...(canAdmin
-      ? [{ name: 'Grants', path: '/admin/cosmetics', icon: '👑' }]
-      : []),
-    ...(showOperatorNav
-      ? [{ name: 'SavvyShield', path: '/shield-dashboard', icon: '🛡️' }]
-      : []),
-    ...(showSuperadminNav
-      ? [{ name: 'Owner Control', path: '/owner-control', icon: '👑' }]
-      : []),
-    ...(showOperatorNav
+    ...(showAdminNav
       ? [
-          { name: 'Launch KPIs', path: '/launch-kpis', icon: '📊' },
-          { name: 'Growth Levers', path: '/growth-levers', icon: '🚀' },
-          { name: 'Prod Readiness', path: '/production-readiness', icon: '✅' },
+          { name: 'Admin', path: '/admin/cosmetics', icon: '⚙️' },
+          { name: 'Shield', path: '/shield-dashboard', icon: '🛡️' },
+          { name: 'Founder Admin', path: '/owner-control', icon: '👑' },
         ]
       : []),
   ];

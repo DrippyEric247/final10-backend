@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { buildApiUrl } from '../lib/runtimeApi';
-import { isAdminUser, isSuperAdminUser } from '../lib/adminAccess';
+import { isAdminUser } from '../lib/adminAccess';
 
 const ShieldDashboard = () => {
   const { user } = useAuth();
@@ -122,14 +122,14 @@ const ShieldDashboard = () => {
     }
   };
 
-  if (!isSuperAdminUser(user)) {
+  if (!isAdminUser(user)) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
           <Shield className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-          <p className="text-gray-400">Superadmin access required for SavvyShield Dashboard</p>
-          <p className="text-gray-500 text-sm mt-2">Only the system owner can control the AI fraud prevention system</p>
+          <p className="text-gray-400">Admin access required for SavvyShield Dashboard</p>
+          <p className="text-gray-500 text-sm mt-2">Contact a superadmin if you need operator access</p>
         </div>
       </div>
     );
