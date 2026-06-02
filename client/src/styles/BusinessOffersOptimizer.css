@@ -116,6 +116,50 @@
 
 .optimizer-horizontal-lane::-webkit-scrollbar { display: none; }
 
+.optimizer-cart-card {
+  min-width: 220px;
+  max-width: 260px;
+}
+
+.optimizer-cart-img-wrap {
+  width: 100%;
+  height: 108px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.optimizer-cart-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.optimizer-view-deal-btn {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
+  cursor: pointer;
+}
+
+.optimizer-view-deal-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.optimizer-view-deal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .optimizer-item-card {
   min-width: 250px;
   border-radius: 14px;

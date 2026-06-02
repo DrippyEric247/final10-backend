@@ -1,10 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import businessOffersService from "../services/businessOffersService";
 import { incrementJourneyStep } from "../lib/tabJourney";
 import { SAVVY_SCOUT } from "../config/savvyScoutBranding";
+import {
+  buildLifeOptimizerBundle,
+  formatOptimizerMoney,
+  openOptimizerDeal,
+  OPTIMIZER_FALLBACK_SUGGESTIONS,
+} from "../lib/lifeOptimizerBundle";
 import "../styles/BusinessOffersOptimizer.css";
 
 const HERO_LINES = [
@@ -66,13 +72,6 @@ const RETAIL_BATTLE_ROWS = [
   { metric: "Shipping", values: ["B", "A", "A", "B", "A", "B", "B", "C", "B"] },
 ];
 
-const SMART_CART_BY_KEYWORD = {
-  ps5: ["DualSense Edge", "Charging Dock", "Gaming Headset", "PSVR2", "SSD Expansion", "Gaming Chair", "4K Monitor", "Snacks + Drinks", "Extended Warranty"],
-  gaming: ["Mechanical Keyboard", "Low-Latency Mouse", "RGB Desk Mat", "Streaming Cam", "Capture Card", "Blue Light Glasses"],
-  grocery: ["Protein Pack", "Grill Combo", "Hydration Bundle", "Bulk Pantry Stack", "Family Pack Produce"],
-  bmw: ["Wheel Cleaner", "Ceramic Detail Kit", "Carbon Trim Set", "Ambient Light Kit", "Seat Protection Set"],
-};
-
 function useTypewriter(lines) {
   const [lineIndex, setLineIndex] = useState(0);
   const [charCount, setCharCount] = useState(0);
@@ -108,6 +107,10 @@ export default function BusinessOffersDashboard() {
   const [command, setCommand] = useState("");
   const [selectedChip, setSelectedChip] = useState("Budget Mode");
   const [liveNoticeIndex, setLiveNoticeIndex] = useState(0);
+  const [bundleLoading, setBundleLoading] = useState(false);
+  const [bundleError, setBundleError] = useState("");
+  const [bundleResult, setBundleResult] = useState(null);
+  const [scoutMessage, setScoutMessage] = useState("");
 
   const { data: overview } = useQuery({
     queryKey: ["business-offers-overview"],
@@ -148,16 +151,33 @@ export default function BusinessOffersDashboard() {
     return () => window.clearInterval(id);
   }, [notices.length]);
 
-  const lowerCommand = command.toLowerCase();
-  const smartItems = useMemo(() => {
-    if (lowerCommand.includes("ps5")) return SMART_CART_BY_KEYWORD.ps5;
-    if (lowerCommand.includes("gaming")) return SMART_CART_BY_KEYWORD.gaming;
-    if (lowerCommand.includes("grocery") || lowerCommand.includes("cookout") || lowerCommand.includes("meal")) return SMART_CART_BY_KEYWORD.grocery;
-    if (lowerCommand.includes("bmw") || lowerCommand.includes("auto")) return SMART_CART_BY_KEYWORD.bmw;
-    return ["Starter Bundle", "Savings Pairing", "Smart Add-on", "Top Cashback Match", "Trust Optimized Choice"];
-  }, [lowerCommand]);
+  const runOptimization = useCallback(async (overrideQuery) => {
+    const q = String(overrideQuery ?? command).trim() || REQUEST_HINTS[hintIndex];
+    if (!q) return;
+    setBundleLoading(true);
+    setBundleError("");
+    setCommand(q);
+    try {
+      const result = await buildLifeOptimizerBundle(q, {
+        chip: selectedChip,
+        triggerScout: true,
+      });
+      setBundleResult(result);
+      setScoutMessage(result.scoutLine || `${SAVVY_SCOUT.shortTitle} built your Smart Cart.`);
+      incrementJourneyStep("/business-offers", "run_optimizer", 1);
+    } catch (err) {
+      setBundleError(err?.message || "Could not load eBay results. Try again shortly.");
+      setBundleResult(null);
+    } finally {
+      setBundleLoading(false);
+    }
+  }, [command, hintIndex, selectedChip]);
 
-  const projectedPoints = 180 + smartItems.length * 44 + (selectedChip === "Luxury Mode" ? 120 : 0);
+  const cartRows = bundleResult?.searchRows?.filter((r) => r.pick) || [];
+  const bundle = bundleResult?.bundle;
+  const projectedPoints =
+    bundle?.savvyPointsEstimate ??
+    180 + cartRows.length * 44 + (selectedChip === "Luxury Mode" ? 120 : 0);
 
   return (
     <div className="min-h-screen life-optimizer-bg text-white pt-20">
@@ -203,8 +223,23 @@ export default function BusinessOffersDashboard() {
               placeholder={REQUEST_HINTS[hintIndex]}
               className="optimizer-command-input flex-1"
             />
-            <button type="button" className="optimizer-command-btn">Run Optimization</button>
+            <button
+              type="button"
+              className="optimizer-command-btn"
+              onClick={() => void runOptimization()}
+              disabled={bundleLoading}
+            >
+              {bundleLoading ? "Searching eBay…" : "Run Optimization"}
+            </button>
           </div>
+          {bundleError ? (
+            <p className="mt-2 text-sm text-red-300">{bundleError}</p>
+          ) : null}
+          {scoutMessage ? (
+            <p className="mt-2 text-sm text-violet-200 font-semibold">
+              {SAVVY_SCOUT.shortTitle}: {scoutMessage}
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             {REQUEST_CHIPS.map((chip) => (
               <button
@@ -220,20 +255,110 @@ export default function BusinessOffersDashboard() {
         </section>
 
         <section className="optimizer-panel rounded-2xl p-5">
-          <h2 className="text-xl font-black">AI SMART CART</h2>
-          <p className="text-sm text-slate-300 mb-3">Users usually pair this with...</p>
-          <div className="optimizer-horizontal-lane">
-            {smartItems.map((it, i) => (
-              <motion.article key={`${it}-${i}`} className="optimizer-item-card" whileHover={{ y: -4, scale: 1.01 }}>
-                <div className="text-white font-semibold">{it}</div>
-                <div className="text-xs text-emerald-300 mt-1">Market savings: ${22 + i * 8}</div>
-                <div className="text-xs text-slate-300">Best retailer: {RETAILERS[i % RETAILERS.length]}</div>
-                <div className="text-xs text-slate-300">Bundle bonus: +{8 + i * 3}%</div>
-                <div className="text-xs text-amber-300">Savvy points: +{34 + i * 11}</div>
-                <div className="text-xs text-slate-300">Trust: {i % 2 === 0 ? "HIGH" : "MED"} · AI score: {84 - i * 2}</div>
-              </motion.article>
-            ))}
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-xl font-black">AI SMART CART</h2>
+              <p className="text-sm text-slate-300">
+                Live eBay Browse picks — ranked by price, trust, seller rating, and shipping.
+              </p>
+            </div>
+            {bundle?.itemCount > 0 ? (
+              <div className="text-right text-xs text-slate-300 space-y-0.5">
+                <div>
+                  Est. total:{" "}
+                  <span className="text-emerald-300 font-bold">
+                    {formatOptimizerMoney(bundle.estimatedTotal)}
+                  </span>
+                </div>
+                <div>
+                  Est. savings:{" "}
+                  <span className="text-amber-300 font-bold">
+                    {formatOptimizerMoney(bundle.estimatedSavings)}
+                  </span>
+                </div>
+                <div>
+                  Trust:{" "}
+                  <span className="text-cyan-200 font-bold">{bundle.avgTrustScore}%</span> · Savvy pts ~{" "}
+                  <span className="text-amber-200 font-bold">{projectedPoints}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
+
+          {bundleLoading ? (
+            <p className="text-sm text-cyan-200 animate-pulse">
+              {SAVVY_SCOUT.shortTitle} is hunting eBay listings for your bundle…
+            </p>
+          ) : null}
+
+          {!bundleLoading && cartRows.length === 0 ? (
+            <div className="rounded-xl border border-slate-600/40 bg-slate-900/50 p-4 space-y-3">
+              <p className="text-sm text-slate-300">
+                Run an optimization to build a Smart Cart from real eBay results. Try:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {OPTIMIZER_FALLBACK_SUGGESTIONS.map((s) => (
+                  <button
+                    key={s.query}
+                    type="button"
+                    className="optimizer-chip"
+                    onClick={() => void runOptimization(s.query)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="optimizer-horizontal-lane">
+              {cartRows.map(({ group, pick, poolSize }) => (
+                <motion.article
+                  key={`${group.label}-${pick.itemId}`}
+                  className="optimizer-item-card optimizer-cart-card"
+                  whileHover={{ y: -4, scale: 1.01 }}
+                >
+                  <div className="optimizer-cart-img-wrap">
+                    <img src={pick.image} alt="" loading="lazy" />
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wider text-violet-300 font-bold">
+                    {group.label}
+                  </div>
+                  <div className="text-white font-semibold text-sm line-clamp-2">{pick.title}</div>
+                  <div className="text-sm text-emerald-300 font-bold mt-1">
+                    {formatOptimizerMoney(pick.price)}
+                    {pick.shippingCost > 0 ? (
+                      <span className="text-slate-400 font-normal text-xs">
+                        {" "}
+                        + {formatOptimizerMoney(pick.shippingCost)} ship
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-normal text-xs"> · check shipping on eBay</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-300 mt-1">
+                    Seller: {pick.sellerUsername}
+                    {pick.sellerFeedbackPercent != null
+                      ? ` · ${Math.round(pick.sellerFeedbackPercent)}%`
+                      : ""}
+                  </div>
+                  <div className="text-xs text-slate-300">
+                    Trust {Math.round(pick.trustScore || 0)}% · {poolSize} compared
+                  </div>
+                  <button
+                    type="button"
+                    className="optimizer-view-deal-btn mt-2"
+                    onClick={() => openOptimizerDeal(pick.url)}
+                    disabled={!pick.url}
+                  >
+                    View Deal
+                  </button>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Opens eBay — complete purchase on the retailer site.
+                  </p>
+                </motion.article>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="optimizer-panel rounded-2xl p-5">
@@ -281,7 +406,10 @@ export default function BusinessOffersDashboard() {
               <div>Finish gaming setup → unlock badge</div>
             </div>
             <div className="mt-4 h-3 rounded-full bg-slate-800 overflow-hidden">
-              <motion.div className="h-full bg-gradient-to-r from-violet-500 to-cyan-400" animate={{ width: `${Math.min(96, 24 + smartItems.length * 8)}%` }} />
+              <motion.div
+                className="h-full bg-gradient-to-r from-violet-500 to-cyan-400"
+                animate={{ width: `${Math.min(96, 24 + cartRows.length * 8)}%` }}
+              />
             </div>
           </div>
         </section>
@@ -290,7 +418,30 @@ export default function BusinessOffersDashboard() {
           <h2 className="text-xl font-black mb-3">LIFE SCENARIOS</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {SCENARIOS.map((s, i) => (
-              <motion.article key={s} className="optimizer-scenario-card" whileHover={{ y: -4 }}>
+              <motion.article
+                key={s}
+                className="optimizer-scenario-card cursor-pointer"
+                whileHover={{ y: -4 }}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  const q =
+                    s === "Starter Streamer Setup"
+                      ? "starter streaming room"
+                      : s.toLowerCase();
+                  void runOptimization(q);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    const q =
+                      s === "Starter Streamer Setup"
+                        ? "starter streaming room"
+                        : s.toLowerCase();
+                    void runOptimization(q);
+                  }
+                }}
+              >
                 <div className="font-bold text-white">🔥 {s}</div>
                 <div className="text-xs text-slate-300 mt-2">Optimized budget: ${90 + i * 22}</div>
                 <div className="text-xs text-slate-300">AI savings: ${28 + i * 7}</div>
