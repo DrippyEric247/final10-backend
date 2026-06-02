@@ -6,7 +6,6 @@ import { getApiBaseUrl } from "./runtimeApi";
 import {
   gatedRequest,
   markGlobalCooling,
-  resetAuthMeBootstrap,
 } from "./apiRequestGate";
 
 export {

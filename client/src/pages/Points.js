@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { claimDailyLogin } from "../lib/api";
 import { SAVVY_AUTH_REFRESH_REQUEST } from "../store/savvyStore";

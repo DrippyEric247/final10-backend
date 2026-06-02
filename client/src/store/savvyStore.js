@@ -83,7 +83,7 @@ function mergeRecentFeed(walletRecent, txRows) {
 }
 
 export function SavvyPointsProvider({ children }) {
-  const { user, loading, patchUser } = useAuth();
+  const { user, patchUser } = useAuth();
   const [walletTick, setWalletTick] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState([]);
   const pointsSyncTimerRef = useRef(null);

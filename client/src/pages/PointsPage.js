@@ -90,7 +90,7 @@ export default function PointsPage() {
     } finally {
       setLoading(false);
     }
-  }, [refreshProfile]);
+  }, []);
 
   useEffect(() => {
     void loadWallet();
