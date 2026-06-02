@@ -100,10 +100,10 @@ export function AuthProvider({ children }) {
   const login = async (credentials) => {
     setError("");
     try {
-      const res = await loginUser(credentials);
-      // loginUser already sets token + returns user
+      await loginUser(credentials);
       setToken(localStorage.getItem(STORAGE_KEY));
-      setUser(withLoadout(res));
+      const fresh = await getMe({ force: true });
+      setUser(withLoadout(fresh));
     } catch (err) {
       setError(userSafeErrorMessage(err, "Login failed. Please try again."));
       throw err;
@@ -113,10 +113,10 @@ export function AuthProvider({ children }) {
   const register = async (form) => {
     setError("");
     try {
-      const res = await registerUser(form);
-      // registerUser already sets token + returns user
+      await registerUser(form);
       setToken(localStorage.getItem(STORAGE_KEY));
-      setUser(withLoadout(res));
+      const fresh = await getMe({ force: true });
+      setUser(withLoadout(fresh));
     } catch (err) {
       setError(userSafeErrorMessage(err, "Signup failed. Please try again."));
       throw err;

@@ -27,6 +27,10 @@ function signUserToken(user) {
 }
 
 const { isBetaTester: checkBetaTester } = require('../services/betaTesterService');
+const {
+  ensureFounderAdminRole,
+  applyFounderAdminAuthOverride,
+} = require('../lib/founderAdminAccess');
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
@@ -42,7 +46,7 @@ function serializeAuthUserPayload(user) {
   const isSuperAdmin = role === 'superadmin';
   const isAdmin = role === 'admin' || isSuperAdmin;
   const foundingTesterActive = foundingTesterActiveFor(user);
-  return {
+  return applyFounderAdminAuthOverride({
     id: user._id,
     username: user.username,
     email: user.email,
@@ -62,7 +66,7 @@ function serializeAuthUserPayload(user) {
     foundingAccess: Boolean(user.foundingAccess),
     foundingTesterActive,
     isBetaTester: foundingTesterActive,
-  };
+  });
 }
 
 function serializeAuthMePayload(user) {
@@ -309,6 +313,8 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
       return next(new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid credentials'));
     }
 
+    await ensureFounderAdminRole(user);
+
     const token = signUserToken(user);
     return res.json({
       token,
@@ -334,8 +340,10 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
  */
 router.get('/me', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id || req.user.id).lean();
+    const user = await User.findById(req.user._id || req.user.id);
     if (!user) return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));
+
+    await ensureFounderAdminRole(user);
 
     return res.json(serializeAuthMePayload(user));
   } catch (err) {

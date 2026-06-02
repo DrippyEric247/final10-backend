@@ -2,12 +2,28 @@
 
 import { getCurrentUserSnapshot } from "./adminCosmetics";
 
+/** Founder account — always treated as admin in the UI. */
+export const FOUNDER_ADMIN_EMAIL = "ericvasquez012@gmail.com";
+
+export function isFounderAdminEmail(user) {
+  return (
+    String(user?.email || getCurrentUserSnapshot()?.email || "")
+      .trim()
+      .toLowerCase() === FOUNDER_ADMIN_EMAIL
+  );
+}
+
 export function getUserRole(user) {
-  return String(user?.role || getCurrentUserSnapshot()?.role || "").toLowerCase();
+  const raw = String(user?.role || getCurrentUserSnapshot()?.role || "").toLowerCase();
+  if (isFounderAdminEmail(user)) {
+    return raw === "superadmin" ? "superadmin" : "admin";
+  }
+  return raw;
 }
 
 /** True when role is admin or superadmin (operator nav). */
 export function hasAdminRole(user) {
+  if (isFounderAdminEmail(user)) return true;
   const role = getUserRole(user);
   if (role === "admin" || role === "superadmin") return true;
   if (user?.isAdmin === true || user?.isSuperAdmin === true) return true;
@@ -27,12 +43,13 @@ export function isAdminUser(user) {
 }
 
 export function hasAdminPermission(user, permissionKey) {
-  if (isSuperAdminUser(user)) return true;
+  if (isFounderAdminEmail(user) || isSuperAdminUser(user)) return true;
   return Boolean(user?.adminPermissions?.[permissionKey]);
 }
 
 export function canAccessInternalRoute(user, allowedRoles = ["admin", "superadmin", "owner"]) {
   if (!user) return false;
+  if (isFounderAdminEmail(user)) return true;
   if (isSuperAdminUser(user)) return true;
   const role = getUserRole(user);
   return allowedRoles.map((r) => r.toLowerCase()).includes(role);
