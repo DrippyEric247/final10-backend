@@ -29,6 +29,7 @@ import { SAVVY_SCOUT, SCOUT_COPY } from "../config/savvyScoutBranding";
 import {
   buildVoiceAlertPayload,
   getSavvyAiCapabilities,
+  extractShoppingIntent,
   parseVoiceDealIntent,
 } from "../lib/savvyAiSystem";
 import "../styles/Final10SideAssistant.css";
@@ -717,8 +718,27 @@ export default function Final10SideAssistant() {
     window.setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
-  const runDealSearch = useCallback(async (query, limit = 6) => {
-    const key = query.toLowerCase().trim();
+  const runDealSearch = useCallback(async (queryOrIntent, limit = 6) => {
+    const intent =
+      typeof queryOrIntent === "string"
+        ? extractShoppingIntent(queryOrIntent)
+        : queryOrIntent && typeof queryOrIntent === "object"
+          ? queryOrIntent
+          : null;
+    const query = String(intent?.query || queryOrIntent || "").trim();
+    if (!query) return [];
+
+    const keyObj = {
+      q: query.toLowerCase(),
+      maxPrice: intent?.maxPrice ?? null,
+      minPrice: intent?.minPrice ?? null,
+      minTrust: intent?.minTrust ?? null,
+      category: intent?.category ?? null,
+      brands: Array.isArray(intent?.brands) ? intent.brands : [],
+      dealType: intent?.dealType ?? "any",
+      budgetPreference: intent?.budgetPreference ?? "any",
+    };
+    const key = JSON.stringify(keyObj);
     const cache = searchCacheRef.current;
     const cached = cache.get(key);
     if (cached && Date.now() - cached.ts < SEARCH_CACHE_TTL_MS) {
@@ -730,7 +750,24 @@ export default function Final10SideAssistant() {
       await new Promise((r) => setTimeout(r, MIN_API_INTERVAL_MS - sinceLast));
     }
     lastApiAtRef.current = Date.now();
-    const data = await ebayService.searchItems({ q: query, limit: Math.max(6, Number(limit) || 6) });
+    const categoryMap = {
+      gaming: "video-games",
+      electronics: "electronics",
+      auto: "auto-parts",
+      sneakers: "fashion",
+      collectibles: "collectibles",
+    };
+    const params = {
+      q: query,
+      limit: Math.max(6, Number(limit) || 6),
+      ...(intent?.maxPrice ? { maxPrice: intent.maxPrice } : {}),
+      ...(intent?.minPrice ? { minPrice: intent.minPrice } : {}),
+      ...(intent?.minTrust ? { minTrust: intent.minTrust } : {}),
+      ...(intent?.category && categoryMap[intent.category]
+        ? { category: categoryMap[intent.category] }
+        : {}),
+    };
+    const data = await ebayService.searchItems(params);
     const results = (data?.items || [])
       .map(normalizeDealItem)
       .filter(Boolean)
@@ -851,6 +888,7 @@ export default function Final10SideAssistant() {
   const buildAnswer = useCallback(
     async (rawQuery) => {
       const query = rawQuery.trim();
+      const shoppingIntent = extractShoppingIntent(query);
       const intent = detectIntent(query);
 
       if (intent === "monitor") {
@@ -888,12 +926,9 @@ export default function Final10SideAssistant() {
       }
 
       if (intent === "best_move") {
-        const bestMoveQuery = query
-          .replace(/\b(best move|best deal(s)? (today|right now)|biggest savings?|largest savings?|top savings?)\b/gi, "")
-          .trim();
-        const searchQuery = bestMoveQuery || "best deals today";
+        const searchIntent = shoppingIntent || extractShoppingIntent("best deals today");
         try {
-          const deals = await runDealSearch(searchQuery);
+          const deals = await runDealSearch(searchIntent);
           if (!deals.length) {
             return {
               intent,
@@ -929,7 +964,7 @@ export default function Final10SideAssistant() {
 
       if (intent === "trending") {
         try {
-          const data = await ebayService.getTrendingItems("all", 12);
+          const data = await ebayService.getTrendingItems(shoppingIntent?.category || "all", 12);
           const deals = (data?.items || data?.trendingAuctions || [])
             .map(normalizeDealItem)
             .filter(Boolean)
@@ -986,7 +1021,7 @@ export default function Final10SideAssistant() {
       }
 
       try {
-        const deals = await runDealSearch(query);
+        const deals = await runDealSearch(shoppingIntent || query);
         const topic = inferTopic(query);
         const category = categoryFromTopic(topic);
 

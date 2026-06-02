@@ -37,33 +37,118 @@ export function getSavvyAiCapabilities(tier = getEffectiveSubscriptionTier()) {
   };
 }
 
-export function parseVoiceDealIntent(text) {
-  const raw = String(text || "").trim();
+const PRODUCT_CATEGORY_HINTS = [
+  { pat: /\b(ps5|playstation|xbox|switch|nintendo|gaming pc|gaming laptop|rtx|4090|gpu)\b/i, category: "gaming" },
+  { pat: /\b(iphone|ipad|airpods|macbook|apple watch|samsung|pixel)\b/i, category: "electronics" },
+  { pat: /\b(bmw|mercedes|audi|wheel|wheels|rim|rims|car part|automotive)\b/i, category: "auto" },
+  { pat: /\b(sneaker|jordan|yeezy|nike dunk|adidas)\b/i, category: "sneakers" },
+  { pat: /\b(pokemon|pok[eé]mon|trading card|mtg|card lot)\b/i, category: "collectibles" },
+];
+
+const BRAND_HINTS = [
+  "sony",
+  "playstation",
+  "nintendo",
+  "microsoft",
+  "xbox",
+  "apple",
+  "samsung",
+  "bmw",
+  "nike",
+  "adidas",
+  "nvidia",
+  "amd",
+  "intel",
+  "rolex",
+];
+
+function normalizeWhitespace(s) {
+  return String(s || "").replace(/\s+/g, " ").trim();
+}
+
+function extractBrands(textLower) {
+  return BRAND_HINTS.filter((b) => new RegExp(`\\b${b}\\b`, "i").test(textLower));
+}
+
+function extractCategory(text) {
+  const hit = PRODUCT_CATEGORY_HINTS.find((x) => x.pat.test(text));
+  return hit ? hit.category : null;
+}
+
+/**
+ * Convert natural language shopping requests into a structured object
+ * suitable for marketplace querying and alert creation.
+ */
+export function extractShoppingIntent(text) {
+  const raw = normalizeWhitespace(text);
   if (!raw) return null;
   const lower = raw.toLowerCase();
-  const m = lower.match(/(?:under|below|less than)\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
-  const maxPrice = m ? Number(m[1]) : undefined;
-  const highTrust = /\bhigh trust\b|\btrusted\b|\btop trust\b/i.test(lower);
-  const condMatch = lower.match(/\b(new|used|refurbished|open box|excellent|very good|good)\b/i);
-  const preferredCondition = condMatch ? condMatch[1].toLowerCase() : undefined;
-  const normalizedQuery = raw
-    .replace(/^(find|search|show|look for|watch|track)\s+/i, "")
-    .replace(/\s+(deals?|listings?)\b/gi, "")
-    .replace(/\s+(with|and)\s+high trust\b/gi, "")
-    .replace(/\s+\bhigh trust\b/gi, "")
-    .replace(/\s+\b(new|used|refurbished|open box|excellent|very good|good)\b/gi, "")
-    .replace(/\s+(under|below|less than)\s*\$?\s*\d+(?:\.\d{1,2})?/i, "")
+
+  const underMatch = lower.match(/(?:under|below|less than|<=?)\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  const overMatch = lower.match(/(?:over|above|more than|>=?)\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  const aroundMatch = lower.match(/(?:around|about|~)\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+
+  const maxPrice = underMatch ? Number(underMatch[1]) : aroundMatch ? Number(aroundMatch[1]) : undefined;
+  const minPrice = overMatch ? Number(overMatch[1]) : undefined;
+
+  const monitorRequested =
+    /\b(alert|alerts|notify|notification|watch|watchlist|track|tracking|monitor|monitoring|price drop|drops below)\b/i.test(lower);
+
+  const bestMoveRequested =
+    /\b(best move|best deal(s)? (today|right now)|biggest savings?|largest savings?|top savings?)\b/i.test(lower);
+
+  const trendingRequested =
+    /\b(what('| i)?s hot( today)?|trending|popular right now|what are people buying)\b/i.test(lower);
+
+  const goal = bestMoveRequested ? "best_move" : trendingRequested ? "trending" : monitorRequested ? "monitor" : "search";
+
+  const preferredConditionMatch = lower.match(/\b(new|used|refurbished|open box|excellent|very good|good)\b/i);
+  const preferredCondition = preferredConditionMatch ? preferredConditionMatch[1].toLowerCase() : undefined;
+  const highTrustOnly = /\bhigh trust|trusted|safe seller|reliable seller\b/i.test(lower);
+
+  const cleanedQuery = raw
+    .replace(/^(find|show|search|look for|i('?m| am) looking for|any good)\s+/i, "")
+    .replace(/\b(deals?|listings?|products?)\b/gi, "")
+    .replace(/\b(today|right now|please)\b/gi, "")
+    .replace(/\b(cheap|affordable|budget)\b/gi, "")
+    .replace(/\b(alert|alerts|notify me|watch|track|monitor(?:ing)?)\b/gi, "")
+    .replace(/\b(under|below|less than|over|above|more than|around|about|~)\s*\$?\s*\d+(?:\.\d{1,2})?/gi, "")
+    .replace(/\s{2,}/g, " ")
     .trim();
-  const query = normalizedQuery || raw;
-  if (!query) return null;
+
+  const query = cleanedQuery || raw;
+  const keywords = query.split(/\s+/).filter(Boolean).slice(0, 8);
+  const brands = extractBrands(lower);
+  const category = extractCategory(lower);
+
   return {
-    query, // Keep backward compatibility for existing call sites.
-    item: query,
+    raw,
+    goal, // search | monitor | best_move | trending
+    query,
+    item: query, // backward compatibility
+    keywords,
+    brands,
+    category,
     maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
-    minTrust: highTrust ? 80 : undefined,
-    highTrustOnly: highTrust,
+    minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
     preferredCondition,
+    highTrustOnly,
+    minTrust: highTrustOnly ? 80 : undefined,
+    dealType: /\bauction|bid\b/i.test(lower) ? "auction" : /\bbuy now\b/i.test(lower) ? "buy_now" : "any",
+    budgetPreference: /\bcheap|affordable|budget\b/i.test(lower) ? "cheap" : "any",
+    shoppingGoal:
+      goal === "best_move"
+        ? "maximize_savings"
+        : goal === "trending"
+          ? "discover_hot"
+          : goal === "monitor"
+            ? "price_drop_alert"
+            : "find_matches",
   };
+}
+
+export function parseVoiceDealIntent(text) {
+  return extractShoppingIntent(text);
 }
 
 export function buildVoiceAlertPayload(intent) {

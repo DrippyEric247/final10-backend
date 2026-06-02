@@ -6,6 +6,7 @@ import { emitPowerToast } from '../../lib/final10PowerFeedback';
 import { trackQuickSnipeAction } from '../../lib/analytics';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import QuickSnipeSavvyRewards from './QuickSnipeSavvyRewards';
+import { getTopCategories } from '../../lib/userBehavior';
 
 const TRENDING_SNEAKERS = [
   { label: 'Jordan 1', query: 'air jordan 1' },
@@ -37,6 +38,13 @@ const TRENDING_BMW = [
   { label: 'M3 V8', query: 'bmw e92 m3 parts' },
   { label: 'E60 M5', query: 'bmw e60 m5 exhaust' },
   { label: 'F80 M3', query: 'bmw f80 m3 carbon' },
+];
+
+const TRENDING_COLLECTIBLES = [
+  { label: 'Pokémon', query: 'pokemon cards' },
+  { label: 'Sports Cards', query: 'sports cards lot' },
+  { label: 'Hot Wheels', query: 'hot wheels rare' },
+  { label: 'MTG', query: 'magic the gathering cards' },
 ];
 
 function toMoney(v) {
@@ -143,6 +151,18 @@ function buildTrustBadges(item) {
 }
 
 function sortSavvyItems(items, liveTick) {
+  const userInterests = getTopCategories(3).map((x) => String(x.category || '').toLowerCase());
+  const inferInterest = (row) => {
+    const cat = String(row.categoryId || row.category || '').toLowerCase();
+    const title = String(row.title || '').toLowerCase();
+    if (cat) return cat;
+    if (/bmw|b58|exhaust|wheel|rim|automotive|car part/.test(title)) return 'auto';
+    if (/ps5|xbox|switch|rtx|gaming|pc/.test(title)) return 'gaming';
+    if (/iphone|airpods|ipad|apple watch|macbook/.test(title)) return 'electronics';
+    if (/pokemon|sports card|hot wheels|mtg/.test(title)) return 'collectibles';
+    if (/jordan|yeezy|nike|sneaker/.test(title)) return 'sneakers';
+    return 'all';
+  };
   const extract = (row) => ({
     trustScore: Number(row.trustScore) || 0,
     trustLevel: row.trustLevel,
@@ -153,16 +173,35 @@ function sortSavvyItems(items, liveTick) {
 
   const scored = items.map((item) => {
     const s = scoreListing(item, extract);
+    const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
+    const market = Number(item.marketValue ?? 0);
+    const savings = Math.max(0, market - price);
+    const savingsPct = market > 0 ? (savings / market) * 100 : 0;
+    const trust = Number(item.trustScore) || 0;
+    const demand = Math.max(0, Number(item.bidCount || 0) * 8 + (Number(item.confidenceScore || item.aiConfidence) || 0) * 0.6);
+    const interest = inferInterest(item);
+    const personalizedBoost = userInterests.includes(interest) ? 28 : 0;
+    const wowScore =
+      Math.min(300, savings) * 0.9 +
+      Math.min(60, savingsPct) * 2.4 +
+      trust * 1.4 +
+      demand +
+      personalizedBoost;
     const risky =
       !item.safeToRecommend ||
       item.trustLevel === 'unverified' ||
       (Number(item.trustScore) < 32 && feedbackCount(item) < 5);
-    return { item, ...s, risky };
+    const extraordinary =
+      !risky &&
+      trust >= 70 &&
+      (savings >= 80 || savingsPct >= 18) &&
+      (Number(item.bidCount || 0) >= 2 || Number(item.confidenceScore || item.aiConfidence) >= 70);
+    return { item, ...s, risky, wowScore, savings, savingsPct, extraordinary, personalizedBoost, interest };
   });
 
   scored.sort((a, b) => {
     if (a.risky !== b.risky) return a.risky ? 1 : -1;
-    return b.bestMoveScore - a.bestMoveScore;
+    return b.wowScore - a.wowScore || b.bestMoveScore - a.bestMoveScore;
   });
 
   return scored;
@@ -207,6 +246,8 @@ export default function QuickSnipesSavvyResults({
   const [banner, setBanner] = useState('');
 
   const ranked = useMemo(() => sortSavvyItems(items || [], liveTick), [items, liveTick]);
+  const extraordinary = useMemo(() => ranked.filter((x) => x.extraordinary), [ranked]);
+  const cardsToRender = extraordinary.length > 0 ? extraordinary : [];
 
   const headerStats = useMemo(() => {
     const n = ranked.length;
@@ -293,6 +334,7 @@ export default function QuickSnipesSavvyResults({
           <TrendingRow title="Trending watches" chips={TRENDING_WATCHES} runHunt={runHunt} />
           <TrendingRow title="Trending BMW parts" chips={TRENDING_BMW} runHunt={runHunt} />
         </div>
+        <TrendingRow title="Trending collectibles" chips={TRENDING_COLLECTIBLES} runHunt={runHunt} />
       </div>
 
       <div className="qscc-savvy-header flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
@@ -323,11 +365,19 @@ export default function QuickSnipesSavvyResults({
         </div>
       </div>
 
+      {cardsToRender.length === 0 ? (
+        <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-5 py-6 text-amber-100">
+          <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Emergency wow mode</div>
+          <h4 className="text-xl font-black text-white">No extraordinary opportunities detected right now.</h4>
+          <p className="text-sm text-amber-100/90 mt-2">
+            Savvy paused low-interest filler. Tap a trending lane above to hunt high-intent products only.
+          </p>
+        </div>
+      ) : (
       <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {ranked.map(({ item, bestMoveScore, risky }, idx) => {
+        {cardsToRender.map(({ item, risky, savings, savingsPct }, idx) => {
           const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
           const market = Number(item.marketValue ?? 0);
-          const savings = Math.max(0, market - price);
           const seconds = Math.max(0, Number(item.secondsRemaining || 0) - liveTick);
           const bids = Number(item.bidCount || 0);
           const badges = buildTrustBadges(item);
@@ -374,10 +424,17 @@ export default function QuickSnipesSavvyResults({
               </div>
 
               <div className="p-4 sm:p-5 flex flex-col flex-1 bg-gradient-to-b from-slate-900/40 to-slate-950/95">
-                <div className="text-emerald-300 font-black text-sm sm:text-base">SAVE {toMoney(savings)}</div>
+                <div className="text-[10px] font-black tracking-[0.2em] text-rose-300 uppercase">🔥 Best move of the day</div>
                 <h4 className="mt-1 text-white font-bold text-sm sm:text-base leading-snug line-clamp-2">{item.title}</h4>
-                <div className="mt-2 text-xs text-slate-400">
-                  Market {toMoney(market)} · Your price {toMoney(price)}
+                <div className="mt-3 text-xs text-slate-300 space-y-1.5">
+                  <div><span className="text-slate-400">Market Value:</span> <span className="font-bold text-slate-100">{toMoney(market)}</span></div>
+                  <div><span className="text-slate-400">Current Price:</span> <span className="font-bold text-slate-100">{toMoney(price)}</span></div>
+                  <div className="text-emerald-300 font-black">YOU SAVE: {toMoney(savings)}{Number.isFinite(savingsPct) && savingsPct > 0 ? ` (${Math.round(savingsPct)}%)` : ''}</div>
+                  <div><span className="text-slate-400">Trust Score:</span> <span className="font-bold text-cyan-200">{Math.round(Number(item.trustScore || 0))}%</span></div>
+                  <div><span className="text-slate-400">Only</span> <span className="font-black text-amber-200">{Math.max(1, bids)}</span> <span className="text-slate-400">similar listings found.</span></div>
+                  <div className="text-[11px] leading-relaxed text-violet-100/90 border border-violet-400/25 bg-violet-500/10 rounded-lg px-2.5 py-2 mt-2">
+                    Savvy found this because the seller is highly trusted, the price is {Math.max(0, Math.round(Number(savingsPct || 0)))}% below market, and demand is increasing.
+                  </div>
                 </div>
 
                 <QuickSnipeSavvyRewards item={item} effectiveSavings={savings} />
@@ -391,7 +448,7 @@ export default function QuickSnipesSavvyResults({
                       if (url) window.open(url, '_blank', 'noopener,noreferrer');
                     }}
                   >
-                    Buy
+                    View Deal
                   </button>
                   <button type="button" className="qscc-savvy-btn qscc-savvy-btn--ghost" onClick={() => onMeaningfulView(item, 'lane_watch')}>
                     Watch
@@ -416,6 +473,7 @@ export default function QuickSnipesSavvyResults({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

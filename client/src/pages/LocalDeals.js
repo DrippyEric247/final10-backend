@@ -10,7 +10,7 @@ import { emitPowerToast } from '../lib/final10PowerFeedback';
 import { evaluateBestMove } from '../lib/bestMoveEngine';
 import { evaluateTrustScore, trustScoreInputFromListing } from '../lib/trustScoreEngine';
 import { scoreListing } from '../lib/listingSectionsEngine';
-import { SCOUT_COPY, SCOUT_LABELS } from '../config/savvyScoutBranding';
+import { SCOUT_LABELS } from '../config/savvyScoutBranding';
 import GlobalSmartSearch from '../components/search/GlobalSmartSearch';
 import { useSearchIntent } from '../context/SearchIntentContext';
 import { filterItemsByIntent } from '../lib/smartSearch';
@@ -753,16 +753,36 @@ const LocalDeals = () => {
           />
         ) : null}
         {!listings.isLoading && !listings.error && hasSearchContext && visibleItems.length === 0 ? (
-          <EmptyState
-            title="No matches for this hunt"
-            description={`${SCOUT_COPY.empty.searchingLanes} Try broader keywords, another category, or a boosted Best Move search.`}
-            className="text-left items-stretch qscc-glass border-slate-600/40"
-            action={
+          <div className="qscc-glass border border-slate-600/40 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-4">
+              <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Emergency wow mode</div>
+              <h4 className="text-xl font-black text-white">No extraordinary opportunities detected right now.</h4>
+              <p className="text-sm text-slate-200 mt-2">
+                Savvy will not fill your feed with low-interest products.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[
+                { label: "🔥 Trending Gaming", q: "ps5 gaming pc deals" },
+                { label: "🔥 Trending Tech", q: "iphone airpods apple watch deals" },
+                { label: "🔥 Trending Automotive", q: "bmw wheels b58 exhaust deals" },
+              ].map((x) => (
+                <button
+                  key={x.label}
+                  type="button"
+                  className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-left text-sm font-bold text-violet-100 hover:bg-violet-500/15"
+                  onClick={() => runHunt(x.q, "emergency_wow", { loadingMessage: `Launching ${x.label.replace("🔥 ", "")} hunt...` })}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+            <div>
               <button type="button" className="f10-state__retry" onClick={() => void listings.refetch()}>
                 Refresh results
               </button>
-            }
-          />
+            </div>
+          </div>
         ) : null}
 
         {boostExhaustedOpen ? (
