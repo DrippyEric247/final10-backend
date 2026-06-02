@@ -266,6 +266,8 @@ function mirrorToAssistantDock(alert) {
           title: alert.headline,
           body: alert.body,
           priority: alert.priority + 1,
+          url: alert.url || "",
+          dealFound: true,
           ts: Date.now(),
         },
       })

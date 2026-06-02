@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import SavvyScoutButton from "./SavvyScoutButton";
+import SavvyScoutDealToast from "./SavvyScoutDealToast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -32,8 +34,16 @@ import {
   extractShoppingIntent,
   parseVoiceDealIntent,
 } from "../lib/savvyAiSystem";
+import {
+  SCOUT_DEAL_FOUND_EVENT,
+  SCOUT_STATE_EVENT,
+  isDealFoundFeedRow,
+} from "../lib/savvyScoutState";
 import "../styles/Final10SideAssistant.css";
 import SavvyWalletBubble from "./wallet/SavvyWalletBubble";
+
+const SCOUT_GREETING =
+  "Savvy Scout reporting. What opportunity are we hunting today?";
 
 const DISMISS_KEY = "f10_assistant_dismissed_ids";
 const HISTORY_KEY = "f10_savvy_ai_history";
@@ -567,6 +577,10 @@ export default function Final10SideAssistant() {
   const [expanded, setExpanded] = useState(false);
   const [unread, setUnread] = useState(0);
   const [coachToast, setCoachToast] = useState(null);
+  const [dealToast, setDealToast] = useState(null);
+  const [dealFoundFlash, setDealFoundFlash] = useState(false);
+  const [externalScoutState, setExternalScoutState] = useState(null);
+  const [showGreeting, setShowGreeting] = useState(false);
   const [activeTab, setActiveTab] = useState("ask");
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState(() => loadHistory());
@@ -584,6 +598,8 @@ export default function Final10SideAssistant() {
   const suggestionsFetchAtRef = useRef(0);
   const dismissedRef = useRef(loadDismissed());
   const autoOpenedUrgentRef = useRef(false);
+  const prevExpandedRef = useRef(false);
+  const dealFlashTimerRef = useRef(0);
   const searchCacheRef = useRef(new Map());
   const lastApiAtRef = useRef(0);
   const debounceRef = useRef(0);
@@ -649,6 +665,22 @@ export default function Final10SideAssistant() {
         if (isNew) {
           window.queueMicrotask(() => {
             setUnread((u) => u + 1);
+            if (isDealFoundFeedRow(d)) {
+              setDealToast({
+                id: row.id,
+                title: "Deal found!",
+                message: row.body || "I found something worth checking.",
+                url: String(d.url || ""),
+              });
+              setDealFoundFlash(true);
+              if (dealFlashTimerRef.current) {
+                window.clearTimeout(dealFlashTimerRef.current);
+              }
+              dealFlashTimerRef.current = window.setTimeout(
+                () => setDealFoundFlash(false),
+                2800
+              );
+            }
             if (row.tone === "urgent" && !autoOpenedUrgentRef.current) {
               autoOpenedUrgentRef.current = true;
               setExpanded(true);
@@ -689,6 +721,53 @@ export default function Final10SideAssistant() {
 
   useEffect(() => {
     if (!user) return undefined;
+    const onScoutDeal = (e) => {
+      const d = e.detail;
+      if (!d?.title) return;
+      setDealToast({
+        id: String(d.id || `scout-deal-${Date.now()}`),
+        title: d.title,
+        message: d.body || "I found something worth checking.",
+        url: String(d.url || ""),
+      });
+      setDealFoundFlash(true);
+      if (dealFlashTimerRef.current) {
+        window.clearTimeout(dealFlashTimerRef.current);
+      }
+      dealFlashTimerRef.current = window.setTimeout(
+        () => setDealFoundFlash(false),
+        2800
+      );
+    };
+    const onScoutState = (e) => {
+      const st = e.detail?.state;
+      if (st === "idle" || st === "searching" || st === "dealFound" || st === "excited") {
+        setExternalScoutState(st === "idle" ? null : st);
+      }
+    };
+    window.addEventListener(SCOUT_DEAL_FOUND_EVENT, onScoutDeal);
+    window.addEventListener(SCOUT_STATE_EVENT, onScoutState);
+    return () => {
+      window.removeEventListener(SCOUT_DEAL_FOUND_EVENT, onScoutDeal);
+      window.removeEventListener(SCOUT_STATE_EVENT, onScoutState);
+      if (dealFlashTimerRef.current) {
+        window.clearTimeout(dealFlashTimerRef.current);
+      }
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (expanded && !prevExpandedRef.current) {
+      setShowGreeting(true);
+    }
+    if (!expanded) {
+      setShowGreeting(false);
+    }
+    prevExpandedRef.current = expanded;
+  }, [expanded]);
+
+  useEffect(() => {
+    if (!user) return undefined;
     const id = setInterval(() => {
       const hints = buildPassiveHints(location.pathname, user);
       if (hints.length === 0) return;
@@ -715,8 +794,38 @@ export default function Final10SideAssistant() {
   const openPanel = useCallback(() => {
     setExpanded(true);
     setUnread(0);
+    setShowGreeting(true);
     window.setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
+
+  const handleViewDeal = useCallback(() => {
+    const url = dealToast?.url || "";
+    setDealToast(null);
+    setExpanded(true);
+    setActiveTab("hints");
+    setUnread(0);
+    if (url) {
+      if (/^https?:\/\//i.test(url)) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        navigate(url);
+      }
+    }
+  }, [dealToast, navigate]);
+
+  const scoutState = useMemo(() => {
+    if (dealFoundFlash) return "dealFound";
+    if (externalScoutState) return externalScoutState;
+    if (aiBusy || suggestionsLoading) return "searching";
+    if (unread > 0) return "excited";
+    return "idle";
+  }, [
+    dealFoundFlash,
+    externalScoutState,
+    aiBusy,
+    suggestionsLoading,
+    unread,
+  ]);
 
   const runDealSearch = useCallback(async (queryOrIntent, limit = 6) => {
     const intent =
@@ -1582,6 +1691,14 @@ export default function Final10SideAssistant() {
 
   return (
     <div className="f10-assistant-dock" aria-live="polite">
+      {dealToast ? (
+        <SavvyScoutDealToast
+          title={dealToast.title}
+          message={dealToast.message}
+          onViewDeal={handleViewDeal}
+          onDismiss={() => setDealToast(null)}
+        />
+      ) : null}
       {coachToast ? (
         <div
           className={`f10-assistant-coach-toast f10-assistant-coach-toast--${coachToast.tone || "coach"}`}
@@ -1641,6 +1758,12 @@ export default function Final10SideAssistant() {
 
           {activeTab === "ask" ? (
             <div className="f10-assistant-panel-bd f10-assistant-ai-bd">
+              {showGreeting ? (
+                <div className="f10-assistant-scout-greeting" role="status">
+                  <span className="f10-assistant-scout-greeting-tag">Savvy Scout</span>
+                  <p>{SCOUT_GREETING}</p>
+                </div>
+              ) : null}
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
                   {SAVVY_SCOUT.shortTitle} Active
@@ -1936,22 +2059,16 @@ export default function Final10SideAssistant() {
 
       <SavvyWalletBubble />
 
-      <button
-        type="button"
-        className={`f10-assistant-toggle ${unread > 0 ? "f10-assistant-toggle--pulse" : ""}`}
+      <SavvyScoutButton
+        state={scoutState}
+        expanded={expanded}
+        unread={unread}
         onClick={() => (expanded ? setExpanded(false) : openPanel())}
-        aria-expanded={expanded}
-        aria-label={expanded ? `Close ${SAVVY_SCOUT.shortTitle}` : `Open ${SAVVY_SCOUT.shortTitle}`}
+        ariaLabel={
+          expanded ? `Close ${SAVVY_SCOUT.shortTitle}` : `Open ${SAVVY_SCOUT.shortTitle}`
+        }
         title={expanded ? undefined : SAVVY_SCOUT.ask}
-      >
-        <span aria-hidden style={{ fontSize: "16px" }}>
-          ✦
-        </span>
-        <span className="f10-assistant-toggle-label">{SAVVY_SCOUT.shortTitle}</span>
-        {unread > 0 && !expanded ? (
-          <span className="f10-assistant-badge">{unread > 9 ? "9+" : unread}</span>
-        ) : null}
-      </button>
+      />
     </div>
   );
 }
