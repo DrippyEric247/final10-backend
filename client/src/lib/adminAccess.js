@@ -1,4 +1,4 @@
-/** Client-side admin / operator access helpers (requires role from GET /api/auth/me). */
+/** Client-side admin and operator access helpers (requires role from GET /api/auth/me). */
 
 import { getCurrentUserSnapshot } from "./adminCosmetics";
 

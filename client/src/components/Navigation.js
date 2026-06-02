@@ -72,7 +72,7 @@ const Navigation = () => {
     { name: 'Customize', path: '/customization', icon: '🎖️' },
     ...(showAdminNav
       ? [
-          { name: 'Admin', path: '/admin/cosmetics', icon: '⚙️' },
+          { name: 'Admin', path: '/admin', icon: '⚙️' },
           { name: 'Shield', path: '/shield-dashboard', icon: '🛡️' },
           { name: 'Founder Admin', path: '/owner-control', icon: '👑' },
         ]

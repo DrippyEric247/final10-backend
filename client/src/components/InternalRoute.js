@@ -10,7 +10,7 @@ import SavvyMark from "./SavvyMark";
  *
  * Layers of protection:
  *   1. In production builds, the route is only reachable if the signed-in
- *      user has an admin / superadmin role. Everyone else is bounced to /.
+ *      user has an admin or superadmin role. Everyone else is bounced to home.
  *   2. In development builds, the route renders for any authenticated user
  *      so the team can iterate without seeding admin accounts.
  *   3. Unauthenticated visitors are always redirected to /login, never to

@@ -1,5 +1,6 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
+import { matchAnyRoutePrefix } from "../lib/routeMatch";
 import "../styles/AppBackground.css";
 import "../styles/CardSurface.css";
 
@@ -35,8 +36,9 @@ const UNIVERSE_ROUTES = [
   "/customization",
 ];
 
-// Feature surfaces where we want the brand strongest.
-const FEATURE_ROUTES = ["/", "/home", "/dashboard"];
+// Feature surfaces where we want the brand strongest (exact paths only — no bare "/dashboard" prefix).
+const FEATURE_ROUTES = ["/", "/home"];
+const ADMIN_FEATURE_ROUTES = ["/admin", "/dashboard/admin"];
 
 // Listing-heavy pages where we want minimal visual noise behind the grid.
 const DENSE_ROUTES = [
@@ -50,14 +52,11 @@ const DENSE_ROUTES = [
   "/offers",
 ];
 
-function matchesAny(pathname, routes) {
-  return routes.some((r) => pathname === r || pathname.startsWith(`${r}/`));
-}
-
 function resolveVariant(pathname) {
-  if (matchesAny(pathname, UNIVERSE_ROUTES)) return "universe";
-  if (matchesAny(pathname, DENSE_ROUTES)) return "dense";
-  if (matchesAny(pathname, FEATURE_ROUTES)) return "feature";
+  if (matchAnyRoutePrefix(pathname, UNIVERSE_ROUTES)) return "universe";
+  if (matchAnyRoutePrefix(pathname, DENSE_ROUTES)) return "dense";
+  if (matchAnyRoutePrefix(pathname, ADMIN_FEATURE_ROUTES)) return "feature";
+  if (matchAnyRoutePrefix(pathname, FEATURE_ROUTES)) return "feature";
   return "default";
 }
 

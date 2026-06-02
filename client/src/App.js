@@ -53,6 +53,7 @@ import PromotionPayment from "./pages/PromotionPayment"; // protected
 import PromotionDashboard from "./pages/PromotionDashboard"; // protected
 import ShieldDashboard from "./pages/ShieldDashboard"; // superadmin only
 import OwnerControlPanel from "./pages/OwnerControlPanel"; // superadmin only
+import AdminHub from "./pages/AdminHub";
 import ProductionReadinessPage from "./pages/ProductionReadinessPage"; // internal planning
 import LaunchKPIDashboard from "./pages/LaunchKPIDashboard"; // internal KPI dashboard
 import GrowthLeversDashboard from "./pages/GrowthLeversDashboard"; // internal growth lever system
@@ -438,9 +439,25 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        {/* Internal / operator tools — see `InternalRoute`. In production
-            these are only accessible to admin / superadmin users; in dev
+        {/* Internal / operator tools — see InternalRoute. In production
+            these are only accessible to admin or superadmin users; in dev
             any logged-in user can reach them to iterate quickly. */}
+        <Route
+          path="/admin"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <AdminHub />
+            </InternalRoute>
+          }
+        />
+        <Route
+          path="/dashboard/admin"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <AdminHub />
+            </InternalRoute>
+          }
+        />
         <Route
           path="/shield-dashboard"
           element={
