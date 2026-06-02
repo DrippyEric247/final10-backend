@@ -157,15 +157,44 @@ function saveHistory(list) {
 
 /**
  * Classify the user's raw input into one of five actionable intents.
- * Priority order matters: strategy/advice checks run before the more
- * generic "search_deals" fallback so questions like "how do I win" don't
- * get misrouted into an eBay product lookup.
+ * Never default to monitoring unless the user explicitly asks for alerts,
+ * notify, watch, tracking, monitor, or price-drop behavior.
  */
 export function detectIntent(input) {
   const text = String(input || "").toLowerCase().trim();
-  if (!text) return "strategy";
+  if (!text) return "search";
 
   const has = (patterns) => patterns.some((p) => p.test(text));
+
+  const monitorCues = [
+    /\b(alert|alerts)\b/,
+    /\b(notify|notification|ping me|let me know)\b/,
+    /\b(watch|watchlist|track|tracking|monitor|monitoring)\b/,
+    /\b(price drop|drops below|under \$?\d+.*(notify|alert|watch|track))\b/,
+  ];
+  if (has(monitorCues)) return "monitor";
+
+  const bestMoveCues = [
+    /\b(best move)\b/,
+    /\b(best deal(s)? (today|right now))\b/,
+    /\b(biggest savings?|largest savings?)\b/,
+    /\b(top savings?|best savings?)\b/,
+  ];
+  if (has(bestMoveCues)) return "best_move";
+
+  const trendingCues = [
+    /\b(what('| i)?s hot( today)?)\b/,
+    /\b(trending products?|trending items?|what('?s| is) trending)\b/,
+    /\b(what are people buying|popular right now|hot products?)\b/,
+  ];
+  if (has(trendingCues)) return "trending";
+
+  const searchCues = [
+    /\b(show me|find|search|look for|deals? on|deals? for)\b/,
+    /\b(ps5|xbox|iphone|ipad|macbook|airpods|switch|gpu|rtx|ryzen|watch|nike|lego|pokemon|card|sneaker)\b/,
+    /\b(gaming laptops?|laptops?|phones?|electronics?)\b/,
+  ];
+  if (has(searchCues)) return "search";
 
   const pointsCues = [
     /\bpoints?\b/,
@@ -198,7 +227,7 @@ export function detectIntent(input) {
     /\bwatch this for me\b/,
     /\bwatch for (me|a drop)\b/,
   ];
-  if (has(alertCues)) return "create_alert";
+  if (has(alertCues)) return "monitor";
 
   const evalCues = [
     /\bevaluate (this )?deal\b/,
@@ -212,9 +241,9 @@ export function detectIntent(input) {
     /\b(ps5|xbox|iphone|ipad|macbook|airpods|switch|gpu|rtx|ryzen|watch|nike|lego|pokemon|card|sneaker)\b/,
     /\b(for sale|buy|bid on|auction for)\b/,
   ];
-  if (has(productCues)) return "search_deals";
+  if (has(productCues)) return "search";
 
-  return "search_deals";
+  return "search";
 }
 
 // Verdict tones drive color + emphasis in the UI. Keep the label tight.
@@ -806,11 +835,11 @@ export default function Final10SideAssistant() {
         Number(closestOrFallback?.trustScore) >= 80;
       return {
         kind: "voice_results",
-        verdict: mkVerdict("Monitoring option ready", "watch"),
+        verdict: mkVerdict("Closest matches", "watch"),
         reason:
           hasTarget && Number.isFinite(fallbackPrice)
-            ? `Nothing under $${Math.round(maxPrice)} right now… Closest is $${Math.round(fallbackPrice)}${fallbackTrustHigh ? " with high trust" : ""}. Want me to watch for a drop?`
-            : "No exact match yet. I found the closest options and can watch for a drop.",
+            ? `Nothing under $${Math.round(maxPrice)} right now. Closest is $${Math.round(fallbackPrice)}${fallbackTrustHigh ? " with high trust" : ""}.`
+            : "No exact match yet. Here are the closest high-signal options.",
         deals: expandedDeals,
         voiceIntent: { ...intent, maxPrice: hasTarget ? maxPrice : intent?.maxPrice },
         quickActions: ["create_alert", "expand_range", "show_more"],
@@ -824,20 +853,7 @@ export default function Final10SideAssistant() {
       const query = rawQuery.trim();
       const intent = detectIntent(query);
 
-      if (intent === "strategy") {
-        const card = pickStrategyCard(query);
-        return {
-          intent,
-          kind: "strategy",
-          verdict: card.verdict,
-          reason: card.reason,
-          action: { label: "Open Trending Feed", path: "/feed", kind: "nav" },
-        };
-      }
-      if (intent === "evaluate_deal") {
-        return evaluateDealFromQuery(query);
-      }
-      if (intent === "create_alert") {
+      if (intent === "monitor") {
         const parsed = parseVoiceDealIntent(query);
         if (parsed) {
           const payload = buildVoiceAlertPayload(parsed);
@@ -846,7 +862,7 @@ export default function Final10SideAssistant() {
               await createSavvyAlert(payload);
               return {
                 kind: "monitoring",
-                verdict: mkVerdict(SCOUT_COPY.assistant.monitoringBadge, "strong"),
+                verdict: mkVerdict("Monitoring active", "strong"),
                 reason: parsed.maxPrice
                   ? `Alert set for ${parsed.item || parsed.query} under $${Math.round(parsed.maxPrice)}.`
                   : `Alert set for ${parsed.item || parsed.query}.`,
@@ -862,6 +878,101 @@ export default function Final10SideAssistant() {
             }
           }
         }
+        return {
+          intent,
+          kind: "monitoring",
+          verdict: mkVerdict("Monitoring setup", "watch"),
+          reason: "Tell me what to track and optional price target (e.g. PS5 under $350).",
+          action: { label: "Open Alerts", path: "/alerts", kind: "nav" },
+        };
+      }
+
+      if (intent === "best_move") {
+        const bestMoveQuery = query
+          .replace(/\b(best move|best deal(s)? (today|right now)|biggest savings?|largest savings?|top savings?)\b/gi, "")
+          .trim();
+        const searchQuery = bestMoveQuery || "best deals today";
+        try {
+          const deals = await runDealSearch(searchQuery);
+          if (!deals.length) {
+            return {
+              intent,
+              kind: "deals",
+              verdict: mkVerdict("No high-confidence move", "watch"),
+              reason: "No clear steal right now. Try a category like gaming, phones, or sneakers.",
+            };
+          }
+          const ranked = [...deals].sort(
+            (a, b) =>
+              (Number(b.score) || 0) - (Number(a.score) || 0) ||
+              (Number(b.savingsPct) || 0) - (Number(a.savingsPct) || 0)
+          );
+          const top = ranked[0];
+          return {
+            intent,
+            kind: "deals",
+            verdict: mkVerdict("Best Move", "great"),
+            reason: `Top pick: ${top.title} at ${top.priceText}${Number.isFinite(top.savingsPct) ? ` (${top.savingsPct}% savings)` : ""}${Number.isFinite(top.trustScore) ? ` · Trust ${Math.round(top.trustScore)}` : ""}.`,
+            deals: ranked.slice(0, 3),
+            action: { label: "See all on Trending", path: "/feed", kind: "nav" },
+          };
+        } catch {
+          return {
+            intent,
+            kind: "nav",
+            verdict: mkVerdict("Retry", "watch"),
+            reason: "Best Move lookup hiccuped. Open Trending for the live board.",
+            action: { label: "Go to Trending", path: "/feed", kind: "nav" },
+          };
+        }
+      }
+
+      if (intent === "trending") {
+        try {
+          const data = await ebayService.getTrendingItems("all", 12);
+          const deals = (data?.items || data?.trendingAuctions || [])
+            .map(normalizeDealItem)
+            .filter(Boolean)
+            .slice(0, 3);
+          if (!deals.length) {
+            return {
+              intent,
+              kind: "deals",
+              verdict: mkVerdict("Trending board is quiet", "watch"),
+              reason: "No strong trending picks right now. Check back in a few minutes.",
+            };
+          }
+          return {
+            intent,
+            kind: "deals",
+            verdict: mkVerdict("Trending now", "strong"),
+            reason: "These are the hottest live opportunities across the board.",
+            deals,
+            action: { label: "Open Trending Feed", path: "/feed", kind: "nav" },
+          };
+        } catch {
+          return {
+            intent,
+            kind: "nav",
+            verdict: mkVerdict("Trending unavailable", "watch"),
+            reason: "Trending lookup failed. Open Feed to browse live categories.",
+            action: { label: "Go to Feed", path: "/feed", kind: "nav" },
+          };
+        }
+      }
+
+      if (intent === "strategy") {
+        const card = pickStrategyCard(query);
+        return {
+          intent,
+          kind: "strategy",
+          verdict: card.verdict,
+          reason: card.reason,
+          action: { label: "Open Trending Feed", path: "/feed", kind: "nav" },
+        };
+      }
+      if (intent === "evaluate_deal") {
+        return evaluateDealFromQuery(query);
       }
       if (intent === "find_category" || intent === "earn_points" || intent === "promote") {
         const target = NAV_TARGETS[intent];
