@@ -1,6 +1,6 @@
 // src/pages/AdminCosmeticsPanel.js
 //
-// Owner / superadmin grant panel for exclusive calling cards + emblems.
+// Owner or superadmin grant panel for exclusive calling cards and emblems.
 // Access is gated by `isCosmeticsAdmin(user)` — true superadmins pass, and a
 // localStorage dev-override (`f10_dev_admin=1`) also opens the door during
 // development so we never block iteration on backend role plumbing.

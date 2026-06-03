@@ -439,9 +439,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        {/* Internal / operator tools — see InternalRoute. In production
-            these are only accessible to admin or superadmin users; in dev
-            any logged-in user can reach them to iterate quickly. */}
+        {/* Internal operator tools — see InternalRoute. In production only
+            admin or superadmin users can open these; in dev any signed-in user
+            can reach them to iterate quickly. */}
         <Route
           path="/admin"
           element={

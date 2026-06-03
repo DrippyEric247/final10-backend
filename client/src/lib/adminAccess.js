@@ -21,6 +21,16 @@ export function getUserRole(user) {
   return raw;
 }
 
+/** Operator nav: admin role or founder email (never regex on paths). */
+export function shouldShowAdminNav(user) {
+  if (!user) return false;
+  const email = String(user.email || "").trim().toLowerCase();
+  if (email === FOUNDER_ADMIN_EMAIL) return true;
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin" || role === "superadmin") return true;
+  return hasAdminRole(user);
+}
+
 /** True when role is admin or superadmin (operator nav). */
 export function hasAdminRole(user) {
   if (isFounderAdminEmail(user)) return true;

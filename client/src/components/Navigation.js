@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
 import { Bug, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { hasAdminRole } from '../lib/adminAccess';
+import { shouldShowAdminNav } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
 
@@ -12,7 +12,7 @@ const Navigation = () => {
   const [showBugReport, setShowBugReport] = useState(false);
   const [alertUnreadCount, setAlertUnreadCount] = useState(0);
   const { user } = useAuth() || {};
-  const showAdminNav = hasAdminRole(user);
+  const showAdminNav = shouldShowAdminNav(user);
 
   useEffect(() => {
     if (!user) {
