@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const { requireSuperAdmin } = require('../middleware/requireRole');
+const { requireOwnerAccess } = require('../middleware/requireRole');
 
 // grant-founding-access is mounted in server/index.js (before this router) so
 // OWNER_GRANT_SECRET bypass is never blocked by router.use(auth) below.
@@ -14,10 +14,11 @@ router.use(auth);
  * GET /api/owner/search-users
  * Search for users by username, email, or ID
  */
-router.get('/search-users', requireSuperAdmin, async (req, res) => {
+router.get('/search-users', requireOwnerAccess, async (req, res) => {
   try {
-    const { query, limit = 20 } = req.query;
-    
+    const query = String(req.query.query || req.query.q || '').trim();
+    const { limit = 20 } = req.query;
+
     if (!query || query.length < 2) {
       return res.status(400).json({ 
         message: 'Search query must be at least 2 characters long' 
@@ -71,7 +72,7 @@ router.get('/search-users', requireSuperAdmin, async (req, res) => {
  * GET /api/owner/user/:userId
  * Get detailed user information
  */
-router.get('/user/:userId', requireSuperAdmin, async (req, res) => {
+router.get('/user/:userId', requireOwnerAccess, async (req, res) => {
   try {
     const { userId } = req.params;
     
@@ -120,7 +121,7 @@ router.get('/user/:userId', requireSuperAdmin, async (req, res) => {
  * POST /api/owner/grant-points
  * Grant points to a user (Owner Perk)
  */
-router.post('/grant-points', requireSuperAdmin, async (req, res) => {
+router.post('/grant-points', requireOwnerAccess, async (req, res) => {
   try {
     const { userId, points, reason = 'Owner grant' } = req.body;
     
@@ -176,7 +177,7 @@ router.post('/grant-points', requireSuperAdmin, async (req, res) => {
  * POST /api/owner/grant-lifetime-subscription
  * Grant lifetime subscription to a user (Owner Perk)
  */
-router.post('/grant-lifetime-subscription', requireSuperAdmin, async (req, res) => {
+router.post('/grant-lifetime-subscription', requireOwnerAccess, async (req, res) => {
   try {
     const { userId, reason = 'Owner grant - Lifetime subscription' } = req.body;
     
@@ -231,7 +232,7 @@ router.post('/grant-lifetime-subscription', requireSuperAdmin, async (req, res) 
  * POST /api/owner/revoke-lifetime-subscription
  * Revoke lifetime subscription from a user (Owner Perk)
  */
-router.post('/revoke-lifetime-subscription', requireSuperAdmin, async (req, res) => {
+router.post('/revoke-lifetime-subscription', requireOwnerAccess, async (req, res) => {
   try {
     const { userId, reason = 'Owner revoke - Lifetime subscription' } = req.body;
     
@@ -286,7 +287,7 @@ router.post('/revoke-lifetime-subscription', requireSuperAdmin, async (req, res)
  * POST /api/owner/grant-premium-subscription
  * Grant premium subscription for specific duration (Owner Perk)
  */
-router.post('/grant-premium-subscription', requireSuperAdmin, async (req, res) => {
+router.post('/grant-premium-subscription', requireOwnerAccess, async (req, res) => {
   try {
     const { userId, durationMonths = 12, reason = 'Owner grant - Premium subscription' } = req.body;
     
@@ -347,7 +348,7 @@ router.post('/grant-premium-subscription', requireSuperAdmin, async (req, res) =
  * POST /api/owner/revoke-founding-access
  * Disable Founding Tester / beta status for a user.
  */
-router.post('/revoke-founding-access', requireSuperAdmin, async (req, res) => {
+router.post('/revoke-founding-access', requireOwnerAccess, async (req, res) => {
   try {
     const { email = '', userId = '', reason = 'Owner revoked Founding Tester access' } = req.body || {};
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -395,7 +396,7 @@ router.post('/revoke-founding-access', requireSuperAdmin, async (req, res) => {
  * GET /api/owner/user/:userId/grants
  * Get owner grants history for a user
  */
-router.get('/user/:userId/grants', requireSuperAdmin, async (req, res) => {
+router.get('/user/:userId/grants', requireOwnerAccess, async (req, res) => {
   try {
     const { userId } = req.params;
     
@@ -420,7 +421,7 @@ router.get('/user/:userId/grants', requireSuperAdmin, async (req, res) => {
  * GET /api/owner/stats
  * Get owner control panel statistics
  */
-router.get('/stats', requireSuperAdmin, async (req, res) => {
+router.get('/stats', requireOwnerAccess, async (req, res) => {
   try {
     // Get total users
     const totalUsers = await User.countDocuments();

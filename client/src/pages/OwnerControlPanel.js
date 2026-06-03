@@ -12,8 +12,21 @@ import {
   Eye
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { STORAGE_KEY } from '../lib/api';
 import { buildApiUrl } from '../lib/runtimeApi';
 import { hasAdminRole } from '../lib/adminAccess';
+
+function getAuthToken() {
+  return localStorage.getItem(STORAGE_KEY) || localStorage.getItem('token') || '';
+}
+
+function ownerAuthHeaders(extra = {}) {
+  const token = getAuthToken();
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 const OwnerControlPanel = () => {
   const { user } = useAuth();
@@ -38,7 +51,7 @@ const OwnerControlPanel = () => {
   const fetchStats = async () => {
     try {
       const response = await fetch(buildApiUrl('/owner/stats'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: ownerAuthHeaders(),
       });
       const data = await response.json();
       setStats(data.stats);
@@ -53,7 +66,7 @@ const OwnerControlPanel = () => {
     setLoading(true);
     try {
       const response = await fetch(buildApiUrl(`/owner/search-users?query=${encodeURIComponent(searchQuery)}`), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: ownerAuthHeaders(),
       });
       const data = await response.json();
       setSearchResults(data.users || []);
@@ -67,7 +80,7 @@ const OwnerControlPanel = () => {
   const fetchUserDetails = async (userId) => {
     try {
       const response = await fetch(buildApiUrl(`/owner/user/${userId}`), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: ownerAuthHeaders(),
       });
       const data = await response.json();
       setSelectedUser(data.user);
@@ -82,10 +95,7 @@ const OwnerControlPanel = () => {
     try {
       const response = await fetch(buildApiUrl('/owner/revoke-founding-access'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email: selectedUser.email,
           reason: grantReason || 'Owner revoked Founding Tester access',
@@ -142,10 +152,7 @@ const OwnerControlPanel = () => {
       
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
+        headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
       
