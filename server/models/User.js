@@ -895,23 +895,23 @@ userSchema.methods.isSuperAdmin = function() {
 };
 
 userSchema.methods.canManageShield = function() {
-  return this.role === 'superadmin' || (this.role === 'admin' && this.adminPermissions.canManageShield);
+  return this.role === 'superadmin' || (this.role === 'admin' && Boolean(this.adminPermissions?.canManageShield));
 };
 
 userSchema.methods.canManageUsers = function() {
-  return this.role === 'superadmin' || (this.role === 'admin' && this.adminPermissions.canManageUsers);
+  return this.role === 'superadmin' || (this.role === 'admin' && Boolean(this.adminPermissions?.canManageUsers));
 };
 
 userSchema.methods.canManagePromotions = function() {
-  return this.role === 'superadmin' || (this.role === 'admin' && this.adminPermissions.canManagePromotions);
+  return this.role === 'superadmin' || (this.role === 'admin' && Boolean(this.adminPermissions?.canManagePromotions));
 };
 
 userSchema.methods.canManagePayments = function() {
-  return this.role === 'superadmin' || (this.role === 'admin' && this.adminPermissions.canManagePayments);
+  return this.role === 'superadmin' || (this.role === 'admin' && Boolean(this.adminPermissions?.canManagePayments));
 };
 
 userSchema.methods.canViewAnalytics = function() {
-  return this.role === 'superadmin' || (this.role === 'admin' && this.adminPermissions.canViewAnalytics);
+  return this.role === 'superadmin' || (this.role === 'admin' && Boolean(this.adminPermissions?.canViewAnalytics));
 };
 
 // Static method to create superadmin

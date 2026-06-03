@@ -61,13 +61,28 @@ function requireOwnerAccess() {
       if (!user) {
         return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
       }
-      await ensureFounderAdminRole(user);
+      try {
+        await ensureFounderAdminRole(user);
+      } catch (founderErr) {
+        console.error('[requireOwnerAccess] ensureFounderAdminRole failed:', founderErr);
+      }
       user = await User.findById(user._id || user.id);
+      if (!user) {
+        return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
+      }
 
-      const allowed =
-        (typeof user.isSuperAdmin === 'function' && user.isSuperAdmin()) ||
-        (typeof user.canManageUsers === 'function' && user.canManageUsers()) ||
-        isFounderAdminEmail(user.email);
+      const isSuper =
+        typeof user.isSuperAdmin === 'function' && user.isSuperAdmin();
+      const isFounder = isFounderAdminEmail(user.email);
+      let canManage = false;
+      try {
+        canManage =
+          typeof user.canManageUsers === 'function' && user.canManageUsers();
+      } catch (permErr) {
+        console.error('[requireOwnerAccess] canManageUsers check failed:', permErr);
+      }
+
+      const allowed = isSuper || isFounder || canManage;
 
       if (!allowed) {
         return next(new HttpError(403, 'FORBIDDEN', 'Owner panel access required'));
@@ -76,6 +91,7 @@ function requireOwnerAccess() {
       req.superAdmin = user;
       next();
     } catch (err) {
+      console.error('[requireOwnerAccess] unexpected error:', err);
       next(err);
     }
   };

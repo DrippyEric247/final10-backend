@@ -3,6 +3,23 @@ const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { requireOwnerAccess } = require('../middleware/requireRole');
+const { buildOwnerUserSearchFilter } = require('../lib/ownerUserSearch');
+
+function ownerRouteError(res, err, context) {
+  console.error(`[owner/${context}]`, err?.stack || err);
+  if (res.headersSent) return;
+  const isCast = err?.name === 'CastError';
+  const isValidation = err?.name === 'ValidationError';
+  return res.status(isCast || isValidation ? 400 : 500).json({
+    success: false,
+    code: err?.code || 'OWNER_ROUTE_ERROR',
+    message:
+      isCast
+        ? 'Invalid search query'
+        : err?.message || `Failed to complete owner ${context}`,
+    ...(process.env.NODE_ENV !== 'production' ? { detail: String(err?.message || err) } : {}),
+  });
+}
 
 // grant-founding-access is mounted in server/index.js (before this router) so
 // OWNER_GRANT_SECRET bypass is never blocked by router.use(auth) below.
@@ -17,30 +34,30 @@ router.use(auth);
 router.get('/search-users', requireOwnerAccess, async (req, res) => {
   try {
     const query = String(req.query.query || req.query.q || '').trim();
-    const { limit = 20 } = req.query;
+    const limitRaw = parseInt(String(req.query.limit || '20'), 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
 
     if (!query || query.length < 2) {
-      return res.status(400).json({ 
-        message: 'Search query must be at least 2 characters long' 
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_QUERY',
+        message: 'Search query must be at least 2 characters long',
       });
     }
-    
-    const searchRegex = new RegExp(query, 'i');
-    
-    const users = await User.find({
-      $or: [
-        { username: searchRegex },
-        { email: searchRegex },
-        { _id: query }
-      ]
-    })
-    .select('username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt')
-    .limit(parseInt(limit))
-    .sort({ createdAt: -1 });
-    
-    res.json({
+
+    const filter = buildOwnerUserSearchFilter(query);
+
+    const users = await User.find(filter)
+      .select(
+        'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt'
+      )
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
       success: true,
-      users: users.map(user => ({
+      users: users.map((user) => ({
         id: user._id,
         username: user.username,
         email: user.email,
@@ -57,14 +74,12 @@ router.get('/search-users', requireOwnerAccess, async (req, res) => {
         betaAccessExpiresAt: user.betaAccessExpiresAt || null,
         memberSince: user.createdAt,
         lastActive: user.lastActive,
-        hasLifetimeSub: user.subscriptionExpires === null && user.isPremium
+        hasLifetimeSub: user.subscriptionExpires == null && Boolean(user.isPremium),
       })),
-      total: users.length
+      total: users.length,
     });
-    
   } catch (error) {
-    console.error('Error searching users:', error);
-    res.status(500).json({ message: 'Failed to search users' });
+    return ownerRouteError(res, error, 'search-users');
   }
 });
 
@@ -423,66 +438,56 @@ router.get('/user/:userId/grants', requireOwnerAccess, async (req, res) => {
  */
 router.get('/stats', requireOwnerAccess, async (req, res) => {
   try {
-    // Get total users
-    const totalUsers = await User.countDocuments();
-    
-    // Get premium users
-    const premiumUsers = await User.countDocuments({ isPremium: true });
-    
-    // Get lifetime subscribers
-    const lifetimeUsers = await User.countDocuments({ 
-      isPremium: true, 
-      subscriptionExpires: null 
-    });
-    
-    // Get total points granted by owner
-    const usersWithGrants = await User.find({ 
-      ownerGrants: { $exists: true, $ne: [] } 
-    });
-    
-    const totalOwnerGrants = usersWithGrants.reduce((total, user) => {
-      const pointsGrants = user.ownerGrants.filter(grant => grant.type === 'points');
-      return total + pointsGrants.reduce((sum, grant) => sum + (grant.amount || 0), 0);
-    }, 0);
-    
-    // Get recent owner grants
-    const recentGrants = await User.find({ 
-      ownerGrants: { $exists: true, $ne: [] } 
-    })
-    .select('username ownerGrants')
-    .sort({ 'ownerGrants.grantedAt': -1 })
-    .limit(10);
-    
+    const [totalUsers, premiumUsers, lifetimeUsers] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isPremium: true }),
+      User.countDocuments({ isPremium: true, subscriptionExpires: null }),
+    ]);
+
+    let totalOwnerGrants = 0;
     const recentGrantsList = [];
-    recentGrants.forEach(user => {
-      user.ownerGrants.forEach(grant => {
+
+    const usersWithGrants = await User.find({
+      ownerGrants: { $exists: true, $ne: [] },
+    })
+      .select('username ownerGrants')
+      .limit(200)
+      .lean();
+
+    for (const user of usersWithGrants) {
+      const grants = Array.isArray(user.ownerGrants) ? user.ownerGrants : [];
+      for (const grant of grants) {
+        if (!grant || typeof grant !== 'object') continue;
+        if (grant.type === 'points') {
+          totalOwnerGrants += Number(grant.amount) || 0;
+        }
         recentGrantsList.push({
           username: user.username,
           type: grant.type,
           amount: grant.amount,
           reason: grant.reason,
           grantedBy: grant.grantedBy,
-          grantedAt: grant.grantedAt
+          grantedAt: grant.grantedAt,
         });
-      });
-    });
-    
-    recentGrantsList.sort((a, b) => new Date(b.grantedAt) - new Date(a.grantedAt));
-    
-    res.json({
+      }
+    }
+
+    recentGrantsList.sort(
+      (a, b) => new Date(b.grantedAt || 0).getTime() - new Date(a.grantedAt || 0).getTime()
+    );
+
+    return res.json({
       success: true,
       stats: {
         totalUsers,
         premiumUsers,
         lifetimeUsers,
         totalOwnerGrants,
-        recentGrants: recentGrantsList.slice(0, 10)
-      }
+        recentGrants: recentGrantsList.slice(0, 10),
+      },
     });
-    
   } catch (error) {
-    console.error('Error fetching owner stats:', error);
-    res.status(500).json({ message: 'Failed to fetch owner statistics' });
+    return ownerRouteError(res, error, 'stats');
   }
 });
 
