@@ -1,4 +1,5 @@
 import type { InterestId } from "./onboardingPreferences";
+import { getHeroSearchQueriesForInterest } from "./categoryHeroSearchMap";
 
 export type InterestConfig = {
   id: InterestId;
@@ -12,12 +13,16 @@ export type InterestConfig = {
   accent: string;
 };
 
+function interestQuery(id: InterestId, fallback: string): string {
+  return getHeroSearchQueriesForInterest(id)[0] || fallback;
+}
+
 export const INTERESTS: ReadonlyArray<InterestConfig> = [
   {
     id: "gaming",
     label: "Gaming",
     emoji: "🎮",
-    query: "playstation xbox nintendo switch console",
+    query: interestQuery("gaming", "Sony PlayStation 5 console"),
     neighbors: ["tech", "collectibles"],
     accent: "#a78bfa",
   },
@@ -25,7 +30,7 @@ export const INTERESTS: ReadonlyArray<InterestConfig> = [
     id: "tech",
     label: "Tech",
     emoji: "💻",
-    query: "iphone macbook airpods laptop",
+    query: interestQuery("tech", "Apple AirPods Pro"),
     neighbors: ["gaming", "home"],
     accent: "#22d3ee",
   },
@@ -33,7 +38,7 @@ export const INTERESTS: ReadonlyArray<InterestConfig> = [
     id: "sneakers",
     label: "Sneakers",
     emoji: "👟",
-    query: "jordan nike sneakers yeezy",
+    query: interestQuery("sneakers", "Nike sneakers"),
     neighbors: ["fashion", "collectibles"],
     accent: "#f472b6",
   },
@@ -41,7 +46,7 @@ export const INTERESTS: ReadonlyArray<InterestConfig> = [
     id: "fashion",
     label: "Fashion",
     emoji: "👗",
-    query: "designer handbag jacket watch",
+    query: interestQuery("fashion", "Nike sneakers"),
     neighbors: ["sneakers"],
     accent: "#fb7185",
   },
@@ -49,7 +54,7 @@ export const INTERESTS: ReadonlyArray<InterestConfig> = [
     id: "collectibles",
     label: "Collectibles",
     emoji: "🎴",
-    query: "pokemon cards trading cards funko",
+    query: interestQuery("collectibles", "pokemon booster box"),
     neighbors: ["gaming", "sneakers"],
     accent: "#facc15",
   },
@@ -57,7 +62,7 @@ export const INTERESTS: ReadonlyArray<InterestConfig> = [
     id: "home",
     label: "Home",
     emoji: "🏡",
-    query: "dyson kitchenaid vitamix robot vacuum",
+    query: interestQuery("home", "desk chair"),
     neighbors: ["tech"],
     accent: "#34d399",
   },
@@ -65,7 +70,7 @@ export const INTERESTS: ReadonlyArray<InterestConfig> = [
     id: "auto",
     label: "Auto",
     emoji: "🚗",
-    query: "wheels car parts dash cam",
+    query: interestQuery("auto", "OBD2 scanner"),
     neighbors: ["tech", "collectibles"],
     accent: "#f59e0b",
   },

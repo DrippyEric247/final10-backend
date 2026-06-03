@@ -1,6 +1,20 @@
 import { fetchEbaySearch } from "./ebayClient";
+import {
+  isLuxuryLowValueTitle,
+  isPremiumBrandedTitle,
+  LUXURY_LOW_PRICE_ALLOWED_CATEGORIES,
+  LUXURY_MIN_PRICE_USD,
+  resolveLuxuryLaneAndTerms,
+  titleMatchesHeroIntent,
+} from "./luxuryHeroSearchMap";
 import { evaluateTrustScore, trustScoreInputFromListing } from "./trustScoreEngine";
 import { pushScoutDealFound, setScoutVisualState } from "./savvyScoutState";
+
+export const OPTIMIZER_MODE = {
+  STANDARD: "standard",
+  BUDGET: "budget",
+  LUXURY: "luxury",
+};
 
 /** @typedef {{ label: string, query: string }} ProductGroup */
 
@@ -112,7 +126,65 @@ export const OPTIMIZER_FALLBACK_SUGGESTIONS = [
  * @param {string} [chip]
  * @returns {{ terms: ProductGroup[], scoutLine: string }}
  */
+export function isLuxuryMode(chip) {
+  return String(chip || "").trim().toLowerCase() === "luxury mode";
+}
+
+export function isBudgetMode(chip) {
+  return String(chip || "").trim().toLowerCase() === "budget mode";
+}
+
+export function resolveOptimizerMode(chip) {
+  if (isLuxuryMode(chip)) return OPTIMIZER_MODE.LUXURY;
+  if (isBudgetMode(chip)) return OPTIMIZER_MODE.BUDGET;
+  return OPTIMIZER_MODE.STANDARD;
+}
+
+/**
+ * Luxury Mode — hero searches only; fewer slots, premium intent.
+ * @param {string} request
+ * @param {string} [chip]
+ */
+export function extractLuxuryProductGroups(request, chip = "") {
+  const { terms, scoutLine } = resolveLuxuryLaneAndTerms(request, chip);
+  return { terms, scoutLine, mode: OPTIMIZER_MODE.LUXURY };
+}
+
+/**
+ * Budget Mode — favor value-oriented queries from scenarios/chips.
+ * @param {string} request
+ * @param {string} [chip]
+ */
+export function extractBudgetProductGroups(request, chip = "") {
+  const base = extractProductGroups(request, chip === "Budget Mode" ? "" : chip);
+  const text = String(request || "").trim().toLowerCase();
+  if (/cheap|budget|under\s*\$|affordable/i.test(text)) {
+    return {
+      ...base,
+      scoutLine: "I found the best value bundle for your budget.",
+      mode: OPTIMIZER_MODE.BUDGET,
+    };
+  }
+  const budgetTerms = base.terms.map((t) => ({
+    ...t,
+    query: `${t.query} best value`.replace(/\s+/g, " ").trim(),
+  }));
+  return {
+    terms: budgetTerms.slice(0, 5),
+    scoutLine: "I optimized for the lowest smart-cart total with solid trust.",
+    mode: OPTIMIZER_MODE.BUDGET,
+  };
+}
+
 export function extractProductGroups(request, chip = "") {
+  const mode = resolveOptimizerMode(chip);
+  if (mode === OPTIMIZER_MODE.LUXURY) {
+    return extractLuxuryProductGroups(request);
+  }
+  if (mode === OPTIMIZER_MODE.BUDGET) {
+    return extractBudgetProductGroups(request);
+  }
+
   const text = String(request || "").trim().toLowerCase();
   if (text) {
     for (const scenario of BUNDLE_SCENARIOS) {
@@ -174,7 +246,31 @@ function normalizeOptimizerItem(raw) {
   };
 }
 
-function rankOptimizerItem(item) {
+function passesLuxuryPriceFloor(item, group) {
+  const price = Number(item.price) || 0;
+  if (price >= LUXURY_MIN_PRICE_USD) return true;
+  const lane = group?.lane || "";
+  if (LUXURY_LOW_PRICE_ALLOWED_CATEGORIES.has(lane)) return price > 0;
+  return false;
+}
+
+function filterLuxuryPool(pool, group) {
+  return pool.filter((it) => {
+    if (!it.title || !(it.price > 0 || it.url)) return false;
+    if (isLuxuryLowValueTitle(it.title)) return false;
+    if (!passesLuxuryPriceFloor(it, group)) return false;
+    if (group?.query && !titleMatchesHeroIntent(it.title, group.query)) {
+      if (!isPremiumBrandedTitle(it.title)) return false;
+    }
+    return true;
+  });
+}
+
+function filterBudgetPool(pool) {
+  return pool.filter((it) => it.title && (it.price > 0 || it.url));
+}
+
+function rankOptimizerItem(item, mode = OPTIMIZER_MODE.STANDARD, group = null) {
   const trust = evaluateTrustScore(trustScoreInputFromListing(item._raw || item));
   const trustScore = Number(trust?.trustScore) || 0;
   const price = Number(item.price) || 0;
@@ -183,13 +279,48 @@ function rankOptimizerItem(item) {
   const savingsPct = market > 0 ? (savings / market) * 100 : 0;
   const fb = Number(item.sellerFeedbackPercent) || 0;
   const shipping = Number(item.shippingCost) || 0;
+  const bids = Number(item._raw?.bidCount ?? item.bidCount ?? 0) || 0;
+  const popularity = Math.min(25, bids * 2.5);
 
-  const rankScore =
-    trustScore * 2.2 +
-    Math.min(35, savingsPct) +
-    Math.min(15, fb * 0.12) -
-    Math.min(12, shipping * 0.04) -
-    (price > 0 ? Math.min(8, price / 400) : 0);
+  let rankScore;
+
+  if (mode === OPTIMIZER_MODE.LUXURY) {
+    const premiumBoost = isPremiumBrandedTitle(item.title) ? 22 : 0;
+    const heroBoost =
+      group?.query && titleMatchesHeroIntent(item.title, group.query) ? 16 : 0;
+    const desirability =
+      price >= 80 && price <= 1200
+        ? 18
+        : price >= LUXURY_MIN_PRICE_USD
+          ? 8
+          : -40;
+    const cheapPenalty = price < LUXURY_MIN_PRICE_USD ? -80 : 0;
+
+    rankScore =
+      trustScore * 2.6 +
+      Math.min(28, savingsPct) * 1.1 +
+      Math.min(18, fb * 0.14) +
+      popularity +
+      premiumBoost +
+      heroBoost +
+      desirability +
+      cheapPenalty -
+      Math.min(8, shipping * 0.03);
+  } else if (mode === OPTIMIZER_MODE.BUDGET) {
+    rankScore =
+      trustScore * 1.6 +
+      Math.min(30, savingsPct) +
+      Math.min(12, fb * 0.1) -
+      Math.min(20, price * 0.08) -
+      Math.min(10, shipping * 0.05);
+  } else {
+    rankScore =
+      trustScore * 2.2 +
+      Math.min(35, savingsPct) +
+      Math.min(15, fb * 0.12) -
+      Math.min(12, shipping * 0.04) -
+      (price > 0 ? Math.min(8, price / 400) : 0);
+  }
 
   return {
     item: { ...item, trustScore, trustLevel: trust?.trustLevel || "medium" },
@@ -200,14 +331,77 @@ function rankOptimizerItem(item) {
   };
 }
 
-function pickBestFromSearch(data, group) {
-  const pool = (data?.items || data?.normalizedItems || [])
+async function searchEbayForGroup(group, mode) {
+  const sort =
+    mode === OPTIMIZER_MODE.BUDGET
+      ? "price"
+      : mode === OPTIMIZER_MODE.LUXURY
+        ? "bestMatch"
+        : "bestMatch";
+  const limit = mode === OPTIMIZER_MODE.LUXURY ? 14 : 8;
+
+  const queries =
+    mode === OPTIMIZER_MODE.LUXURY
+      ? [group.query, ...(group.fallbacks || [])].filter(Boolean)
+      : [group.query];
+
+  let bestResult = { group, pick: null, poolSize: 0 };
+
+  for (const q of queries) {
+    try {
+      const data = await fetchEbaySearch({
+        q,
+        limit,
+        listingMode: "buy_now",
+        sort,
+      });
+      const rawPool = (data?.items || data?.normalizedItems || []).map(normalizeOptimizerItem);
+      const pool =
+        mode === OPTIMIZER_MODE.LUXURY
+          ? filterLuxuryPool(rawPool, { ...group, query: q })
+          : filterBudgetPool(rawPool);
+
+      if (!pool.length) continue;
+
+      const ranked = pool
+        .map((it) => rankOptimizerItem(it, mode, { ...group, query: q }))
+        .sort((a, b) => b.rankScore - a.rankScore);
+      const best = ranked[0];
+      if (
+        !bestResult.pick ||
+        best.rankScore > (bestResult.rankMeta?.rankScore ?? -Infinity)
+      ) {
+        bestResult = {
+          group,
+          pick: best.item,
+          rankMeta: best,
+          poolSize: pool.length,
+        };
+      }
+      if (mode === OPTIMIZER_MODE.LUXURY && best.rankScore >= 95) break;
+    } catch {
+      /* try next query */
+    }
+  }
+
+  return bestResult;
+}
+
+function pickBestFromSearch(data, group, mode = OPTIMIZER_MODE.STANDARD) {
+  const rawPool = (data?.items || data?.normalizedItems || [])
     .map(normalizeOptimizerItem)
     .filter((it) => it.title && (it.price > 0 || it.url));
 
+  const pool =
+    mode === OPTIMIZER_MODE.LUXURY
+      ? filterLuxuryPool(rawPool, group)
+      : rawPool;
+
   if (!pool.length) return { group, pick: null, poolSize: 0 };
 
-  const ranked = pool.map(rankOptimizerItem).sort((a, b) => b.rankScore - a.rankScore);
+  const ranked = pool
+    .map((it) => rankOptimizerItem(it, mode, group))
+    .sort((a, b) => b.rankScore - a.rankScore);
   const best = ranked[0];
   return {
     group,
@@ -254,18 +448,23 @@ function computeBundleSummary(rows) {
  */
 export async function buildLifeOptimizerBundle(request, options = {}) {
   const { chip = "", triggerScout = true } = options;
+  const mode = resolveOptimizerMode(chip);
   const { terms, scoutLine } = extractProductGroups(request, chip);
 
   const searchRows = await Promise.all(
     terms.map(async (group) => {
       try {
+        if (mode === OPTIMIZER_MODE.LUXURY) {
+          return await searchEbayForGroup(group, mode);
+        }
+        const sort = mode === OPTIMIZER_MODE.BUDGET ? "price" : "bestMatch";
         const data = await fetchEbaySearch({
           q: group.query,
           limit: 8,
           listingMode: "buy_now",
-          sort: "price",
+          sort,
         });
-        return pickBestFromSearch(data, group);
+        return pickBestFromSearch(data, group, mode);
       } catch {
         return { group, pick: null, poolSize: 0, error: true };
       }
@@ -293,6 +492,7 @@ export async function buildLifeOptimizerBundle(request, options = {}) {
     searchRows,
     bundle,
     hasResults,
+    mode,
     fallbackSuggestions: OPTIMIZER_FALLBACK_SUGGESTIONS,
   };
 }

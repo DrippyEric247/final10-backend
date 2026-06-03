@@ -259,7 +259,11 @@ export default function BusinessOffersDashboard() {
             <div>
               <h2 className="text-xl font-black">AI SMART CART</h2>
               <p className="text-sm text-slate-300">
-                Live eBay Browse picks — ranked by price, trust, seller rating, and shipping.
+                {selectedChip === "Luxury Mode"
+                  ? "Premium hero picks — trust, brand, savings, and seller reputation (no cheap filler)."
+                  : selectedChip === "Budget Mode"
+                    ? "Value picks — lowest smart-cart total with solid trust."
+                    : "Live eBay Browse picks — ranked by trust, seller rating, savings, and shipping."}
               </p>
             </div>
             {bundle?.itemCount > 0 ? (
@@ -287,7 +291,9 @@ export default function BusinessOffersDashboard() {
 
           {bundleLoading ? (
             <p className="text-sm text-cyan-200 animate-pulse">
-              {SAVVY_SCOUT.shortTitle} is hunting eBay listings for your bundle…
+              {selectedChip === "Luxury Mode"
+                ? `${SAVVY_SCOUT.shortTitle} is scanning premium hero products on eBay…`
+                : `${SAVVY_SCOUT.shortTitle} is hunting eBay listings for your bundle…`}
             </p>
           ) : null}
 

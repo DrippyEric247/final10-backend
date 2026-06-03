@@ -24,9 +24,9 @@ import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
 import "../styles/OnboardingBestMove.css";
 
 const LOADING_STAGES = [
-  "Scanning deals...",
-  "Checking trust...",
-  "Savvy Scout is scanning for your Best Move…",
+  "Searching hero picks in your categories...",
+  "Checking trust and savings...",
+  "Savvy Scout is picking your strongest Best Move…",
 ];
 
 const FIRST_MOVE_BONUS_KEY = "f10_first_best_move_bonus_granted_v1";

@@ -20,6 +20,11 @@ import { evaluateBestMove } from "./bestMoveEngine";
 import { evaluateTrustScore } from "./trustScoreEngine";
 import type { BestMoveResult } from "../types/bestMove";
 import type { TrustScoreResult } from "../types/trustScore";
+import {
+  getHeroSearchQueriesForInterest,
+  isLowWowOnboardingTitle,
+  titleMatchesHeroIntent,
+} from "./categoryHeroSearchMap";
 import { getInterestConfig, labelForInterest } from "./onboardingInterests";
 import type { InterestId } from "./onboardingPreferences";
 import { getBestListingImageUrl } from "./listingImageUrl";
@@ -650,6 +655,223 @@ function pickBestCandidate(
   return null;
 }
 
+function isLowWowOnboardingCandidate(c: InstantBestMoveCandidate): boolean {
+  return isLowWowOnboardingTitle(String(c.listing.title || ""));
+}
+
+function filterOnboardingHeroCandidates(
+  candidates: InstantBestMoveCandidate[],
+  interest: InterestId,
+  requireHeroIntent: boolean
+): InstantBestMoveCandidate[] {
+  return candidates.filter((c) => {
+    if (isLowWowOnboardingCandidate(c)) return false;
+    if (requireHeroIntent && !titleMatchesHeroIntent(interest, String(c.listing.title || ""))) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/** Composite score for comparing one finalist per selected category. */
+export function computeOnboardingFinalistScore(c: InstantBestMoveCandidate): number {
+  const trust = c.trust.trustScore;
+  const savings = clamp(c.savingsPercent * 1.55, 0, 100);
+  const price = pickComparablePrice(c.listing) ?? 0;
+  const priceAttractiveness =
+    price > 0
+      ? clamp(88 - Math.log10(Math.max(price, 1)) * 14, 28, 92)
+      : 45;
+  const seller = c.trust.isMegaReputation
+    ? 96
+    : c.trust.isEstablishedSeller
+      ? 84
+      : c.trust.trustLevel === "high"
+        ? 76
+        : 58;
+  const bids = toNum(c.listing.bidCount) ?? 0;
+  const demand = clamp(bids * 7 + Math.min(bids, 8) * 4, 0, 100);
+  const heroBoost = titleMatchesHeroIntent(c.interest, String(c.listing.title || ""))
+    ? 14
+    : 0;
+  const underMarketBoost = isUnderMarket(c) ? 10 : 0;
+  return (
+    trust * 0.34 +
+    savings * 0.26 +
+    priceAttractiveness * 0.1 +
+    seller * 0.16 +
+    demand * 0.08 +
+    heroBoost +
+    underMarketBoost +
+    c.instantScore * 0.06
+  );
+}
+
+function compareOnboardingFinalists(
+  a: InstantBestMoveCandidate,
+  b: InstantBestMoveCandidate
+): number {
+  return computeOnboardingFinalistScore(a) - computeOnboardingFinalistScore(b);
+}
+
+function pickStrongerFinalist(
+  current: InstantBestMoveCandidate | null,
+  next: InstantBestMoveCandidate | null
+): InstantBestMoveCandidate | null {
+  if (!next) return current;
+  if (!current) return next;
+  return compareOnboardingFinalists(next, current) > 0 ? next : current;
+}
+
+function buildHeroPickedReason(pick: InstantBestMoveCandidate): string {
+  const label = labelForInterest(pick.interest);
+  if (pick.savingsPercent >= 5 || pick.savingsAmount > 0) {
+    return `Picked because ${label} is trending and this listing is under market.`;
+  }
+  if (pick.trust.trustScore >= 78) {
+    return `Picked because ${label} is trending with top trust and seller quality.`;
+  }
+  return `Picked because ${label} is trending and this is the strongest hero deal right now.`;
+}
+
+function buildHeroMatchMessage(
+  pick: InstantBestMoveCandidate,
+  finalistCount: number
+): string {
+  const savingsLine =
+    pick.savingsAmount > 0
+      ? `Est. savings ${pick.savingsPercent >= 1 ? `${Math.round(pick.savingsPercent)}%` : formatUsd(pick.savingsAmount)}.`
+      : "Strong value vs market.";
+  return [
+    `Compared ${finalistCount} category ${finalistCount === 1 ? "winner" : "winners"} from your picks.`,
+    `Trust score ${pick.trust.trustScore}.`,
+    savingsLine,
+    "Savvy Points unlock when you act on this move.",
+  ].join(" ");
+}
+
+function formatUsd(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: amount >= 100 ? 0 : 2,
+  }).format(amount);
+}
+
+async function searchCategoryHeroFinalist(
+  interest: InterestId,
+  options: FetchInstantBestMoveOptions
+): Promise<{
+  finalist: InstantBestMoveCandidate | null;
+  widened: boolean;
+  scoredCount: number;
+}> {
+  const cfg = getInterestConfig(interest);
+  const heroQueries = [...getHeroSearchQueriesForInterest(interest)];
+  const fallbackQuery = cfg?.query ? [cfg.query] : [];
+  const queries = [...heroQueries, ...fallbackQuery];
+  let categoryBest: InstantBestMoveCandidate | null = null;
+  let widened = false;
+  let scoredCount = 0;
+
+  for (let i = 0; i < queries.length; i += 1) {
+    const q = queries[i];
+    const isHeroQuery = i < heroQueries.length;
+    const { items, widened: wasWidened } = await searchWithCategoryFallback({
+      q,
+      limit: options.perCategoryLimit ?? DEFAULT_PER_CATEGORY_LIMIT,
+      signal: options.signal,
+      engine: isHeroQuery ? "onboarding_hero_search" : "onboarding_category_fallback",
+      interest,
+    });
+    widened = widened || wasWidened;
+    const scored = filterOnboardingHeroCandidates(
+      items.map((raw) => scoreListing(raw, interest)),
+      interest,
+      isHeroQuery
+    );
+    scoredCount += scored.length;
+    const ranked = rankCandidates(scored);
+    const pick = pickBestCandidate(ranked, ["strict", "standard", "relaxed"]);
+    categoryBest = pickStrongerFinalist(categoryBest, pick);
+    if (
+      pick &&
+      isHeroQuery &&
+      meetsBestMoveQuality(pick, "standard") &&
+      titleMatchesHeroIntent(interest, String(pick.listing.title || ""))
+    ) {
+      break;
+    }
+  }
+
+  return { finalist: categoryBest, widened, scoredCount };
+}
+
+async function fetchFirstOnboardingHeroBestMove(
+  interests: ReadonlyArray<InterestId>,
+  options: FetchInstantBestMoveOptions
+): Promise<InstantBestMoveResult | null> {
+  const unique = Array.from(new Set(interests));
+  if (!unique.length) return null;
+
+  debugLog("hero_search_start", { interests: unique });
+
+  const settled = await Promise.allSettled(
+    unique.map((interest) => searchCategoryHeroFinalist(interest, options))
+  );
+
+  const finalists: InstantBestMoveCandidate[] = [];
+  const emptyInterests: InterestId[] = [];
+  let widened = false;
+  let totalScored = 0;
+
+  settled.forEach((entry, idx) => {
+    const interest = unique[idx];
+    if (entry.status !== "fulfilled") {
+      emptyInterests.push(interest);
+      return;
+    }
+    const { finalist, widened: wasWidened, scoredCount } = entry.value;
+    widened = widened || wasWidened;
+    totalScored += scoredCount;
+    if (finalist) {
+      finalists.push(finalist);
+    } else {
+      emptyInterests.push(interest);
+    }
+  });
+
+  if (!finalists.length) {
+    debugLog("hero_search_empty", { interests: unique, totalScored });
+    return null;
+  }
+
+  const pick = finalists.reduce((best, c) =>
+    compareOnboardingFinalists(c, best) > 0 ? c : best
+  );
+
+  debugLog("hero_search_pick", {
+    pickInterest: pick.interest,
+    finalistCount: finalists.length,
+    trustScore: pick.trust.trustScore,
+    savingsPercent: pick.savingsPercent,
+    title: pick.listing.title,
+  });
+
+  const heroResult = buildSuccessResult(pick, [pick], {
+    matchType: "exact",
+    matchLabel: "Exact Match",
+    matchMessage: buildHeroMatchMessage(pick, finalists.length),
+    pickedReason: buildHeroPickedReason(pick),
+    searchedInterests: unique,
+    emptyInterests,
+    totalCandidates: Math.max(finalists.length, totalScored),
+    widenedSearch: widened,
+  });
+  heroResult.alternates = [];
+  return heroResult;
+}
+
 type InterestSearchResult = {
   searchedInterests: InterestId[];
   emptyInterests: InterestId[];
@@ -755,6 +977,7 @@ function buildSuccessResult(
   const alternates = ranked
     .filter((c) => c !== pick && meetsBestMoveQuality(c, "standard"))
     .slice(0, 4);
+  // First onboarding hero path returns only the single strongest pick (no alternates).
   return {
     pick,
     alternates,
@@ -798,6 +1021,13 @@ export async function fetchInstantBestMove(
   }
 
   try {
+    // 0) First onboarding — one hero search per selected category, compare finalists
+    const heroResult = await fetchFirstOnboardingHeroBestMove(unique, options);
+    if (heroResult?.pick) {
+      debugLog("fallback_step_used", { step: 0, label: "category_hero_search" });
+      return heroResult;
+    }
+
     let widened = false;
     let searchedInterests: InterestId[] = [];
     let emptyInterests: InterestId[] = [];
