@@ -1,5 +1,23 @@
 const rateLimit = require('express-rate-limit');
 
+/** True for GET /api/auth/me (profile hydrate — not a credential guess). */
+function isAuthMeRequest(req) {
+  const path = String(req.originalUrl || req.url || req.path || '').split('?')[0];
+  return req.method === 'GET' && /\/auth\/me(?:\/)?$/i.test(path);
+}
+
+/** Lenient limiter for session hydration — separate bucket from login brute-force. */
+const authMeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Profile sync is busy — wait a few seconds and retry.',
+  },
+});
+
 const authLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
@@ -79,6 +97,8 @@ const authPasswordResetLimiter = rateLimit({
 });
 
 module.exports = {
+  isAuthMeRequest,
+  authMeLimiter,
   authLoginLimiter,
   authSignupLimiter,
   authPasswordResetLimiter,

@@ -7,7 +7,7 @@ const ReferralLog = require('../models/ReferralLog');
 const CreatorEvent = require('../models/CreatorEvent');
 const auth = require('../middleware/auth');
 const { validateRequest } = require('../middleware/validateRequest');
-const { authLoginLimiter, authSignupLimiter } = require('../middleware/rateLimits');
+const { authLoginLimiter, authMeLimiter, authSignupLimiter } = require('../middleware/rateLimits');
 const schemas = require('../validation/schemas');
 const { HttpError } = require('../middleware/apiErrors');
 const { auditFireAndForget } = require('../services/securityAuditService');
@@ -338,7 +338,7 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
 /**
  * GET /api/auth/me
  */
-router.get('/me', auth, async (req, res, next) => {
+router.get('/me', authMeLimiter, auth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id || req.user.id);
     if (!user) return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));

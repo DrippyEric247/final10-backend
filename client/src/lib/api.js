@@ -88,9 +88,18 @@ api.interceptors.response.use(
         error.response.headers["retry-after"] ||
         error.response.headers["Retry-After"] ||
         60;
-      markGlobalCooling(retryAfter);
+      const path = String(url).split("?")[0];
+      const isAuthMe = method === "GET" && /\/auth\/me$/i.test(path);
+      const isAuthLogin = method === "POST" && /\/auth\/(login|register)$/i.test(path);
+      if (!isAuthMe && !isAuthLogin) {
+        markGlobalCooling(retryAfter);
+      }
       const rateLimitError = new Error(
-        `Too many requests. Cooling down for ${retryAfter} seconds.`
+        isAuthMe
+          ? "Profile sync rate limit — wait a few seconds and retry."
+          : isAuthLogin
+            ? "Too many login attempts. Wait a moment and try again."
+            : `Too many requests. Cooling down for ${retryAfter} seconds.`
       );
       rateLimitError.status = 429;
       rateLimitError.retryAfter = retryAfter;
@@ -118,9 +127,13 @@ if (saved) setAuthToken(saved);
 
 // AUTH endpoints (note the /api prefix now baked into baseURL)
 export async function loginUser({ email, password }) {
-  const { data } = await api.post("/auth/login", { email, password });
-  setAuthToken(data.token);
-  return data.user;
+  const res = await gatedRequest(
+    "authLogin",
+    async () => api.post("/auth/login", { email, password }),
+    { force: true }
+  );
+  setAuthToken(res.data.token);
+  return res.data.user;
 }
 export async function registerUser(payload) {
   const { data } = await api.post("/auth/register", payload);

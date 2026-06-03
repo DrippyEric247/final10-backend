@@ -4,7 +4,9 @@
  */
 
 const COOLDOWN_MS = {
-  authMe: Infinity,
+  /** Dedupe rapid /auth/me — not the same as login brute-force protection. */
+  authMe: 45_000,
+  authLogin: 3_000,
   notifications: 60_000,
   levelsMe: 60_000,
   dailyTasks: 5 * 60_000,
@@ -61,10 +63,12 @@ export function markGlobalCooling(retryAfterSec = 60) {
   notifyCooling();
 }
 
-function markRouteCooling(key, retryAfterSec = 60) {
+function markRouteCooling(key, retryAfterSec = 60, { affectGlobal = true } = {}) {
   const ms = Math.max(1000, Number(retryAfterSec) || 60) * 1000;
   routeCoolingUntil.set(key, Date.now() + ms);
-  markGlobalCooling(retryAfterSec);
+  if (affectGlobal) {
+    markGlobalCooling(retryAfterSec);
+  }
 }
 
 function isGloballyCooling() {
@@ -89,6 +93,9 @@ export function cooldownKeyForRequest(method, url = "") {
     .split("?")[0];
 
   if (m === "GET" && path === "/auth/me") return "authMe";
+  if (m === "POST" && (path === "/auth/login" || path === "/auth/register")) {
+    return "authLogin";
+  }
   if (m === "GET" && path === "/notifications") return "notifications";
   if (m === "GET" && path === "/levels/me") return "levelsMe";
   if (m === "GET" && (path === "/auctions/daily-tasks" || path === "/actions/daily-tasks")) {
@@ -125,16 +132,20 @@ export async function gatedRequest(key, run, opts = {}) {
     return run();
   }
 
-  if (isGloballyCooling() && !force) {
+  if (isGloballyCooling() && !force && key !== "authLogin") {
     throw new ApiCoolingDownError();
   }
   if (isRouteCooling(coolKey) && !force) {
     throw new ApiCoolingDownError();
   }
 
-  if (key === "authMe") {
-    if (!force && !allowBootstrap && authMeBootstrapPending === false) {
-      throw new ApiCoolingDownError("Profile refresh is on cooldown. Use an in-app action to sync.");
+  if (key === "authMe" && !force) {
+    const minMs = minIntervalForKey("authMe");
+    if (!allowBootstrap && authMeBootstrapPending === false) {
+      const last = lastSuccessAt.get("authMe") || 0;
+      if (Number.isFinite(minMs) && minMs > 0 && Date.now() - last < minMs) {
+        throw new ApiCoolingDownError("Profile refresh is on cooldown. Try again shortly.");
+      }
     }
   } else if (!force) {
     const minMs = minIntervalForKey(key);
@@ -166,7 +177,9 @@ export async function gatedRequest(key, run, opts = {}) {
           err?.response?.headers?.["Retry-After"] ??
           err?.retryAfter ??
           60;
-        markRouteCooling(coolKey, retryAfter);
+        const affectGlobal = coolKey !== "authMe" && coolKey !== "authLogin";
+        const routeRetry = coolKey === "authMe" ? Math.min(15, Number(retryAfter) || 15) : retryAfter;
+        markRouteCooling(coolKey, routeRetry, { affectGlobal });
       }
       throw err;
     } finally {

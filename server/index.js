@@ -61,11 +61,14 @@ app.use(cacheControl);
 app.use(cookieSecurity);
 
 // --- Rate Limiting (skip OPTIONS + telemetry ingest) ---
+const { isAuthMeRequest } = require('./middleware/rateLimits');
+
 const limiter = rateLimit({
   ...rateLimitConfig,
   skip: (req) =>
     req.method === 'OPTIONS' ||
-    req.path.startsWith('/analytics'),
+    req.path.startsWith('/analytics') ||
+    isAuthMeRequest(req),
 });
 app.use('/api/', limiter);
 
