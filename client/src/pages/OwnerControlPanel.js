@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Crown, 
@@ -9,12 +9,20 @@ import {
   TrendingUp,
   User,
   RefreshCw,
-  Eye
+  Eye,
+  History,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { STORAGE_KEY } from '../lib/api';
 import { buildApiUrl } from '../lib/runtimeApi';
 import { hasAdminRole } from '../lib/adminAccess';
+import OwnerSearchUserCard from '../components/owner/OwnerSearchUserCard';
+import {
+  loadOwnerSearchHistory,
+  saveOwnerSearchHistory,
+  clearOwnerSearchHistory,
+} from '../lib/ownerSearchHistory';
 
 function getAuthToken() {
   return localStorage.getItem(STORAGE_KEY) || localStorage.getItem('token') || '';
@@ -41,13 +49,30 @@ const OwnerControlPanel = () => {
   const [grantAmount, setGrantAmount] = useState('');
   const [grantReason, setGrantReason] = useState('');
   const [searchError, setSearchError] = useState('');
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const [membershipTierEdit, setMembershipTierEdit] = useState('premium');
+  const [membershipMonths, setMembershipMonths] = useState('12');
+  const [membershipReason, setMembershipReason] = useState('Owner membership update');
+  const profileDetailsRef = useRef(null);
+
+  const ownerAccountId = String(user?.id || user?._id || '');
 
   useEffect(() => {
     if (!hasAdminRole(user)) {
       return;
     }
     fetchStats();
-  }, [user]);
+    if (ownerAccountId) {
+      setRecentSearches(loadOwnerSearchHistory(ownerAccountId));
+    }
+  }, [user, ownerAccountId]);
+
+  const patchSearchResult = useCallback((userId, patch) => {
+    setSearchResults((prev) =>
+      prev.map((row) => (String(row.id) === String(userId) ? { ...row, ...patch } : row))
+    );
+  }, []);
 
   const fetchStats = async () => {
     try {
@@ -61,8 +86,10 @@ const OwnerControlPanel = () => {
     }
   };
 
-  const searchUsers = async () => {
-    if (!searchQuery.trim()) return;
+  const searchUsers = async (queryOverride) => {
+    const q = String(queryOverride ?? searchQuery).trim();
+    if (!q) return;
+    if (queryOverride) setSearchQuery(q);
 
     setLoading(true);
     setSearchError('');
@@ -73,7 +100,7 @@ const OwnerControlPanel = () => {
 
     try {
       const response = await fetch(
-        buildApiUrl(`/owner/search-users?query=${encodeURIComponent(searchQuery)}`),
+        buildApiUrl(`/owner/search-users?query=${encodeURIComponent(q)}`),
         {
           headers: ownerAuthHeaders(),
           signal: controller.signal,
@@ -94,6 +121,15 @@ const OwnerControlPanel = () => {
 
       const users = data.users || [];
       setSearchResults(users);
+      if (ownerAccountId) {
+        setRecentSearches(
+          saveOwnerSearchHistory(ownerAccountId, {
+            query: q,
+            resultCount: users.length,
+            users,
+          })
+        );
+      }
       if (users.length === 0) {
         setSearchError('No users found for that query.');
       }
@@ -124,9 +160,122 @@ const OwnerControlPanel = () => {
       });
       const data = await response.json();
       setSelectedUser(data.user);
+      return data.user;
     } catch (error) {
       console.error('Error fetching user details:', error);
+      return null;
     }
+  };
+
+  const handleViewFullProfile = async (row) => {
+    setSelectedUser(row);
+    await fetchUserDetails(row.id);
+    setTimeout(() => {
+      profileDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
+  const handleGrantSavvy = (row) => {
+    setSelectedUser(row);
+    setGrantType('points');
+    setGrantAmount('');
+    setGrantReason('Owner Savvy grant');
+    setShowGrantModal(true);
+  };
+
+  const handleEditMembership = (row) => {
+    setSelectedUser(row);
+    setMembershipTierEdit(row.hasLifetimeSub ? 'pro' : row.membershipTier || 'free');
+    setMembershipMonths(row.hasLifetimeSub ? '0' : '12');
+    setMembershipReason('Owner membership update');
+    setShowMembershipModal(true);
+  };
+
+  const handleBanUser = async (row) => {
+    const reason = window.prompt(`Ban reason for ${row.username}:`, 'Owner ban');
+    if (reason === null) return;
+    try {
+      const response = await fetch(buildApiUrl('/owner/ban-user'), {
+        method: 'POST',
+        headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ userId: row.id, reason }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        patchSearchResult(row.id, { isBanned: true });
+        alert(`Banned ${row.username}`);
+      } else {
+        alert(data.message || 'Ban failed');
+      }
+    } catch (error) {
+      console.error('Ban user error:', error);
+      alert('Failed to ban user');
+    }
+  };
+
+  const handleUnbanUser = async (row) => {
+    if (!window.confirm(`Unban ${row.username}?`)) return;
+    try {
+      const response = await fetch(buildApiUrl('/owner/unban-user'), {
+        method: 'POST',
+        headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ userId: row.id }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        patchSearchResult(row.id, { isBanned: false });
+        alert(`Unbanned ${row.username}`);
+      } else {
+        alert(data.message || 'Unban failed');
+      }
+    } catch (error) {
+      console.error('Unban user error:', error);
+      alert('Failed to unban user');
+    }
+  };
+
+  const handleUpdateMembership = async () => {
+    if (!selectedUser) return;
+    try {
+      const response = await fetch(buildApiUrl('/owner/update-membership'), {
+        method: 'POST',
+        headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          membershipTier: membershipTierEdit,
+          durationMonths: parseInt(membershipMonths, 10),
+          reason: membershipReason,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(data.message);
+        setShowMembershipModal(false);
+        const updated = data.user || {};
+        patchSearchResult(selectedUser.id, {
+          membershipTier: updated.membershipTier,
+          isPremium: updated.isPremium,
+          hasLifetimeSub: updated.hasLifetimeSub,
+        });
+        fetchUserDetails(selectedUser.id);
+        fetchStats();
+      } else {
+        alert(data.message || 'Update failed');
+      }
+    } catch (error) {
+      console.error('Update membership error:', error);
+      alert('Failed to update membership');
+    }
+  };
+
+  const applyHistoryEntry = async (entry) => {
+    setSearchError('');
+    if (entry.users?.length) {
+      setSearchQuery(entry.query);
+      setSearchResults(entry.users);
+      return;
+    }
+    await searchUsers(entry.query);
   };
 
   const revokeFoundingAccess = async () => {
@@ -203,6 +352,15 @@ const OwnerControlPanel = () => {
         setShowGrantModal(false);
         setGrantAmount('');
         setGrantReason('');
+        if (data.user) {
+          const earned = data.user.newLifetimePoints;
+          patchSearchResult(selectedUser.id, {
+            pointsBalance: data.user.newPointsBalance ?? data.user.pointsBalance,
+            lifetimePointsEarned: earned,
+            totalSavvyEarned: earned,
+            savvyPoints: earned,
+          });
+        }
         fetchUserDetails(selectedUser.id);
         fetchStats();
       } else {
@@ -232,16 +390,6 @@ const OwnerControlPanel = () => {
     { id: 'stats', label: 'Owner Stats', icon: TrendingUp },
     { id: 'grants', label: 'Recent Grants', icon: Gift }
   ];
-
-  const getMembershipBadge = (membershipTier, isPremium, hasLifetime) => {
-    if (hasLifetime) {
-      return 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white';
-    }
-    if (isPremium) {
-      return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
-    }
-    return 'bg-gray-600 text-gray-300';
-  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -340,60 +488,75 @@ const OwnerControlPanel = () => {
                   {searchError}
                 </p>
               ) : null}
+
+              {recentSearches.length > 0 && (
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                      <History className="h-3.5 w-3.5" />
+                      Recent searches
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearOwnerSearchHistory(ownerAccountId);
+                        setRecentSearches([]);
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-300"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {recentSearches.map((entry) => (
+                      <button
+                        key={`${entry.query}-${entry.searchedAt}`}
+                        type="button"
+                        onClick={() => applyHistoryEntry(entry)}
+                        className="rounded-full border border-gray-600 bg-gray-700/80 px-3 py-1 text-xs text-gray-200 hover:border-yellow-500/50 hover:text-yellow-200"
+                      >
+                        {entry.query}
+                        <span className="ml-1 text-gray-500">({entry.resultCount})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Search Results */}
+            {/* Search Results — instant card grid */}
             {searchResults.length > 0 && (
-              <div className="bg-gray-800 rounded-xl border border-gray-700">
-                <div className="p-6 border-b border-gray-700">
-                  <h3 className="text-lg font-semibold text-white">Search Results</h3>
-                </div>
-                <div className="divide-y divide-gray-700">
-                  {searchResults.map((user) => (
-                    <div key={user.id} className="p-6 hover:bg-gray-700/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                            <User className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="text-lg font-semibold text-white">{user.username}</h4>
-                            <p className="text-gray-400">{user.email}</p>
-                            <div className="flex items-center space-x-4 mt-2">
-                              {(user.betaTester || user.foundingAccess) && (
-                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/40">
-                                  Founding Tester
-                                </span>
-                              )}
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getMembershipBadge(user.membershipTier, user.isPremium, user.hasLifetimeSub)}`}>
-                                {user.hasLifetimeSub ? 'Lifetime' : user.membershipTier}
-                              </span>
-                              <span className="text-sm text-gray-400">
-                                {user.pointsBalance.toLocaleString()} points
-                              </span>
-                              <span className="text-sm text-gray-400">
-                                Member since {new Date(user.memberSince).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => fetchUserDetails(user.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>View Details</span>
-                        </button>
-                      </div>
-                    </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+                className="space-y-4"
+              >
+                <h3 className="text-lg font-semibold text-white">
+                  Results ({searchResults.length})
+                </h3>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {searchResults.map((row) => (
+                    <OwnerSearchUserCard
+                      key={row.id}
+                      user={row}
+                      onGrantSavvy={handleGrantSavvy}
+                      onEditMembership={handleEditMembership}
+                      onBanUser={handleBanUser}
+                      onUnbanUser={handleUnbanUser}
+                      onViewProfile={handleViewFullProfile}
+                    />
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* User Details */}
             {selectedUser && (
-              <div className="bg-gray-800 rounded-xl border border-gray-700">
+              <div
+                ref={profileDetailsRef}
+                className="bg-gray-800 rounded-xl border border-gray-700"
+              >
                 <div className="p-6 border-b border-gray-700">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">User Details</h3>
@@ -428,9 +591,11 @@ const OwnerControlPanel = () => {
                     
                     <div className="bg-gray-700 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-gray-400 mb-2">Points</h4>
-                      <p className="text-white font-semibold">{selectedUser.pointsBalance.toLocaleString()}</p>
+                      <p className="text-white font-semibold">
+                        {Number(selectedUser.pointsBalance || 0).toLocaleString()}
+                      </p>
                       <p className="text-gray-400 text-sm">
-                        {selectedUser.lifetimePointsEarned.toLocaleString()} lifetime
+                        {Number(selectedUser.lifetimePointsEarned || 0).toLocaleString()} lifetime
                       </p>
                     </div>
                     
@@ -589,6 +754,84 @@ const OwnerControlPanel = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Membership Modal */}
+      {showMembershipModal && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-800"
+          >
+            <div className="flex items-center justify-between border-b border-gray-700 p-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Edit Membership</h3>
+                <p className="text-sm text-gray-400">{selectedUser.username}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMembershipModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-300">Tier</label>
+                <select
+                  value={membershipTierEdit}
+                  onChange={(e) => setMembershipTierEdit(e.target.value)}
+                  className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 text-white"
+                >
+                  <option value="free">Free</option>
+                  <option value="premium">Premium</option>
+                  <option value="pro">Pro</option>
+                </select>
+              </div>
+              {membershipTierEdit !== 'free' && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-300">
+                    Duration (months, 0 = lifetime for Pro)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={membershipMonths}
+                    onChange={(e) => setMembershipMonths(e.target.value)}
+                    className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 text-white"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-300">Reason</label>
+                <input
+                  type="text"
+                  value={membershipReason}
+                  onChange={(e) => setMembershipReason(e.target.value)}
+                  className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 text-white"
+                />
+              </div>
+            </div>
+            <div className="flex gap-4 border-t border-gray-700 p-6">
+              <button
+                type="button"
+                onClick={() => setShowMembershipModal(false)}
+                className="flex-1 rounded-lg bg-gray-700 py-3 font-medium text-white hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateMembership}
+                className="flex-1 rounded-lg bg-violet-600 py-3 font-medium text-white hover:bg-violet-500"
+              >
+                Save
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Grant Modal */}
       {showGrantModal && (

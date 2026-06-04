@@ -17,9 +17,11 @@ function canAccessOwnerPanel(user) {
 }
 
 const OWNER_SEARCH_SELECT =
-  'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt';
+  'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned totalTransactions subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt isBanned bannedAt';
 
 function mapOwnerSearchUser(user) {
+  const totalSavvyEarned =
+    Number(user.lifetimePointsEarned) || Number(user.savvyPoints) || 0;
   return {
     id: user._id,
     username: user.username,
@@ -29,14 +31,17 @@ function mapOwnerSearchUser(user) {
     isPremium: user.isPremium,
     points: user.points,
     savvyPoints: user.savvyPoints,
-    pointsBalance: user.pointsBalance,
+    pointsBalance: user.pointsBalance ?? 0,
     lifetimePointsEarned: user.lifetimePointsEarned,
-    subscriptionExpires: user.subscriptionExpires,
+    totalSavvyEarned,
+    totalPurchases: Number(user.totalTransactions) || 0,
+    accountCreatedAt: user.createdAt,
     betaTester: Boolean(user.betaTester),
     foundingAccess: Boolean(user.foundingAccess),
     betaAccessExpiresAt: user.betaAccessExpiresAt || null,
     memberSince: user.createdAt,
     lastActive: user.lastActive,
+    isBanned: Boolean(user.isBanned),
     hasLifetimeSub: user.subscriptionExpires == null && Boolean(user.isPremium),
   };
 }
@@ -158,6 +163,11 @@ router.get('/user/:userId', requireOwnerAccess, async (req, res) => {
         referralCode: user.referralCode,
         referralCodeUsed: user.referralCodeUsed,
         totalTransactions: user.totalTransactions,
+        totalPurchases: Number(user.totalTransactions) || 0,
+        totalSavvyEarned:
+          Number(user.lifetimePointsEarned) || Number(user.savvyPoints) || 0,
+        accountCreatedAt: user.createdAt,
+        isBanned: Boolean(user.isBanned),
         memberSince: user.createdAt,
         lastActive: user.lastActive,
         ebayConnected: user.ebayAuth?.isConnected || false,
@@ -446,6 +456,131 @@ router.post('/revoke-founding-access', requireOwnerAccess, async (req, res) => {
   } catch (error) {
     console.error('Error revoking founding access:', error);
     return res.status(500).json({ message: 'Failed to revoke founding access' });
+  }
+});
+
+/**
+ * POST /api/owner/ban-user
+ */
+router.post('/ban-user', requireOwnerAccess, async (req, res) => {
+  try {
+    const { userId, reason = 'Owner ban' } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required' });
+    }
+    const target = await User.findById(userId);
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    target.isBanned = true;
+    target.bannedAt = new Date();
+    target.banReason = String(reason).slice(0, 500);
+    await target.save();
+    return res.status(200).json({
+      success: true,
+      message: `Banned ${target.username}`,
+      user: { id: String(target._id), isBanned: true },
+    });
+  } catch (error) {
+    console.error('Error banning user:', error);
+    return res.status(500).json({ success: false, message: 'Failed to ban user' });
+  }
+});
+
+/**
+ * POST /api/owner/unban-user
+ */
+router.post('/unban-user', requireOwnerAccess, async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required' });
+    }
+    const target = await User.findById(userId);
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    target.isBanned = false;
+    target.bannedAt = null;
+    target.banReason = null;
+    await target.save();
+    return res.status(200).json({
+      success: true,
+      message: `Unbanned ${target.username}`,
+      user: { id: String(target._id), isBanned: false },
+    });
+  } catch (error) {
+    console.error('Error unbanning user:', error);
+    return res.status(500).json({ success: false, message: 'Failed to unban user' });
+  }
+});
+
+/**
+ * POST /api/owner/update-membership
+ */
+router.post('/update-membership', requireOwnerAccess, async (req, res) => {
+  try {
+    const {
+      userId,
+      membershipTier = 'free',
+      durationMonths = 12,
+      reason = 'Owner membership update',
+    } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required' });
+    }
+    const target = await User.findById(userId);
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const tier = String(membershipTier).toLowerCase();
+    if (!['free', 'premium', 'pro'].includes(tier)) {
+      return res.status(400).json({ success: false, message: 'Invalid membership tier' });
+    }
+
+    target.membershipTier = tier;
+    target.premiumTier = tier === 'free' ? 'free' : tier === 'premium' ? 'premium' : 'pro';
+
+    if (tier === 'free') {
+      target.isPremium = false;
+      target.subscriptionExpires = null;
+    } else if (tier === 'pro' && Number(durationMonths) === 0) {
+      target.isPremium = true;
+      target.subscriptionExpires = null;
+    } else if (tier === 'premium' || tier === 'pro') {
+      const months = Math.max(1, parseInt(String(durationMonths), 10) || 12);
+      const expires = new Date();
+      expires.setMonth(expires.getMonth() + months);
+      target.isPremium = true;
+      target.subscriptionExpires = expires;
+    }
+
+    target.ownerGrants = target.ownerGrants || [];
+    target.ownerGrants.push({
+      type: 'premium_subscription',
+      amount: tier === 'pro' && Number(durationMonths) === 0 ? null : durationMonths,
+      reason,
+      grantedBy: req.superAdmin.username,
+      grantedAt: new Date(),
+    });
+    await target.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Updated membership for ${target.username} to ${tier}`,
+      user: {
+        id: String(target._id),
+        membershipTier: target.membershipTier,
+        isPremium: target.isPremium,
+        subscriptionExpires: target.subscriptionExpires,
+        hasLifetimeSub:
+          target.subscriptionExpires == null && Boolean(target.isPremium),
+      },
+    });
+  } catch (error) {
+    console.error('Error updating membership:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update membership' });
   }
 });
 

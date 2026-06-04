@@ -232,6 +232,11 @@ const userSchema = new mongoose.Schema({
     titleId: { type: String, default: null },
   },
 
+  // ---- Owner moderation ----
+  isBanned: { type: Boolean, default: false },
+  bannedAt: { type: Date, default: null },
+  banReason: { type: String, default: null },
+
   // ---- Owner Grants (Owner Perks) ----
   ownerGrants: [{
     type: {
