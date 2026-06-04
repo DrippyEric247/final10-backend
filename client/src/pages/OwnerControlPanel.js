@@ -34,6 +34,14 @@ function ownerAuthHeaders(extra = {}) {
   };
 }
 
+/** Only accept plain string/number query text — never events or user objects. */
+function normalizeSearchQuery(value) {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value).trim();
+  return '';
+}
+
 const OwnerControlPanel = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('search');
@@ -66,6 +74,12 @@ const OwnerControlPanel = () => {
     }
   }, [user, ownerAccountId]);
 
+  useEffect(() => {
+    if (typeof searchQuery !== 'string' || searchQuery === '[object Object]') {
+      setSearchQuery('');
+    }
+  }, [searchQuery]);
+
   const patchSearchResult = useCallback((userId, patch) => {
     setSearchResults((prev) =>
       prev.map((row) => (String(row.id) === String(userId) ? { ...row, ...patch } : row))
@@ -84,10 +98,11 @@ const OwnerControlPanel = () => {
     }
   };
 
-  const searchUsers = async (queryOverride) => {
-    const q = String(queryOverride ?? searchQuery).trim();
-    if (!q) return;
-    if (queryOverride) setSearchQuery(q);
+  const handleUserSearch = async (queryOverride) => {
+    const overrideText = normalizeSearchQuery(queryOverride);
+    const q = overrideText || normalizeSearchQuery(searchQuery);
+    if (!q || q === '[object Object]') return;
+    if (overrideText) setSearchQuery(overrideText);
 
     setLoading(true);
     setSearchError('');
@@ -268,12 +283,14 @@ const OwnerControlPanel = () => {
 
   const applyHistoryEntry = async (entry) => {
     setSearchError('');
+    const historyQuery = normalizeSearchQuery(entry?.query);
+    if (!historyQuery || historyQuery === '[object Object]') return;
     if (entry.users?.length) {
-      setSearchQuery(entry.query);
+      setSearchQuery(historyQuery);
       setSearchResults(entry.users);
       return;
     }
-    await searchUsers(entry.query);
+    await handleUserSearch(historyQuery);
   };
 
   const revokeFoundingAccess = async () => {
@@ -462,11 +479,17 @@ const OwnerControlPanel = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search by username, email, or user ID..."
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                    onKeyPress={(e) => e.key === 'Enter' && searchUsers()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleUserSearch();
+                      }
+                    }}
                   />
                 </div>
                 <button
-                  onClick={searchUsers}
+                  type="button"
+                  onClick={() => handleUserSearch()}
                   disabled={loading}
                   className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-2"
                 >
