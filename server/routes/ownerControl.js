@@ -522,14 +522,24 @@ router.post('/update-membership', requireOwnerAccess, async (req, res) => {
   try {
     const {
       userId,
+      email,
       membershipTier = 'free',
       durationMonths = 12,
       reason = 'Owner membership update',
     } = req.body || {};
-    if (!userId) {
-      return res.status(400).json({ success: false, message: 'userId is required' });
+
+    const id = String(userId || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!id && !normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId or email is required',
+      });
     }
-    const target = await User.findById(userId);
+
+    const target = id
+      ? await User.findById(id)
+      : await User.findOne({ email: normalizedEmail });
     if (!target) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -539,48 +549,70 @@ router.post('/update-membership', requireOwnerAccess, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid membership tier' });
     }
 
+    const monthsRaw = parseInt(String(durationMonths), 10);
+    const months = Number.isFinite(monthsRaw) ? monthsRaw : 12;
+
     target.membershipTier = tier;
     target.premiumTier = tier === 'free' ? 'free' : tier === 'premium' ? 'premium' : 'pro';
 
     if (tier === 'free') {
       target.isPremium = false;
       target.subscriptionExpires = null;
-    } else if (tier === 'pro' && Number(durationMonths) === 0) {
+    } else if (tier === 'pro' && months === 0) {
       target.isPremium = true;
       target.subscriptionExpires = null;
     } else if (tier === 'premium' || tier === 'pro') {
-      const months = Math.max(1, parseInt(String(durationMonths), 10) || 12);
+      const span = Math.max(1, months || 12);
       const expires = new Date();
-      expires.setMonth(expires.getMonth() + months);
+      expires.setMonth(expires.getMonth() + span);
       target.isPremium = true;
       target.subscriptionExpires = expires;
     }
 
+    const grantedBy =
+      req.superAdmin?.username || req.ownerUser?.username || req.user?.username || 'owner';
+
     target.ownerGrants = target.ownerGrants || [];
     target.ownerGrants.push({
       type: 'premium_subscription',
-      amount: tier === 'pro' && Number(durationMonths) === 0 ? null : durationMonths,
-      reason,
-      grantedBy: req.superAdmin.username,
+      amount: tier === 'pro' && months === 0 ? null : months,
+      reason: String(reason || '').slice(0, 500),
+      grantedBy,
       grantedAt: new Date(),
     });
     await target.save();
+
+    const hasLifetimeSub =
+      target.subscriptionExpires == null && Boolean(target.isPremium);
+
+    console.log(
+      `[owner/update-membership] ${target.username} -> ${tier} (premium=${target.isPremium})`
+    );
 
     return res.status(200).json({
       success: true,
       message: `Updated membership for ${target.username} to ${tier}`,
       user: {
+        ...mapOwnerSearchUser(target.toObject ? target.toObject() : target),
         id: String(target._id),
+        email: target.email,
+        username: target.username,
         membershipTier: target.membershipTier,
         isPremium: target.isPremium,
         subscriptionExpires: target.subscriptionExpires,
-        hasLifetimeSub:
-          target.subscriptionExpires == null && Boolean(target.isPremium),
+        hasLifetimeSub,
+        pointsBalance: target.pointsBalance,
+        lifetimePointsEarned: target.lifetimePointsEarned,
+        totalSavvyEarned:
+          Number(target.lifetimePointsEarned) || Number(target.savvyPoints) || 0,
       },
     });
   } catch (error) {
-    console.error('Error updating membership:', error);
-    return res.status(500).json({ success: false, message: 'Failed to update membership' });
+    console.error('Error updating membership:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to update membership',
+    });
   }
 });
 

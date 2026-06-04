@@ -60,6 +60,8 @@ const OwnerControlPanel = () => {
   const [membershipTierEdit, setMembershipTierEdit] = useState('premium');
   const [membershipMonths, setMembershipMonths] = useState('12');
   const [membershipReason, setMembershipReason] = useState('Owner membership update');
+  const [membershipSaving, setMembershipSaving] = useState(false);
+  const [membershipFeedback, setMembershipFeedback] = useState({ type: '', text: '' });
   const profileDetailsRef = useRef(null);
 
   const ownerAccountId = String(user?.id || user?._id || '');
@@ -201,6 +203,7 @@ const OwnerControlPanel = () => {
     setMembershipTierEdit(row.hasLifetimeSub ? 'pro' : row.membershipTier || 'free');
     setMembershipMonths(row.hasLifetimeSub ? '0' : '12');
     setMembershipReason('Owner membership update');
+    setMembershipFeedback({ type: '', text: '' });
     setShowMembershipModal(true);
   };
 
@@ -247,37 +250,104 @@ const OwnerControlPanel = () => {
     }
   };
 
-  const handleUpdateMembership = async () => {
-    if (!selectedUser) return;
+  const handleUpdateMembership = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+
+    if (!selectedUser) {
+      setMembershipFeedback({ type: 'error', text: 'No user selected.' });
+      return;
+    }
+
+    const userId = String(selectedUser.id || selectedUser._id || '').trim();
+    const email = String(selectedUser.email || '').trim().toLowerCase();
+    if (!userId && !email) {
+      setMembershipFeedback({ type: 'error', text: 'Missing user id or email.' });
+      return;
+    }
+
+    const url = buildApiUrl('/owner/update-membership');
+    if (!url) {
+      setMembershipFeedback({
+        type: 'error',
+        text: 'API URL is not configured. Set REACT_APP_API_URL on Vercel.',
+      });
+      return;
+    }
+
+    const payload = {
+      userId: userId || undefined,
+      email: email || undefined,
+      membershipTier: membershipTierEdit,
+      durationMonths: parseInt(String(membershipMonths), 10) || 0,
+      reason: String(membershipReason || '').trim() || 'Owner membership update',
+    };
+
+    console.log('Updating membership payload:', payload);
+    setMembershipSaving(true);
+    setMembershipFeedback({ type: '', text: '' });
+
     try {
-      const response = await fetch(buildApiUrl('/owner/update-membership'), {
+      const response = await fetch(url, {
         method: 'POST',
         headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          userId: selectedUser.id,
-          membershipTier: membershipTierEdit,
-          durationMonths: parseInt(membershipMonths, 10),
-          reason: membershipReason,
-        }),
+        body: JSON.stringify(payload),
       });
-      const data = await response.json();
-      if (data.success) {
-        alert(data.message);
-        setShowMembershipModal(false);
-        const updated = data.user || {};
-        patchSearchResult(selectedUser.id, {
-          membershipTier: updated.membershipTier,
-          isPremium: updated.isPremium,
-          hasLifetimeSub: updated.hasLifetimeSub,
-        });
-        fetchUserDetails(selectedUser.id);
-        fetchStats();
-      } else {
-        alert(data.message || 'Update failed');
+
+      const rawBody = await response.text();
+      let data = {};
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        data = { message: rawBody };
       }
+      console.log('update-membership status:', response.status, 'body:', data);
+
+      if (!response.ok) {
+        setMembershipFeedback({
+          type: 'error',
+          text: data.message || `Update failed (HTTP ${response.status})`,
+        });
+        return;
+      }
+
+      if (!data.success) {
+        setMembershipFeedback({
+          type: 'error',
+          text: data.message || 'Update failed.',
+        });
+        return;
+      }
+
+      const updated = data.user || {};
+      const targetId = String(updated.id || userId);
+      patchSearchResult(targetId, {
+        membershipTier: updated.membershipTier,
+        isPremium: updated.isPremium,
+        hasLifetimeSub: updated.hasLifetimeSub,
+        subscriptionExpires: updated.subscriptionExpires,
+      });
+
+      setMembershipFeedback({
+        type: 'success',
+        text: data.message || 'Membership updated successfully.',
+      });
+
+      const refreshed = await fetchUserDetails(targetId);
+      if (refreshed) setSelectedUser(refreshed);
+      fetchStats();
+
+      setTimeout(() => {
+        setShowMembershipModal(false);
+        setMembershipFeedback({ type: '', text: '' });
+      }, 900);
     } catch (error) {
       console.error('Update membership error:', error);
-      alert('Failed to update membership');
+      setMembershipFeedback({
+        type: 'error',
+        text: error?.message || 'Network error — POST did not complete.',
+      });
+    } finally {
+      setMembershipSaving(false);
     }
   };
 
@@ -797,7 +867,22 @@ const OwnerControlPanel = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="space-y-4 p-6">
+            <form
+              className="space-y-4 p-6"
+              onSubmit={handleUpdateMembership}
+            >
+              {membershipFeedback.text ? (
+                <p
+                  role="alert"
+                  className={`rounded-lg border px-4 py-3 text-sm ${
+                    membershipFeedback.type === 'success'
+                      ? 'border-emerald-500/40 bg-emerald-950/40 text-emerald-200'
+                      : 'border-red-500/40 bg-red-950/40 text-red-200'
+                  }`}
+                >
+                  {membershipFeedback.text}
+                </p>
+              ) : null}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-300">Tier</label>
                 <select
@@ -833,23 +918,27 @@ const OwnerControlPanel = () => {
                   className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 text-white"
                 />
               </div>
-            </div>
-            <div className="flex gap-4 border-t border-gray-700 p-6">
-              <button
-                type="button"
-                onClick={() => setShowMembershipModal(false)}
-                className="flex-1 rounded-lg bg-gray-700 py-3 font-medium text-white hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleUpdateMembership}
-                className="flex-1 rounded-lg bg-violet-600 py-3 font-medium text-white hover:bg-violet-500"
-              >
-                Save
-              </button>
-            </div>
+              <div className="flex gap-4 border-t border-gray-700 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMembershipModal(false);
+                    setMembershipFeedback({ type: '', text: '' });
+                  }}
+                  disabled={membershipSaving}
+                  className="flex-1 rounded-lg bg-gray-700 py-3 font-medium text-white hover:bg-gray-600 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={membershipSaving}
+                  className="flex-1 rounded-lg bg-violet-600 py-3 font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+                >
+                  {membershipSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
           </motion.div>
         </div>
       )}
