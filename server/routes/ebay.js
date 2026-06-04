@@ -13,6 +13,7 @@ const ebaySchemas = require('../validation/schemas');
 const { isProduction } = require('../config/envValidation');
 const { refreshScanDeck, issueBidFlowTokens } = require('../services/progressionTrustService');
 const { logEbayProviderError } = require('../services/structuredLog');
+const { isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
 const { safeBuildEbaySellerTrendsPayload } = require('../services/ebaySellerTrendsService');
 const { ebayBrowseGet } = require('../services/ebayBrowseClient');
 const { getEbayAuthStatus, getEbayAppToken } = require('../services/ebayAuthService');
@@ -105,17 +106,17 @@ async function loadEbayBrowseSearch(req, {
   let data;
   try {
     data = await ebayBrowseGet('item_summary/search', params);
-    console.log('eBay API success');
-    console.log('eBay item count:', data?.itemSummaries?.length);
+    if (isEbayVerboseLogEnabled()) {
+      console.log('eBay browse search ok', data?.itemSummaries?.length || 0, 'items');
+    }
   } catch (apiError) {
     logEbayProviderError('/ebay/browse/search', apiError.status, apiError.code || apiError.message);
-    console.warn('eBay Browse search failed:', apiError.status, apiError.message);
     const useMock =
       apiError.code === 'EBAY_TOKEN_UNAVAILABLE' ||
       apiError.status === 401 ||
       apiError.status === 403;
-    if (useMock) {
-      console.warn('eBay Browse: using mock/trending fallback for query:', searchQuery);
+    if (useMock && isEbayVerboseLogEnabled()) {
+      console.warn('eBay Browse: mock fallback for query:', searchQuery);
       return buildMockBrowseResponse({
         searchQuery,
         limit,

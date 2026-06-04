@@ -1,6 +1,11 @@
 const crypto = require('crypto');
 const SimpleScraper = require('./scrapers/SimpleScraper');
 const Auction = require('../models/Auction');
+const { isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
+
+function aggLog(...args) {
+  if (isEbayVerboseLogEnabled()) console.log(...args);
+}
 
 const ALLOWED_PLATFORMS = new Set(['ebay', 'mercari', 'facebook', 'internal']);
 
@@ -79,7 +84,7 @@ class AuctionAggregator {
 
   async searchAllPlatforms(searchTerm, limitPerPlatform = 5) {
     try {
-      console.log(`🔍 Searching for "${searchTerm}" across all platforms...`);
+      aggLog(`🔍 Searching for "${searchTerm}" across all platforms...`);
       
       // Search all platforms in parallel
       const [eBayResults, mercariResults, facebookResults, offerUpResults] = await Promise.allSettled([
@@ -93,37 +98,37 @@ class AuctionAggregator {
       
       // Process eBay results
       if (eBayResults.status === 'fulfilled' && eBayResults.value) {
-        console.log(`✅ eBay: Found ${eBayResults.value.length} results`);
+        aggLog(`✅ eBay: Found ${eBayResults.value.length} results`);
         allResults.push(...eBayResults.value);
       } else {
-        console.log('❌ eBay: Failed to fetch results');
+        aggLog('❌ eBay: Failed to fetch results');
       }
 
       // Process Mercari results
       if (mercariResults.status === 'fulfilled' && mercariResults.value) {
-        console.log(`✅ Mercari: Found ${mercariResults.value.length} results`);
+        aggLog(`✅ Mercari: Found ${mercariResults.value.length} results`);
         allResults.push(...mercariResults.value);
       } else {
-        console.log('❌ Mercari: Failed to fetch results');
+        aggLog('❌ Mercari: Failed to fetch results');
       }
 
       // Process Facebook results
       if (facebookResults.status === 'fulfilled' && facebookResults.value) {
-        console.log(`✅ Facebook: Found ${facebookResults.value.length} results`);
+        aggLog(`✅ Facebook: Found ${facebookResults.value.length} results`);
         allResults.push(...facebookResults.value);
       } else {
-        console.log('❌ Facebook: Failed to fetch results');
+        aggLog('❌ Facebook: Failed to fetch results');
       }
 
       // Process OfferUp results
       if (offerUpResults.status === 'fulfilled' && offerUpResults.value) {
-        console.log(`✅ OfferUp: Found ${offerUpResults.value.length} local results`);
+        aggLog(`✅ OfferUp: Found ${offerUpResults.value.length} local results`);
         allResults.push(...offerUpResults.value);
       } else {
-        console.log('❌ OfferUp: Failed to fetch results');
+        aggLog('❌ OfferUp: Failed to fetch results');
       }
 
-      console.log(`🎯 Total results: ${allResults.length}`);
+      aggLog(`🎯 Total results: ${allResults.length}`);
       return allResults;
 
     } catch (error) {
@@ -226,7 +231,7 @@ class AuctionAggregator {
 
   async refreshAuctionData() {
     try {
-      console.log('🔄 Refreshing auction data...');
+      aggLog('🔄 Refreshing auction data...');
       
       // Get all unique search terms from existing auctions
       const existingAuctions = await Auction.find({ status: 'active' });
@@ -238,16 +243,16 @@ class AuctionAggregator {
         try {
           const result = await this.searchAndSave(term, 3);
           totalRefreshed += result.totalSaved;
-          console.log(`✅ Refreshed ${term}: ${result.totalSaved} auctions`);
+          aggLog(`✅ Refreshed ${term}: ${result.totalSaved} auctions`);
           
           // Add delay between searches to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (error) {
-          console.error(`Error refreshing ${term}:`, error);
+          console.error(`Error refreshing ${term}:`, error?.message || error);
         }
       }
       
-      console.log(`🎯 Total refreshed: ${totalRefreshed} auctions`);
+      aggLog(`🎯 Total refreshed: ${totalRefreshed} auctions`);
       return totalRefreshed;
     } catch (error) {
       console.error('Error refreshing auction data:', error);

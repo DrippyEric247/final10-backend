@@ -4,9 +4,10 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { requireOwnerAccess } = require('../middleware/requireRole');
 const { buildOwnerUserSearchFilter } = require('../lib/ownerUserSearch');
+const { logOwnerPanel, actorFromReq } = require('../lib/ownerPanelLog');
 
 function ownerRouteError(res, err, context) {
-  console.error(`[owner/${context}]`, err?.stack || err);
+  console.error(`[owner/${context}]`, err?.message || err);
   if (res.headersSent) return;
   const isCast = err?.name === 'CastError';
   const isValidation = err?.name === 'ValidationError';
@@ -32,12 +33,21 @@ router.use(auth);
  * Search for users by username, email, or ID
  */
 router.get('/search-users', requireOwnerAccess, async (req, res) => {
+  const route = 'GET /api/owner/search-users';
+  const query = String(req.query.query || req.query.q || '').trim();
+  logOwnerPanel(route, { phase: 'hit', ...actorFromReq(req), query });
+
   try {
-    const query = String(req.query.query || req.query.q || '').trim();
     const limitRaw = parseInt(String(req.query.limit || '20'), 10);
     const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
 
     if (!query || query.length < 2) {
+      logOwnerPanel(route, {
+        ...actorFromReq(req),
+        query,
+        resultCount: 0,
+        error: 'query too short',
+      });
       return res.status(400).json({
         success: false,
         code: 'INVALID_QUERY',
@@ -54,6 +64,12 @@ router.get('/search-users', requireOwnerAccess, async (req, res) => {
       .limit(limit)
       .sort({ createdAt: -1 })
       .lean();
+
+    logOwnerPanel(route, {
+      ...actorFromReq(req),
+      query,
+      resultCount: users.length,
+    });
 
     return res.json({
       success: true,
@@ -79,6 +95,12 @@ router.get('/search-users', requireOwnerAccess, async (req, res) => {
       total: users.length,
     });
   } catch (error) {
+    logOwnerPanel(route, {
+      ...actorFromReq(req),
+      query,
+      resultCount: null,
+      error: error?.message || String(error),
+    });
     return ownerRouteError(res, error, 'search-users');
   }
 });
@@ -437,6 +459,9 @@ router.get('/user/:userId/grants', requireOwnerAccess, async (req, res) => {
  * Get owner control panel statistics
  */
 router.get('/stats', requireOwnerAccess, async (req, res) => {
+  const route = 'GET /api/owner/stats';
+  logOwnerPanel(route, { phase: 'hit', ...actorFromReq(req), query: null });
+
   try {
     const [totalUsers, premiumUsers, lifetimeUsers] = await Promise.all([
       User.countDocuments(),
@@ -476,6 +501,12 @@ router.get('/stats', requireOwnerAccess, async (req, res) => {
       (a, b) => new Date(b.grantedAt || 0).getTime() - new Date(a.grantedAt || 0).getTime()
     );
 
+    logOwnerPanel(route, {
+      ...actorFromReq(req),
+      query: null,
+      resultCount: totalUsers,
+    });
+
     return res.json({
       success: true,
       stats: {
@@ -487,6 +518,12 @@ router.get('/stats', requireOwnerAccess, async (req, res) => {
       },
     });
   } catch (error) {
+    logOwnerPanel(route, {
+      ...actorFromReq(req),
+      query: null,
+      resultCount: null,
+      error: error?.message || String(error),
+    });
     return ownerRouteError(res, error, 'stats');
   }
 });

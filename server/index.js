@@ -130,6 +130,10 @@ const marketValueRoutes = require('./routes/marketValue');
 const analyticsIngestRoutes = require('./routes/analyticsIngest');
 const notificationsRoutes = require('./routes/notifications');
 const { runSavvyScoutAlertScan } = require('./services/savvyScoutAlertScanner');
+const {
+  isSavvyScoutBackgroundScanEnabled,
+  isAuctionCronRefreshEnabled,
+} = require('./lib/backgroundJobFlags');
 const { logProcessCrash } = require('./services/structuredLog');
 
 process.on('uncaughtException', (err) => {
@@ -228,29 +232,34 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     // Initialize auction aggregator
     const auctionAggregator = new AuctionAggregator();
     
-    // Schedule auction data refresh every 30 minutes
-    cron.schedule('*/30 * * * *', async () => {
-      console.log('🔄 Scheduled auction refresh starting...');
-      try {
-        const totalRefreshed = await auctionAggregator.refreshAuctionData();
-        console.log(`✅ Scheduled refresh completed: ${totalRefreshed} auctions updated`);
-      } catch (error) {
-        console.error('❌ Scheduled refresh failed:', error);
-      }
-    });
-    
-    console.log('⏰ Scheduled auction refresh every 30 minutes');
-
-    // Savvy Scout alert sweep — active targets every 5 minutes
-    cron.schedule('*/5 * * * *', () => {
-      runSavvyScoutAlertScan().catch((err) => {
-        console.error('[SavvyScout] scheduled scan error:', err.message);
+    if (isAuctionCronRefreshEnabled()) {
+      cron.schedule('*/30 * * * *', async () => {
+        console.log('[cron] auction refresh starting');
+        try {
+          const totalRefreshed = await auctionAggregator.refreshAuctionData();
+          console.log(`[cron] auction refresh done: ${totalRefreshed} updated`);
+        } catch (error) {
+          console.error('[cron] auction refresh failed:', error?.message || error);
+        }
       });
-    });
-    console.log('⏰ Savvy Scout alert scan every 5 minutes');
-    runSavvyScoutAlertScan().catch((err) => {
-      console.warn('[SavvyScout] initial scan error:', err.message);
-    });
+      console.log('⏰ Auction cron refresh enabled (every 30m). Set DISABLE_AUCTION_CRON_REFRESH=true to pause.');
+    } else {
+      console.log('⏸ Auction cron refresh disabled (DISABLE_AUCTION_CRON_REFRESH=true)');
+    }
+
+    if (isSavvyScoutBackgroundScanEnabled()) {
+      cron.schedule('*/5 * * * *', () => {
+        runSavvyScoutAlertScan().catch((err) => {
+          console.error('[SavvyScout] scheduled scan error:', err?.message || err);
+        });
+      });
+      console.log('⏰ Savvy Scout background scan enabled (every 5m). Set DISABLE_SAVVY_SCOUT_SCAN=true to pause.');
+      runSavvyScoutAlertScan().catch((err) => {
+        console.warn('[SavvyScout] initial scan error:', err?.message || err);
+      });
+    } else {
+      console.log('⏸ Savvy Scout background scan disabled (DISABLE_SAVVY_SCOUT_SCAN=true)');
+    }
   })
   .catch((error) => {
     console.error('❌ MongoDB connection error:', error);

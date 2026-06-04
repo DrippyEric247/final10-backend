@@ -69,8 +69,24 @@ function logProgressionFailure(userId, reason, meta = {}) {
   });
 }
 
+const ebayErrorLastLog = new Map();
+
 function logEbayProviderError(path, status, message) {
-  warn('EBAY_PROVIDER_ERROR', { path, status, message });
+  const { ebayLogThrottleMs, isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
+  const safeMessage = String(message || '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 220);
+
+  if (!isEbayVerboseLogEnabled()) {
+    const key = `${path}:${status}`;
+    const now = Date.now();
+    const throttle = ebayLogThrottleMs();
+    const last = ebayErrorLastLog.get(key) || 0;
+    if (now - last < throttle) return;
+    ebayErrorLastLog.set(key, now);
+  }
+
+  warn('EBAY_PROVIDER_ERROR', { path, status, message: safeMessage });
 }
 
 function logPaymentFailure(route, message, code) {
@@ -121,13 +137,28 @@ function logClientAuthError(payload = {}, meta = {}) {
   });
 }
 
+const clientEbayFailureLastLog = new Map();
+
 function logClientEbayFailure(payload = {}, meta = {}) {
+  const { ebayLogThrottleMs, isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
+  const safeMessage = String(payload.message || '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 220);
+  const key = `${payload.path || '?'}:${payload.status || '?'}`;
+
+  if (!isEbayVerboseLogEnabled()) {
+    const now = Date.now();
+    const last = clientEbayFailureLastLog.get(key) || 0;
+    if (now - last < ebayLogThrottleMs()) return;
+    clientEbayFailureLastLog.set(key, now);
+  }
+
   warn('CLIENT_EBAY_FAILURE', {
     path: payload.path,
     method: payload.method,
     status: payload.status,
     code: payload.code,
-    message: payload.message,
+    message: safeMessage,
     ...meta,
   });
 }

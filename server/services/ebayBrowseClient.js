@@ -5,6 +5,9 @@ const fetchModule = require('node-fetch');
 const fetch = fetchModule.default || fetchModule;
 const { getEbayAppToken, getEbayOAuthConfig, clearEbayAppTokenCache } = require('./ebayAuthService');
 const { warn } = require('./structuredLog');
+const { isEbayVerboseLogEnabled, ebayLogThrottleMs } = require('../lib/backgroundJobFlags');
+
+let lastBrowseUnauthLog = 0;
 
 const MAX_ATTEMPTS = 4;
 const BASE_DELAY_MS = 450;
@@ -103,7 +106,14 @@ async function ebayBrowseGet(path, params = {}) {
 
     if (response.status === 401) {
       clearEbayAppTokenCache();
-      warn('EBAY_BROWSE_UNAUTHORIZED', { path, attempt: attempt + 1 });
+      const now = Date.now();
+      if (
+        isEbayVerboseLogEnabled() ||
+        now - lastBrowseUnauthLog >= ebayLogThrottleMs()
+      ) {
+        lastBrowseUnauthLog = now;
+        warn('EBAY_BROWSE_UNAUTHORIZED', { path, attempt: attempt + 1 });
+      }
     }
 
     const retryAfterSec = parseInt(response.headers.get('retry-after'), 10);
