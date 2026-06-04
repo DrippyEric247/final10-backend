@@ -1,10 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const auth = require('../middleware/auth');
-const { requireOwnerAccess, requireOwnerAccessFast } = require('../middleware/requireRole');
+const authModule = require('../middleware/auth');
+const auth = authModule;
+const { authOwnerPanel } = authModule;
+const { requireOwnerAccess } = require('../middleware/requireRole');
+const { isFounderAdminEmail } = require('../lib/founderAdminAccess');
 const { buildOwnerUserRegexFilter } = require('../lib/ownerUserSearch');
 const { logOwnerPanel, actorFromReq } = require('../lib/ownerPanelLog');
+
+function canAccessOwnerPanel(user) {
+  if (!user) return false;
+  if (user.role === 'superadmin') return true;
+  if (isFounderAdminEmail(user.email)) return true;
+  return Boolean(user.adminPermissions?.canManageUsers);
+}
 
 const OWNER_SEARCH_SELECT =
   'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt';
@@ -50,29 +60,27 @@ function ownerRouteError(res, err, context) {
 // grant-founding-access is mounted in server/index.js (before this router) so
 // OWNER_GRANT_SECRET bypass is never blocked by router.use(auth) below.
 
-// Apply auth middleware to all owner routes
-router.use(auth);
-
 /**
- * GET /api/owner/search-users
- * Search for users by username, email, or ID
+ * GET /api/owner/search-users — lean auth only; always finishes with res.status().json().
+ * Registered before router.use(auth) so heavy user documents are not loaded.
  */
-router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
+router.get('/search-users', authOwnerPanel, async (req, res) => {
   const route = 'GET /api/owner/search-users';
   const query = String(req.query.query || req.query.q || '').trim();
-  logOwnerPanel(route, { phase: 'hit', ...actorFromReq(req), query });
 
   try {
-    if (!query || query.length < 2) {
-      logOwnerPanel(route, {
-        ...actorFromReq(req),
-        query,
-        resultCount: 0,
-        error: 'query too short',
+    if (!canAccessOwnerPanel(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Owner panel access required',
       });
+    }
+
+    logOwnerPanel(route, { phase: 'hit', ...actorFromReq(req), query });
+
+    if (!query || query.length < 2) {
       return res.status(400).json({
         success: false,
-        code: 'INVALID_QUERY',
         message: 'Search query must be at least 2 characters long',
       });
     }
@@ -80,6 +88,7 @@ router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
     const users = await User.find(buildOwnerUserRegexFilter(query))
       .select(OWNER_SEARCH_SELECT)
       .limit(10)
+      .maxTimeMS(8000)
       .lean();
 
     logOwnerPanel(route, {
@@ -90,7 +99,10 @@ router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      users: users.map(mapOwnerSearchUser),
+      users: users.map((row) => ({
+        ...mapOwnerSearchUser(row),
+        id: String(row._id),
+      })),
       total: users.length,
     });
   } catch (error) {
@@ -101,15 +113,17 @@ router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
       resultCount: null,
       error: message,
     });
-    console.error(`[owner/search-users]`, message);
+    console.error('[owner/search-users]', message);
     if (res.headersSent) return;
     return res.status(500).json({
       success: false,
-      code: 'OWNER_SEARCH_ERROR',
       message,
     });
   }
 });
+
+// Full auth for mutating owner routes
+router.use(auth);
 
 /**
  * GET /api/owner/user/:userId

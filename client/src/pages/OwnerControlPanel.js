@@ -99,9 +99,16 @@ const OwnerControlPanel = () => {
       }
     } catch (error) {
       const isAbort = error?.name === 'AbortError';
+      const raw = String(error?.message || '');
+      const isNetwork =
+        isAbort ||
+        raw === 'Failed to fetch' ||
+        /network|fetch|http2|protocol/i.test(raw);
       const message = isAbort
-        ? 'Search timed out after 8 seconds. Use an exact email or username and try again.'
-        : error?.message || 'Failed to fetch search results (network or server error).';
+        ? 'Search timed out after 8 seconds. Use a full email address and try again.'
+        : isNetwork
+          ? 'Could not reach the server (network or HTTP/2 error). Redeploy may be required — try a full email search again.'
+          : raw || 'Search failed. Try again with a full email address.';
       setSearchError(message);
       console.error('Error searching users:', error);
     } finally {
