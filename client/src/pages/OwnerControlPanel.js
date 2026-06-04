@@ -7,9 +7,7 @@ import {
   Gift, 
   Star, 
   TrendingUp,
-  User,
   RefreshCw,
-  Eye,
   History,
   X,
 } from 'lucide-react';
