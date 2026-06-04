@@ -2,9 +2,12 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const { requireOwnerAccess } = require('../middleware/requireRole');
-const { buildOwnerUserSearchFilter } = require('../lib/ownerUserSearch');
+const { requireOwnerAccess, requireOwnerAccessFast } = require('../middleware/requireRole');
+const { findOwnerUsersFast } = require('../lib/ownerUserSearch');
+const { withMongoTimeout } = require('../lib/mongoQueryTimeout');
 const { logOwnerPanel, actorFromReq } = require('../lib/ownerPanelLog');
+
+const OWNER_SEARCH_TIMEOUT_MS = 5000;
 
 function ownerRouteError(res, err, context) {
   console.error(`[owner/${context}]`, err?.message || err);
@@ -32,15 +35,12 @@ router.use(auth);
  * GET /api/owner/search-users
  * Search for users by username, email, or ID
  */
-router.get('/search-users', requireOwnerAccess, async (req, res) => {
+router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
   const route = 'GET /api/owner/search-users';
   const query = String(req.query.query || req.query.q || '').trim();
   logOwnerPanel(route, { phase: 'hit', ...actorFromReq(req), query });
 
   try {
-    const limitRaw = parseInt(String(req.query.limit || '20'), 10);
-    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
-
     if (!query || query.length < 2) {
       logOwnerPanel(route, {
         ...actorFromReq(req),
@@ -55,15 +55,11 @@ router.get('/search-users', requireOwnerAccess, async (req, res) => {
       });
     }
 
-    const filter = buildOwnerUserSearchFilter(query);
-
-    const users = await User.find(filter)
-      .select(
-        'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt'
-      )
-      .limit(limit)
-      .sort({ createdAt: -1 })
-      .lean();
+    const users = await withMongoTimeout(
+      findOwnerUsersFast(User, query),
+      OWNER_SEARCH_TIMEOUT_MS,
+      'owner search-users'
+    );
 
     logOwnerPanel(route, {
       ...actorFromReq(req),
@@ -101,6 +97,13 @@ router.get('/search-users', requireOwnerAccess, async (req, res) => {
       resultCount: null,
       error: error?.message || String(error),
     });
+    if (/timed out after/i.test(String(error?.message || ''))) {
+      return res.status(504).json({
+        success: false,
+        code: 'SEARCH_TIMEOUT',
+        message: 'User search timed out. Try an exact email or username.',
+      });
+    }
     return ownerRouteError(res, error, 'search-users');
   }
 });

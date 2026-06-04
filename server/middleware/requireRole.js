@@ -97,4 +97,44 @@ function requireOwnerAccess() {
   };
 }
 
-module.exports = { requireRole, requireSuperAdmin, requireOwnerAccess };
+/**
+ * Lightweight owner gate for read-only owner routes (no full user hydrate / double fetch).
+ */
+function requireOwnerAccessFast() {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
+      }
+      const user = await User.findById(req.user._id || req.user.id)
+        .select('email role adminPermissions username')
+        .lean();
+
+      if (!user) {
+        return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
+      }
+
+      const isSuper = user.role === 'superadmin';
+      const isFounder = isFounderAdminEmail(user.email);
+      const canManage = Boolean(user.adminPermissions?.canManageUsers);
+
+      if (!isSuper && !isFounder && !canManage) {
+        return next(new HttpError(403, 'FORBIDDEN', 'Owner panel access required'));
+      }
+
+      req.ownerUser = user;
+      req.superAdmin = user;
+      next();
+    } catch (err) {
+      console.error('[requireOwnerAccessFast] unexpected error:', err?.message || err);
+      next(err);
+    }
+  };
+}
+
+module.exports = {
+  requireRole,
+  requireSuperAdmin,
+  requireOwnerAccess,
+  requireOwnerAccessFast,
+};

@@ -1,41 +1,57 @@
-const mongoose = require('mongoose');
+/**
+ * Fast owner-panel user lookup — indexed equality on email or username only.
+ * No regex scans, no ObjectId $or, no background jobs.
+ */
 
-function escapeRegExp(value) {
-  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+const OWNER_SEARCH_LIMIT = 10;
+const OWNER_SEARCH_MAX_TIME_MS = 4500;
 
-function isValidObjectIdString(value) {
-  const s = String(value || '').trim();
-  if (!s || !mongoose.Types.ObjectId.isValid(s)) return false;
-  return String(new mongoose.Types.ObjectId(s)) === s;
+const OWNER_SEARCH_SELECT =
+  'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt';
+
+/**
+ * @param {string} rawQuery
+ * @returns {{ email: string } | { username: string } | null}
+ */
+function buildFastOwnerUserSearchFilter(rawQuery) {
+  const query = String(rawQuery || '').trim();
+  if (!query) return null;
+
+  if (query.includes('@')) {
+    return { email: query.toLowerCase() };
+  }
+
+  return { username: query };
 }
 
 /**
- * Safe user search — escaped regex on email/username; _id only when valid ObjectId.
+ * Indexed find by exact email or username (case-insensitive username via collation).
+ * @param {import('mongoose').Model} User
  * @param {string} rawQuery
- * @returns {{ $or: object[] }}
  */
-function buildOwnerUserSearchFilter(rawQuery) {
-  const query = String(rawQuery || '').trim();
-  const emailLower = query.toLowerCase();
-  const pattern = escapeRegExp(query);
-  const regex = new RegExp(pattern, 'i');
+async function findOwnerUsersFast(User, rawQuery) {
+  const filter = buildFastOwnerUserSearchFilter(rawQuery);
+  if (!filter) return [];
 
-  const or = [
-    { username: regex },
-    { email: regex },
-    { email: emailLower },
-  ];
+  const base = User.find(filter)
+    .select(OWNER_SEARCH_SELECT)
+    .limit(OWNER_SEARCH_LIMIT)
+    .maxTimeMS(OWNER_SEARCH_MAX_TIME_MS)
+    .lean();
 
-  if (isValidObjectIdString(query)) {
-    or.push({ _id: new mongoose.Types.ObjectId(query) });
+  if (filter.email) {
+    return base;
   }
 
-  return { $or: or };
+  return base.collation({ locale: 'en', strength: 2 });
 }
 
 module.exports = {
-  escapeRegExp,
-  isValidObjectIdString,
-  buildOwnerUserSearchFilter,
+  OWNER_SEARCH_LIMIT,
+  OWNER_SEARCH_SELECT,
+  OWNER_SEARCH_MAX_TIME_MS,
+  buildFastOwnerUserSearchFilter,
+  findOwnerUsersFast,
+  /** @deprecated use buildFastOwnerUserSearchFilter */
+  buildOwnerUserSearchFilter: buildFastOwnerUserSearchFilter,
 };
