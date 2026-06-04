@@ -3,11 +3,33 @@ const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { requireOwnerAccess, requireOwnerAccessFast } = require('../middleware/requireRole');
-const { findOwnerUsersFast } = require('../lib/ownerUserSearch');
-const { withMongoTimeout } = require('../lib/mongoQueryTimeout');
+const { buildOwnerUserRegexFilter } = require('../lib/ownerUserSearch');
 const { logOwnerPanel, actorFromReq } = require('../lib/ownerPanelLog');
 
-const OWNER_SEARCH_TIMEOUT_MS = 5000;
+const OWNER_SEARCH_SELECT =
+  'username email role membershipTier isPremium points savvyPoints pointsBalance lifetimePointsEarned subscriptionExpires createdAt lastActive betaTester foundingAccess betaAccessExpiresAt';
+
+function mapOwnerSearchUser(user) {
+  return {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    membershipTier: user.membershipTier,
+    isPremium: user.isPremium,
+    points: user.points,
+    savvyPoints: user.savvyPoints,
+    pointsBalance: user.pointsBalance,
+    lifetimePointsEarned: user.lifetimePointsEarned,
+    subscriptionExpires: user.subscriptionExpires,
+    betaTester: Boolean(user.betaTester),
+    foundingAccess: Boolean(user.foundingAccess),
+    betaAccessExpiresAt: user.betaAccessExpiresAt || null,
+    memberSince: user.createdAt,
+    lastActive: user.lastActive,
+    hasLifetimeSub: user.subscriptionExpires == null && Boolean(user.isPremium),
+  };
+}
 
 function ownerRouteError(res, err, context) {
   console.error(`[owner/${context}]`, err?.message || err);
@@ -55,11 +77,10 @@ router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
       });
     }
 
-    const users = await withMongoTimeout(
-      findOwnerUsersFast(User, query),
-      OWNER_SEARCH_TIMEOUT_MS,
-      'owner search-users'
-    );
+    const users = await User.find(buildOwnerUserRegexFilter(query))
+      .select(OWNER_SEARCH_SELECT)
+      .limit(10)
+      .lean();
 
     logOwnerPanel(route, {
       ...actorFromReq(req),
@@ -67,44 +88,26 @@ router.get('/search-users', requireOwnerAccessFast, async (req, res) => {
       resultCount: users.length,
     });
 
-    return res.json({
+    return res.status(200).json({
       success: true,
-      users: users.map((user) => ({
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        membershipTier: user.membershipTier,
-        isPremium: user.isPremium,
-        points: user.points,
-        savvyPoints: user.savvyPoints,
-        pointsBalance: user.pointsBalance,
-        lifetimePointsEarned: user.lifetimePointsEarned,
-        subscriptionExpires: user.subscriptionExpires,
-        betaTester: Boolean(user.betaTester),
-        foundingAccess: Boolean(user.foundingAccess),
-        betaAccessExpiresAt: user.betaAccessExpiresAt || null,
-        memberSince: user.createdAt,
-        lastActive: user.lastActive,
-        hasLifetimeSub: user.subscriptionExpires == null && Boolean(user.isPremium),
-      })),
+      users: users.map(mapOwnerSearchUser),
       total: users.length,
     });
   } catch (error) {
+    const message = error?.message || 'User search failed';
     logOwnerPanel(route, {
       ...actorFromReq(req),
       query,
       resultCount: null,
-      error: error?.message || String(error),
+      error: message,
     });
-    if (/timed out after/i.test(String(error?.message || ''))) {
-      return res.status(504).json({
-        success: false,
-        code: 'SEARCH_TIMEOUT',
-        message: 'User search timed out. Try an exact email or username.',
-      });
-    }
-    return ownerRouteError(res, error, 'search-users');
+    console.error(`[owner/search-users]`, message);
+    if (res.headersSent) return;
+    return res.status(500).json({
+      success: false,
+      code: 'OWNER_SEARCH_ERROR',
+      message,
+    });
   }
 });
 

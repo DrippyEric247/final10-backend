@@ -40,6 +40,7 @@ const OwnerControlPanel = () => {
   const [grantType, setGrantType] = useState('points');
   const [grantAmount, setGrantAmount] = useState('');
   const [grantReason, setGrantReason] = useState('');
+  const [searchError, setSearchError] = useState('');
 
   useEffect(() => {
     if (!hasAdminRole(user)) {
@@ -62,17 +63,49 @@ const OwnerControlPanel = () => {
 
   const searchUsers = async () => {
     if (!searchQuery.trim()) return;
-    
+
     setLoading(true);
+    setSearchError('');
+    setSearchResults([]);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
-      const response = await fetch(buildApiUrl(`/owner/search-users?query=${encodeURIComponent(searchQuery)}`), {
-        headers: ownerAuthHeaders(),
-      });
-      const data = await response.json();
-      setSearchResults(data.users || []);
+      const response = await fetch(
+        buildApiUrl(`/owner/search-users?query=${encodeURIComponent(searchQuery)}`),
+        {
+          headers: ownerAuthHeaders(),
+          signal: controller.signal,
+        }
+      );
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Server returned an invalid response. Try again in a moment.');
+      }
+
+      if (!response.ok) {
+        setSearchError(data.message || `Search failed (${response.status})`);
+        return;
+      }
+
+      const users = data.users || [];
+      setSearchResults(users);
+      if (users.length === 0) {
+        setSearchError('No users found for that query.');
+      }
     } catch (error) {
+      const isAbort = error?.name === 'AbortError';
+      const message = isAbort
+        ? 'Search timed out after 8 seconds. Use an exact email or username and try again.'
+        : error?.message || 'Failed to fetch search results (network or server error).';
+      setSearchError(message);
       console.error('Error searching users:', error);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -292,6 +325,14 @@ const OwnerControlPanel = () => {
                   <span>Search</span>
                 </button>
               </div>
+              {searchError ? (
+                <p
+                  className="mt-4 rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200"
+                  role="alert"
+                >
+                  {searchError}
+                </p>
+              ) : null}
             </div>
 
             {/* Search Results */}
