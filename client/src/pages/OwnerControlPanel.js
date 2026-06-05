@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { STORAGE_KEY } from '../lib/api';
 import { buildApiUrl } from '../lib/runtimeApi';
+import { ownerPost, getOwnerAuthToken } from '../lib/ownerApi';
 import { hasAdminRole } from '../lib/adminAccess';
 import OwnerSearchUserCard from '../components/owner/OwnerSearchUserCard';
 import {
@@ -250,11 +251,16 @@ const OwnerControlPanel = () => {
     }
   };
 
-  const handleUpdateMembership = async (e) => {
-    if (e?.preventDefault) e.preventDefault();
+  const submitMembershipUpdate = async () => {
+    console.log('[owner] submitMembershipUpdate called');
 
     if (!selectedUser) {
       setMembershipFeedback({ type: 'error', text: 'No user selected.' });
+      return;
+    }
+
+    if (!getOwnerAuthToken()) {
+      setMembershipFeedback({ type: 'error', text: 'Missing auth token. Please log in again.' });
       return;
     }
 
@@ -262,15 +268,6 @@ const OwnerControlPanel = () => {
     const email = String(selectedUser.email || '').trim().toLowerCase();
     if (!userId && !email) {
       setMembershipFeedback({ type: 'error', text: 'Missing user id or email.' });
-      return;
-    }
-
-    const url = buildApiUrl('/owner/update-membership');
-    if (!url) {
-      setMembershipFeedback({
-        type: 'error',
-        text: 'API URL is not configured. Set REACT_APP_API_URL on Vercel.',
-      });
       return;
     }
 
@@ -287,33 +284,13 @@ const OwnerControlPanel = () => {
     setMembershipFeedback({ type: '', text: '' });
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: ownerAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(payload),
-      });
+      const data = await ownerPost('/owner/update-membership', payload);
+      console.log('update-membership status:', 200, 'body:', data);
 
-      const rawBody = await response.text();
-      let data = {};
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {};
-      } catch {
-        data = { message: rawBody };
-      }
-      console.log('update-membership status:', response.status, 'body:', data);
-
-      if (!response.ok) {
+      if (!data?.success) {
         setMembershipFeedback({
           type: 'error',
-          text: data.message || `Update failed (HTTP ${response.status})`,
-        });
-        return;
-      }
-
-      if (!data.success) {
-        setMembershipFeedback({
-          type: 'error',
-          text: data.message || 'Update failed.',
+          text: data?.message || 'Update failed.',
         });
         return;
       }
@@ -341,14 +318,26 @@ const OwnerControlPanel = () => {
         setMembershipFeedback({ type: '', text: '' });
       }, 900);
     } catch (error) {
+      const status = error?.response?.status;
+      const body = error?.response?.data;
+      console.log('update-membership status:', status || 'network', 'body:', body || error?.message);
       console.error('Update membership error:', error);
       setMembershipFeedback({
         type: 'error',
-        text: error?.message || 'Network error — POST did not complete.',
+        text:
+          body?.message ||
+          error?.message ||
+          'Network error — POST did not complete. Check browser Network tab for POST /owner/update-membership.',
       });
     } finally {
       setMembershipSaving(false);
     }
+  };
+
+  const handleMembershipFormSubmit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void submitMembershipUpdate();
   };
 
   const applyHistoryEntry = async (entry) => {
@@ -848,11 +837,20 @@ const OwnerControlPanel = () => {
 
       {/* Membership Modal */}
       {showMembershipModal && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => {
+            if (!membershipSaving) {
+              setShowMembershipModal(false);
+              setMembershipFeedback({ type: '', text: '' });
+            }
+          }}
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-800"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-700 p-6">
               <div>
@@ -869,7 +867,8 @@ const OwnerControlPanel = () => {
             </div>
             <form
               className="space-y-4 p-6"
-              onSubmit={handleUpdateMembership}
+              onSubmit={handleMembershipFormSubmit}
+              noValidate
             >
               {membershipFeedback.text ? (
                 <p
@@ -931,8 +930,13 @@ const OwnerControlPanel = () => {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
                   disabled={membershipSaving}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void submitMembershipUpdate();
+                  }}
                   className="flex-1 rounded-lg bg-violet-600 py-3 font-medium text-white hover:bg-violet-500 disabled:opacity-50"
                 >
                   {membershipSaving ? 'Saving…' : 'Save'}

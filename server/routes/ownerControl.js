@@ -519,6 +519,11 @@ router.post('/unban-user', requireOwnerAccess, async (req, res) => {
  * POST /api/owner/update-membership
  */
 router.post('/update-membership', requireOwnerAccess, async (req, res) => {
+  console.log('[owner/update-membership] POST', {
+    userId: req.body?.userId,
+    email: req.body?.email,
+    membershipTier: req.body?.membershipTier,
+  });
   try {
     const {
       userId,
