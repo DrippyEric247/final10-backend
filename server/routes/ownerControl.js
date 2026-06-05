@@ -9,6 +9,11 @@ const { requireOwnerAccess } = require('../middleware/requireRole');
 const { isFounderAdminEmail } = require('../lib/founderAdminAccess');
 const { buildOwnerUserRegexFilter } = require('../lib/ownerUserSearch');
 const { logOwnerPanel, actorFromReq } = require('../lib/ownerPanelLog');
+const {
+  buildOwnerMembershipMongoSet,
+  serializeMembershipForClient,
+} = require('../lib/membershipFields');
+const { syncEntitlementFromOwnerMembership } = require('../services/premiumEntitlementService');
 
 function canAccessOwnerPanel(user) {
   if (!user) return false;
@@ -53,33 +58,6 @@ function isValidObjectIdString(value) {
   const s = String(value || '').trim();
   if (!s || !mongoose.Types.ObjectId.isValid(s)) return false;
   return String(new mongoose.Types.ObjectId(s)) === s;
-}
-
-function buildMembershipSetFields(membershipTier, durationMonths) {
-  const tier = String(membershipTier || 'free').toLowerCase();
-  const monthsRaw = parseInt(String(durationMonths), 10);
-  const months = Number.isFinite(monthsRaw) ? monthsRaw : 12;
-
-  const $set = {
-    membershipTier: tier,
-    premiumTier: tier === 'free' ? 'free' : tier === 'premium' ? 'premium' : 'pro',
-  };
-
-  if (tier === 'free') {
-    $set.isPremium = false;
-    $set.subscriptionExpires = null;
-  } else if (tier === 'pro' && months === 0) {
-    $set.isPremium = true;
-    $set.subscriptionExpires = null;
-  } else if (tier === 'premium' || tier === 'pro') {
-    const span = Math.max(1, months || 12);
-    const expires = new Date();
-    expires.setMonth(expires.getMonth() + span);
-    $set.isPremium = true;
-    $set.subscriptionExpires = expires;
-  }
-
-  return { tier, months, $set };
 }
 
 const OWNER_MEMBERSHIP_SELECT =
@@ -208,7 +186,7 @@ router.post('/update-membership', authOwnerPanel, async (req, res) => {
       });
     }
 
-    const { tier, $set } = buildMembershipSetFields(membershipTier, durationMonths);
+    const { tier, $set } = buildOwnerMembershipMongoSet(membershipTier, durationMonths);
     if (!['free', 'premium', 'pro'].includes(tier)) {
       return res.status(400).json({ success: false, message: 'Invalid membership tier' });
     }
@@ -246,21 +224,23 @@ router.post('/update-membership', authOwnerPanel, async (req, res) => {
     step('user found', { username: updated.username, id: String(updated._id) });
     step('update complete');
 
-    const hasLifetimeSub =
-      updated.subscriptionExpires == null && Boolean(updated.isPremium);
+    try {
+      await syncEntitlementFromOwnerMembership(updated._id, updated);
+      step('entitlement synced');
+    } catch (entErr) {
+      step('entitlement sync skipped', entErr?.message || entErr);
+    }
+
+    const membership = serializeMembershipForClient(updated);
 
     const payload = {
       success: true,
       message: `Updated membership for ${updated.username} to ${tier}`,
       user: {
         ...mapOwnerSearchUser(updated),
+        ...membership,
         id: String(updated._id),
-        membershipTier: updated.membershipTier,
-        isPremium: updated.isPremium,
-        subscriptionExpires: updated.subscriptionExpires,
-        membershipExpiresAt: updated.subscriptionExpires,
         membershipReason: String(reason || '').slice(0, 500),
-        hasLifetimeSub,
       },
     };
 

@@ -31,6 +31,7 @@ const {
   ensureFounderAdminRole,
   applyFounderAdminAuthOverride,
 } = require('../lib/founderAdminAccess');
+const { serializeMembershipForClient } = require('../lib/membershipFields');
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
@@ -70,8 +71,11 @@ function serializeAuthUserPayload(user) {
 }
 
 function serializeAuthMePayload(user) {
+  const membership = serializeMembershipForClient(user);
+  const sub = user.subscription && typeof user.subscription === 'object' ? user.subscription : {};
   return {
     ...serializeAuthUserPayload(user),
+    ...membership,
     points: user.points,
     referralCode: user.referralCode,
     referredBy: user.referredBy || null,
@@ -92,12 +96,13 @@ function serializeAuthMePayload(user) {
     followersCount: Array.isArray(user.followers) ? user.followers.length : 0,
     pinnedWins: user.pinnedWins || [],
     weeklyStats: user.weeklyStats || null,
-    subscription: user.subscription || {
-      tier: 'free',
-      billing: 'monthly',
-      multiplier: 1,
-      earlyAdopter: false,
-      renewalDate: null,
+    subscription: {
+      tier: membership.tier === 'free' ? 'free' : membership.subscriptionTier || sub.tier || 'free',
+      billing: sub.billing || 'monthly',
+      multiplier: sub.multiplier ?? 1,
+      earlyAdopter: Boolean(sub.earlyAdopter),
+      renewalDate: user.subscriptionExpires || sub.renewalDate || null,
+      badge: sub.badge || '',
     },
     savvyPoints: Number(user.savvyPoints || 0),
     flipBestScoreEver:

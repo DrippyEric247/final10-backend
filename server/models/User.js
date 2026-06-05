@@ -123,6 +123,12 @@ const userSchema = new mongoose.Schema({
     enum: ['free', 'premium', 'pro'], 
     default: 'free' 
   },
+  /** Mirrors membershipTier for legacy clients */
+  tier: { type: String, default: null },
+  plan: { type: String, default: null },
+  subscriptionTier: { type: String, default: null },
+  premium: { type: Boolean, default: false },
+  membershipExpiresAt: { type: Date, default: null },
   subscription: {
     tier: { type: String, enum: ['free', 'core', 'pro', 'elite'], default: 'free' },
     billing: { type: String, enum: ['monthly', 'yearly'], default: 'monthly' },

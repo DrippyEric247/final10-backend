@@ -9,7 +9,9 @@ router.get('/me', auth, async (req, res, next) => {
   try {
     const ent = await getEntitlementByUserId(req.user._id);
     const user = await User.findById(req.user._id)
-      .select('betaTester foundingAccess betaAccessExpiresAt')
+      .select(
+        'betaTester foundingAccess betaAccessExpiresAt membershipTier premiumTier isPremium subscriptionExpires subscription tier plan subscriptionTier premium membershipExpiresAt'
+      )
       .lean();
     return res.json(toMeResponse(ent, user));
   } catch (err) {

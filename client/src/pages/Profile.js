@@ -12,6 +12,7 @@ import {
 } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
 import ProfilePageLayout from './ProfilePageLayout';
+import MembershipStatusBadge from '../components/membership/MembershipStatusBadge';
 import PremiumEntitlementCard from '../components/PremiumEntitlementCard';
 import { useEntitlement } from '../hooks/useEntitlement';
 import { calculateRewardMultiplier } from '../lib/rewardMultiplier';
@@ -1095,7 +1096,12 @@ const Profile = () => {
         entitlementSlot={
           <PremiumEntitlementCard entitlement={entitlement} onRefreshSubscription={() => void entitlement.reload()} />
         }
-        programBadgeSlot={<ProgramBadge />}
+        programBadgeSlot={
+          <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 8 }}>
+            <MembershipStatusBadge user={user} />
+            <ProgramBadge />
+          </div>
+        }
         user={user}
         basePoints={basePoints}
         tasksData={tasksData}

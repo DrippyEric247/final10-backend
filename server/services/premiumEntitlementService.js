@@ -42,6 +42,11 @@ function toUserObjectId(userId) {
 }
 
 const { isBetaTester: checkBetaTester, logBetaUsage } = require('../services/betaTesterService');
+const {
+  isMembershipCurrentlyActive,
+  serializeMembershipForClient,
+  normalizeMembershipTier,
+} = require('../lib/membershipFields');
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
@@ -68,6 +73,20 @@ async function ensureEntitlementRow(userId) {
   return row;
 }
 
+function membershipFieldsForEntitlements(user) {
+  if (!user || !isMembershipCurrentlyActive(user)) return null;
+  const serialized = serializeMembershipForClient(user);
+  const mt = normalizeMembershipTier(user.membershipTier);
+  return {
+    ...serialized,
+    isPremium: true,
+    premiumStatus: 'active',
+    premiumTier: mt === 'pro' ? 'elite' : 'premium',
+    currentPeriodEnd: user.subscriptionExpires || null,
+    provider: 'owner',
+  };
+}
+
 /**
  * Public payload for GET /api/entitlements/me
  */
@@ -78,6 +97,10 @@ function toMeResponse(doc, user = null) {
       isPremium: true,
       premiumStatus: 'active',
       premiumTier: 'elite',
+      tier: 'elite',
+      plan: 'pro',
+      subscriptionTier: 'elite',
+      membershipTier: 'pro',
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       trialEndsAt: null,
@@ -88,13 +111,34 @@ function toMeResponse(doc, user = null) {
       betaTester: Boolean(user?.betaTester),
       foundingAccess: Boolean(user?.foundingAccess),
       betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+      entitlements: { pro: true, premium: true, core: true, elite: true },
     };
   }
+
+  const fromUser = membershipFieldsForEntitlements(user);
+  if (fromUser) {
+    return {
+      ...fromUser,
+      cancelAtPeriodEnd: false,
+      trialEndsAt: null,
+      creatorMonetization: monetizationFromEntitlement(doc),
+      foundingTesterAccess: false,
+      isBetaTester: false,
+      betaTester: Boolean(user?.betaTester),
+      foundingAccess: Boolean(user?.foundingAccess),
+      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+    };
+  }
+
   if (!doc) {
     return {
       isPremium: false,
       premiumStatus: 'inactive',
       premiumTier: 'free',
+      tier: 'free',
+      plan: 'free',
+      subscriptionTier: 'free',
+      membershipTier: 'free',
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       trialEndsAt: null,
@@ -105,13 +149,19 @@ function toMeResponse(doc, user = null) {
       betaTester: Boolean(user?.betaTester),
       foundingAccess: Boolean(user?.foundingAccess),
       betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+      entitlements: { pro: false, premium: false, core: false, elite: false },
     };
   }
   const isPremium = premiumStatusGrantsBattlePassAccess(doc);
+  const pt = doc.premiumTier || 'free';
   return {
     isPremium,
     premiumStatus: doc.premiumStatus,
-    premiumTier: doc.premiumTier || 'free',
+    premiumTier: pt,
+    tier: isPremium ? (pt === 'elite' ? 'elite' : pt === 'premium' ? 'core' : 'core') : 'free',
+    plan: pt,
+    subscriptionTier: pt,
+    membershipTier: pt === 'elite' ? 'pro' : pt === 'premium' ? 'premium' : 'free',
     currentPeriodEnd: doc.currentPeriodEnd || null,
     cancelAtPeriodEnd: Boolean(doc.cancelAtPeriodEnd),
     trialEndsAt: doc.trialEndsAt || null,
@@ -121,8 +171,37 @@ function toMeResponse(doc, user = null) {
     isBetaTester: false,
     betaTester: Boolean(user?.betaTester),
     foundingAccess: Boolean(user?.foundingAccess),
-    betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+    entitlements: {
+      pro: isPremium && pt === 'elite',
+      premium: isPremium,
+      core: isPremium,
+      elite: isPremium && pt === 'elite',
+    },
   };
+}
+
+async function syncEntitlementFromOwnerMembership(userId, userDoc) {
+  const uid = toUserObjectId(userId);
+  if (!uid || !userDoc) return null;
+  const mt = normalizeMembershipTier(userDoc.membershipTier);
+  const active = isMembershipCurrentlyActive(userDoc);
+  const premiumTier = !active || mt === 'free' ? 'free' : mt === 'pro' ? 'elite' : 'premium';
+  const premiumStatus = active && mt !== 'free' ? 'active' : 'inactive';
+  return PremiumEntitlement.findOneAndUpdate(
+    { userId: uid },
+    {
+      $set: {
+        premiumStatus,
+        premiumTier,
+        currentPeriodEnd: userDoc.subscriptionExpires || null,
+        cancelAtPeriodEnd: false,
+        lastVerifiedAt: new Date(),
+        provider: 'stripe',
+      },
+    },
+    { upsert: true, new: true, maxTimeMS: 5000, setDefaultsOnInsert: true }
+  );
 }
 
 /**
@@ -237,6 +316,7 @@ module.exports = {
   getEntitlementByUserId,
   ensureEntitlementRow,
   toMeResponse,
+  syncEntitlementFromOwnerMembership,
   upsertFromStripeSubscription,
   markEntitlementStatus,
   canSelfServeBattlePassPremiumUnlock,

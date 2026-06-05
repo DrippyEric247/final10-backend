@@ -5,9 +5,11 @@ import {
   registerUser,
   setAuthToken,
   getMe,
+  getEntitlementsMe,
   STORAGE_KEY,
   resetAuthMeBootstrap,
 } from "../lib/api";
+import { hydrateMembershipFromApi } from "../lib/membershipSync";
 import { parseApiError, userSafeErrorMessage } from "../lib/apiErrorParsing";
 import { getDevSavvyPointsOffset, isDev, FINAL10_DEV_OVERRIDE_EVENT } from "../lib/devOverride";
 import { getEquippedCallingCardId, getEquippedEmblemId } from "../lib/customizationCatalog";
@@ -37,6 +39,29 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const logUserMembership = (u) => {
+    // eslint-disable-next-line no-console
+    console.log("Current user membership:", {
+      username: u?.username,
+      membershipTier: u?.membershipTier,
+      tier: u?.tier,
+      plan: u?.plan,
+      subscriptionTier: u?.subscriptionTier,
+      isPremium: u?.isPremium,
+      premium: u?.premium,
+      entitlements: u?.entitlements,
+      subscription: u?.subscription,
+      membershipExpiresAt: u?.membershipExpiresAt || u?.subscriptionExpires,
+    });
+  };
+
+  const hydrateSessionUser = async (rawUser) => {
+    const merged = withLoadout(rawUser);
+    await hydrateMembershipFromApi(merged, getEntitlementsMe);
+    logUserMembership(merged);
+    return merged;
+  };
 
   const withLoadout = (u) => {
     if (!u || typeof u !== "object") return u;
@@ -70,13 +95,13 @@ export function AuthProvider({ children }) {
       setToken(stored);
       setAuthToken(stored);
       // hydrate user profile
-      getMe()
-        .then((user) => {
+      getMe({ force: true })
+        .then(async (user) => {
           if (process.env.NODE_ENV !== "production") {
             // eslint-disable-next-line no-console
             console.debug("Auth hydration successful");
           }
-          setUser(withLoadout(user));
+          setUser(await hydrateSessionUser(user));
         })
         .catch((err) => {
           if (process.env.NODE_ENV !== "production") {
@@ -103,7 +128,7 @@ export function AuthProvider({ children }) {
       await loginUser(credentials);
       setToken(localStorage.getItem(STORAGE_KEY));
       const fresh = await getMe({ force: true });
-      setUser(withLoadout(fresh));
+      setUser(await hydrateSessionUser(fresh));
     } catch (err) {
       setError(userSafeErrorMessage(err, "Login failed. Please try again."));
       throw err;
@@ -116,7 +141,7 @@ export function AuthProvider({ children }) {
       await registerUser(form);
       setToken(localStorage.getItem(STORAGE_KEY));
       const fresh = await getMe({ force: true });
-      setUser(withLoadout(fresh));
+      setUser(await hydrateSessionUser(fresh));
     } catch (err) {
       setError(userSafeErrorMessage(err, "Signup failed. Please try again."));
       throw err;
@@ -145,7 +170,7 @@ export function AuthProvider({ children }) {
     if (!stored) return null;
     try {
       const res = await getMe({ force: true });
-      const hydrated = withLoadout(res);
+      const hydrated = await hydrateSessionUser(res);
       setUser(hydrated);
       return hydrated;
     } catch (err) {

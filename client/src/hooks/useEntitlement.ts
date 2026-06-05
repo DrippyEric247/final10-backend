@@ -57,7 +57,11 @@ export function useEntitlement(enabled: boolean): UseEntitlementResult {
     try {
       const { data: d } = await api.get<EntitlementMe>("/entitlements/me");
       setData(d);
-      const normalized = normalizeSubscriptionTier(d?.premiumTier, Boolean(d?.isPremium));
+      const direct = String((d as EntitlementMe & { tier?: string })?.tier || "").toLowerCase();
+      const normalized =
+        direct === "core" || direct === "pro" || direct === "elite" || direct === "free"
+          ? direct
+          : normalizeSubscriptionTier(d?.premiumTier, Boolean(d?.isPremium));
       setCurrentSubscriptionTier(normalized);
     } catch (e: unknown) {
       setError(parseApiError(e).message);

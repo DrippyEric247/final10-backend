@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
 import { Bug, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import MembershipStatusBadge from './membership/MembershipStatusBadge';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
@@ -81,10 +82,11 @@ const Navigation = () => {
 
   return (
     <nav className="main-navigation">
-      <div className="nav-brand">
+      <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
           <h2>Final10</h2>
         </Link>
+        {user ? <MembershipStatusBadge user={user} /> : null}
       </div>
       
       <div className="nav-items">
