@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const User = require('../models/User');
 const authModule = require('../middleware/auth');
@@ -45,6 +46,44 @@ function mapOwnerSearchUser(user) {
     hasLifetimeSub: user.subscriptionExpires == null && Boolean(user.isPremium),
   };
 }
+
+const OWNER_MONGO_MAX_MS = 5000;
+
+function isValidObjectIdString(value) {
+  const s = String(value || '').trim();
+  if (!s || !mongoose.Types.ObjectId.isValid(s)) return false;
+  return String(new mongoose.Types.ObjectId(s)) === s;
+}
+
+function buildMembershipSetFields(membershipTier, durationMonths) {
+  const tier = String(membershipTier || 'free').toLowerCase();
+  const monthsRaw = parseInt(String(durationMonths), 10);
+  const months = Number.isFinite(monthsRaw) ? monthsRaw : 12;
+
+  const $set = {
+    membershipTier: tier,
+    premiumTier: tier === 'free' ? 'free' : tier === 'premium' ? 'premium' : 'pro',
+  };
+
+  if (tier === 'free') {
+    $set.isPremium = false;
+    $set.subscriptionExpires = null;
+  } else if (tier === 'pro' && months === 0) {
+    $set.isPremium = true;
+    $set.subscriptionExpires = null;
+  } else if (tier === 'premium' || tier === 'pro') {
+    const span = Math.max(1, months || 12);
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + span);
+    $set.isPremium = true;
+    $set.subscriptionExpires = expires;
+  }
+
+  return { tier, months, $set };
+}
+
+const OWNER_MEMBERSHIP_SELECT =
+  'username email membershipTier isPremium premiumTier subscriptionExpires lifetimePointsEarned savvyPoints pointsBalance totalTransactions createdAt lastActive betaTester foundingAccess';
 
 function ownerRouteError(res, err, context) {
   console.error(`[owner/${context}]`, err?.message || err);
@@ -123,6 +162,116 @@ router.get('/search-users', authOwnerPanel, async (req, res) => {
     return res.status(500).json({
       success: false,
       message,
+    });
+  }
+});
+
+/**
+ * POST /api/owner/update-membership — lean auth + atomic findByIdAndUpdate (fast path).
+ * Registered before router.use(auth) to avoid loading huge owner user documents.
+ */
+router.post('/update-membership', authOwnerPanel, async (req, res) => {
+  const step = (label, extra) => {
+    console.log(`[owner/update-membership] ${label}`, extra !== undefined ? extra : '');
+  };
+
+  step('route hit', {
+    userId: req.body?.userId,
+    email: req.body?.email,
+    membershipTier: req.body?.membershipTier,
+  });
+
+  try {
+    if (!canAccessOwnerPanel(req.user)) {
+      step('auth failed');
+      return res.status(403).json({
+        success: false,
+        message: 'Owner panel access required',
+      });
+    }
+    step('auth passed');
+
+    const {
+      userId,
+      email,
+      membershipTier = 'free',
+      durationMonths = 12,
+      reason = 'Owner membership update',
+    } = req.body || {};
+
+    const id = String(userId || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!id && !normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId or email is required',
+      });
+    }
+
+    const { tier, $set } = buildMembershipSetFields(membershipTier, durationMonths);
+    if (!['free', 'premium', 'pro'].includes(tier)) {
+      return res.status(400).json({ success: false, message: 'Invalid membership tier' });
+    }
+
+    const updateOpts = {
+      new: true,
+      runValidators: false,
+      maxTimeMS: OWNER_MONGO_MAX_MS,
+    };
+
+    step('user lookup started', { id: id || null, email: normalizedEmail || null });
+    step('update started', { tier, reason: String(reason).slice(0, 120) });
+
+    let updated = null;
+    if (id && isValidObjectIdString(id)) {
+      updated = await User.findByIdAndUpdate(id, { $set }, updateOpts)
+        .select(OWNER_MEMBERSHIP_SELECT)
+        .lean()
+        .maxTimeMS(OWNER_MONGO_MAX_MS);
+    }
+
+    if (!updated && normalizedEmail) {
+      step('user id miss — email lookup');
+      updated = await User.findOneAndUpdate({ email: normalizedEmail }, { $set }, updateOpts)
+        .select(OWNER_MEMBERSHIP_SELECT)
+        .lean()
+        .maxTimeMS(OWNER_MONGO_MAX_MS);
+    }
+
+    if (!updated) {
+      step('user not found');
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    step('user found', { username: updated.username, id: String(updated._id) });
+    step('update complete');
+
+    const hasLifetimeSub =
+      updated.subscriptionExpires == null && Boolean(updated.isPremium);
+
+    const payload = {
+      success: true,
+      message: `Updated membership for ${updated.username} to ${tier}`,
+      user: {
+        ...mapOwnerSearchUser(updated),
+        id: String(updated._id),
+        membershipTier: updated.membershipTier,
+        isPremium: updated.isPremium,
+        subscriptionExpires: updated.subscriptionExpires,
+        membershipExpiresAt: updated.subscriptionExpires,
+        membershipReason: String(reason || '').slice(0, 500),
+        hasLifetimeSub,
+      },
+    };
+
+    step('response sent');
+    return res.status(200).json(payload);
+  } catch (error) {
+    step('error', error?.message || error);
+    if (res.headersSent) return;
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to update membership',
     });
   }
 });
@@ -512,112 +661,6 @@ router.post('/unban-user', requireOwnerAccess, async (req, res) => {
   } catch (error) {
     console.error('Error unbanning user:', error);
     return res.status(500).json({ success: false, message: 'Failed to unban user' });
-  }
-});
-
-/**
- * POST /api/owner/update-membership
- */
-router.post('/update-membership', requireOwnerAccess, async (req, res) => {
-  console.log('[owner/update-membership] POST', {
-    userId: req.body?.userId,
-    email: req.body?.email,
-    membershipTier: req.body?.membershipTier,
-  });
-  try {
-    const {
-      userId,
-      email,
-      membershipTier = 'free',
-      durationMonths = 12,
-      reason = 'Owner membership update',
-    } = req.body || {};
-
-    const id = String(userId || '').trim();
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    if (!id && !normalizedEmail) {
-      return res.status(400).json({
-        success: false,
-        message: 'userId or email is required',
-      });
-    }
-
-    const target = id
-      ? await User.findById(id)
-      : await User.findOne({ email: normalizedEmail });
-    if (!target) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    const tier = String(membershipTier).toLowerCase();
-    if (!['free', 'premium', 'pro'].includes(tier)) {
-      return res.status(400).json({ success: false, message: 'Invalid membership tier' });
-    }
-
-    const monthsRaw = parseInt(String(durationMonths), 10);
-    const months = Number.isFinite(monthsRaw) ? monthsRaw : 12;
-
-    target.membershipTier = tier;
-    target.premiumTier = tier === 'free' ? 'free' : tier === 'premium' ? 'premium' : 'pro';
-
-    if (tier === 'free') {
-      target.isPremium = false;
-      target.subscriptionExpires = null;
-    } else if (tier === 'pro' && months === 0) {
-      target.isPremium = true;
-      target.subscriptionExpires = null;
-    } else if (tier === 'premium' || tier === 'pro') {
-      const span = Math.max(1, months || 12);
-      const expires = new Date();
-      expires.setMonth(expires.getMonth() + span);
-      target.isPremium = true;
-      target.subscriptionExpires = expires;
-    }
-
-    const grantedBy =
-      req.superAdmin?.username || req.ownerUser?.username || req.user?.username || 'owner';
-
-    target.ownerGrants = target.ownerGrants || [];
-    target.ownerGrants.push({
-      type: 'premium_subscription',
-      amount: tier === 'pro' && months === 0 ? null : months,
-      reason: String(reason || '').slice(0, 500),
-      grantedBy,
-      grantedAt: new Date(),
-    });
-    await target.save();
-
-    const hasLifetimeSub =
-      target.subscriptionExpires == null && Boolean(target.isPremium);
-
-    console.log(
-      `[owner/update-membership] ${target.username} -> ${tier} (premium=${target.isPremium})`
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: `Updated membership for ${target.username} to ${tier}`,
-      user: {
-        ...mapOwnerSearchUser(target.toObject ? target.toObject() : target),
-        id: String(target._id),
-        email: target.email,
-        username: target.username,
-        membershipTier: target.membershipTier,
-        isPremium: target.isPremium,
-        subscriptionExpires: target.subscriptionExpires,
-        hasLifetimeSub,
-        pointsBalance: target.pointsBalance,
-        lifetimePointsEarned: target.lifetimePointsEarned,
-        totalSavvyEarned:
-          Number(target.lifetimePointsEarned) || Number(target.savvyPoints) || 0,
-      },
-    });
-  } catch (error) {
-    console.error('Error updating membership:', error?.message || error);
-    return res.status(500).json({
-      success: false,
-      message: error?.message || 'Failed to update membership',
-    });
   }
 });
 
