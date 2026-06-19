@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { SavvyPointsIcon } from "../components/rewards/SavvyPointsIcon";
 import { createAlert } from "../lib/api";
 import {
@@ -13,6 +14,7 @@ import { INTERESTS, labelForInterest } from "../lib/onboardingInterests";
 import {
   getSelectedInterests,
   markOnboardingCompleted,
+  onboardingUserId,
   recordFirstBestMove,
   type InterestId,
 } from "../lib/onboardingPreferences";
@@ -170,8 +172,10 @@ function grantFirstMoveBonusOnce(): boolean {
 
 export default function OnboardingBestMove() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = onboardingUserId(user);
   const [interests, setInterests] = useState<InterestId[]>(() =>
-    getSelectedInterests()
+    getSelectedInterests(userId)
   );
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [stageIdx, setStageIdx] = useState(0);
@@ -205,9 +209,10 @@ export default function OnboardingBestMove() {
       if (data.pick) {
         recordFirstBestMove(
           data.pick.interest,
-          String(data.pick.listing.itemId ?? data.pick.listing.id ?? "")
+          String(data.pick.listing.itemId ?? data.pick.listing.id ?? ""),
+          userId
         );
-        markOnboardingCompleted();
+        markOnboardingCompleted(userId);
         onboardingAnalytics.bestMoveLoaded({
           category: data.pick.interest,
           trustBand: trustBand(data.pick.trust.trustScore),
@@ -239,12 +244,13 @@ export default function OnboardingBestMove() {
       if (data.pick) {
         recordFirstBestMove(
           data.pick.interest,
-          String(data.pick.listing.itemId ?? data.pick.listing.id ?? "")
+          String(data.pick.listing.itemId ?? data.pick.listing.id ?? ""),
+          userId
         );
-        markOnboardingCompleted();
+        markOnboardingCompleted(userId);
       }
     }
-  }, [interests]);
+  }, [interests, userId]);
 
   useEffect(() => {
     if (interests.length === 0) return;
@@ -294,12 +300,12 @@ export default function OnboardingBestMove() {
       listingId: active.listing.itemId ?? active.listing.id,
       bestMove: active.decision.bestMove,
     });
-    markOnboardingCompleted();
+    markOnboardingCompleted(userId);
     if (url) {
       window.open(url, "_blank", "noopener,noreferrer");
     }
     navigate("/local-deals");
-  }, [active, navigate]);
+  }, [active, navigate, userId]);
 
   const handleSave = useCallback(() => {
     if (!active) return;
@@ -308,15 +314,15 @@ export default function OnboardingBestMove() {
       trustBand: trustBand(active.trust.trustScore),
       listingId: active.listing.itemId ?? active.listing.id,
     });
-    markOnboardingCompleted();
+    markOnboardingCompleted(userId);
     navigate("/local-deals");
-  }, [active, navigate]);
+  }, [active, navigate, userId]);
 
   const handleSkip = useCallback(() => {
     onboardingAnalytics.skipped({ interests });
-    markOnboardingCompleted();
+    markOnboardingCompleted(userId);
     navigate("/local-deals");
-  }, [interests, navigate]);
+  }, [interests, navigate, userId]);
 
   const handleCreateAlert = useCallback(async () => {
     if (creatingAlert) return;
@@ -339,17 +345,17 @@ export default function OnboardingBestMove() {
         source: "onboarding_best_move",
       });
       onboardingAnalytics.skipped({ interests, from: "watching_alert_created" });
-      markOnboardingCompleted();
+      markOnboardingCompleted(userId);
       navigate("/alerts");
     } catch {
       // If alert creation fails (e.g. unauthenticated session), keep moving
       // forward so users never get stuck on an empty-state branch.
-      markOnboardingCompleted();
+      markOnboardingCompleted(userId);
       navigate("/register");
     } finally {
       setCreatingAlert(false);
     }
-  }, [creatingAlert, interests, navigate]);
+  }, [creatingAlert, interests, navigate, userId]);
 
   const handleRefine = useCallback(() => {
     onboardingAnalytics.refined({ interests });

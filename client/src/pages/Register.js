@@ -10,7 +10,7 @@ import { triggerDailyLoginReward, triggerStreakReward } from '../lib/rewardEngin
 import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { buildSignupAttributionPayload, getAttribution } from '../lib/attribution';
-import { hasCompletedOnboarding } from '../lib/onboardingPreferences';
+import { resetOnboardingForNewAccount, onboardingUserId } from '../lib/onboardingPreferences';
 import { ANALYTICS_EVENTS, trackEvent } from '../lib/analytics';
 import { parseApiError } from '../lib/apiErrorParsing';
 import LoadingState from '../components/ui/states/LoadingState';
@@ -55,7 +55,8 @@ export default function Register() {
       const payload = attributionPayload
         ? { ...form, attribution: attributionPayload }
         : form;
-      await register(payload);
+      const newUser = await register(payload);
+      resetOnboardingForNewAccount(onboardingUserId(newUser));
       trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, { method: 'email' });
       const loginPower = recordDailyLogin();
       try {
@@ -78,11 +79,9 @@ export default function Register() {
       if (loginPower.changed) {
         triggerStreakReward(loginPower.streakDays);
       }
-      // Send the freshly-registered user straight into the "Instant Best
-      // Move" preference flow so we never drop them onto a generic
-      // homepage. If they've already completed it (e.g. previous visit on
-      // the same device), fall through to the dashboard.
-      nav(hasCompletedOnboarding() ? '/' : '/onboarding/preferences', { replace: true });
+      // Every new account starts with category selection — never reuse
+      // device-wide guest onboarding flags from prior sessions.
+      nav('/onboarding/preferences', { replace: true });
     } catch (e) {
       const { message } = parseApiError(e);
       setErr(message || 'Registration failed. Please try again.');

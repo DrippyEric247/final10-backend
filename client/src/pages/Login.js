@@ -9,7 +9,7 @@ import { recordBattlePassXp } from '../lib/battlePassEngine';
 import { triggerDailyLoginReward, triggerStreakReward } from '../lib/rewardEngine';
 import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
-import { hasCompletedOnboarding } from '../lib/onboardingPreferences';
+import { hasCompletedOnboarding, onboardingUserId } from '../lib/onboardingPreferences';
 import { parseApiError } from '../lib/apiErrorParsing';
 import LoadingState from '../components/ui/states/LoadingState';
 
@@ -27,7 +27,7 @@ export default function Login() {
     try {
       // Current backend contract expects email. If username login is added
       // later, branch here on identifier type and call the matching endpoint.
-      await login({ email: form.email.trim(), password: form.password });
+      const signedInUser = await login({ email: form.email.trim(), password: form.password });
       const loginPower = recordDailyLogin();
       try {
         const claim = await claimDailyLogin();
@@ -49,7 +49,10 @@ export default function Login() {
       if (loginPower.changed) {
         triggerStreakReward(loginPower.streakDays);
       }
-      nav(hasCompletedOnboarding() ? '/' : '/onboarding/preferences', { replace: true });
+      nav(
+        hasCompletedOnboarding(onboardingUserId(signedInUser)) ? '/' : '/onboarding/preferences',
+        { replace: true }
+      );
     } catch (e) {
       const { message } = parseApiError(e);
       setErr(message || 'Login failed. Please try again.');

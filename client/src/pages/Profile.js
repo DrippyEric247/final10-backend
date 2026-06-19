@@ -54,7 +54,7 @@ import {
   getEffectiveSubscriptionTier,
 } from '../lib/tierMultiplier';
 import '../styles/SavvyPrograms.css';
-import { resetOnboardingPreferences } from '../lib/onboardingPreferences';
+import { resetOnboardingPreferences, onboardingUserId } from '../lib/onboardingPreferences';
 
 const getSavvySyncBonus = (completedCount, totalSystems) => {
   if (completedCount >= totalSystems) return 3;
@@ -1022,9 +1022,9 @@ const Profile = () => {
   }, []);
 
   const handleRetakeSetup = useCallback(() => {
-    resetOnboardingPreferences();
+    resetOnboardingPreferences(onboardingUserId(user));
     navigate('/onboarding/preferences');
-  }, [navigate]);
+  }, [navigate, user]);
 
   if (!user) {
     return (

@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { SavvyPointsIcon } from "../components/rewards/SavvyPointsIcon";
 import { INTERESTS } from "../lib/onboardingInterests";
 import {
   MAX_INTERESTS,
   getSelectedInterests,
+  onboardingUserId,
   setSelectedInterests,
   type InterestId,
 } from "../lib/onboardingPreferences";
@@ -21,8 +23,10 @@ const TRANSITION_STAGE_MS = 360;
 
 export default function OnboardingPreferences() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = onboardingUserId(user);
   const [selected, setSelected] = useState<InterestId[]>(() =>
-    getSelectedInterests()
+    getSelectedInterests(userId)
   );
   const [shake, setShake] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -64,7 +68,7 @@ export default function OnboardingPreferences() {
 
   const submit = useCallback(() => {
     if (!canSubmit || isTransitioning) return;
-    setSelectedInterests(selected);
+    setSelectedInterests(selected, userId);
     // Required debug trail for first Best Move onboarding reliability.
     // eslint-disable-next-line no-console
     console.info("[OnboardingBestMove] selected_interests_after_submit", {
@@ -73,7 +77,7 @@ export default function OnboardingPreferences() {
     onboardingAnalytics.submitted(selected);
     setIsTransitioning(true);
     setTransitionStage(0);
-  }, [canSubmit, isTransitioning, selected]);
+  }, [canSubmit, isTransitioning, selected, userId]);
 
   useEffect(() => {
     if (!isTransitioning) return;

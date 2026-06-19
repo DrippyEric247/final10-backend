@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const logUserMembership = (u) => {
+  const logUserMembership = useCallback((u) => {
     // eslint-disable-next-line no-console
     console.log("Current user membership:", {
       username: u?.username,
@@ -54,16 +54,9 @@ export function AuthProvider({ children }) {
       subscription: u?.subscription,
       membershipExpiresAt: u?.membershipExpiresAt || u?.subscriptionExpires,
     });
-  };
+  }, []);
 
-  const hydrateSessionUser = async (rawUser) => {
-    const merged = withLoadout(rawUser);
-    await hydrateMembershipFromApi(merged, getEntitlementsMe);
-    logUserMembership(merged);
-    return merged;
-  };
-
-  const withLoadout = (u) => {
+  const withLoadout = useCallback((u) => {
     if (!u || typeof u !== "object") return u;
     const rawBase =
       u.savvyPointsServerBase != null && Number.isFinite(Number(u.savvyPointsServerBase))
@@ -78,15 +71,24 @@ export function AuthProvider({ children }) {
       equippedCallingCardId: u.equippedCallingCardId || getEquippedCallingCardId(),
       equippedEmblemId: u.equippedEmblemId || getEquippedEmblemId(),
     };
-  };
+  }, []);
+
+  const hydrateSessionUser = useCallback(
+    async (rawUser) => {
+      const merged = withLoadout(rawUser);
+      await hydrateMembershipFromApi(merged, getEntitlementsMe);
+      logUserMembership(merged);
+      return merged;
+    },
+    [withLoadout, logUserMembership]
+  );
 
   useEffect(() => {
     if (!isDev) return undefined;
     const refreshPts = () => setUser((prev) => (prev ? withLoadout(prev) : prev));
     window.addEventListener(FINAL10_DEV_OVERRIDE_EVENT, refreshPts);
     return () => window.removeEventListener(FINAL10_DEV_OVERRIDE_EVENT, refreshPts);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync fake Savvy offset without re-subscribing on render
-  }, []);
+  }, [withLoadout]);
 
   // Load token on mount + fetch user
   useEffect(() => {
@@ -120,7 +122,7 @@ export function AuthProvider({ children }) {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [hydrateSessionUser]);
 
   const login = async (credentials) => {
     setError("");
@@ -128,7 +130,9 @@ export function AuthProvider({ children }) {
       await loginUser(credentials);
       setToken(localStorage.getItem(STORAGE_KEY));
       const fresh = await getMe({ force: true });
-      setUser(await hydrateSessionUser(fresh));
+      const hydrated = await hydrateSessionUser(fresh);
+      setUser(hydrated);
+      return hydrated;
     } catch (err) {
       setError(userSafeErrorMessage(err, "Login failed. Please try again."));
       throw err;
@@ -141,7 +145,9 @@ export function AuthProvider({ children }) {
       await registerUser(form);
       setToken(localStorage.getItem(STORAGE_KEY));
       const fresh = await getMe({ force: true });
-      setUser(await hydrateSessionUser(fresh));
+      const hydrated = await hydrateSessionUser(fresh);
+      setUser(hydrated);
+      return hydrated;
     } catch (err) {
       setError(userSafeErrorMessage(err, "Signup failed. Please try again."));
       throw err;
@@ -163,7 +169,7 @@ export function AuthProvider({ children }) {
   const patchUser = useCallback((partial) => {
     if (!partial || typeof partial !== "object") return;
     setUser((prev) => (prev ? withLoadout({ ...prev, ...partial }) : prev));
-  }, []);
+  }, [withLoadout]);
 
   const refreshProfile = useCallback(async () => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -181,7 +187,7 @@ export function AuthProvider({ children }) {
       }
       return null;
     }
-  }, []);
+  }, [hydrateSessionUser]);
 
   useEffect(() => {
     const onLoadout = () => {
@@ -189,7 +195,7 @@ export function AuthProvider({ children }) {
     };
     window.addEventListener("f10:loadout-updated", onLoadout);
     return () => window.removeEventListener("f10:loadout-updated", onLoadout);
-  }, []);
+  }, [withLoadout]);
 
   return (
     <AuthContext.Provider

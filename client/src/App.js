@@ -25,8 +25,9 @@ import './styles/final10-ftue.css';
 import './styles/states.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect, useMemo } from "react";
-import { Routes, Route, Link, Navigate } from "react-router-dom";
+import { Routes, Route, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { hasCompletedOnboarding, onboardingUserId } from "./lib/onboardingPreferences";
 import { installRewardDevTools } from "./lib/rewardEngine";
 import { setCurrentUserForCosmetics } from "./lib/adminCosmetics";
 import { captureAttributionFromLocation, recordCreatorClick } from "./lib/attribution";
@@ -119,6 +120,37 @@ const queryClient = new QueryClient({
   },
 });
 
+/* Redirect signed-in users who have not finished category onboarding. */
+const ONBOARDING_EXEMPT_PREFIXES = [
+  "/onboarding/",
+  "/login",
+  "/register",
+  "/privacy",
+  "/terms",
+  "/support",
+  "/c/",
+];
+
+function OnboardingRedirect() {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading || !user) return;
+    const path = location.pathname;
+    if (ONBOARDING_EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+      return;
+    }
+    const userId = onboardingUserId(user);
+    if (!userId || !hasCompletedOnboarding(userId)) {
+      navigate("/onboarding/preferences", { replace: true });
+    }
+  }, [loading, location.pathname, navigate, user]);
+
+  return null;
+}
+
 export default function App() {
   const { user, logout } = useAuth();
   const entitlement = useEntitlement(Boolean(user));
@@ -174,6 +206,7 @@ export default function App() {
         {/* Faded brand layer (logo on every tab, aurora on /profile). */}
         <AppBackground />
         <AppTelemetry />
+        <OnboardingRedirect />
         {/* Auth Debugger is strictly a development aid and must not
             render in production builds or for App Store reviewers. */}
         {process.env.NODE_ENV !== 'production' ? <AuthDebugger /> : null}
