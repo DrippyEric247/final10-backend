@@ -32,7 +32,15 @@ import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trac
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import EmptyState from '../components/ui/states/EmptyState';
+import { useQuery } from '@tanstack/react-query';
 import QuickSnipesSavvyResults from '../components/deals/QuickSnipesSavvyResults';
+import {
+  applyIntentPoolFallback,
+  buildSavvyPickReason,
+  getConfidenceLabel,
+  rankQuickSnipeListings,
+  resolveQuickSnipesBestMove,
+} from '../lib/quickSnipesBestMove';
 import '../styles/QuickSnipesCommandCenter.css';
 
 const BOOSTED_POWER_KEY = "f10_best_move_power_daily_v1";
@@ -200,6 +208,7 @@ const LocalDeals = () => {
   const [boostExhaustedOpen, setBoostExhaustedOpen] = useState(false);
   const [pendingBoostQuery, setPendingBoostQuery] = useState('');
   const [huntLaneLoadingMessage, setHuntLaneLoadingMessage] = useState(null);
+  const [liveTick, setLiveTick] = useState(0);
   /** When true, avoid overwriting the hunt input (e.g. boost-exhausted modal sync). Resets on tile/wheel/URL. */
   const searchInputUserEditedRef = useRef(false);
   const [tierTick, bumpTier] = useReducer((n) => n + 1, 0);
@@ -441,7 +450,7 @@ const LocalDeals = () => {
     } else {
       next = sorted;
     }
-    return filterItemsByIntent(next, smartIntent, {
+    const intentFiltered = filterItemsByIntent(next, smartIntent, {
       title: 'title',
       tags: 'tags',
       category: 'categoryId',
@@ -450,7 +459,48 @@ const LocalDeals = () => {
       price: 'buyNowPrice',
       secondsRemaining: 'secondsRemaining',
     });
+    return applyIntentPoolFallback(next, intentFiltered, 0).items;
   }, [allItems, boostedActive, mode, showPass, smartIntent, subscriptionTier]);
+
+  const quickSnipesRanked = useMemo(
+    () => rankQuickSnipeListings(visibleItems, liveTick),
+    [visibleItems, liveTick]
+  );
+
+  const localBestMove = useMemo(() => {
+    if (!quickSnipesRanked.length) return null;
+    const extraordinary = quickSnipesRanked.find((r) => r.extraordinary);
+    if (extraordinary) return null;
+    const top = quickSnipesRanked[0];
+    if (!top?.item) return null;
+    return {
+      item: top.item,
+      savings: top.savings,
+      savingsPct: top.savingsPct,
+      trustScore: Number(top.item.trustScore) || 0,
+      confidence: getConfidenceLabel(top.confidenceScore),
+      pickReason: buildSavvyPickReason(top, { isFallback: true }),
+      source: 'quick_snipes_relaxed',
+      isFallback: true,
+      extraordinary: false,
+    };
+  }, [quickSnipesRanked]);
+
+  const needsExternalFallback =
+    Boolean(query) &&
+    hasSearchContext &&
+    !listings.isLoading &&
+    !listings.error &&
+    visibleItems.length === 0;
+
+  const externalFallbackQuery = useQuery({
+    queryKey: ['quickSnipesBestMoveFallback', query, categoryId],
+    enabled: needsExternalFallback,
+    queryFn: () => resolveQuickSnipesBestMove({ query, primaryItems: [], liveTick }),
+    staleTime: 60_000,
+  });
+
+  const fallbackBestMove = localBestMove || externalFallbackQuery.data || null;
 
   /** Quick Snipes: rank by deal engine; #1 is the cinematic hero deal. */
   const quickSnipesHero = useMemo(() => {
@@ -510,7 +560,6 @@ const LocalDeals = () => {
   };
 
   const lanesRef = useRef(null);
-  const [liveTick, setLiveTick] = useState(0);
   const [wheelIndex, setWheelIndex] = useState(0);
   const [activityIndex, setActivityIndex] = useState(0);
 
@@ -552,7 +601,7 @@ const LocalDeals = () => {
     return () => window.clearInterval(id);
   }, [liveActivities.length]);
 
-  const heroItem = quickSnipesHero?.item || null;
+  const heroItem = quickSnipesHero?.item || fallbackBestMove?.item || null;
   const heroPrice = heroItem ? Number(heroItem.buyNowPrice ?? heroItem.currentBidPrice ?? heroItem.price ?? 0) : 0;
   const heroMarket = heroItem ? Number(heroItem.marketValue ?? heroPrice * 1.16) : 0;
   const heroSavings = Math.max(0, Math.round(heroMarket - heroPrice));
@@ -684,7 +733,7 @@ const LocalDeals = () => {
         <section ref={lanesRef} className="space-y-4">
           {hasSearchContext ? (
             <QuickSnipesSavvyResults
-              loading={Boolean(listings.isLoading)}
+              loading={Boolean(listings.isLoading || (needsExternalFallback && externalFallbackQuery.isLoading))}
               items={visibleItems}
               liveTick={liveTick}
               mode={mode}
@@ -693,6 +742,8 @@ const LocalDeals = () => {
               setShowPass={setShowPass}
               runHunt={runHunt}
               onMeaningfulView={onMeaningfulView}
+              fallbackBestMove={fallbackBestMove}
+              searchQuery={query}
             />
           ) : null}
         </section>
@@ -752,13 +803,15 @@ const LocalDeals = () => {
             className="text-left items-stretch"
           />
         ) : null}
-        {!listings.isLoading && !listings.error && hasSearchContext && visibleItems.length === 0 ? (
+        {!listings.isLoading && !listings.error && hasSearchContext && visibleItems.length === 0 && !fallbackBestMove && !externalFallbackQuery.isLoading ? (
           <div className="qscc-glass border border-slate-600/40 rounded-2xl p-5 sm:p-6 space-y-4">
             <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-4">
-              <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Emergency wow mode</div>
-              <h4 className="text-xl font-black text-white">No extraordinary opportunities detected right now.</h4>
+              <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Savvy Scout scanning</div>
+              <h4 className="text-xl font-black text-white">
+                Savvy Scout is still scanning for legendary finds. Here&apos;s the strongest move available right now.
+              </h4>
               <p className="text-sm text-slate-200 mt-2">
-                Savvy will not fill your feed with low-interest products.
+                Pulling from Auctions and Trending lanes — tap a hunt below if nothing appears in a few seconds.
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">

@@ -1,12 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import ListingModeTabs from '../ebay/ListingModeTabs';
-import { scoreListing } from '../../lib/listingSectionsEngine';
 import { emitPowerToast } from '../../lib/final10PowerFeedback';
 import { trackQuickSnipeAction } from '../../lib/analytics';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import QuickSnipeSavvyRewards from './QuickSnipeSavvyRewards';
-import { getTopCategories } from '../../lib/userBehavior';
+import { getConfidenceLabel, rankQuickSnipeListings } from '../../lib/quickSnipesBestMove';
 
 const TRENDING_SNEAKERS = [
   { label: 'Jordan 1', query: 'air jordan 1' },
@@ -150,61 +149,96 @@ function buildTrustBadges(item) {
   return uniq.slice(0, 4);
 }
 
-function sortSavvyItems(items, liveTick) {
-  const userInterests = getTopCategories(3).map((x) => String(x.category || '').toLowerCase());
-  const inferInterest = (row) => {
-    const cat = String(row.categoryId || row.category || '').toLowerCase();
-    const title = String(row.title || '').toLowerCase();
-    if (cat) return cat;
-    if (/bmw|b58|exhaust|wheel|rim|automotive|car part/.test(title)) return 'auto';
-    if (/ps5|xbox|switch|rtx|gaming|pc/.test(title)) return 'gaming';
-    if (/iphone|airpods|ipad|apple watch|macbook/.test(title)) return 'electronics';
-    if (/pokemon|sports card|hot wheels|mtg/.test(title)) return 'collectibles';
-    if (/jordan|yeezy|nike|sneaker/.test(title)) return 'sneakers';
-    return 'all';
-  };
-  const extract = (row) => ({
-    trustScore: Number(row.trustScore) || 0,
-    trustLevel: row.trustLevel,
-    price: row.buyNowPrice ?? row.currentBidPrice ?? row.price,
-    marketValue: row.marketValue,
-    secondsRemaining: Math.max(0, Number(row.secondsRemaining || 0) - liveTick),
-  });
+function BestMoveFallbackCard({
+  fallback,
+  liveTick,
+  onMeaningfulView,
+  saveAlert,
+  searchQuery,
+}) {
+  const item = fallback?.item;
+  if (!item) return null;
+  const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
+  const market = Number(item.marketValue ?? 0);
+  const savings = Number(fallback.savings) || Math.max(0, market - price);
+  const savingsPct = Number(fallback.savingsPct) || (market > 0 ? (savings / market) * 100 : 0);
+  const trust = Math.round(Number(fallback.trustScore ?? item.trustScore) || 0);
+  const confidence = fallback.confidence || getConfidenceLabel(fallback.confidenceScore ?? item.confidenceScore);
+  const url = item.itemWebUrl || item.itemUrl;
+  const seconds = Math.max(0, Number(item.secondsRemaining || 0) - liveTick);
+  const bids = Math.max(1, Number(item.bidCount || 0));
 
-  const scored = items.map((item) => {
-    const s = scoreListing(item, extract);
-    const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
-    const market = Number(item.marketValue ?? 0);
-    const savings = Math.max(0, market - price);
-    const savingsPct = market > 0 ? (savings / market) * 100 : 0;
-    const trust = Number(item.trustScore) || 0;
-    const demand = Math.max(0, Number(item.bidCount || 0) * 8 + (Number(item.confidenceScore || item.aiConfidence) || 0) * 0.6);
-    const interest = inferInterest(item);
-    const personalizedBoost = userInterests.includes(interest) ? 28 : 0;
-    const wowScore =
-      Math.min(300, savings) * 0.9 +
-      Math.min(60, savingsPct) * 2.4 +
-      trust * 1.4 +
-      demand +
-      personalizedBoost;
-    const risky =
-      !item.safeToRecommend ||
-      item.trustLevel === 'unverified' ||
-      (Number(item.trustScore) < 32 && feedbackCount(item) < 5);
-    const extraordinary =
-      !risky &&
-      trust >= 70 &&
-      (savings >= 80 || savingsPct >= 18) &&
-      (Number(item.bidCount || 0) >= 2 || Number(item.confidenceScore || item.aiConfidence) >= 70);
-    return { item, ...s, risky, wowScore, savings, savingsPct, extraordinary, personalizedBoost, interest };
-  });
-
-  scored.sort((a, b) => {
-    if (a.risky !== b.risky) return a.risky ? 1 : -1;
-    return b.wowScore - a.wowScore || b.bestMoveScore - a.bestMoveScore;
-  });
-
-  return scored;
+  return (
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="qscc-savvy-card qscc-savvy-card--fallback rounded-2xl overflow-hidden flex flex-col border-2 border-cyan-400/40 mb-6"
+    >
+      <div className="px-5 py-4 border-b border-cyan-400/25 bg-cyan-500/10">
+        <div className="text-[10px] font-black tracking-[0.22em] text-cyan-200 uppercase">Best Move Available Right Now</div>
+        <p className="mt-2 text-sm text-cyan-50/95 leading-relaxed">
+          Savvy Scout is still scanning for legendary finds. Here&apos;s the strongest move available right now.
+        </p>
+      </div>
+      <div className="grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] gap-0">
+        <div className="qscc-savvy-card__media relative aspect-[4/3] md:aspect-auto md:min-h-[260px] bg-slate-950">
+          {item.imageUrl ? (
+            <img
+              src={item.imageUrl}
+              alt={String(item.title || 'Listing')}
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-bold">No photo</div>
+          )}
+          <div className="absolute top-3 left-3">
+            <span className={`qscc-confidence-badge qscc-confidence-badge--${confidence.key}`}>
+              {confidence.label}
+            </span>
+          </div>
+        </div>
+        <div className="p-5 sm:p-6 flex flex-col bg-gradient-to-b from-slate-900/50 to-slate-950">
+          <h4 className="text-white font-bold text-lg leading-snug line-clamp-3">{item.title}</h4>
+          <div className="mt-3 text-sm text-slate-300 space-y-1.5">
+            <div><span className="text-slate-400">Price:</span> <span className="font-bold text-white">{toMoney(price)}</span></div>
+            <div className="text-emerald-300 font-black">
+              Est. savings: {toMoney(savings)}
+              {savingsPct > 0 ? ` (${Math.round(savingsPct)}%)` : ''}
+            </div>
+            <div><span className="text-slate-400">Trust score:</span> <span className="font-bold text-cyan-200">{trust}%</span></div>
+            <div><span className="text-slate-400">Ends in:</span> <span className="font-bold text-amber-200">{fmtTime(seconds)}</span></div>
+            <div><span className="text-slate-400">Activity:</span> <span className="font-bold text-amber-200">{bids} watching</span></div>
+          </div>
+          <div className="mt-3 text-xs leading-relaxed text-violet-100/95 border border-violet-400/25 bg-violet-500/10 rounded-lg px-3 py-2.5">
+            <strong className="text-violet-200">Why Savvy Scout picked it:</strong>{' '}
+            {fallback.pickReason || 'Strongest composite score from savings, trust, seller reputation, and urgency.'}
+          </div>
+          <QuickSnipeSavvyRewards item={item} effectiveSavings={savings} />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="qscc-savvy-btn qscc-savvy-btn--buy"
+              onClick={() => {
+                onMeaningfulView(item, 'fallback_view_deal');
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              View Deal
+            </button>
+            <button
+              type="button"
+              className="qscc-savvy-btn qscc-savvy-btn--accent"
+              onClick={() => saveAlert(item, searchQuery)}
+            >
+              Create Alert for Better Deal
+            </button>
+          </div>
+        </div>
+      </div>
+    </motion.article>
+  );
 }
 
 function TrendingRow({ title, chips, runHunt }) {
@@ -242,16 +276,23 @@ export default function QuickSnipesSavvyResults({
   setShowPass,
   runHunt,
   onMeaningfulView,
+  fallbackBestMove = null,
+  searchQuery = '',
 }) {
   const [banner, setBanner] = useState('');
 
-  const ranked = useMemo(() => sortSavvyItems(items || [], liveTick), [items, liveTick]);
+  const ranked = useMemo(() => rankQuickSnipeListings(items || [], liveTick), [items, liveTick]);
   const extraordinary = useMemo(() => ranked.filter((x) => x.extraordinary), [ranked]);
   const cardsToRender = extraordinary.length > 0 ? extraordinary : [];
+  const showFallbackCard = cardsToRender.length === 0 && Boolean(fallbackBestMove?.item);
 
   const headerStats = useMemo(() => {
-    const n = ranked.length;
+    const n = ranked.length || (fallbackBestMove?.item ? 1 : 0);
     if (!n) return { count: 0, lowComp: false, confLabel: 'MEDIUM' };
+    if (!ranked.length && fallbackBestMove?.item) {
+      const conf = fallbackBestMove.confidence || getConfidenceLabel(fallbackBestMove.item.confidenceScore);
+      return { count: 1, lowComp: true, confLabel: conf.label.toUpperCase().includes('LEGENDARY') || conf.label.includes('High') ? 'HIGH' : 'MEDIUM' };
+    }
     const lowBids = ranked.filter((r) => Number(r.item.bidCount || 0) <= 2).length;
     const lowComp = lowBids / n >= 0.38;
     const avgConf =
@@ -260,9 +301,9 @@ export default function QuickSnipesSavvyResults({
     if (avgConf >= 72) confLabel = 'HIGH';
     else if (avgConf < 48) confLabel = 'LOW';
     return { count: n, lowComp, confLabel };
-  }, [ranked]);
+  }, [ranked, fallbackBestMove]);
 
-  const saveAlert = useCallback((item) => {
+  const saveAlert = useCallback((item, alertQuery = '') => {
     try {
       const key = 'f10_quick_snipe_alerts_v1';
       const raw = JSON.parse(localStorage.getItem(key) || '[]');
@@ -275,7 +316,7 @@ export default function QuickSnipesSavvyResults({
       raw.unshift({
         id,
         title: String(item.title || '').slice(0, 120),
-        query: String(item.title || '').slice(0, 40),
+        query: String(alertQuery || item.title || '').slice(0, 40),
         savedAt: Date.now(),
       });
       localStorage.setItem(key, JSON.stringify(raw.slice(0, 40)));
@@ -316,7 +357,7 @@ export default function QuickSnipesSavvyResults({
     );
   }
 
-  if (!ranked.length) return null;
+  if (!ranked.length && !showFallbackCard) return null;
 
   return (
     <div className="qscc-savvy-wrap qscc-glass rounded-2xl border border-violet-500/30 p-5 sm:p-8 shadow-[0_0_60px_rgba(139,92,246,0.12)]">
@@ -365,15 +406,27 @@ export default function QuickSnipesSavvyResults({
         </div>
       </div>
 
-      {cardsToRender.length === 0 ? (
+      {showFallbackCard ? (
+        <BestMoveFallbackCard
+          fallback={fallbackBestMove}
+          liveTick={liveTick}
+          onMeaningfulView={onMeaningfulView}
+          saveAlert={saveAlert}
+          searchQuery={searchQuery}
+        />
+      ) : null}
+
+      {cardsToRender.length === 0 && !showFallbackCard ? (
         <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-5 py-6 text-amber-100">
-          <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Emergency wow mode</div>
-          <h4 className="text-xl font-black text-white">No extraordinary opportunities detected right now.</h4>
+          <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Savvy Scout scanning</div>
+          <h4 className="text-xl font-black text-white">
+            Savvy Scout is still scanning for legendary finds. Here&apos;s the strongest move available right now.
+          </h4>
           <p className="text-sm text-amber-100/90 mt-2">
-            Savvy paused low-interest filler. Tap a trending lane above to hunt high-intent products only.
+            Pulling from Auctions and Trending lanes — tap a hunt above while Savvy widens the search.
           </p>
         </div>
-      ) : (
+      ) : cardsToRender.length > 0 ? (
       <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {cardsToRender.map(({ item, risky, savings, savingsPct }, idx) => {
           const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
@@ -473,7 +526,7 @@ export default function QuickSnipesSavvyResults({
           );
         })}
       </div>
-      )}
+      ) : null}
     </div>
   );
 }

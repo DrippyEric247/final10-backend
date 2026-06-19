@@ -468,3 +468,45 @@
     transform: translateX(100%);
   }
 }
+
+.qscc-confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+}
+
+.qscc-confidence-badge--legendary {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(245, 158, 11, 0.22);
+  color: #fde68a;
+}
+
+.qscc-confidence-badge--high {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+}
+
+.qscc-confidence-badge--watching {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(14, 165, 233, 0.15);
+  color: #bae6fd;
+}
+
+.qscc-confidence-badge--standard {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(51, 65, 85, 0.35);
+  color: #cbd5e1;
+}
+
+.qscc-savvy-card--fallback {
+  box-shadow: 0 0 40px rgba(34, 211, 238, 0.12);
+}
