@@ -1,0 +1,307 @@
+.scout-missions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.scout-missions-panel__hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.scout-missions-panel__eyebrow {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.scout-missions-panel__tagline {
+  margin: 0.35rem 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.scout-missions-panel__log-link {
+  font-size: 11px;
+  font-weight: 800;
+  color: #67e8f9;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.scout-missions-panel__log-link:hover {
+  color: #a5f3fc;
+}
+
+.scout-missions-section__title {
+  margin: 0 0 0.5rem;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+}
+
+.scout-missions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scout-missions-list--dense {
+  gap: 0.35rem;
+}
+
+.scout-mission-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.scout-mission-card--claimable {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.scout-mission-card--dense {
+  grid-template-columns: 1fr auto;
+  padding: 0.45rem 0.6rem;
+}
+
+.scout-mission-card--done {
+  opacity: 0.72;
+}
+
+.scout-mission-card__title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.scout-mission-card__desc {
+  margin: 0.2rem 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+.scout-mission-card__bar {
+  margin-top: 0.45rem;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.8);
+  overflow: hidden;
+}
+
+.scout-mission-card__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a855f7, #22d3ee);
+}
+
+.scout-mission-card__meta {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.scout-mission-card__reward {
+  color: #6ee7b7;
+}
+
+.scout-mission-card__cadence {
+  color: #93c5fd;
+}
+
+.scout-mission-card__claim,
+.scout-mission-card__cta {
+  font-size: 11px;
+  font-weight: 900;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.scout-mission-card__claim {
+  background: linear-gradient(90deg, #34d399, #10b981);
+  color: #042f2e;
+}
+
+.scout-mission-card__cta {
+  background: rgba(99, 102, 241, 0.2);
+  color: #c7d2fe;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+}
+
+.scout-missions-empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.scout-mission-popup {
+  position: fixed;
+  right: 5.5rem;
+  bottom: 6.5rem;
+  z-index: 95;
+  width: min(92vw, 320px);
+  padding: 0.85rem 1rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 12px 40px rgba(124, 58, 237, 0.35);
+}
+
+.scout-mission-popup__close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.45rem;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.scout-mission-popup__scout {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #67e8f9;
+}
+
+.scout-mission-popup__message {
+  margin: 0.4rem 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.35;
+}
+
+.scout-mission-popup__sub {
+  margin: 0.35rem 0 0;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.scout-mission-popup__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.scout-mission-popup__btn {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.scout-mission-popup__btn--primary {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.15);
+  color: #a7f3d0;
+}
+
+.scout-mission-popup__reward {
+  margin-top: 0.5rem;
+  font-size: 11px;
+  font-weight: 900;
+  color: #6ee7b7;
+}
+
+.scout-mission-log-page {
+  background: #020617;
+}
+
+.scout-mission-log-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.scout-mission-log-hd h1 {
+  margin: 0.25rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.scout-mission-log-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.scout-mission-log-sub {
+  margin: 0.5rem 0 1.25rem;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.scout-mission-log-section-title {
+  margin: 1.25rem 0 0.65rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.scout-mission-log-foot {
+  margin-top: 2rem;
+  font-size: 13px;
+}
+
+.scout-mission-log-foot a {
+  color: #93c5fd;
+}
+
+.savvy-scout-btn--mission .savvy-scout-btn__ring {
+  animation: savvy-scout-mission-glow 1.8s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.45) 0%, transparent 70%);
+}
+
+@keyframes savvy-scout-mission-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}

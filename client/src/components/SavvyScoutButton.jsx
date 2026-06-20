@@ -8,6 +8,7 @@ import "../styles/SavvyScoutButton.css";
  *   state?: "idle" | "searching" | "dealFound" | "excited",
  *   expanded?: boolean,
  *   unread?: number,
+ *   missionGlow?: boolean,
  *   onClick?: () => void,
  *   ariaLabel?: string,
  *   title?: string,
@@ -17,6 +18,7 @@ export default function SavvyScoutButton({
   state = "idle",
   expanded = false,
   unread = 0,
+  missionGlow = false,
   onClick,
   ariaLabel,
   title,
@@ -36,8 +38,9 @@ export default function SavvyScoutButton({
     const parts = ["savvy-scout-btn"];
     if (state && state !== "idle") parts.push(`savvy-scout-btn--${state}`);
     if (reducedMotion) parts.push("savvy-scout-btn--reduced");
+    if (missionGlow) parts.push("savvy-scout-btn--mission");
     return parts.join(" ");
-  }, [state, reducedMotion]);
+  }, [state, reducedMotion, missionGlow]);
 
   return (
     <button

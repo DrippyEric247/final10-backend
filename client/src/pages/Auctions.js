@@ -23,6 +23,7 @@ import {
 import { POWER } from "../lib/final10PowerConfig";
 import { recordBattlePassXp } from "../lib/battlePassEngine";
 import { triggerActionReward } from "../lib/rewardEngine";
+import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
 import { emitBattlePassAction } from "../lib/battlePassActionBus";
 import PlaceBidModal from "../components/ebay/PlaceBidModal";
 import GlobalSmartSearch from "../components/search/GlobalSmartSearch";
@@ -687,6 +688,8 @@ export default function Auctions() {
         recordBattlePassXp("save_item");
         triggerActionReward("save_item");
       }
+      recordScoutMissionAction("save_deal", { pathname: "/auctions" });
+      recordScoutMissionAction("add_watchlist", { pathname: "/auctions" });
     }
     setWatchlistIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]

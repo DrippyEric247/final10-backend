@@ -14,6 +14,7 @@ import {
   Zap
 } from 'lucide-react';
 import { scanVideo, trackVideoScanner } from '../lib/api';
+import { recordScoutMissionAction } from '../lib/savvyScoutMissions';
 import { notifyUniversalProgressRefresh } from '../lib/universalBoostProgress';
 import { recordPowerAfterScan } from '../lib/final10PowerEngine';
 import { POWER } from '../lib/final10PowerConfig';
@@ -75,6 +76,7 @@ const VideoScanner = () => {
       recordPowerAfterScan();
       notifyUniversalProgressRefresh();
       emitPowerToast(POWER.DISPLAY.scanPowerPop, "Scan logged");
+      recordScoutMissionAction("scan_complete", { pathname: "/scanner" });
       return next;
     });
   };

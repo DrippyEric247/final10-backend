@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { Link } from "react-router-dom";
 import RedeemCodeSection from "../components/RedeemCodeSection";
 import Final10SocialLinks from "../components/Final10SocialLinks";
 import { ProfileNextGoal } from "../components/profileActivity/ProfileNextGoal.jsx";
@@ -8,7 +9,9 @@ import { useFinal10Power } from "../context/Final10PowerContext";
 import { getUniversalBoostState } from "../lib/universalBoostProgress";
 import CallingCard from "../components/CallingCard";
 import { findCallingCard, findEmblem } from "../lib/customizationCatalog";
+import { useSavvyScoutMissionsOptional } from "../context/SavvyScoutMissionsContext";
 import "../styles/ProfilePageLayout.css";
+import "../styles/SavvyScoutMissions.css";
 
 /**
  * Mobile-first, scan-friendly profile dashboard.
@@ -67,6 +70,7 @@ export default function ProfilePageLayout({
   equippedEmblemId = "sigil_starter",
 }) {
   const { snapshot } = useFinal10Power();
+  const scoutMissions = useSavvyScoutMissionsOptional()?.snapshot;
   const powerBar = useMemo(() => {
     void snapshot;
     return getUniversalBoostState();
@@ -245,33 +249,45 @@ export default function ProfilePageLayout({
           onViewLoadout={onRivalryViewLoadout}
         />
 
-        {/* 3 — Daily tasks */}
-        <section className="f10-profile-card" aria-labelledby="f10-daily-hd">
-          <h2 id="f10-daily-hd" className="f10-profile-card-hd">
-            Daily tasks · {taskProgress.completed}/{taskProgress.total}
-          </h2>
-          <div className="f10-profile-bar" aria-hidden>
-            <div
-              className="f10-profile-bar-fill"
-              style={{
-                width: `${taskProgress.total ? (taskProgress.completed / taskProgress.total) * 100 : 0}%`,
-              }}
-            />
+        {/* 3 — Savvy Scout Missions (contextual; full log is secondary) */}
+        <section className="f10-profile-card" aria-labelledby="f10-scout-missions-hd">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
+            <h2 id="f10-scout-missions-hd" className="f10-profile-card-hd" style={{ margin: 0 }}>
+              Savvy Scout Missions
+            </h2>
+            <Link to="/mission-log" className="scout-missions-panel__log-link">
+              Mission Log
+            </Link>
           </div>
-          <ul style={{ listStyle: "none", margin: "0.5rem 0 0", padding: 0 }}>
-            {tasksToShow.map((t) => (
+          <p className="f10-profile-stat-label" style={{ marginTop: "0.35rem", lineHeight: 1.45 }}>
+            {scoutMissions?.tagline ||
+              "Savvy Scout discovers Savvy Point earning opportunities while you use the Savvy Universe."}
+          </p>
+          {scoutMissions?.claimable?.length ? (
+            <p className="f10-profile-success" style={{ marginTop: "0.5rem" }}>
+              {scoutMissions.claimable.length} reward{scoutMissions.claimable.length === 1 ? "" : "s"} ready to claim — open Savvy Scout.
+            </p>
+          ) : null}
+          <ul style={{ listStyle: "none", margin: "0.65rem 0 0", padding: 0 }}>
+            {(scoutMissions?.contextualActive || tasksToShow).slice(0, 4).map((t) => (
               <li key={t.id} className="f10-profile-task-line">
-                <span aria-hidden>{t.done ? "✓" : "○"}</span>
-                <span>{t.label}</span>
+                <span aria-hidden>{t.claimable || t.done || t.complete ? "✓" : "○"}</span>
+                <span>
+                  {t.title || t.label}
+                  {t.rewardSavvy ? (
+                    <span className="scout-mission-card__reward" style={{ marginLeft: 6 }}>
+                      +{t.rewardSavvy} Savvy
+                    </span>
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>
-          <p
-            className="f10-profile-stat-label"
-            style={{ marginTop: "0.5rem", fontSize: "0.75rem", lineHeight: 1.4 }}
-          >
-            All done: +{taskDailyBonusMin}–{taskDailyBonusMax} bonus pts
-          </p>
+          {!scoutMissions?.contextualActive?.length && !tasksToShow.length ? (
+            <p className="f10-profile-stat-label" style={{ marginTop: "0.5rem" }}>
+              Keep hunting — missions appear as you save deals, create alerts, and explore tabs.
+            </p>
+          ) : null}
           {taskBonusMessage ? (
             <p className="f10-profile-success" style={{ marginTop: "0.35rem" }}>
               {taskBonusMessage}

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SavvyScoutButton from "./SavvyScoutButton";
 import SavvyScoutDealToast from "./SavvyScoutDealToast";
+import SavvyScoutMissionsPanel from "./scout/SavvyScoutMissionsPanel";
+import SavvyScoutMissionPopupHost from "./scout/SavvyScoutMissionPopup";
+import { useSavvyScoutMissionsOptional } from "../context/SavvyScoutMissionsContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -40,7 +43,9 @@ import {
   isDealFoundFeedRow,
 } from "../lib/savvyScoutState";
 import "../styles/Final10SideAssistant.css";
+import "../styles/SavvyScoutMissions.css";
 import SavvyWalletBubble from "./wallet/SavvyWalletBubble";
+import { emitPowerToast } from "../lib/final10PowerFeedback";
 
 const SCOUT_GREETING =
   "Savvy Scout reporting. What opportunity are we hunting today?";
@@ -571,6 +576,8 @@ function normalizeDealItem(raw) {
 
 export default function Final10SideAssistant() {
   const { user } = useAuth();
+  const missionsCtx = useSavvyScoutMissionsOptional();
+  const missionSnapshot = missionsCtx?.snapshot;
   const location = useLocation();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -581,7 +588,8 @@ export default function Final10SideAssistant() {
   const [dealFoundFlash, setDealFoundFlash] = useState(false);
   const [externalScoutState, setExternalScoutState] = useState(null);
   const [showGreeting, setShowGreeting] = useState(false);
-  const [activeTab, setActiveTab] = useState("ask");
+  const [activeTab, setActiveTab] = useState("missions");
+  const [claimingMissionId, setClaimingMissionId] = useState(null);
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState(() => loadHistory());
   const [aiBusy, setAiBusy] = useState(false);
@@ -794,9 +802,36 @@ export default function Final10SideAssistant() {
   const openPanel = useCallback(() => {
     setExpanded(true);
     setUnread(0);
-    setShowGreeting(true);
-    window.setTimeout(() => inputRef.current?.focus(), 50);
+    if (missionSnapshot?.shouldGlow) {
+      setActiveTab("missions");
+    } else {
+      setShowGreeting(true);
+      setActiveTab("ask");
+      window.setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [missionSnapshot]);
+
+  const openMissionsPanel = useCallback(() => {
+    setExpanded(true);
+    setUnread(0);
+    setActiveTab("missions");
   }, []);
+
+  const handleClaimMission = useCallback(
+    async (missionId) => {
+      if (!missionsCtx?.claimMission) return;
+      setClaimingMissionId(missionId);
+      try {
+        const res = missionsCtx.claimMission(missionId);
+        if (res.ok && res.rewardSavvy) {
+          emitPowerToast(res.rewardSavvy, res.message || "Mission claimed");
+        }
+      } finally {
+        setClaimingMissionId(null);
+      }
+    },
+    [missionsCtx]
+  );
 
   const handleViewDeal = useCallback(() => {
     const url = dealToast?.url || "";
@@ -817,7 +852,7 @@ export default function Final10SideAssistant() {
     if (dealFoundFlash) return "dealFound";
     if (externalScoutState) return externalScoutState;
     if (aiBusy || suggestionsLoading) return "searching";
-    if (unread > 0) return "excited";
+    if (unread > 0 || (missionSnapshot?.claimableCount || 0) > 0) return "excited";
     return "idle";
   }, [
     dealFoundFlash,
@@ -825,6 +860,7 @@ export default function Final10SideAssistant() {
     aiBusy,
     suggestionsLoading,
     unread,
+    missionSnapshot,
   ]);
 
   const runDealSearch = useCallback(async (queryOrIntent, limit = 6) => {
@@ -1382,8 +1418,9 @@ export default function Final10SideAssistant() {
           ? `Got you. I'll ping you the second a ${answer.topic} deal actually lands.`
           : "Got you. I'll ping you when something real shows up.",
       });
+      missionsCtx?.trackAction?.("add_watchlist");
     },
-    [updateHistoryAnswer]
+    [updateHistoryAnswer, missionsCtx]
   );
 
   // Weak-board: "⚡ Show Best Available" — surface the top 3 of the original
@@ -1688,9 +1725,14 @@ export default function Final10SideAssistant() {
   if (!user) return null;
 
   const hintCount = sorted.length;
+  const missionCount =
+    (missionSnapshot?.claimableCount || 0) +
+    (missionSnapshot?.contextualActive || []).filter((m) => !m.complete).length;
+  const bubbleUnread = unread + (expanded ? 0 : missionSnapshot?.claimableCount || 0);
 
   return (
     <div className="f10-assistant-dock" aria-live="polite">
+      <SavvyScoutMissionPopupHost onOpenMissions={openMissionsPanel} />
       {dealToast ? (
         <SavvyScoutDealToast
           title={dealToast.title}
@@ -1736,6 +1778,18 @@ export default function Final10SideAssistant() {
             <button
               type="button"
               role="tab"
+              aria-selected={activeTab === "missions"}
+              className={`f10-assistant-tab ${activeTab === "missions" ? "f10-assistant-tab--active" : ""}`}
+              onClick={() => setActiveTab("missions")}
+            >
+              Missions
+              {missionCount > 0 ? (
+                <span className="f10-assistant-tab-count">{missionCount > 9 ? "9+" : missionCount}</span>
+              ) : null}
+            </button>
+            <button
+              type="button"
+              role="tab"
               aria-selected={activeTab === "ask"}
               className={`f10-assistant-tab ${activeTab === "ask" ? "f10-assistant-tab--active" : ""}`}
               onClick={() => setActiveTab("ask")}
@@ -1756,7 +1810,22 @@ export default function Final10SideAssistant() {
             </button>
           </div>
 
-          {activeTab === "ask" ? (
+          {activeTab === "missions" ? (
+            <div className="f10-assistant-panel-bd">
+              {missionSnapshot ? (
+                <SavvyScoutMissionsPanel
+                  snapshot={missionSnapshot}
+                  onClaim={handleClaimMission}
+                  claimingId={claimingMissionId}
+                  compact
+                />
+              ) : (
+                <div className="f10-assistant-empty">
+                  Savvy Scout is scanning for earning opportunities.
+                </div>
+              )}
+            </div>
+          ) : activeTab === "ask" ? (
             <div className="f10-assistant-panel-bd f10-assistant-ai-bd">
               {showGreeting ? (
                 <div className="f10-assistant-scout-greeting" role="status">
@@ -2062,7 +2131,8 @@ export default function Final10SideAssistant() {
       <SavvyScoutButton
         state={scoutState}
         expanded={expanded}
-        unread={unread}
+        unread={bubbleUnread}
+        missionGlow={Boolean(missionSnapshot?.shouldGlow)}
         onClick={() => (expanded ? setExpanded(false) : openPanel())}
         ariaLabel={
           expanded ? `Close ${SAVVY_SCOUT.shortTitle}` : `Open ${SAVVY_SCOUT.shortTitle}`

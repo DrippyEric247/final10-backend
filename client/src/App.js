@@ -89,6 +89,9 @@ import { useEntitlement } from "./hooks/useEntitlement";
 import { setCurrentSubscriptionTier } from "./lib/tierMultiplier";
 import { isBetaTester, registerBetaTesterGetter } from "./lib/betaTesterAccess";
 import FoundingTesterBadge from "./components/beta/FoundingTesterBadge";
+import { SavvyScoutMissionsProvider } from './context/SavvyScoutMissionsContext';
+import MissionLog from './pages/MissionLog';
+import './styles/SavvyScoutMissions.css';
 
 /* Protect any route by requiring a token/user */
 function ProtectedRoute({ children }) {
@@ -198,6 +201,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SavvyScoutMissionsProvider>
       <Final10PowerProvider>
       <PointsRewardProvider>
       <SearchIntentProvider>
@@ -368,6 +372,14 @@ export default function App() {
             }
           />
           <Route path="/build-wars" element={<BuildWarsPage />} />
+          <Route
+            path="/mission-log"
+            element={
+              <ProtectedRoute>
+                <MissionLog />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/profile"
             element={
@@ -569,6 +581,7 @@ export default function App() {
           <Link to="/terms" className="hover:text-gray-200">Terms</Link>
           <Link to="/support" className="hover:text-gray-200">Support</Link>
           {user ? <Link to="/delete-account" className="hover:text-red-300">Delete Account</Link> : null}
+          {user ? <Link to="/mission-log" className="hover:text-gray-200">Mission Log</Link> : null}
         </div>
       </footer>
     </div>
@@ -576,6 +589,7 @@ export default function App() {
       </SearchIntentProvider>
       </PointsRewardProvider>
       </Final10PowerProvider>
+      </SavvyScoutMissionsProvider>
     </QueryClientProvider>
   );
 }

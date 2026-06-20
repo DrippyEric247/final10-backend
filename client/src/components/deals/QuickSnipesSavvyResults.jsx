@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import ListingModeTabs from '../ebay/ListingModeTabs';
 import { emitPowerToast } from '../../lib/final10PowerFeedback';
 import { trackQuickSnipeAction } from '../../lib/analytics';
+import { recordScoutMissionAction } from '../../lib/savvyScoutMissions';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import QuickSnipeSavvyRewards from './QuickSnipeSavvyRewards';
 import { getConfidenceLabel, rankQuickSnipeListings } from '../../lib/quickSnipesBestMove';
@@ -321,6 +322,7 @@ export default function QuickSnipesSavvyResults({
       });
       localStorage.setItem(key, JSON.stringify(raw.slice(0, 40)));
       trackQuickSnipeAction('save_alert', { itemId: id });
+      recordScoutMissionAction('save_deal', { pathname: '/local-deals' });
       emitPowerToast(8, 'Deal alert saved to your dock.');
       setBanner('Saved to Savvy Deal Alerts.');
       window.setTimeout(() => setBanner(''), 2800);

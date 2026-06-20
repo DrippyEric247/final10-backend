@@ -4,6 +4,7 @@ import { BP_TIER_COMPLETE_EVENT } from "../lib/battlePassConfig";
 import { POWER_TOAST_EVENT } from "../lib/final10PowerFeedback";
 import { REWARD_EVENT } from "../lib/rewardEngine";
 import { notifyWalletFromLegacyReward } from "../lib/pointsEngine";
+import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
 
 type PointsRewardSource =
   | "task_complete"
@@ -49,6 +50,7 @@ export function PointsRewardProvider({ children }: { children: React.ReactNode }
     if (since < 250) return;
     lastShownAtRef.current = now;
     notifyWalletFromLegacyReward({ amount: pts, source: String(source || "unknown"), origin: null });
+    recordScoutMissionAction("savvy_earned", { amount: pts, silent: true });
   }, []);
 
   useEffect(() => {
@@ -87,6 +89,7 @@ export function PointsRewardProvider({ children }: { children: React.ReactNode }
       if (d?.reward?.type !== "points") return;
       const pts = safeRoundedAmount(d.reward.value);
       if (pts) showPointsReward({ amount: pts, source: "tier_up" });
+      recordScoutMissionAction("battle_pass_tier_up", { pathname: "/battle-pass" });
     };
 
     window.addEventListener(POWER_TOAST_EVENT, onPower);

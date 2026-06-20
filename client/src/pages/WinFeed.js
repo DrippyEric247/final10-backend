@@ -23,6 +23,7 @@ import {
   submitWin,
   _internal,
 } from "../lib/winFeed";
+import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
 import Final10SocialLinks from "../components/Final10SocialLinks";
 import CallingCard from "../components/CallingCard";
 import "../styles/WinFeed.css";
@@ -592,6 +593,10 @@ export default function WinFeed() {
           { ...payload, tags, username: defaultUsername },
           { user }
         );
+        recordScoutMissionAction("post_win", { pathname: "/win-feed" });
+        if (tags.some((t) => String(t).toLowerCase().includes("savvywin"))) {
+          recordScoutMissionAction("share_win_proof", { pathname: "/win-feed" });
+        }
         refresh();
       } catch (err) {
         if (err instanceof WinSubmissionError) throw err;
