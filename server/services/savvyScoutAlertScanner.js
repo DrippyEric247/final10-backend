@@ -3,6 +3,7 @@ const Auction = require('../models/Auction');
 const AuctionAggregator = require('./AuctionAggregator');
 const marketScanner = require('./marketScanner');
 const { isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
+const { auditAlertScan } = require('./auditLogger');
 
 const aggregator = new AuctionAggregator();
 
@@ -15,10 +16,12 @@ function scoutLog(...args) {
  */
 async function runSavvyScoutAlertScan() {
   scoutLog('[SavvyScout] Scanning active alert targets…');
+  auditAlertScan({ phase: 'start' });
 
   const alerts = await Alert.find({ isActive: true }).select('name keywords user').lean();
   if (!alerts.length) {
     scoutLog('[SavvyScout] No active alert targets.');
+    auditAlertScan({ phase: 'skip', reason: 'no_active_alerts' });
     return { targets: 0, lanesSwept: 0, listingsChecked: 0 };
   }
 
@@ -42,6 +45,7 @@ async function runSavvyScoutAlertScan() {
     } catch (err) {
       const msg = String(err?.message || err).slice(0, 200);
       console.warn(`[SavvyScout] lane failed query="${query.slice(0, 80)}" error=${msg}`);
+      auditAlertScan({ phase: 'lane_error', query: query.slice(0, 80), message: msg });
     }
   }
 
@@ -58,6 +62,12 @@ async function runSavvyScoutAlertScan() {
   console.log(
     `[SavvyScout] done targets=${alerts.length} lanes=${lanes.size} checked=${listingsChecked}`
   );
+  auditAlertScan({
+    targets: alerts.length,
+    lanesSwept: lanes.size,
+    listingsChecked,
+    phase: 'done',
+  });
 
   return { targets: alerts.length, lanesSwept: lanes.size, listingsChecked };
 }

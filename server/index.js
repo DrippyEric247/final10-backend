@@ -135,6 +135,19 @@ const {
   isAuctionCronRefreshEnabled,
 } = require('./lib/backgroundJobFlags');
 const { logProcessCrash } = require('./services/structuredLog');
+const {
+  auditStartup,
+  auditMongoConnect,
+  auditMongoFailure,
+  auditCronJob,
+} = require('./services/auditLogger');
+
+auditStartup({
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: process.env.PORT || 8080,
+  savvyScoutScan: isSavvyScoutBackgroundScanEnabled(),
+  auctionCron: isAuctionCronRefreshEnabled(),
+});
 
 process.on('uncaughtException', (err) => {
   logProcessCrash('PROCESS_UNCAUGHT_EXCEPTION', err);
@@ -202,11 +215,24 @@ app.use('/api/email', require('./routes/email'));
 // health
 app.get('/api/health', (_req, res) => {
   const { getEmailEnvPresence, getEmailProvider, isEmailConfigured } = require('./services/emailService');
+  const mongoState = mongoose.connection.readyState;
+  const mongoStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
   res.json({
-    ok: true,
+    ok: mongoState === 1,
+    uptimeSec: Math.round(process.uptime()),
+    mongo: {
+      readyState: mongoState,
+      status: mongoStates[mongoState] || 'unknown',
+      host: mongoose.connection.host || null,
+    },
+    jobs: {
+      savvyScoutScan: isSavvyScoutBackgroundScanEnabled(),
+      auctionCron: isAuctionCronRefreshEnabled(),
+    },
     emailEnvPresent: getEmailEnvPresence(),
     emailProvider: getEmailProvider(),
     emailConfigured: isEmailConfigured(),
+    alertEmailEnabled: String(process.env.ALERT_EMAIL_ENABLED || '').toLowerCase() === 'true',
   });
 });
 
@@ -228,6 +254,11 @@ const mongooseOptions = {
 mongoose.connect(MONGODB_URI, mongooseOptions)
   .then(() => {
     console.log('✅ Connected to MongoDB with production optimizations');
+    auditMongoConnect({
+      host: mongoose.connection.host,
+      name: mongoose.connection.name,
+      readyState: mongoose.connection.readyState,
+    });
     
     // Initialize auction aggregator
     const auctionAggregator = new AuctionAggregator();
@@ -235,11 +266,14 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     if (isAuctionCronRefreshEnabled()) {
       cron.schedule('*/30 * * * *', async () => {
         console.log('[cron] auction refresh starting');
+        auditCronJob('auction_refresh', { phase: 'start' });
         try {
           const totalRefreshed = await auctionAggregator.refreshAuctionData();
           console.log(`[cron] auction refresh done: ${totalRefreshed} updated`);
+          auditCronJob('auction_refresh', { phase: 'done', totalRefreshed });
         } catch (error) {
           console.error('[cron] auction refresh failed:', error?.message || error);
+          auditCronJob('auction_refresh', { phase: 'error', message: error?.message });
         }
       });
       console.log('⏰ Auction cron refresh enabled (every 30m). Set DISABLE_AUCTION_CRON_REFRESH=true to pause.');
@@ -263,6 +297,7 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
   })
   .catch((error) => {
     console.error('❌ MongoDB connection error:', error);
+    auditMongoFailure({ message: error?.message, code: error?.code });
     process.exit(1);
   });
 

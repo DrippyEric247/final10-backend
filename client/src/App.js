@@ -28,6 +28,7 @@ import React, { useEffect, useMemo } from "react";
 import { Routes, Route, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { hasCompletedOnboarding, onboardingUserId } from "./lib/onboardingPreferences";
+import { auditOnboarding } from "./lib/auditLog";
 import { installRewardDevTools } from "./lib/rewardEngine";
 import { setCurrentUserForCosmetics } from "./lib/adminCosmetics";
 import { captureAttributionFromLocation, recordCreatorClick } from "./lib/attribution";
@@ -147,6 +148,11 @@ function OnboardingRedirect() {
     }
     const userId = onboardingUserId(user);
     if (!userId || !hasCompletedOnboarding(userId)) {
+      auditOnboarding({
+        action: "redirect_to_preferences",
+        userId: userId || null,
+        path,
+      });
       navigate("/onboarding/preferences", { replace: true });
     }
   }, [loading, location.pathname, navigate, user]);

@@ -4,6 +4,7 @@ import { markFoundingTesterAlertCreated } from "./foundingTesterMission";
 import { triggerActionReward } from "./rewardEngine";
 import { applyTierMultiplier, formatTierMultiplierLabel } from "./tierMultiplier";
 import { recordScoutMissionAction } from "./savvyScoutMissions";
+import { auditAlertAction } from "./auditLog";
 
 export const SAVVY_ALERT_EVENT = "f10-savvy-alert-created";
 
@@ -55,6 +56,7 @@ export async function createSavvyAlert(payload) {
     durationMs: 1200,
   });
   recordScoutMissionAction("create_alert", { pathname: "/alerts" });
+  auditAlertAction({ action: 'created', kind: alertPayload.kind || 'custom' });
   return data;
 }
 

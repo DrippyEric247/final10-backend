@@ -13,6 +13,7 @@ const ebaySchemas = require('../validation/schemas');
 const { isProduction } = require('../config/envValidation');
 const { refreshScanDeck, issueBidFlowTokens } = require('../services/progressionTrustService');
 const { logEbayProviderError } = require('../services/structuredLog');
+const { auditEbaySearch, auditEbayFinal10 } = require('../services/auditLogger');
 const { isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
 const { safeBuildEbaySellerTrendsPayload } = require('../services/ebaySellerTrendsService');
 const { ebayBrowseGet } = require('../services/ebayBrowseClient');
@@ -262,9 +263,27 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
         pagination: body.pagination,
       });
     }
+    auditEbaySearch({
+      query: searchQuery,
+      userId: req.user?._id ? String(req.user._id) : null,
+      itemCount: legacyItems.length,
+      final10Count: final10.length,
+      mock: Boolean(data.mock),
+      listingMode,
+      page,
+      limit,
+    });
     res.json(body);
   } catch (err) {
     console.error('eBay search route error', err.status || '', err.message);
+    auditEbaySearch({
+      query: String(req.query?.q || req.query?.keywords || '').trim(),
+      userId: req.user?._id ? String(req.user._id) : null,
+      error: true,
+      status: err.status,
+      code: err.code,
+      message: String(err.message || '').slice(0, 200),
+    });
     const stale = cacheRowKey ? ebaySearchMemoryCache.recall(cacheRowKey) : null;
     if (stale && Array.isArray(stale.items) && stale.items.length) {
       return res.status(200).json({
@@ -407,9 +426,25 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
         query: searchQuery,
       });
     }
+    auditEbayFinal10({
+      query: searchQuery,
+      userId: req.user?._id ? String(req.user._id) : null,
+      poolCount: items.length,
+      final10Count: shaped.length,
+      mock: Boolean(data.mock),
+    });
     res.json(body);
   } catch (err) {
     console.error('eBay final10 route error', err.status || '', err.message);
+    auditEbayFinal10({
+      query: String(req.query?.q || req.query?.keywords || '').trim(),
+      userId: req.user?._id ? String(req.user._id) : null,
+      error: true,
+      status: err.status,
+      code: err.code,
+      message: String(err.message || '').slice(0, 200),
+      returnedEmpty: true,
+    });
     const stale = cacheRowKey ? ebaySearchMemoryCache.recall(cacheRowKey) : null;
     if (stale && Array.isArray(stale.items) && stale.items.length) {
       return res.status(200).json({

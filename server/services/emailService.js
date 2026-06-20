@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
+const { auditEmailDelivery } = require('./auditLogger');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
@@ -448,10 +449,25 @@ async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl }) 
 
   if (!alertEmailEnabled()) {
     console.log(`[email] Alert match (log-only) → ${to || 'no-email'} | ${alertName}`);
+    auditEmailDelivery({
+      kind: 'alert_match',
+      to: to ? `${String(to).slice(0, 3)}***` : null,
+      sent: false,
+      reason: 'alert_email_disabled',
+    });
     return { sent: false, logOnly: true, reason: 'alert_email_disabled' };
   }
 
-  return sendMailMessage({ to, subject, text, html });
+  const result = await sendMailMessage({ to, subject, text, html });
+  auditEmailDelivery({
+    kind: 'alert_match',
+    to: to ? `${String(to).slice(0, 3)}***` : null,
+    sent: Boolean(result?.sent),
+    reason: result?.reason || null,
+    provider: result?.provider || getEmailProvider(),
+    logOnly: Boolean(result?.logOnly),
+  });
+  return result;
 }
 
 async function sendTestEmail({ to }) {

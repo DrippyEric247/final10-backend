@@ -4,6 +4,7 @@ const auth = require('../middleware/auth');  // your JWT middleware
 const User = require('../models/User');
 const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
 const { isBetaTester, getTierConfigForUser, logBetaUsage } = require('../services/betaTesterService');
+const { auditAlertCreated } = require('../services/auditLogger');
 
 // Get my alerts
 router.get('/', auth, async (req, res) => {
@@ -18,6 +19,7 @@ router.get('/', auth, async (req, res) => {
 
 // Create alert
 router.post('/', auth, async (req, res) => {
+  try {
   const {
     name,
     keywords = [],
@@ -65,7 +67,25 @@ router.post('/', auth, async (req, res) => {
     void logBetaUsage(user._id, 'alert_created', { name: String(name).slice(0, 80) });
   }
 
+  auditAlertCreated({
+    userId: String(req.user.id),
+    alertId: String(alert._id),
+    keywordCount: alert.keywords?.length || 0,
+    tier: tierCfg.label,
+    alertsMax: tierCfg.alertsMax,
+    existingCount,
+  });
+
   res.status(201).json(alert);
+  } catch (err) {
+    auditAlertCreated({
+      userId: String(req.user?.id || ''),
+      error: true,
+      message: String(err?.message || '').slice(0, 200),
+    });
+    console.error('[alerts] create failed:', err?.message || err);
+    res.status(500).json({ message: 'Could not create alert' });
+  }
 });
 
 // Toggle on/off

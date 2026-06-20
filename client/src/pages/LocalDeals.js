@@ -41,6 +41,7 @@ import {
   rankQuickSnipeListings,
   resolveQuickSnipesBestMove,
 } from '../lib/quickSnipesBestMove';
+import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
 import '../styles/QuickSnipesCommandCenter.css';
 
 const BOOSTED_POWER_KEY = "f10_best_move_power_daily_v1";
@@ -501,6 +502,39 @@ const LocalDeals = () => {
   });
 
   const fallbackBestMove = localBestMove || externalFallbackQuery.data || null;
+
+  useEffect(() => {
+    if (!hasSearchContext) return;
+    auditQuickSnipes({
+      query,
+      visibleCount: visibleItems.length,
+      rankedCount: quickSnipesRanked.length,
+      needsExternalFallback,
+      fallbackSource: fallbackBestMove?.source || null,
+      listingsLoading: listings.isLoading,
+      listingsError: listings.error ? String(listings.error?.message || listings.error) : null,
+    });
+  }, [
+    query,
+    hasSearchContext,
+    visibleItems.length,
+    quickSnipesRanked.length,
+    needsExternalFallback,
+    fallbackBestMove?.source,
+    listings.isLoading,
+    listings.error,
+  ]);
+
+  useEffect(() => {
+    if (!fallbackBestMove?.item) return;
+    auditBestMove({
+      surface: 'quick_snipes',
+      source: fallbackBestMove.source,
+      isFallback: Boolean(fallbackBestMove.isFallback),
+      itemId: fallbackBestMove.item?.itemId || null,
+      confidence: fallbackBestMove.confidence?.label || null,
+    });
+  }, [fallbackBestMove]);
 
   /** Quick Snipes: rank by deal engine; #1 is the cinematic hero deal. */
   const quickSnipesHero = useMemo(() => {

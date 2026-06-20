@@ -160,6 +160,15 @@ export function markOnboardingCompleted(userId?: string | null): void {
         m.trackEvent("onboarding_complete", {});
       })
       .catch(() => {});
+    import("./auditLog")
+      .then((m) => {
+        m.auditOnboarding({
+          action: "completed",
+          userId: userId || "guest",
+          scopedKey: key,
+        });
+      })
+      .catch(() => {});
   }
 }
 

@@ -8,6 +8,7 @@ const {
   computeDailyLoginSavvy,
 } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
+const { auditRewardGrant } = require('./auditLogger');
 
 function readTier(user) {
   return normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
@@ -67,6 +68,13 @@ async function grantSavvyReward(user, {
     });
   } catch (e) {
     if (e?.code === 11000) {
+      auditRewardGrant({
+        userId: String(user._id),
+        rewardType,
+        granted: false,
+        duplicate: true,
+        idempotencyKey,
+      });
       return {
         granted: false,
         amount: 0,
@@ -97,6 +105,15 @@ async function grantSavvyReward(user, {
   } catch (err) {
     console.warn('[savvyReward] SavvyPoint ledger write failed:', err?.message);
   }
+
+  auditRewardGrant({
+    userId: String(user._id),
+    rewardType,
+    granted: true,
+    amount: savvyAmount,
+    idempotencyKey,
+    newBalance: user.savvyPoints,
+  });
 
   return {
     granted: true,
