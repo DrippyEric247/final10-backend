@@ -1,6 +1,20 @@
 // top (already there)
 const path = require('path');
 
+// Process crash hooks FIRST — before any code that can throw or exit.
+const { logProcessCrash } = require('./services/structuredLog');
+
+process.on('uncaughtException', (err) => {
+  logProcessCrash('PROCESS_UNCAUGHT_EXCEPTION', err);
+  console.error('[startup] uncaughtException — process may be unstable:', err?.message);
+});
+process.on('unhandledRejection', (reason) => {
+  const e =
+    reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : JSON.stringify(reason));
+  logProcessCrash('PROCESS_UNHANDLED_REJECTION', e);
+  console.error('[startup] unhandledRejection:', e.message);
+});
+
 // Load .env only when not in production
 if (process.env.NODE_ENV !== 'production') {
   // eslint-disable-next-line global-require
@@ -8,6 +22,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const { validateCoreEnv, printSecurityStartupReport } = require('./config/envValidation');
+console.log(`[startup] boot phase=env_validation NODE_ENV=${process.env.NODE_ENV || 'undefined'} PORT=${process.env.PORT || '(default 8080)'}`);
 validateCoreEnv();
 
 const express = require('express');
@@ -134,13 +149,14 @@ const {
   isSavvyScoutBackgroundScanEnabled,
   isAuctionCronRefreshEnabled,
 } = require('./lib/backgroundJobFlags');
-const { logProcessCrash } = require('./services/structuredLog');
 const {
   auditStartup,
   auditMongoConnect,
   auditMongoFailure,
   auditCronJob,
 } = require('./services/auditLogger');
+
+console.log('[startup] boot phase=routes_loaded');
 
 auditStartup({
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -149,15 +165,7 @@ auditStartup({
   auctionCron: isAuctionCronRefreshEnabled(),
 });
 
-process.on('uncaughtException', (err) => {
-  logProcessCrash('PROCESS_UNCAUGHT_EXCEPTION', err);
-});
-process.on('unhandledRejection', (reason) => {
-  const e =
-    reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : JSON.stringify(reason));
-  logProcessCrash('PROCESS_UNHANDLED_REJECTION', e);
-});
-
+console.log('[startup] boot phase=audit_startup');
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
@@ -298,6 +306,8 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
   .catch((error) => {
     console.error('❌ MongoDB connection error:', error);
     auditMongoFailure({ message: error?.message, code: error?.code });
+    logProcessCrash('MONGO_CONNECT_FAILURE', error);
+    console.error('[startup] MongoDB connect failed — exiting (server/index.js:301). Check MONGODB_URI on Railway.');
     process.exit(1);
   });
 
@@ -310,9 +320,11 @@ const { errorHandler } = require('./middleware/errorHandler');
 app.use(errorHandler);
 
 // --- START SERVER ---
-const PORT = process.env.PORT || 8080;
+const PORT = Number(process.env.PORT) || 8080;
 
-app.listen(PORT, '0.0.0.0', () => {
+console.log(`[startup] boot phase=listen port=${PORT} host=0.0.0.0`);
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Final10 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
@@ -341,6 +353,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('eBay auth mode: dynamic app token with retry + mock fallback');
   console.log(`eBay env: ${process.env.EBAY_ENV || 'production'}`);
   printSecurityStartupReport();
+});
+
+server.on('error', (err) => {
+  logProcessCrash('HTTP_LISTEN_FAILURE', err);
+  console.error(`[startup] app.listen failed on port ${PORT}:`, err?.message);
+  process.exit(1);
 });
 
 // --- GRACEFUL SHUTDOWN ---

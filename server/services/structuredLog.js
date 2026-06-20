@@ -169,7 +169,8 @@ function logProcessCrash(kind, errOrReason) {
     message: isErr ? errOrReason.message : String(errOrReason),
     name: isErr ? errOrReason.name : undefined,
   };
-  if (!isProduction() && isErr) {
+  // Always include stack for process-level crashes — required for Railway diagnosis.
+  if (isErr && errOrReason.stack) {
     row.stack = errOrReason.stack;
   }
   emit('critical', kind, row);

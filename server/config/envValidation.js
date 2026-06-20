@@ -141,7 +141,7 @@ function validateCoreEnv() {
   if (errors.length) {
     // eslint-disable-next-line no-console
     console.error(
-      '[security] Environment validation failed — refusing to start:\n' +
+      '[security] Environment validation failed — refusing to start (server/config/envValidation.js:147):\n' +
         errors.map((e) => '  - ' + e).join('\n')
     );
     process.exit(1);
