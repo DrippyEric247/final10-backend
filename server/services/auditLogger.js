@@ -76,6 +76,10 @@ function auditAlertTest(meta = {}) {
   audit('AUDIT_ALERT_TEST', meta);
 }
 
+function auditEmailPipelineStep(step, meta = {}) {
+  audit('AUDIT_EMAIL_PIPELINE', { step, ...meta });
+}
+
 module.exports = {
   audit,
   auditWarn,
@@ -95,4 +99,5 @@ module.exports = {
   auditRewardGrant,
   auditOnboarding,
   auditAlertTest,
+  auditEmailPipelineStep,
 };

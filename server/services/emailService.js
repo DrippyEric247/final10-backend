@@ -296,13 +296,27 @@ function getEmailConfigStatus() {
   };
 }
 
-async function sendViaResend({ to, subject, text, html }) {
+async function sendViaResend({ to, subject, text, html, trace = null }) {
   const client = getResendClient();
   const from = getEmailFrom();
   if (!client || !from) {
-    return { sent: false, logOnly: true, provider: 'resend', reason: 'resend_not_configured' };
+    const result = { sent: false, logOnly: true, provider: 'resend', reason: 'resend_not_configured' };
+    trace?.step('provider_resend_not_configured', {
+      ok: false,
+      hasClient: Boolean(client),
+      hasFrom: Boolean(from),
+      ...result,
+    });
+    return result;
   }
 
+  trace?.step('provider_resend_request', {
+    to: `${String(to).slice(0, 3)}***`,
+    from: from.replace(/(.{0,12}).+@/, '$1…@'),
+    subjectLen: String(subject || '').length,
+    htmlLen: String(html || '').length,
+    textLen: String(text || '').length,
+  });
   logEmailDiagnostics({ provider: 'resend', action: 'send_start' });
 
   try {
@@ -324,46 +338,55 @@ async function sendViaResend({ to, subject, text, html }) {
           ...formatted,
         })
       );
-      return {
+      const result = {
         sent: false,
         logOnly: false,
         provider: 'resend',
         reason: 'resend_send_failed',
         ...formatted,
       };
+      trace?.step('provider_resend_error', { ok: false, ...result });
+      return result;
     }
 
     console.log(
       '[email] Email sent',
       JSON.stringify({ provider: 'resend', to, messageId: data?.id || null })
     );
-    return { sent: true, provider: 'resend', messageId: data?.id || null };
+    const result = { sent: true, provider: 'resend', messageId: data?.id || null };
+    trace?.step('provider_resend_success', { ok: true, messageId: result.messageId });
+    return result;
   } catch (err) {
     const formatted = formatMailerError(err);
     console.warn(
       '[email] Email failed',
       JSON.stringify({ provider: 'resend', to, ...formatted })
     );
-    return {
+    const result = {
       sent: false,
       logOnly: false,
       provider: 'resend',
       reason: 'resend_send_failed',
       ...formatted,
     };
+    trace?.step('provider_resend_exception', { ok: false, ...result });
+    return result;
   }
 }
 
-async function sendViaSmtp({ to, subject, text, html, verifyFirst = false }) {
+async function sendViaSmtp({ to, subject, text, html, verifyFirst = false, trace = null }) {
   const tx = getTransport();
   if (!tx) {
-    return { sent: false, logOnly: true, provider: 'smtp', reason: 'smtp_not_configured' };
+    const result = { sent: false, logOnly: true, provider: 'smtp', reason: 'smtp_not_configured' };
+    trace?.step('provider_smtp_not_configured', { ok: false, ...result });
+    return result;
   }
 
   if (verifyFirst) {
+    trace?.step('provider_smtp_verify_start', {});
     const verify = await verifySmtpConnection({ log: true });
     if (!verify.ok) {
-      return {
+      const result = {
         sent: false,
         logOnly: false,
         provider: 'smtp',
@@ -375,8 +398,16 @@ async function sendViaSmtp({ to, subject, text, html, verifyFirst = false }) {
             : null
         ),
       };
+      trace?.step('provider_smtp_verify_failed', { ok: false, ...result });
+      return result;
     }
+    trace?.step('provider_smtp_verify_ok', { ok: true });
   }
+
+  trace?.step('provider_smtp_send_start', {
+    to: `${String(to).slice(0, 3)}***`,
+    subjectLen: String(subject || '').length,
+  });
 
   try {
     const info = await tx.sendMail({
@@ -391,47 +422,127 @@ async function sendViaSmtp({ to, subject, text, html, verifyFirst = false }) {
       '[email] SMTP send success',
       JSON.stringify({ provider: 'smtp', to, messageId: info.messageId || null })
     );
-    return { sent: true, provider: 'smtp', messageId: info.messageId || null };
+    const result = { sent: true, provider: 'smtp', messageId: info.messageId || null };
+    trace?.step('provider_smtp_success', { ok: true, messageId: result.messageId });
+    return result;
   } catch (err) {
     const mailerError = formatMailerError(err);
     console.warn('[email] SMTP send failed', JSON.stringify({ provider: 'smtp', to, ...mailerError }));
     resetTransport();
-    return {
+    const result = {
       sent: false,
       logOnly: false,
       provider: 'smtp',
       reason: 'smtp_send_failed',
       ...mailerError,
     };
+    trace?.step('provider_smtp_failed', { ok: false, ...result });
+    return result;
   }
 }
 
-async function sendMailMessage({ to, subject, text, html, verifyFirst = false }) {
+async function sendMailMessage({ to, subject, text, html, verifyFirst = false, trace = null }) {
+  trace?.step('send_mail_enter', {
+    hasRecipient: Boolean(to),
+    subjectLen: String(subject || '').length,
+    htmlLen: String(html || '').length,
+    textLen: String(text || '').length,
+  });
+
   if (!to) {
     console.log(`[email] (log-only) To: missing | ${subject}`);
-    return { sent: false, logOnly: true, reason: 'missing_recipient' };
+    const result = { sent: false, logOnly: true, reason: 'missing_recipient' };
+    trace?.step('send_mail_stop', { ok: false, reason: 'missing_recipient', ...result });
+    return result;
   }
 
   const provider = getEmailProvider();
+  trace?.step('provider_selected', {
+    provider,
+    emailConfigured: isEmailConfigured(),
+    alertEmailEnabled: alertEmailEnabled(),
+    resendConfigured: isResendConfigured(),
+    smtpConfigured: isSmtpConfigured(),
+    fromPresent: Boolean(getEmailFrom()),
+  });
   logEmailDiagnostics({ action: 'send_route' });
 
   if (provider === 'resend') {
-    return sendViaResend({ to, subject, text, html });
+    const result = await sendViaResend({ to, subject, text, html, trace });
+    trace?.step('send_mail_complete', { sent: Boolean(result.sent), provider: 'resend', reason: result.reason || null });
+    return result;
   }
   if (provider === 'smtp') {
-    return sendViaSmtp({ to, subject, text, html, verifyFirst });
+    const result = await sendViaSmtp({ to, subject, text, html, verifyFirst, trace });
+    trace?.step('send_mail_complete', { sent: Boolean(result.sent), provider: 'smtp', reason: result.reason || null });
+    return result;
   }
 
   console.log(`[email] (log-only) To: ${to} | ${subject}`);
-  return { sent: false, logOnly: true, reason: 'email_not_configured' };
+  const result = { sent: false, logOnly: true, reason: 'email_not_configured' };
+  trace?.step('send_mail_stop', {
+    ok: false,
+    reason: 'email_not_configured',
+    hint: 'Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/SMTP_PASS on Railway',
+    ...result,
+  });
+  return result;
 }
 
-async function sendSavvyScoutDealFoundEmail({ to, data = {}, subject: subjectOverride, forceSend = false }) {
+async function sendSavvyScoutDealFoundEmail({
+  to,
+  data = {},
+  subject: subjectOverride,
+  forceSend = false,
+  trace = null,
+}) {
+  trace?.step('savvy_email_enter', {
+    hasRecipient: Boolean(to),
+    forceSend,
+    alertEmailEnabled: alertEmailEnabled(),
+    emailConfigured: isEmailConfigured(),
+    provider: getEmailProvider(),
+  });
+
   const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
-  const { subject, html, text } = buildSavvyScoutDealFoundEmail(payload);
+
+  trace?.step('template_render_start', {
+    productTitle: String(payload.productTitle || '').slice(0, 80),
+    hasProductImage: Boolean(payload.productImage),
+  });
+
+  let subject;
+  let html;
+  let text;
+  try {
+    const built = buildSavvyScoutDealFoundEmail(payload);
+    subject = built.subject;
+    html = built.html;
+    text = built.text;
+    trace?.step('template_render_done', {
+      ok: true,
+      subjectLen: String(subject || '').length,
+      htmlLen: String(html || '').length,
+      textLen: String(text || '').length,
+      preheader: String(built.preheader || '').slice(0, 120),
+    });
+  } catch (err) {
+    trace?.step('template_render_failed', {
+      ok: false,
+      reason: 'template_build_error',
+      message: String(err?.message || err).slice(0, 200),
+    });
+    throw err;
+  }
 
   if (!forceSend && !alertEmailEnabled()) {
     console.log(`[email] Savvy Scout deal (log-only) → ${to || 'no-email'} | ${subject}`);
+    trace?.step('savvy_email_stop', {
+      ok: false,
+      reason: 'alert_email_disabled',
+      forceSend,
+      hint: 'Set ALERT_EMAIL_ENABLED=true or pass forceSend:true',
+    });
     auditEmailDelivery({
       kind: 'savvy_scout_deal',
       to: to ? `${String(to).slice(0, 3)}***` : null,
@@ -441,7 +552,19 @@ async function sendSavvyScoutDealFoundEmail({ to, data = {}, subject: subjectOve
     return { sent: false, logOnly: true, reason: 'alert_email_disabled', subject, html, text };
   }
 
-  const result = await sendMailMessage({ to, subject, text, html });
+  trace?.step('savvy_email_dispatch', { forceSend, provider: getEmailProvider() });
+
+  const result = await sendMailMessage({ to, subject, text, html, trace });
+
+  trace?.step('savvy_email_result', {
+    sent: Boolean(result.sent),
+    logOnly: Boolean(result.logOnly),
+    provider: result.provider || getEmailProvider(),
+    reason: result.reason || null,
+    messageId: result.messageId || null,
+    errorCode: result.errorCode || null,
+  });
+
   auditEmailDelivery({
     kind: 'savvy_scout_deal',
     to: to ? `${String(to).slice(0, 3)}***` : null,
@@ -449,6 +572,7 @@ async function sendSavvyScoutDealFoundEmail({ to, data = {}, subject: subjectOve
     reason: result?.reason || null,
     provider: result?.provider || getEmailProvider(),
     logOnly: Boolean(result?.logOnly),
+    messageId: result?.messageId || null,
   });
   return { ...result, subject };
 }
