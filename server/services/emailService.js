@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const { auditEmailDelivery } = require('./auditLogger');
+const { buildSavvyScoutDealFoundEmail } = require('../templates/email/savvyScoutDealFoundTemplate');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
@@ -425,52 +426,83 @@ async function sendMailMessage({ to, subject, text, html, verifyFirst = false })
   return { sent: false, logOnly: true, reason: 'email_not_configured' };
 }
 
-async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl }) {
-  const subject = `🎯 Savvy Scout Alert: ${alertName}`;
-  const text = [
-    'Savvy Scout found a listing that matches your alert.',
-    '',
-    `Alert: ${alertName}`,
-    `Listing: ${listingTitle}`,
-    listingUrl ? `Link: ${listingUrl}` : '',
-    '',
-    'Open Final10 to review the match.',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const html = `
-    <p><strong>Savvy Scout</strong> found a listing that matches your alert.</p>
-    <p><strong>Alert:</strong> ${alertName}</p>
-    <p><strong>Listing:</strong> ${listingTitle}</p>
-    ${listingUrl ? `<p><a href="${listingUrl}">View listing</a></p>` : ''}
-    <p>Open Final10 to review the match.</p>
-  `;
+async function sendSavvyScoutDealFoundEmail({ to, data = {}, subject: subjectOverride }) {
+  const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
+  const { subject, html, text } = buildSavvyScoutDealFoundEmail(payload);
 
   if (!alertEmailEnabled()) {
-    console.log(`[email] Alert match (log-only) → ${to || 'no-email'} | ${alertName}`);
+    console.log(`[email] Savvy Scout deal (log-only) → ${to || 'no-email'} | ${subject}`);
     auditEmailDelivery({
-      kind: 'alert_match',
+      kind: 'savvy_scout_deal',
       to: to ? `${String(to).slice(0, 3)}***` : null,
       sent: false,
       reason: 'alert_email_disabled',
     });
-    return { sent: false, logOnly: true, reason: 'alert_email_disabled' };
+    return { sent: false, logOnly: true, reason: 'alert_email_disabled', subject, html, text };
   }
 
   const result = await sendMailMessage({ to, subject, text, html });
   auditEmailDelivery({
-    kind: 'alert_match',
+    kind: 'savvy_scout_deal',
     to: to ? `${String(to).slice(0, 3)}***` : null,
     sent: Boolean(result?.sent),
     reason: result?.reason || null,
     provider: result?.provider || getEmailProvider(),
     logOnly: Boolean(result?.logOnly),
   });
-  return result;
+  return { ...result, subject };
 }
 
-async function sendTestEmail({ to }) {
+async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl, dealData = {} }) {
+  const merged = {
+    productTitle: listingTitle,
+    viewDealUrl: listingUrl,
+    preheader: `Savvy Scout matched your alert "${alertName}"`,
+    ...dealData,
+  };
+  const subjectOverride = `🎯 Savvy Scout Alert: ${alertName}`;
+  return sendSavvyScoutDealFoundEmail({
+    to,
+    data: merged,
+    subject: subjectOverride,
+  });
+}
+
+async function sendTestEmail({ to, useDealTemplate = true }) {
+  if (useDealTemplate) {
+    const result = await sendSavvyScoutDealFoundEmail({
+      to,
+      data: {
+        userName: 'Eric',
+        productTitle: 'PlayStation 5 Slim Console — Disc Edition',
+        productImage: 'https://i.ebayimg.com/images/g/example/ps5.jpg',
+        currentPrice: 374.99,
+        originalPrice: 499.99,
+        savingsAmount: 125,
+        savingsPercent: 25,
+        trustScore: 94,
+        rankedAbovePercent: 97,
+        shippingStatus: 'Fast Shipping Available',
+        viewDealUrl: `${String(process.env.CLIENT_URL || 'https://final10.app').replace(/\/$/, '')}/auctions`,
+        baseReward: 250,
+        premiumBonus: 125,
+        seasonPassBonus: 80,
+        doublePointBonus: 150,
+        doublePointActive: true,
+        userLevel: 'Founding Tester',
+        savvyBalance: 4250,
+        currentMultiplier: '1.5X',
+        nextRewardTier: 'Deal Hunter',
+        progressPercent: 75,
+      },
+      subject: '🎯 Savvy Scout — Final10 deal notification test',
+    });
+    if (result.sent) {
+      console.log(`[email] Deal template test sent via ${result.provider || getEmailProvider()} to ${to}`);
+    }
+    return { ...result, config: getEmailConfigStatus() };
+  }
+
   const subject = '🎯 Savvy Scout — Final10 test email';
   const provider = getEmailProvider();
   const text = [
@@ -502,7 +534,9 @@ async function sendTestEmail({ to }) {
 
 module.exports = {
   sendAlertMatchEmail,
+  sendSavvyScoutDealFoundEmail,
   sendTestEmail,
+  buildSavvyScoutDealFoundEmail,
   alertEmailEnabled,
   getEmailConfigStatus,
   getSmtpEnvPresence,

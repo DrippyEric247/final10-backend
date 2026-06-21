@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const router = require('express').Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
-const { sendTestEmail, getEmailConfigStatus } = require('../services/emailService');
+const { sendTestEmail, getEmailConfigStatus, buildSavvyScoutDealFoundEmail } = require('../services/emailService');
 const { HttpError } = require('../middleware/apiErrors');
 
 function readGrantSecretHeader(req) {
@@ -59,6 +59,43 @@ function jsonEmailTestResult(res, result, meta) {
     ...meta,
   });
 }
+
+/**
+ * GET /api/email/preview/deal-found
+ * Returns HTML for the Savvy Scout deal notification (JWT or owner secret).
+ */
+router.get('/preview/deal-found', (req, res, next) => {
+  const render = () => {
+    const sample = {
+      userName: 'Eric',
+      productTitle: 'PlayStation 5 Slim Console — Disc Edition',
+      productImage: 'https://i.ebayimg.com/images/g/example/ps5.jpg',
+      currentPrice: 374.99,
+      originalPrice: 499.99,
+      savingsAmount: 125,
+      savingsPercent: 25,
+      trustScore: 94,
+      rankedAbovePercent: 97,
+      shippingStatus: 'Fast Shipping Available',
+      baseReward: 250,
+      premiumBonus: 125,
+      seasonPassBonus: 80,
+      doublePointBonus: 150,
+      doublePointActive: true,
+      userLevel: 'Founding Tester',
+      savvyBalance: 4250,
+      currentMultiplier: '1.5X',
+      nextRewardTier: 'Deal Hunter',
+      progressPercent: 75,
+    };
+    const { html } = buildSavvyScoutDealFoundEmail(sample);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  };
+
+  if (grantSecretValid(req)) return render();
+  return auth(req, res, () => render());
+});
 
 /**
  * POST /api/email/test

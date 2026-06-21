@@ -7,7 +7,9 @@ const { auditAlertDelivery } = require('./auditLogger');
  * Deliver an alert match: in-app notification, optional email, Savvy points.
  */
 async function deliverAlertMatch(userId, auction, alert) {
-  const user = await User.findById(userId).select('username email notifications alertEmailOnMatch');
+  const user = await User.findById(userId).select(
+    'username email notifications alertEmailOnMatch savvyPoints pointsBalance membershipTier subscription'
+  );
   if (!user) {
     auditAlertDelivery({ userId: String(userId), delivered: false, reason: 'user_not_found' });
     return { delivered: false, reason: 'user_not_found' };
@@ -43,11 +45,32 @@ async function deliverAlertMatch(userId, auction, alert) {
 
   if (emailWanted && user.email) {
     try {
+      const imageUrl =
+        auction.images?.[0]?.url ||
+        auction.image ||
+        auction.source?.image ||
+        '';
+      const currentPrice = auction.currentBid ?? auction.currentPrice ?? auction.price;
       const emailResult = await sendAlertMatchEmail({
         to: user.email,
         alertName: alert.name,
         listingTitle: auction.title,
         listingUrl,
+        dealData: {
+          userName: user.username || 'Savvy Hunter',
+          productTitle: auction.title,
+          productImage: imageUrl,
+          currentPrice,
+          originalPrice: auction.marketValue ?? auction.originalPrice,
+          savingsAmount: auction.savings,
+          savingsPercent: auction.savingsPct,
+          trustScore: auction.trustScore ?? auction.sellerFeedbackPercent,
+          rankedAbovePercent: auction.rankedAbovePercent,
+          shippingStatus: auction.shippingStatus || 'See listing for shipping',
+          savvyBalance: user.savvyPoints ?? user.pointsBalance ?? 0,
+          userLevel: user.membershipTier || user.subscription?.tier || 'Explorer',
+          baseReward: 10,
+        },
       });
       auditAlertDelivery({
         userId: String(userId),
