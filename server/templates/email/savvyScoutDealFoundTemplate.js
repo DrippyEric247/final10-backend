@@ -67,6 +67,10 @@ function normalizeDealEmailData(input = {}) {
     input.doublePointActive != null
       ? Boolean(input.doublePointActive)
       : doublePointBonus > 0;
+  const pointsEventLabel = pick(
+    input.pointsEventLabel,
+    input.triplePointActive ? '3X REWARDS ACTIVE!' : doublePointActive ? '2X REWARDS ACTIVE!' : ''
+  );
 
   const clientUrl = getClientBaseUrl();
   const viewDealUrl = pick(input.viewDealUrl, `${clientUrl}/auctions`);
@@ -98,6 +102,7 @@ function normalizeDealEmailData(input = {}) {
     progressPercent,
     whyPicked,
     doublePointActive,
+    pointsEventLabel,
     preferencesUrl,
     unsubscribeUrl,
     clientUrl,
@@ -192,7 +197,7 @@ function buildSavvyScoutDealFoundHtml(raw = {}) {
           <tr>
             <td style="padding:18px 20px;font-family:Arial,Helvetica,sans-serif;">
               <div style="font-size:12px;font-weight:bold;color:${COLORS.gold};letter-spacing:1px;text-transform:uppercase;">Double Point Weekend</div>
-              <div style="font-size:22px;font-weight:bold;color:${COLORS.text};margin-top:4px;">2X REWARDS ACTIVE!</div>
+              <div style="font-size:22px;font-weight:bold;color:${COLORS.text};margin-top:4px;">${escapeHtml(d.pointsEventLabel || '2X REWARDS ACTIVE!')}</div>
               <div style="font-size:13px;color:${COLORS.muted};margin-top:6px;">Earn twice the Savvy on qualifying actions this weekend.</div>
             </td>
             <td align="center" width="80" style="padding:12px;font-size:36px;line-height:1;">🪙</td>

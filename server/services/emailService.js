@@ -426,11 +426,11 @@ async function sendMailMessage({ to, subject, text, html, verifyFirst = false })
   return { sent: false, logOnly: true, reason: 'email_not_configured' };
 }
 
-async function sendSavvyScoutDealFoundEmail({ to, data = {}, subject: subjectOverride }) {
+async function sendSavvyScoutDealFoundEmail({ to, data = {}, subject: subjectOverride, forceSend = false }) {
   const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
   const { subject, html, text } = buildSavvyScoutDealFoundEmail(payload);
 
-  if (!alertEmailEnabled()) {
+  if (!forceSend && !alertEmailEnabled()) {
     console.log(`[email] Savvy Scout deal (log-only) → ${to || 'no-email'} | ${subject}`);
     auditEmailDelivery({
       kind: 'savvy_scout_deal',

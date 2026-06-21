@@ -72,6 +72,10 @@ function auditOnboarding(meta = {}) {
   audit('AUDIT_ONBOARDING', meta);
 }
 
+function auditAlertTest(meta = {}) {
+  audit('AUDIT_ALERT_TEST', meta);
+}
+
 module.exports = {
   audit,
   auditWarn,
@@ -90,4 +94,5 @@ module.exports = {
   auditEmailDelivery,
   auditRewardGrant,
   auditOnboarding,
+  auditAlertTest,
 };
