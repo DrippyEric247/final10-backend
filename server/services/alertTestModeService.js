@@ -36,7 +36,7 @@ const {
   auditAlertDelivery,
 } = require('./auditLogger');
 const { createEmailPipelineTrace } = require('../lib/emailPipelineTrace');
-const { getEmailConfigStatus } = require('./emailService');
+const { getEmailConfigStatus, auditEmailFrom } = require('./emailService');
 
 /** @type {Map<string, number>} userId → last email sent ms */
 const emailCooldown = new Map();
@@ -342,6 +342,7 @@ async function runAlertTestPipeline(user, opts = {}) {
       provider: getEmailConfigStatus().provider,
       emailConfigured: getEmailConfigStatus().emailConfigured,
       alertEmailEnabled: getEmailConfigStatus().alertEmailEnabled,
+      fromAudit: auditEmailFrom(),
     },
   });
 

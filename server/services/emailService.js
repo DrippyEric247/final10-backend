@@ -2,10 +2,16 @@ const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const { auditEmailDelivery } = require('./auditLogger');
 const { buildSavvyScoutDealFoundEmail } = require('../templates/email/savvyScoutDealFoundTemplate');
+const {
+  resolveEmailFrom,
+  auditEmailFrom,
+  resendValidationHint,
+  isResendSandboxAddress,
+  allowResendSandboxFrom,
+} = require('../config/emailFrom');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
-const DEFAULT_RESEND_FROM = 'onboarding@resend.dev';
 
 let transport = null;
 let lastVerifyResult = null;
@@ -17,12 +23,7 @@ function readResendApiKey() {
 }
 
 function getEmailFrom() {
-  const explicit = String(
-    process.env.EMAIL_FROM || process.env.SMTP_FROM || readSmtpAuth().user || ''
-  ).trim();
-  if (explicit) return explicit;
-  if (readResendApiKey()) return DEFAULT_RESEND_FROM;
-  return '';
+  return resolveEmailFrom();
 }
 
 function isResendConfigured() {
@@ -77,8 +78,19 @@ function getResendClient() {
 }
 
 function logEmailStartup() {
+  const fromAudit = auditEmailFrom();
   if (isResendConfigured()) {
     getResendClient();
+    console.log('[email] sender audit', JSON.stringify({
+      resolvedAddress: fromAudit.resolvedAddress,
+      isResendSandboxFrom: fromAudit.isResendSandboxFrom,
+      verifiedDomain: fromAudit.verifiedDomain,
+      recommendedFrom: fromAudit.recommendedFrom,
+      issue: fromAudit.issue,
+    }));
+    if (fromAudit.issue === 'resend_sandbox_from_restricted') {
+      console.warn('[email] FIX:', fromAudit.fixHint);
+    }
     return;
   }
   if (isSmtpConfigured()) {
@@ -280,6 +292,7 @@ function getEmailConfigStatus() {
     smtpConfigured: isSmtpConfigured(),
     alertEmailEnabled: alertEmailEnabled(),
     emailFrom: from || null,
+    fromAudit: auditEmailFrom(),
     smtpHost: auth.host ? auth.host.replace(/^(.{3}).+/, '$1…') : null,
     mode: emailConfigured && alertEmailEnabled() ? 'live' : 'log-only',
     envPresent: getEmailEnvPresence(),
@@ -310,6 +323,29 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
     return result;
   }
 
+  if (isResendSandboxAddress(from) && !allowResendSandboxFrom()) {
+    const audit = auditEmailFrom();
+    const result = {
+      sent: false,
+      logOnly: false,
+      provider: 'resend',
+      reason: 'resend_sandbox_from_blocked',
+      errorCode: 'RESEND_SANDBOX_FROM',
+      errorReason:
+        'Resend sandbox sender onboarding@resend.dev only delivers to your Resend account email.',
+      resendValidationHint: audit.fixHint,
+    };
+    trace?.step('provider_resend_sandbox_blocked', { ok: false, ...result, fromAudit: audit });
+    return result;
+  }
+
+  const fromAudit = auditEmailFrom();
+  trace?.step('provider_resend_from_audit', {
+    resolvedAddress: fromAudit.resolvedAddress,
+    isResendSandboxFrom: fromAudit.isResendSandboxFrom,
+    verifiedDomain: fromAudit.verifiedDomain,
+  });
+
   trace?.step('provider_resend_request', {
     to: `${String(to).slice(0, 3)}***`,
     from: from.replace(/(.{0,12}).+@/, '$1…@'),
@@ -330,11 +366,13 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
 
     if (error) {
       const formatted = formatMailerError(error);
+      const validationHint = resendValidationHint(formatted.errorReason);
       console.warn(
         '[email] Email failed',
         JSON.stringify({
           provider: 'resend',
           to,
+          validationHint,
           ...formatted,
         })
       );
@@ -343,6 +381,7 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
         logOnly: false,
         provider: 'resend',
         reason: 'resend_send_failed',
+        resendValidationHint: validationHint,
         ...formatted,
       };
       trace?.step('provider_resend_error', { ok: false, ...result });
@@ -661,6 +700,7 @@ module.exports = {
   sendSavvyScoutDealFoundEmail,
   sendTestEmail,
   buildSavvyScoutDealFoundEmail,
+  auditEmailFrom,
   alertEmailEnabled,
   getEmailConfigStatus,
   getSmtpEnvPresence,
