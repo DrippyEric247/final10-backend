@@ -3,7 +3,8 @@
  * Tagline: Savvy Scout discovers Savvy Point earning opportunities while you use the Savvy Universe.
  */
 
-import { notifyWalletFromLegacyReward } from "./pointsEngine";
+import { claimScoutMissionReward as apiClaimScoutMissionReward } from "./api";
+import { awardPoints } from "./pointsEngine";
 
 export const SCOUT_MISSION_SYNC_EVENT = "f10:scout-mission-sync";
 export const SCOUT_MISSION_POPUP_EVENT = "f10:scout-mission-popup";
@@ -475,8 +476,16 @@ export function recordScoutMissionAction(trigger, meta = {}) {
   }
 }
 
-/** @returns {{ ok: boolean, rewardSavvy?: number, message?: string }} */
-export function claimScoutMission(missionId) {
+function markMissionClaimedLocally(state, def) {
+  const key = progressKey(def);
+  state.claimed[key] = Date.now();
+  if (def.once) state.onceDone[def.id] = Date.now();
+  saveState(state);
+  dispatchScoutMissionSync();
+}
+
+/** @returns {Promise<{ ok: boolean, rewardSavvy?: number, newBalance?: number, message?: string }>} */
+export async function claimScoutMission(missionId) {
   const def = missionDef(missionId);
   if (!def) return { ok: false, message: "Mission not found." };
 
@@ -484,21 +493,53 @@ export function claimScoutMission(missionId) {
   if (!isComplete(state, def)) return { ok: false, message: "Mission not complete yet." };
   if (isClaimed(state, def)) return { ok: false, message: "Already claimed." };
 
-  const key = progressKey(def);
-  state.claimed[key] = Date.now();
-  if (def.once) state.onceDone[def.id] = Date.now();
-  saveState(state);
-  dispatchScoutMissionSync();
+  const periodKey = progressKey(def);
 
-  const reward = Math.max(1, Number(def.rewardSavvy) || 0);
-  notifyWalletFromLegacyReward({ amount: reward, source: `scout_mission_${def.id}` });
+  try {
+    const data = await apiClaimScoutMissionReward({ missionId: def.id, periodKey });
 
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.info("[ScoutMissions] claimed", { missionId, reward });
+    if (data?.alreadyClaimed || data?.duplicate) {
+      markMissionClaimedLocally(state, def);
+      return { ok: false, message: "Already claimed." };
+    }
+
+    if (!data?.granted && !data?.added) {
+      return { ok: false, message: data?.message || "Could not claim reward." };
+    }
+
+    markMissionClaimedLocally(state, def);
+
+    const reward = Math.max(1, Number(data.added ?? data.rewardSavvy ?? def.rewardSavvy) || 0);
+    const newBalance = data.newBalance != null ? Math.round(Number(data.newBalance)) : undefined;
+
+    awardPoints(`scout_mission_${def.id}`, reward);
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.info("[ScoutMissions] claimed", { missionId, reward, newBalance });
+    }
+
+    return {
+      ok: true,
+      rewardSavvy: reward,
+      newBalance,
+      message: `+${reward} Savvy added to your wallet`,
+    };
+  } catch (err) {
+    const status = err?.response?.status;
+    const body = err?.response?.data;
+    if (status === 409 || body?.alreadyClaimed) {
+      markMissionClaimedLocally(state, def);
+      return { ok: false, message: "Already claimed." };
+    }
+    if (status === 401) {
+      return { ok: false, message: "Log in to claim Savvy rewards." };
+    }
+    return {
+      ok: false,
+      message: body?.message || err?.message || "Could not claim reward. Try again.",
+    };
   }
-
-  return { ok: true, rewardSavvy: reward, message: `+${reward} Savvy claimed!` };
 }
 
 /** Proactively surface a contextual mission popup on route change (respects cooldown). */

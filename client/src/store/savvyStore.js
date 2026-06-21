@@ -41,6 +41,7 @@ const TX_LABELS = {
   trusted_purchase: "Trusted Purchase",
   watch_item: "Watch Item",
   daily_login: "Daily Login",
+  scout_mission: "Scout Mission",
   generic: "Reward",
 };
 
@@ -49,6 +50,7 @@ const SavvyPointsContext = createContext(null);
 function labelForType(type) {
   const t = String(type || "").trim();
   if (!t) return "Reward";
+  if (t.startsWith("scout_mission_")) return "Scout Mission";
   return TX_LABELS[t] || t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

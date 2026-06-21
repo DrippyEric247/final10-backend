@@ -822,9 +822,9 @@ export default function Final10SideAssistant() {
       if (!missionsCtx?.claimMission) return;
       setClaimingMissionId(missionId);
       try {
-        const res = missionsCtx.claimMission(missionId);
+        const res = await missionsCtx.claimMission(missionId);
         if (res.ok && res.rewardSavvy) {
-          emitPowerToast(res.rewardSavvy, res.message || "Mission claimed");
+          emitPowerToast(res.rewardSavvy, res.message || `+${res.rewardSavvy} Savvy added to your wallet`);
         }
       } finally {
         setClaimingMissionId(null);

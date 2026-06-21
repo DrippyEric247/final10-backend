@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "./AuthContext";
+import { SAVVY_AUTH_REFRESH_REQUEST } from "../store/savvyStore";
 import {
   SCOUT_MISSION_SYNC_EVENT,
   claimScoutMission,
@@ -12,6 +14,7 @@ const SavvyScoutMissionsContext = createContext(null);
 
 export function SavvyScoutMissionsProvider({ children }) {
   const location = useLocation();
+  const { patchUser } = useAuth();
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -40,7 +43,26 @@ export function SavvyScoutMissionsProvider({ children }) {
     [location.pathname]
   );
 
-  const claimMission = useCallback((missionId) => claimScoutMission(missionId), []);
+  const claimMission = useCallback(
+    async (missionId) => {
+      const res = await claimScoutMission(missionId);
+      if (res.ok && res.newBalance != null) {
+        patchUser({
+          savvyPoints: res.newBalance,
+          savvyPointsServerBase: res.newBalance,
+        });
+      }
+      if (res.ok) {
+        try {
+          window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+        } catch {
+          /* ignore */
+        }
+      }
+      return res;
+    },
+    [patchUser]
+  );
 
   const value = useMemo(
     () => ({

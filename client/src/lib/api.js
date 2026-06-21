@@ -178,6 +178,12 @@ export async function claimDailyLogin() {
   return data;
 }
 
+/** POST /api/scout-missions/claim — persist Savvy Scout mission reward to wallet. */
+export async function claimScoutMissionReward({ missionId, periodKey }) {
+  const { data } = await api.post("/scout-missions/claim", { missionId, periodKey });
+  return data;
+}
+
 /** ---- Alerts ---- **/
 export async function getAlerts() {
   const { data } = await api.get("/alerts");

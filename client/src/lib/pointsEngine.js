@@ -27,6 +27,7 @@ export const POINT_ACTION_DEFAULTS = {
   trusted_purchase: { amount: 40, rarity: "RARE" },
   watch_item: { amount: 10, rarity: "NORMAL" },
   daily_login: { amount: DAILY_LOGIN_BASE_SAVVY, rarity: "GOOD" },
+  scout_mission: { amount: 10, rarity: "GOOD" },
   generic: { amount: 10, rarity: "NORMAL" },
 };
 
