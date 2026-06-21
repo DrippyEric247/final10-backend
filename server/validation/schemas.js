@@ -78,7 +78,7 @@ exports.authLoginBody = Joi.object({
 exports.ebaySearchQuery = Joi.object({
   q: Joi.string().allow('').max(200).optional(),
   keywords: Joi.string().allow('').max(200).optional(),
-  limit: Joi.alternatives().try(Joi.number().integer().min(1).max(200), Joi.string().pattern(/^\d+$/)).optional(),
+  limit: Joi.alternatives().try(Joi.number().integer().min(1).max(30), Joi.string().pattern(/^\d+$/)).optional(),
   offset: Joi.alternatives().try(Joi.number().integer().min(0).max(50000), Joi.string().pattern(/^\d+$/)).optional(),
   page: Joi.alternatives().try(Joi.number().integer().min(1).max(5000), Joi.string().pattern(/^\d+$/)).optional(),
   categoryId: Joi.string().max(120).allow('').optional(),
@@ -94,7 +94,7 @@ exports.ebaySearchQuery = Joi.object({
 exports.ebayFinal10Query = Joi.object({
   q: Joi.string().allow('').max(200).optional(),
   keywords: Joi.string().allow('').max(200).optional(),
-  limit: Joi.alternatives().try(Joi.number().integer().min(1).max(100), Joi.string().pattern(/^\d+$/)).optional(),
+  limit: Joi.alternatives().try(Joi.number().integer().min(1).max(30), Joi.string().pattern(/^\d+$/)).optional(),
   offset: Joi.alternatives().try(Joi.number().integer().min(0).max(50000), Joi.string().pattern(/^\d+$/)).optional(),
   categoryId: Joi.string().max(120).allow('').optional(),
   minPrice: Joi.alternatives().try(Joi.number(), Joi.string().max(32)).optional(),

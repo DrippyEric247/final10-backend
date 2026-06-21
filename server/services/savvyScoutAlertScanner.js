@@ -3,9 +3,16 @@ const Auction = require('../models/Auction');
 const AuctionAggregator = require('./AuctionAggregator');
 const marketScanner = require('./marketScanner');
 const { isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
+const { isProduction } = require('../config/envValidation');
 const { auditAlertScan } = require('./auditLogger');
 
 const aggregator = new AuctionAggregator();
+
+const MAX_LANES_PER_SCAN = isProduction() ? 3 : 12;
+const MAX_RECENT_AUCTIONS = isProduction() ? 30 : 80;
+const LANE_RESULT_LIMIT = isProduction() ? 3 : 4;
+
+let scanRunning = false;
 
 function scoutLog(...args) {
   if (isEbayVerboseLogEnabled()) console.log(...args);
@@ -15,6 +22,13 @@ function scoutLog(...args) {
  * Savvy Scout beta sweep: scan active alert keyword lanes, ingest listings, run matchers.
  */
 async function runSavvyScoutAlertScan() {
+  if (scanRunning) {
+    scoutLog('[SavvyScout] Scan skipped — previous run still active.');
+    auditAlertScan({ phase: 'skip', reason: 'scan_already_running' });
+    return { targets: 0, lanesSwept: 0, listingsChecked: 0, skipped: true };
+  }
+  scanRunning = true;
+  try {
   scoutLog('[SavvyScout] Scanning active alert targets…');
   auditAlertScan({ phase: 'start' });
 
@@ -33,11 +47,12 @@ async function runSavvyScoutAlertScan() {
   }
 
   let listingsChecked = 0;
+  const laneEntries = Array.from(lanes.entries()).slice(0, MAX_LANES_PER_SCAN);
 
-  for (const [query, alertName] of lanes.entries()) {
+  for (const [query, alertName] of laneEntries) {
     scoutLog(`[SavvyScout] Sweeping lane "${query}" (${alertName})`);
     try {
-      const { savedAuctions = [] } = await aggregator.searchAndSave(query, 4);
+      const { savedAuctions = [] } = await aggregator.searchAndSave(query, LANE_RESULT_LIMIT);
       for (const auction of savedAuctions) {
         listingsChecked += 1;
         await marketScanner.checkAlerts(auction);
@@ -52,7 +67,9 @@ async function runSavvyScoutAlertScan() {
   const since = new Date(Date.now() - 6 * 60 * 60 * 1000);
   const recent = await Auction.find({ status: 'active', updatedAt: { $gte: since } })
     .sort({ updatedAt: -1 })
-    .limit(120);
+    .limit(MAX_RECENT_AUCTIONS)
+    .lean()
+    .select('title currentBid endTime status platform source url images sellerUsername');
 
   for (const auction of recent) {
     listingsChecked += 1;
@@ -64,12 +81,15 @@ async function runSavvyScoutAlertScan() {
   );
   auditAlertScan({
     targets: alerts.length,
-    lanesSwept: lanes.size,
+    lanesSwept: laneEntries.length,
     listingsChecked,
     phase: 'done',
   });
 
-  return { targets: alerts.length, lanesSwept: lanes.size, listingsChecked };
+  return { targets: alerts.length, lanesSwept: laneEntries.length, listingsChecked };
+  } finally {
+    scanRunning = false;
+  }
 }
 
 module.exports = { runSavvyScoutAlertScan };

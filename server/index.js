@@ -21,7 +21,7 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
-const { validateCoreEnv, printSecurityStartupReport } = require('./config/envValidation');
+const { validateCoreEnv, printSecurityStartupReport, isProduction } = require('./config/envValidation');
 console.log(`[startup] boot phase=env_validation NODE_ENV=${process.env.NODE_ENV || 'undefined'} PORT=${process.env.PORT || '(default 8080)'}`);
 validateCoreEnv();
 
@@ -290,15 +290,21 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     }
 
     if (isSavvyScoutBackgroundScanEnabled()) {
-      cron.schedule('*/5 * * * *', () => {
+      const scoutCron = isProduction() ? '*/15 * * * *' : '*/5 * * * *';
+      cron.schedule(scoutCron, () => {
         runSavvyScoutAlertScan().catch((err) => {
           console.error('[SavvyScout] scheduled scan error:', err?.message || err);
         });
       });
-      console.log('⏰ Savvy Scout background scan enabled (every 5m). Set DISABLE_SAVVY_SCOUT_SCAN=true to pause.');
-      runSavvyScoutAlertScan().catch((err) => {
-        console.warn('[SavvyScout] initial scan error:', err?.message || err);
-      });
+      console.log(
+        `⏰ Savvy Scout background scan enabled (${isProduction() ? 'every 15m' : 'every 5m'}). Set DISABLE_SAVVY_SCOUT_SCAN=true to pause.`
+      );
+      const bootDelayMs = isProduction() ? 5 * 60 * 1000 : 15_000;
+      setTimeout(() => {
+        runSavvyScoutAlertScan().catch((err) => {
+          console.warn('[SavvyScout] initial scan error:', err?.message || err);
+        });
+      }, bootDelayMs);
     } else {
       console.log('⏸ Savvy Scout background scan disabled (DISABLE_SAVVY_SCOUT_SCAN=true)');
     }

@@ -1,7 +1,6 @@
 const express = require('express');
 const {
   normalizeEbayItemSummary,
-  toLegacyAuctionShape,
   ENDING_SOON_SECONDS,
 } = require('../services/ebayListingNormalizer');
 const { placeProxyBidForUser } = require('../services/ebayOfferService');
@@ -28,6 +27,15 @@ const {
   getMarketValue,
   attachMarketValue,
 } = require('../services/marketValueService');
+const {
+  clampSearchLimit,
+  clampFinal10OutLimit,
+  clampBrowseLimit,
+  MAX_FINAL10_POOL,
+  MAX_ENRICH_ITEMS,
+  slimListingList,
+} = require('../lib/ebayBetaLimits');
+const { logMemoryUsage } = require('../lib/memoryDiagnostics');
 
 const router = express.Router();
 
@@ -83,7 +91,7 @@ async function loadEbayBrowseSearch(req, {
 }) {
   const params = {
     q: searchQuery,
-    limit: Math.min(limit, 200),
+    limit: clampBrowseLimit(limit),
     sort: sortOrder,
     offset: Math.max(0, Number(offset) || 0)
   };
@@ -138,6 +146,14 @@ async function loadEbayBrowseSearch(req, {
     data.total = data.itemSummaries.length;
   }
 
+  if (Array.isArray(data?.itemSummaries) && data.itemSummaries.length > params.limit) {
+    console.warn(
+      `[ebay] Trimming oversized Browse response: ${data.itemSummaries.length} → ${params.limit}`
+    );
+    data.itemSummaries = data.itemSummaries.slice(0, params.limit);
+    data.total = Math.min(Number(data.total) || data.itemSummaries.length, params.limit);
+  }
+
   return data;
 }
 
@@ -169,7 +185,7 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
       if (mapped) searchQuery = mapped;
       else if (!rawQ) searchQuery = catRaw.replace(/[-_]/g, ' ');
     }
-    const limit = Math.min(Math.max(parseInt(limitRaw, 10) || 20, 1), 200);
+    const limit = clampSearchLimit(limitRaw);
     const page = Math.max(parseInt(pageRaw, 10) || 1, 1);
     const offset =
       offsetRaw !== undefined && offsetRaw !== null && String(offsetRaw) !== ''
@@ -207,7 +223,7 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
       endingSoonOnly,
     });
 
-    let items = (data.itemSummaries || []).map(normalizeEbayItemSummary);
+    let items = (data.itemSummaries || []).map(normalizeEbayItemSummary).slice(0, limit);
 
     if (listingMode === 'auction') {
       items = items.filter((it) => it.isAuction);
@@ -216,13 +232,14 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
     }
 
     try {
-      await enrichItemsWithMarketValue(items, { fallbackQuery: searchQuery });
+      await enrichItemsWithMarketValue(items.slice(0, MAX_ENRICH_ITEMS), { fallbackQuery: searchQuery });
     } catch (e) {
       console.warn('marketValue enrichment failed', e.message || e);
     }
 
-    const final10 = pickFinal10Items(items).map(toLegacyAuctionShape);
-    const legacyItems = items.map(toLegacyAuctionShape);
+    const final10Raw = pickFinal10Items(items);
+    const slimItems = slimListingList(items);
+    const final10 = slimListingList(final10Raw);
 
     const totalItems = data.total || items.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
@@ -241,8 +258,8 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
       stale: false,
       mock: Boolean(data.mock),
       warning: data.mock ? MOCK_FALLBACK_WARNING : undefined,
-      items: legacyItems,
-      normalizedItems: items,
+      items: slimItems,
+      normalizedItems: slimItems,
       final10,
       listingMode,
       pagination: {
@@ -256,22 +273,29 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
     };
     if (cacheRowKey) {
       ebaySearchMemoryCache.remember(cacheRowKey, {
-        items: legacyItems,
-        normalizedItems: items,
+        items: slimItems,
+        normalizedItems: slimItems,
         final10,
         listingMode,
         pagination: body.pagination,
       });
     }
+    const heap = logMemoryUsage('EBAY_SEARCH', {
+      query: searchQuery.slice(0, 80),
+      itemCount: slimItems.length,
+      final10Count: final10.length,
+      enrichedCap: MAX_ENRICH_ITEMS,
+    });
     auditEbaySearch({
       query: searchQuery,
       userId: req.user?._id ? String(req.user._id) : null,
-      itemCount: legacyItems.length,
+      itemCount: slimItems.length,
       final10Count: final10.length,
       mock: Boolean(data.mock),
       listingMode,
       page,
       limit,
+      heapUsedMb: heap.heapUsedMb,
     });
     res.json(body);
   } catch (err) {
@@ -303,19 +327,19 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
     try {
       const mockData = buildMockBrowseResponse({
         searchQuery: String(req.query?.q || req.query?.keywords || 'electronics').trim() || 'electronics',
-        limit: Math.min(Math.max(parseInt(req.query?.limit, 10) || 20, 1), 200),
+        limit: clampSearchLimit(req.query?.limit),
         listingMode: String(req.query?.listingMode || 'mixed'),
       });
-      let items = (mockData.itemSummaries || []).map(normalizeEbayItemSummary);
-      const legacyItems = items.map(toLegacyAuctionShape);
+      let items = (mockData.itemSummaries || []).map(normalizeEbayItemSummary).slice(0, clampSearchLimit(req.query?.limit));
+      const slimItems = slimListingList(items);
       return res.status(200).json({
         success: true,
         mock: true,
         warning: MOCK_FALLBACK_WARNING,
         code: err.code || 'EBAY_SEARCH_MOCK_FALLBACK',
-        items: legacyItems,
-        normalizedItems: items,
-        final10: pickFinal10Items(items).map(toLegacyAuctionShape),
+        items: slimItems,
+        normalizedItems: slimItems,
+        final10: slimListingList(pickFinal10Items(items)),
         listingMode: String(req.query?.listingMode || 'mixed'),
         pagination: {
           current: 1,
@@ -366,9 +390,9 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
       if (mapped) searchQuery = mapped;
       else if (!rawQ) searchQuery = catRaw.replace(/[-_]/g, ' ');
     }
-    const outLimit = Math.min(Math.max(parseInt(limitRaw, 10) || 20, 1), 50);
+    const outLimit = clampFinal10OutLimit(limitRaw);
     const offset = Math.max(0, parseInt(offsetRaw, 10) || 0);
-    const poolLimit = Math.min(200, Math.max(outLimit * 5, 50));
+    const poolLimit = Math.min(MAX_FINAL10_POOL, Math.max(outLimit * 2, 20));
 
     cacheRowKey = ebaySearchMemoryCache.final10Key([
       searchQuery,
@@ -392,11 +416,11 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
       endingSoonOnly: false,
     });
 
-    let items = (data.itemSummaries || []).map(normalizeEbayItemSummary);
+    let items = (data.itemSummaries || []).map(normalizeEbayItemSummary).slice(0, poolLimit);
     let final10Items = pickFinal10Items(items).slice(0, outLimit);
 
     try {
-      await enrichItemsWithMarketValue(final10Items, { fallbackQuery: searchQuery });
+      await enrichItemsWithMarketValue(final10Items.slice(0, MAX_ENRICH_ITEMS), { fallbackQuery: searchQuery });
     } catch (e) {
       console.warn('marketValue enrichment (final10) failed', e.message || e);
     }
@@ -409,29 +433,35 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
       }
     }
 
-    const shaped = final10Items.map(toLegacyAuctionShape);
+    const shaped = slimListingList(final10Items);
     const body = {
       success: true,
       stale: false,
       mock: Boolean(data.mock),
       warning: data.mock ? MOCK_FALLBACK_WARNING : undefined,
       items: shaped,
-      normalizedItems: final10Items,
+      normalizedItems: shaped,
       query: searchQuery,
     };
     if (cacheRowKey) {
       ebaySearchMemoryCache.remember(cacheRowKey, {
         items: shaped,
-        normalizedItems: final10Items,
+        normalizedItems: shaped,
         query: searchQuery,
       });
     }
+    const heap = logMemoryUsage('EBAY_FINAL10', {
+      query: searchQuery.slice(0, 80),
+      poolCount: items.length,
+      final10Count: shaped.length,
+    });
     auditEbayFinal10({
       query: searchQuery,
       userId: req.user?._id ? String(req.user._id) : null,
       poolCount: items.length,
       final10Count: shaped.length,
       mock: Boolean(data.mock),
+      heapUsedMb: heap.heapUsedMb,
     });
     res.json(body);
   } catch (err) {
@@ -572,7 +602,8 @@ router.get('/trending', async (req, res) => {
   let trendingItems = [];
   let categories = [];
   try {
-    const { category = 'all', limit = 20 } = req.query;
+    const { category = 'all', limit: limitRaw = 20 } = req.query;
+    const limit = clampSearchLimit(limitRaw);
 
     trendingItems = [];
     categories = [];

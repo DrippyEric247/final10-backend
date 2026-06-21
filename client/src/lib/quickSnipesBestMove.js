@@ -292,27 +292,29 @@ function pickCuratedQuery(query) {
   return CURATED_FALLBACK_QUERIES[Math.floor(Math.random() * CURATED_FALLBACK_QUERIES.length)];
 }
 
-async function fetchAuctionsLane(query, limit = 30) {
+const BETA_FETCH_LIMIT = 20;
+
+async function fetchAuctionsLane(query, limit = BETA_FETCH_LIMIT) {
   const data = await ebayService.searchItems({
     q: query,
     listingMode: 'mixed',
-    limit,
+    limit: Math.min(limit, BETA_FETCH_LIMIT),
   });
   return itemsFromEbayPayload(data);
 }
 
-async function fetchTrendingLane(query, limit = 24) {
+async function fetchTrendingLane(query, limit = BETA_FETCH_LIMIT) {
   const category = inferTrendingCategory(query);
-  const data = await ebayService.getTrendingItems(category, limit);
+  const data = await ebayService.getTrendingItems(category, Math.min(limit, BETA_FETCH_LIMIT));
   return itemsFromEbayPayload(data);
 }
 
-async function fetchCuratedLane(query, limit = 20) {
+async function fetchCuratedLane(query, limit = BETA_FETCH_LIMIT) {
   const curated = pickCuratedQuery(query);
   const data = await ebayService.searchItems({
     q: curated.query,
     listingMode: 'mixed',
-    limit,
+    limit: Math.min(limit, BETA_FETCH_LIMIT),
   });
   const items = itemsFromEbayPayload(data);
   return { items, curated };

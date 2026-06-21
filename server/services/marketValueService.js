@@ -28,13 +28,16 @@ const { getEbayAppToken } = require('./ebayAuthService');
 const { logEbayProviderError } = require('./structuredLog');
 const { recommendDeal } = require('./dealRecommendationService');
 
+const { isProduction } = require('../config/envValidation');
+const { MAX_ENRICH_ITEMS } = require('../lib/ebayBetaLimits');
+
 const DEFAULT_TTL_MS = clampInt(process.env.MARKET_VALUE_CACHE_TTL_MS, 60_000, 60 * 60_000, 15 * 60_000);
 const STALE_REFRESH_AFTER_MS = Math.floor(DEFAULT_TTL_MS * 0.6);
 const NEGATIVE_TTL_MS = 60_000;
-const CACHE_LIMIT = 500;
+const CACHE_LIMIT = isProduction() ? 100 : 500;
 const MIN_COMPS_FOR_HIGH = 18;
 const MIN_COMPS_FOR_MEDIUM = 8;
-const SAMPLE_FETCH_LIMIT = 60;
+const SAMPLE_FETCH_LIMIT = isProduction() ? 24 : 60;
 const SOLD_WINDOW_DAYS = 30;
 const SPAM_TOKENS = [
   'broken', 'parts only', 'for parts', 'not working', 'damaged', 'cracked',
@@ -451,14 +454,17 @@ const ENRICH_CONCURRENCY = clampInt(
   process.env.MARKET_VALUE_ENRICH_CONCURRENCY,
   1,
   16,
-  4
+  isProduction() ? 2 : 4
 );
+
+const MAX_ENRICH_GROUPS = isProduction() ? 6 : 20;
 
 async function enrichItemsWithMarketValue(items, { fallbackQuery } = {}) {
   if (!Array.isArray(items) || !items.length) return items || [];
 
+  const capped = items.slice(0, MAX_ENRICH_ITEMS);
   const groups = new Map();
-  for (const item of items) {
+  for (const item of capped) {
     const q = deriveQueryFromItem(item) || fallbackQuery || '';
     if (!q) continue;
     const conditionIds = item.conditionId ? String(item.conditionId) : '';
@@ -469,7 +475,7 @@ async function enrichItemsWithMarketValue(items, { fallbackQuery } = {}) {
 
   // Bounded-concurrency worker queue so we never fan out more than N eBay
   // comp lookups at once even when a search returns 50+ unique titles.
-  const buckets = Array.from(groups.values());
+  const buckets = Array.from(groups.values()).slice(0, MAX_ENRICH_GROUPS);
   let cursor = 0;
   const workers = Array.from({ length: Math.min(ENRICH_CONCURRENCY, buckets.length) }, async () => {
     while (cursor < buckets.length) {

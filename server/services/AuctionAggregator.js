@@ -233,13 +233,15 @@ class AuctionAggregator {
     try {
       aggLog('🔄 Refreshing auction data...');
       
-      // Get all unique search terms from existing auctions
-      const existingAuctions = await Auction.find({ status: 'active' });
-      const searchTerms = [...new Set(existingAuctions.map(a => a.title.split(' ')[0]))];
+      const titleRows = await Auction.find({ status: 'active' })
+        .select('title')
+        .limit(50)
+        .lean();
+      const searchTerms = [...new Set(titleRows.map((a) => String(a.title || '').split(' ')[0]).filter(Boolean))];
       
       let totalRefreshed = 0;
       
-      for (const term of searchTerms.slice(0, 10)) { // Limit to 10 terms to avoid rate limiting
+      for (const term of searchTerms.slice(0, 5)) { // Limit terms during beta
         try {
           const result = await this.searchAndSave(term, 3);
           totalRefreshed += result.totalSaved;

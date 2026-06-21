@@ -6,10 +6,11 @@ const fetch = fetchModule.default || fetchModule;
 const { getEbayAppToken, getEbayOAuthConfig, clearEbayAppTokenCache } = require('./ebayAuthService');
 const { warn } = require('./structuredLog');
 const { isEbayVerboseLogEnabled, ebayLogThrottleMs } = require('../lib/backgroundJobFlags');
+const { EBAY_FETCH_TIMEOUT_MS } = require('../lib/ebayBetaLimits');
 
 let lastBrowseUnauthLog = 0;
 
-const MAX_ATTEMPTS = 4;
+const MAX_ATTEMPTS = 3;
 const BASE_DELAY_MS = 450;
 
 function sleep(ms) {
@@ -90,12 +91,32 @@ async function ebayBrowseGet(path, params = {}) {
       throw tokenUnavailableError();
     }
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), EBAY_FETCH_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeout);
+      if (fetchErr?.name === 'AbortError') {
+        const err = Object.assign(new Error('Market search timed out. Try again shortly.'), {
+          status: 504,
+          code: 'EBAY_FETCH_TIMEOUT',
+        });
+        lastErr = err;
+        if (attempt >= MAX_ATTEMPTS - 1) throw err;
+        await sleep(backoffMs(attempt, null));
+        continue;
+      }
+      throw fetchErr;
+    }
+    clearTimeout(timeout);
 
     const text = await response.text();
     const data = safeParseJson(text);

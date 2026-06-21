@@ -1,10 +1,12 @@
 /**
  * Short-lived in-memory cache of last successful eBay search payloads per route.
- * Used only when live Browse calls fail — returns stale results instead of an empty screen.
+ * Stores slim listing rows only — never full normalized + legacy duplicates.
  */
 
-const TTL_MS = 15 * 60 * 1000;
-const MAX_ENTRIES = 48;
+const { slimListingList } = require('../lib/ebayBetaLimits');
+
+const TTL_MS = 10 * 60 * 1000;
+const MAX_ENTRIES = 16;
 
 const map = new Map();
 /** @type {string[]} */
@@ -25,8 +27,14 @@ function touch(key) {
  * @param {object} payload — JSON-serializable subset of route response
  */
 function remember(key, payload) {
-  if (!key) return;
-  map.set(key, { savedAt: Date.now(), payload });
+  if (!key || !payload) return;
+  const slim = { ...payload };
+  if (Array.isArray(slim.items)) slim.items = slimListingList(slim.items);
+  if (Array.isArray(slim.normalizedItems)) {
+    slim.normalizedItems = slim.items;
+  }
+  if (Array.isArray(slim.final10)) slim.final10 = slimListingList(slim.final10);
+  map.set(key, { savedAt: Date.now(), payload: slim });
   touch(key);
 }
 
