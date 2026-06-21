@@ -224,7 +224,7 @@ app.use('/api/email', require('./routes/email'));
 
 // health
 app.get('/api/health', (_req, res) => {
-  const { getEmailEnvPresence, getEmailProvider, isEmailConfigured } = require('./services/emailService');
+  const { getEmailEnvPresence, getEmailProvider, isEmailConfigured, auditEmailFrom } = require('./services/emailService');
   const mongoState = mongoose.connection.readyState;
   const mongoStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
   res.json({
@@ -243,6 +243,7 @@ app.get('/api/health', (_req, res) => {
     emailProvider: getEmailProvider(),
     emailConfigured: isEmailConfigured(),
     alertEmailEnabled: String(process.env.ALERT_EMAIL_ENABLED || '').toLowerCase() === 'true',
+    emailFromAudit: auditEmailFrom(),
   });
 });
 
