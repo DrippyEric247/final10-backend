@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import ListingModeTabs from '../ebay/ListingModeTabs';
 import { emitPowerToast } from '../../lib/final10PowerFeedback';
@@ -150,6 +150,174 @@ function buildTrustBadges(item) {
   return uniq.slice(0, 4);
 }
 
+function buildSnipeTags(scored) {
+  const tags = [];
+  const trust = Number(scored?.item?.trustScore) || 0;
+  const bids = Number(scored?.item?.bidCount || 0);
+  if (bids <= 2) tags.push({ key: 'lowcomp', label: 'LOW COMPETITION', tone: 'hot' });
+  if (trust >= 80) tags.push({ key: 'trust', label: 'HIGH TRUST', tone: 'cyan' });
+  else if (trust >= 60) tags.push({ key: 'watch', label: 'WORTH WATCHING', tone: 'violet' });
+  if (scored?.extraordinary) tags.push({ key: 'top', label: 'TOP PICK', tone: 'gold' });
+  return tags.slice(0, 3);
+}
+
+function getHeroConfidenceTier(scored) {
+  const s =
+    Number(scored?.confidenceScore ?? scored?.item?.confidenceScore ?? scored?.item?.aiConfidence) || 0;
+  if (s >= 75) return 'High';
+  if (s >= 55) return 'Medium';
+  return 'Low';
+}
+
+function getSearchStrengthLabel(count) {
+  if (count >= 10) return 'Strong';
+  if (count >= 4) return 'Moderate';
+  if (count >= 1) return 'Light';
+  return null;
+}
+
+function OpportunityCard({
+  scored,
+  liveTick,
+  variant = 'snipe',
+  onMeaningfulView,
+  saveAlert,
+  openSeller,
+  searchQuery = '',
+  index = 0,
+}) {
+  const { item, risky, savings, savingsPct } = scored;
+  const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
+  const market = Number(item.marketValue ?? 0);
+  const seconds = Math.max(0, Number(item.secondsRemaining || 0) - liveTick);
+  const bids = Number(item.bidCount || 0);
+  const badges = buildTrustBadges(item);
+  const snipeTags = buildSnipeTags(scored);
+  const url = item.itemWebUrl || item.itemUrl;
+  const isHero = variant === 'hero';
+  const heroConf = isHero ? getHeroConfidenceTier(scored) : null;
+
+  return (
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(0.35, index * 0.04) }}
+      className={`qscc-savvy-card group rounded-2xl overflow-hidden flex flex-col ${
+        isHero ? 'qscc-savvy-card--hero border-2 border-amber-400/45' : ''
+      } ${risky ? 'qscc-savvy-card--risky' : ''}`}
+    >
+      {isHero ? (
+        <div className="px-4 py-3 border-b border-amber-400/25 bg-amber-500/10">
+          <div className="text-[10px] font-black tracking-[0.22em] text-amber-200 uppercase">🔥 Best Move</div>
+          {heroConf ? (
+            <div className="mt-1 text-xs font-bold text-amber-100/90">
+              Best Move Confidence: <span className="text-white">{heroConf}</span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className={`qscc-savvy-card__media relative aspect-[4/3] bg-slate-950 ${isHero ? 'md:aspect-[16/9]' : ''}`}>
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={String(item.title || 'Listing')}
+            className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-[1.04]"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-bold tracking-wide">
+            No photo
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-90 pointer-events-none" />
+        <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1">
+          {snipeTags.map((t) => (
+            <span key={t.key} className={`qscc-snipe-tag qscc-snipe-tag--${t.tone}`}>
+              {t.label}
+            </span>
+          ))}
+          {badges.slice(0, isHero ? 2 : 1).map((b) => (
+            <span key={b.key} className={`qscc-trust-badge qscc-trust-badge--${b.tone}`}>
+              <span aria-hidden>{b.icon}</span> {b.label}
+            </span>
+          ))}
+        </div>
+        <div className="absolute bottom-2 left-2 right-2 flex justify-between items-end gap-2">
+          <span className="text-[10px] font-black tracking-wider text-white/90 bg-black/50 px-2 py-1 rounded-md border border-white/10">
+            ENDS {fmtTime(seconds)}
+          </span>
+          <span className="text-[10px] font-black text-amber-200 bg-amber-500/15 px-2 py-1 rounded-md border border-amber-400/30">
+            {Math.max(1, bids)} watching
+          </span>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-5 flex flex-col flex-1 bg-gradient-to-b from-slate-900/40 to-slate-950/95">
+        {!isHero ? (
+          <div className="text-[10px] font-black tracking-[0.2em] text-cyan-300 uppercase">⚡ Top Quick Snipe</div>
+        ) : null}
+        <h4 className={`mt-1 text-white font-bold leading-snug line-clamp-2 ${isHero ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}>
+          {item.title}
+        </h4>
+        <div className="mt-3 text-xs text-slate-300 space-y-1.5">
+          <div>
+            <span className="text-slate-400">Current Price:</span>{' '}
+            <span className="font-bold text-slate-100">{toMoney(price)}</span>
+          </div>
+          <div className="text-emerald-300 font-black">
+            Est. savings: {toMoney(savings)}
+            {Number.isFinite(savingsPct) && savingsPct > 0 ? ` (${Math.round(savingsPct)}%)` : ''}
+          </div>
+          <div>
+            <span className="text-slate-400">Trust score:</span>{' '}
+            <span className="font-bold text-cyan-200">{Math.round(Number(item.trustScore || 0))}%</span>
+          </div>
+        </div>
+
+        <QuickSnipeSavvyRewards item={item} effectiveSavings={savings} />
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="qscc-savvy-btn qscc-savvy-btn--buy"
+            onClick={() => {
+              onMeaningfulView(item, isHero ? 'hero_buy' : 'lane_buy');
+              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            View Deal
+          </button>
+          <button
+            type="button"
+            className="qscc-savvy-btn qscc-savvy-btn--ghost"
+            onClick={() => onMeaningfulView(item, isHero ? 'hero_watch' : 'lane_watch')}
+          >
+            Watch
+          </button>
+          {!isHero ? (
+            <button type="button" className="qscc-savvy-btn qscc-savvy-btn--ghost" onClick={() => onMeaningfulView(item, 'lane_pass')}>
+              Pass
+            </button>
+          ) : null}
+          <button type="button" className="qscc-savvy-btn qscc-savvy-btn--accent" onClick={() => saveAlert(item, searchQuery)}>
+            Save alert
+          </button>
+          <button
+            type="button"
+            className="qscc-savvy-btn qscc-savvy-btn--ghost"
+            disabled={!sellerUsername(item)}
+            onClick={() => openSeller(item)}
+          >
+            View seller
+          </button>
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
 function BestMoveFallbackCard({
   fallback,
   liveTick,
@@ -281,27 +449,30 @@ export default function QuickSnipesSavvyResults({
   searchQuery = '',
 }) {
   const [banner, setBanner] = useState('');
+  const [showAllSnipes, setShowAllSnipes] = useState(false);
+
+  useEffect(() => {
+    setShowAllSnipes(false);
+  }, [searchQuery, items?.length]);
 
   const ranked = useMemo(() => rankQuickSnipeListings(items || [], liveTick), [items, liveTick]);
-  const extraordinary = useMemo(() => ranked.filter((x) => x.extraordinary), [ranked]);
-  const cardsToRender = extraordinary.length > 0 ? extraordinary : [];
-  const showFallbackCard = cardsToRender.length === 0 && Boolean(fallbackBestMove?.item);
+  const heroDeal = ranked[0] || null;
+  const snipeDeals = ranked.slice(1);
+  const INITIAL_SNIPE_VISIBLE = 11;
+  const visibleSnipes = showAllSnipes ? snipeDeals : snipeDeals.slice(0, INITIAL_SNIPE_VISIBLE);
+  const hiddenSnipeCount = Math.max(0, snipeDeals.length - INITIAL_SNIPE_VISIBLE);
+  const showFallbackCard = ranked.length === 0 && Boolean(fallbackBestMove?.item);
 
   const headerStats = useMemo(() => {
     const n = ranked.length || (fallbackBestMove?.item ? 1 : 0);
-    if (!n) return { count: 0, lowComp: false, confLabel: 'MEDIUM' };
-    if (!ranked.length && fallbackBestMove?.item) {
-      const conf = fallbackBestMove.confidence || getConfidenceLabel(fallbackBestMove.item.confidenceScore);
-      return { count: 1, lowComp: true, confLabel: conf.label.toUpperCase().includes('LEGENDARY') || conf.label.includes('High') ? 'HIGH' : 'MEDIUM' };
-    }
+    if (!n) return { count: 0, lowComp: false, searchStrength: null };
     const lowBids = ranked.filter((r) => Number(r.item.bidCount || 0) <= 2).length;
     const lowComp = lowBids / n >= 0.38;
-    const avgConf =
-      ranked.reduce((a, r) => a + (Number(r.item.confidenceScore) || Number(r.item.aiConfidence) || 0), 0) / n;
-    let confLabel = 'MEDIUM';
-    if (avgConf >= 72) confLabel = 'HIGH';
-    else if (avgConf < 48) confLabel = 'LOW';
-    return { count: n, lowComp, confLabel };
+    return {
+      count: n,
+      lowComp,
+      searchStrength: getSearchStrengthLabel(n),
+    };
   }, [ranked, fallbackBestMove]);
 
   const saveAlert = useCallback((item, alertQuery = '') => {
@@ -359,7 +530,19 @@ export default function QuickSnipesSavvyResults({
     );
   }
 
-  if (!ranked.length && !showFallbackCard) return null;
+  if (!ranked.length && !showFallbackCard) {
+    return (
+      <div className="qscc-savvy-wrap qscc-glass rounded-2xl border border-violet-500/25 p-5 sm:p-8">
+        <div className="rounded-2xl border border-slate-600/40 bg-slate-900/40 px-5 py-8 text-center">
+          <div className="text-xs font-black tracking-[0.2em] uppercase text-violet-300 mb-2">Savvy Scout Report</div>
+          <h3 className="text-xl font-black text-white">Scout is still scanning.</h3>
+          <p className="text-sm text-slate-300 mt-2 max-w-lg mx-auto">
+            Try another category or create an alert — Savvy Scout will notify you when a strong deal appears.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="qscc-savvy-wrap qscc-glass rounded-2xl border border-violet-500/30 p-5 sm:p-8 shadow-[0_0_60px_rgba(139,92,246,0.12)]">
@@ -382,18 +565,22 @@ export default function QuickSnipesSavvyResults({
 
       <div className="qscc-savvy-header flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
         <div>
-          <p className="text-xs font-black tracking-[0.22em] text-cyan-300/90 uppercase mb-2">Savvy Deal Intelligence</p>
+          <p className="text-xs font-black tracking-[0.22em] text-cyan-300/90 uppercase mb-2">Savvy Scout Report</p>
           <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
             {SAVVY_SCOUT.shortTitle} found{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-fuchsia-400">{headerStats.count}</span>{' '}
-            opportunities
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-fuchsia-400">
+              {headerStats.count}
+            </span>{' '}
+            {headerStats.count === 1 ? 'opportunity' : 'opportunities'}
           </h3>
           <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm font-bold">
+            {headerStats.searchStrength ? (
+              <span className="qscc-savvy-pill qscc-savvy-pill--cyan">
+                Search Strength: {headerStats.searchStrength}
+              </span>
+            ) : null}
             <span className={`qscc-savvy-pill ${headerStats.lowComp ? 'qscc-savvy-pill--hot' : ''}`}>
               {headerStats.lowComp ? 'LOW COMPETITION DETECTED' : 'MIXED COMPETITION'}
-            </span>
-            <span className="qscc-savvy-pill qscc-savvy-pill--cyan">
-              BEST MOVE CONFIDENCE: {headerStats.confLabel}
             </span>
           </div>
         </div>
@@ -418,116 +605,60 @@ export default function QuickSnipesSavvyResults({
         />
       ) : null}
 
-      {cardsToRender.length === 0 && !showFallbackCard ? (
-        <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-5 py-6 text-amber-100">
-          <div className="text-xs font-black tracking-[0.2em] uppercase text-amber-200 mb-2">Savvy Scout scanning</div>
-          <h4 className="text-xl font-black text-white">
-            Savvy Scout is still scanning for legendary finds. Here&apos;s the strongest move available right now.
-          </h4>
-          <p className="text-sm text-amber-100/90 mt-2">
-            Pulling from Auctions and Trending lanes — tap a hunt above while Savvy widens the search.
-          </p>
-        </div>
-      ) : cardsToRender.length > 0 ? (
-      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {cardsToRender.map(({ item, risky, savings, savingsPct }, idx) => {
-          const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
-          const market = Number(item.marketValue ?? 0);
-          const seconds = Math.max(0, Number(item.secondsRemaining || 0) - liveTick);
-          const bids = Number(item.bidCount || 0);
-          const badges = buildTrustBadges(item);
-          const url = item.itemWebUrl || item.itemUrl;
+      {heroDeal ? (
+        <section className="mb-8" aria-label="Best Move">
+          <OpportunityCard
+            scored={heroDeal}
+            liveTick={liveTick}
+            variant="hero"
+            onMeaningfulView={onMeaningfulView}
+            saveAlert={saveAlert}
+            openSeller={openSeller}
+            searchQuery={searchQuery}
+            index={0}
+          />
+        </section>
+      ) : null}
 
-          return (
-            <motion.article
-              key={item.itemId}
-              layout
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(0.35, idx * 0.04) }}
-              className={`qscc-savvy-card group rounded-2xl overflow-hidden flex flex-col ${risky ? 'qscc-savvy-card--risky' : ''}`}
-            >
-              <div className="qscc-savvy-card__media relative aspect-[4/3] bg-slate-950">
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={String(item.title || 'Listing')}
-                    className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-[1.04]"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-bold tracking-wide">
-                    No photo
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-90 pointer-events-none" />
-                <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1">
-                  {badges.map((b) => (
-                    <span key={b.key} className={`qscc-trust-badge qscc-trust-badge--${b.tone}`}>
-                      <span aria-hidden>{b.icon}</span> {b.label}
-                    </span>
-                  ))}
-                </div>
-                <div className="absolute bottom-2 left-2 right-2 flex justify-between items-end gap-2">
-                  <span className="text-[10px] font-black tracking-wider text-white/90 bg-black/50 px-2 py-1 rounded-md border border-white/10">
-                    ENDS {fmtTime(seconds)}
-                  </span>
-                  <span className="text-[10px] font-black text-amber-200 bg-amber-500/15 px-2 py-1 rounded-md border border-amber-400/30">
-                    {bids} watching
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-4 sm:p-5 flex flex-col flex-1 bg-gradient-to-b from-slate-900/40 to-slate-950/95">
-                <div className="text-[10px] font-black tracking-[0.2em] text-rose-300 uppercase">🔥 Best move of the day</div>
-                <h4 className="mt-1 text-white font-bold text-sm sm:text-base leading-snug line-clamp-2">{item.title}</h4>
-                <div className="mt-3 text-xs text-slate-300 space-y-1.5">
-                  <div><span className="text-slate-400">Market Value:</span> <span className="font-bold text-slate-100">{toMoney(market)}</span></div>
-                  <div><span className="text-slate-400">Current Price:</span> <span className="font-bold text-slate-100">{toMoney(price)}</span></div>
-                  <div className="text-emerald-300 font-black">YOU SAVE: {toMoney(savings)}{Number.isFinite(savingsPct) && savingsPct > 0 ? ` (${Math.round(savingsPct)}%)` : ''}</div>
-                  <div><span className="text-slate-400">Trust Score:</span> <span className="font-bold text-cyan-200">{Math.round(Number(item.trustScore || 0))}%</span></div>
-                  <div><span className="text-slate-400">Only</span> <span className="font-black text-amber-200">{Math.max(1, bids)}</span> <span className="text-slate-400">similar listings found.</span></div>
-                  <div className="text-[11px] leading-relaxed text-violet-100/90 border border-violet-400/25 bg-violet-500/10 rounded-lg px-2.5 py-2 mt-2">
-                    Savvy found this because the seller is highly trusted, the price is {Math.max(0, Math.round(Number(savingsPct || 0)))}% below market, and demand is increasing.
-                  </div>
-                </div>
-
-                <QuickSnipeSavvyRewards item={item} effectiveSavings={savings} />
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="qscc-savvy-btn qscc-savvy-btn--buy"
-                    onClick={() => {
-                      onMeaningfulView(item, 'lane_buy');
-                      if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                    }}
-                  >
-                    View Deal
-                  </button>
-                  <button type="button" className="qscc-savvy-btn qscc-savvy-btn--ghost" onClick={() => onMeaningfulView(item, 'lane_watch')}>
-                    Watch
-                  </button>
-                  <button type="button" className="qscc-savvy-btn qscc-savvy-btn--ghost" onClick={() => onMeaningfulView(item, 'lane_pass')}>
-                    Pass
-                  </button>
-                  <button type="button" className="qscc-savvy-btn qscc-savvy-btn--accent" onClick={() => saveAlert(item)}>
-                    Save alert
-                  </button>
-                  <button
-                    type="button"
-                    className="qscc-savvy-btn qscc-savvy-btn--ghost"
-                    disabled={!sellerUsername(item)}
-                    onClick={() => openSeller(item)}
-                  >
-                    View seller
-                  </button>
-                </div>
-              </div>
-            </motion.article>
-          );
-        })}
-      </div>
+      {visibleSnipes.length > 0 ? (
+        <section className="qscc-top-snipes" aria-label="Top Quick Snipes">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h4 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight">
+              ⚡ Top Quick Snipes
+            </h4>
+            <span className="text-xs font-bold text-slate-400">
+              Showing {Math.min(ranked.length, 1 + visibleSnipes.length)} of {headerStats.count}
+            </span>
+          </div>
+          <div className="qscc-top-snipes__grid grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {visibleSnipes.map((scored, idx) => (
+              <OpportunityCard
+                key={scored.item.itemId}
+                scored={scored}
+                liveTick={liveTick}
+                variant="snipe"
+                onMeaningfulView={onMeaningfulView}
+                saveAlert={saveAlert}
+                openSeller={openSeller}
+                searchQuery={searchQuery}
+                index={idx + 1}
+              />
+            ))}
+          </div>
+          {!showAllSnipes && hiddenSnipeCount > 0 ? (
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                className="qscc-view-all-btn"
+                onClick={() => setShowAllSnipes(true)}
+              >
+                View All {headerStats.count} Opportunities
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : ranked.length === 1 ? (
+        <p className="text-sm text-slate-300 text-center py-2">1 opportunity found — scout is widening the search for more.</p>
       ) : null}
     </div>
   );
