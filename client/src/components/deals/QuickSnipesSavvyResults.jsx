@@ -262,6 +262,12 @@ function OpportunityCard({
           {item.title}
         </h4>
         <div className="mt-3 text-xs text-slate-300 space-y-1.5">
+          {market > 0 ? (
+            <div>
+              <span className="text-slate-400">Market Value:</span>{' '}
+              <span className="font-bold text-slate-100">{toMoney(market)}</span>
+            </div>
+          ) : null}
           <div>
             <span className="text-slate-400">Current Price:</span>{' '}
             <span className="font-bold text-slate-100">{toMoney(price)}</span>
