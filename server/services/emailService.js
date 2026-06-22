@@ -9,6 +9,7 @@ const {
   isResendSandboxAddress,
   allowResendSandboxFrom,
 } = require('../config/emailFrom');
+const { ensureAccessibleEmailProductImageUrl } = require('../templates/email/emailTemplateUtils');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
@@ -545,16 +546,25 @@ async function sendSavvyScoutDealFoundEmail({
 
   const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
 
+  const imageResult = await ensureAccessibleEmailProductImageUrl(payload.productImage);
+  const payloadWithImage = { ...payload, productImage: imageResult.url };
+
+  trace?.step('product_image_resolved', {
+    usedFallback: imageResult.usedFallback,
+    source: imageResult.source ? String(imageResult.source).slice(0, 120) : null,
+    resolved: String(imageResult.url).slice(0, 120),
+  });
+
   trace?.step('template_render_start', {
-    productTitle: String(payload.productTitle || '').slice(0, 80),
-    hasProductImage: Boolean(payload.productImage),
+    productTitle: String(payloadWithImage.productTitle || '').slice(0, 80),
+    hasProductImage: Boolean(payloadWithImage.productImage),
   });
 
   let subject;
   let html;
   let text;
   try {
-    const built = buildSavvyScoutDealFoundEmail(payload);
+    const built = buildSavvyScoutDealFoundEmail(payloadWithImage);
     subject = built.subject;
     html = built.html;
     text = built.text;

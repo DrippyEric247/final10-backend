@@ -45,7 +45,101 @@ function getClientBaseUrl() {
 }
 
 function getEmailAssetsBaseUrl() {
-  return String(process.env.EMAIL_ASSETS_BASE_URL || getClientBaseUrl()).replace(/\/$/, '');
+  const explicit = String(process.env.EMAIL_ASSETS_BASE_URL || '').trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  const client = getClientBaseUrl();
+  // Prefer known deployed frontend when custom domain is not serving static assets yet.
+  if (!client || client.includes('localhost') || client === 'https://final10.app') {
+    return 'https://final10-backend-jo1t.vercel.app';
+  }
+  return client.replace(/\/$/, '');
+}
+
+function emailProductFallbackImageUrl() {
+  const override = String(process.env.EMAIL_PRODUCT_FALLBACK_URL || '').trim();
+  if (override) return normalizePublicHttpsUrl(override);
+  return `${getEmailAssetsBaseUrl()}/assets/email/savvy-scout-hero.png`;
+}
+
+/**
+ * Force https and fix protocol-relative URLs for email clients (Gmail requires https).
+ */
+function normalizePublicHttpsUrl(raw) {
+  let url = String(raw || '').trim();
+  if (!url) return '';
+  if (url.startsWith('//')) url = `https:${url}`;
+  if (url.startsWith('http://')) url = `https://${url.slice(7)}`;
+  return url;
+}
+
+/**
+ * Upgrade eBay thumbnail URLs to a larger public size (better for email + fewer broken thumbs).
+ */
+function upgradeEbayImageUrl(raw) {
+  let url = normalizePublicHttpsUrl(raw);
+  if (!url) return '';
+  if (!/ebayimg\.com/i.test(url)) return url;
+  url = url.replace(/\/thumbs\//i, '/images/');
+  url = url.replace(/\/s-l\d+\./gi, '/s-l500.');
+  return url;
+}
+
+function isPublicHttpsImageUrl(raw) {
+  const url = normalizePublicHttpsUrl(raw);
+  if (!url) return false;
+  if (!/^https:\/\//i.test(url)) return false;
+  if (url.startsWith('https://localhost') || url.startsWith('https://127.')) return false;
+  const lower = url.toLowerCase();
+  if (lower.startsWith('data:')) return false;
+  if (lower.includes('placeholder')) return false;
+  if (/\/fallback\.png(?:\?|$)/i.test(lower)) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === 'localhost' || host.endsWith('.local')) return false;
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Resolve product image for HTML email — always https; invalid/missing → Final10 fallback.
+ */
+function resolveEmailProductImageUrl(raw) {
+  const upgraded = upgradeEbayImageUrl(raw);
+  if (isPublicHttpsImageUrl(upgraded)) return upgraded;
+  return emailProductFallbackImageUrl();
+}
+
+/**
+ * Optional HEAD check so broken remote URLs are swapped before send (Gmail cannot use onerror).
+ */
+async function ensureAccessibleEmailProductImageUrl(raw, { timeoutMs = 4000 } = {}) {
+  const resolved = resolveEmailProductImageUrl(raw);
+  const fallback = emailProductFallbackImageUrl();
+  if (resolved === fallback) {
+    return { url: resolved, usedFallback: true, source: raw || null };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(resolved, {
+      method: 'HEAD',
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Final10-Email/1.0' },
+    });
+    clearTimeout(timer);
+    const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+    if (res.ok && contentType.startsWith('image/')) {
+      return { url: resolved, usedFallback: false, source: raw || null };
+    }
+  } catch {
+    // fall through to fallback
+  }
+
+  return { url: fallback, usedFallback: true, source: raw || null };
 }
 
 function savvyScoutHeroImageUrl() {
@@ -69,6 +163,12 @@ module.exports = {
   formatSavvy,
   getClientBaseUrl,
   getEmailAssetsBaseUrl,
+  normalizePublicHttpsUrl,
+  upgradeEbayImageUrl,
+  isPublicHttpsImageUrl,
+  resolveEmailProductImageUrl,
+  ensureAccessibleEmailProductImageUrl,
+  emailProductFallbackImageUrl,
   savvyScoutHeroImageUrl,
   final10LogoImageUrl,
 };

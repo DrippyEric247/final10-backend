@@ -13,6 +13,8 @@ const {
   formatPercent,
   formatSavvy,
   getClientBaseUrl,
+  resolveEmailProductImageUrl,
+  emailProductFallbackImageUrl,
   savvyScoutHeroImageUrl,
   final10LogoImageUrl,
 } = require('./emailTemplateUtils');
@@ -80,7 +82,7 @@ function normalizeDealEmailData(input = {}) {
   return {
     userName: pick(input.userName, 'Savvy Hunter'),
     productTitle: pick(input.productTitle, 'A great deal is waiting for you'),
-    productImage: pick(input.productImage, ''),
+    productImage: resolveEmailProductImageUrl(input.productImage),
     currentPrice: formatMoney(input.currentPrice, 'See listing'),
     originalPrice: formatMoney(input.originalPrice, ''),
     savingsAmount: formatMoney(input.savingsAmount, ''),
@@ -185,9 +187,8 @@ function buildSavvyScoutDealFoundHtml(raw = {}) {
         ? `You Save ${d.savingsAmount}`
         : 'Strong savings potential';
 
-  const productImgBlock = d.productImage
-    ? `<img src="${escapeHtml(d.productImage)}" alt="${escapeHtml(d.productTitle)}" width="240" style="display:block;width:100%;max-width:240px;height:auto;border:0;border-radius:12px;margin:0 auto;" />`
-    : `<div style="width:240px;max-width:100%;height:160px;margin:0 auto;background:${COLORS.cardAlt};border:1px dashed ${COLORS.border};border-radius:12px;line-height:160px;text-align:center;font-family:Arial,Helvetica,sans-serif;color:${COLORS.dim};font-size:13px;">Product image</div>`;
+  const productImgUrl = d.productImage || emailProductFallbackImageUrl();
+  const productImgBlock = `<img src="${escapeHtml(productImgUrl)}" alt="${escapeHtml(d.productTitle)}" width="240" style="display:block;width:100%;max-width:240px;height:auto;border:0;border-radius:12px;margin:0 auto;background:${COLORS.cardAlt};" />`;
 
   const doublePointBanner = d.doublePointActive
     ? `
