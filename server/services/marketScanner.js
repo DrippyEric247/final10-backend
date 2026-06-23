@@ -266,17 +266,45 @@ class MarketScanner {
     };
   }
 
-  async checkAlerts(auction) {
+  async checkAlerts(auction, context = {}) {
+    const { auditAlertScan } = require('./auditLogger');
+    let newMatches = 0;
+
     try {
       const alerts = await Alert.find({ isActive: true });
 
       for (const alert of alerts) {
-        if (!alert.matchesAuction(auction)) continue;
+        const mismatch = alert.explainAuctionMismatch(auction);
+        if (mismatch) {
+          if (context.source === 'lane_sweep') {
+            auditAlertScan({
+              phase: 'match_rejected',
+              alertId: String(alert._id),
+              alertName: alert.name,
+              auctionId: String(auction._id),
+              listingTitle: String(auction.title || '').slice(0, 80),
+              reason: mismatch,
+              source: context.source,
+              query: context.query || null,
+            });
+          }
+          continue;
+        }
 
         const already = (alert.matches || []).some(
           (m) => String(m.auction) === String(auction._id)
         );
-        if (already) continue;
+        if (already) {
+          auditAlertScan({
+            phase: 'match_skipped_duplicate',
+            alertId: String(alert._id),
+            alertName: alert.name,
+            auctionId: String(auction._id),
+            source: context.source || null,
+            query: context.query || null,
+          });
+          continue;
+        }
 
         alert.matches.push({
           auction: auction._id,
@@ -287,12 +315,31 @@ class MarketScanner {
         alert.triggerCount = Number(alert.triggerCount || 0) + 1;
         alert.lastTriggeredAt = new Date();
         await alert.save();
+        newMatches += 1;
+
+        console.log(
+          `[SavvyScout] alert match alertId=${alert._id} name="${alert.name}" listing="${String(auction.title || '').slice(0, 80)}" source=${context.source || 'unknown'}`
+        );
+        auditAlertScan({
+          phase: 'match_found',
+          alertId: String(alert._id),
+          alertName: alert.name,
+          auctionId: String(auction._id),
+          listingTitle: String(auction.title || '').slice(0, 120),
+          source: context.source || null,
+          query: context.query || null,
+          dealPotential: auction.aiScore?.dealPotential ?? null,
+          minConfidence: alert.minConfidence,
+        });
 
         await this.sendAlertNotification(alert.user, auction, alert);
       }
     } catch (error) {
-      console.error('Error checking alerts:', error);
+      console.error('[SavvyScout] Error checking alerts:', error);
+      auditAlertScan({ phase: 'check_error', message: String(error?.message || error).slice(0, 200) });
     }
+
+    return { newMatches };
   }
 
   async sendAlertNotification(userId, auction, alert) {

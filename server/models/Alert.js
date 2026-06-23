@@ -63,6 +63,43 @@ alertSchema.methods.matchesAuction = function matchesAuction(auction) {
   return true;
 };
 
+/**
+ * @returns {string|null} null if auction matches; otherwise rejection reason for diagnostics
+ */
+alertSchema.methods.explainAuctionMismatch = function explainAuctionMismatch(auction) {
+  if (!this.isActive || !auction) return 'inactive_or_no_auction';
+
+  const platform = String(auction.source?.platform || '').toLowerCase();
+  const sources = Array.isArray(this.sources) && this.sources.length
+    ? this.sources.map((s) => String(s).toLowerCase())
+    : ['ebay'];
+  if (!sources.includes(platform)) return 'platform_mismatch';
+
+  const title = String(auction.title || '').toLowerCase();
+  const kws = (this.keywords || []).map((k) => String(k).trim().toLowerCase()).filter(Boolean);
+  if (kws.length === 0) return 'no_keywords';
+  const missing = kws.filter((k) => !title.includes(k));
+  if (missing.length) return `keyword_miss:${missing.join(',')}`;
+
+  const bid = Number(auction.currentBid);
+  if (
+    this.maxPrice != null &&
+    Number.isFinite(Number(this.maxPrice)) &&
+    Number.isFinite(bid) &&
+    bid > Number(this.maxPrice)
+  ) {
+    return 'above_max_price';
+  }
+
+  const deal = Number(auction.aiScore?.dealPotential);
+  const minC = Number(this.minConfidence);
+  if (Number.isFinite(minC) && Number.isFinite(deal) && deal < minC) {
+    return `below_min_confidence:${deal}<${minC}`;
+  }
+
+  return null;
+};
+
 module.exports = mongoose.model('Alert', alertSchema);
 
 

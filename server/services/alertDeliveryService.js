@@ -44,6 +44,16 @@ async function deliverAlertMatch(userId, auction, alert) {
     String(process.env.ALERT_EMAIL_DEFAULT || '').toLowerCase() === 'true';
 
   if (emailWanted && user.email) {
+    console.log(
+      `[SavvyScout] email send attempted userId=${userId} alertId=${alert._id} alert="${alert.name}" to=${String(user.email).slice(0, 3)}***`
+    );
+    auditAlertDelivery({
+      userId: String(userId),
+      alertId: String(alert._id),
+      channel: 'email',
+      phase: 'attempt',
+      alertName: alert.name,
+    });
     try {
       const imageUrl =
         auction.images?.[0]?.url ||
@@ -76,10 +86,17 @@ async function deliverAlertMatch(userId, auction, alert) {
         userId: String(userId),
         alertId: String(alert._id),
         channel: 'email',
+        phase: emailResult?.sent ? 'success' : 'failure',
         sent: Boolean(emailResult?.sent),
         reason: emailResult?.reason || null,
         provider: emailResult?.provider || null,
+        messageId: emailResult?.messageId || null,
+        errorCode: emailResult?.errorCode || null,
+        errorReason: emailResult?.errorReason || null,
       });
+      console.log(
+        `[SavvyScout] email send ${emailResult?.sent ? 'success' : 'failure'} alertId=${alert._id} sent=${Boolean(emailResult?.sent)} reason=${emailResult?.reason || 'ok'} messageId=${emailResult?.messageId || 'none'}`
+      );
     } catch (err) {
       console.warn('[alertDelivery] email failed:', err.message);
       auditAlertDelivery({

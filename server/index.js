@@ -295,9 +295,18 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     if (isSavvyScoutBackgroundScanEnabled()) {
       const scoutCron = isProduction() ? '*/15 * * * *' : '*/5 * * * *';
       cron.schedule(scoutCron, () => {
-        runSavvyScoutAlertScan().catch((err) => {
-          console.error('[SavvyScout] scheduled scan error:', err?.message || err);
-        });
+        auditCronJob('savvy_scout_alert_scan', { phase: 'start' });
+        runSavvyScoutAlertScan()
+          .then((result) => {
+            auditCronJob('savvy_scout_alert_scan', { phase: 'done', ...result });
+          })
+          .catch((err) => {
+            console.error('[SavvyScout] scheduled scan error:', err?.message || err);
+            auditCronJob('savvy_scout_alert_scan', {
+              phase: 'error',
+              message: String(err?.message || err).slice(0, 200),
+            });
+          });
       });
       console.log(
         `⏰ Savvy Scout background scan enabled (${isProduction() ? 'every 15m' : 'every 5m'}). Set DISABLE_SAVVY_SCOUT_SCAN=true to pause.`

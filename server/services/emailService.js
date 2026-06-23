@@ -638,6 +638,7 @@ async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl, de
     to,
     data: merged,
     subject: subjectOverride,
+    forceSend: true,
   });
 }
 
