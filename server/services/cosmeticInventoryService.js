@@ -196,6 +196,26 @@ async function equipCosmetic(userId, type, itemId, options = {}) {
   return getCosmeticsForUser(userId);
 }
 
+/** System reward unlock (daily streak, battle pass, etc.) — no admin required. */
+async function grantSystemCosmeticUnlock(userId, itemId, source = 'system') {
+  const id = String(itemId || '').trim();
+  if (!id || !isKnownCosmeticId(id)) return false;
+
+  const { inv } = await ensureProgressDocuments(userId);
+  const had = (inv.unlockedItemIds || []).includes(id);
+  addUnlocks(inv, [id]);
+  await inv.save();
+
+  if (!had) {
+    auditFireAndForget('COSMETIC_SYSTEM_GRANT', {
+      userId,
+      meta: { itemId: id, source: String(source || 'system').slice(0, 64) },
+    });
+  }
+
+  return !had;
+}
+
 async function grantCosmeticUnlock(adminUserId, userKey, itemId, note = '') {
   const id = String(itemId || '').trim();
   if (!id) {
@@ -311,6 +331,7 @@ module.exports = {
   getCosmeticsForUser,
   equipCosmetic,
   grantCosmeticUnlock,
+  grantSystemCosmeticUnlock,
   revokeCosmeticUnlock,
   resolveUserByKey,
   inspectCosmeticUnlockState,

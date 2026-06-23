@@ -92,6 +92,7 @@ import { isBetaTester, registerBetaTesterGetter } from "./lib/betaTesterAccess";
 import FoundingTesterBadge from "./components/beta/FoundingTesterBadge";
 import { SavvyScoutMissionsProvider } from './context/SavvyScoutMissionsContext';
 import MissionLog from './pages/MissionLog';
+import DailyStreak from './pages/DailyStreak';
 import './styles/SavvyScoutMissions.css';
 
 /* Protect any route by requiring a token/user */
@@ -407,6 +408,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Customization />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/daily-streak"
+            element={
+              <ProtectedRoute>
+                <DailyStreak />
               </ProtectedRoute>
             }
           />

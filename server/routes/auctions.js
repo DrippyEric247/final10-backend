@@ -571,8 +571,17 @@ router.post('/claim-daily-login', auth, async (req, res) => {
       legacyPointsEarned: result.legacyPointsEarned || 0,
       alreadyClaimed: Boolean(result.alreadyClaimed),
       streakDays: result.streakDays ?? user.loginStreakDays,
+      currentStreak: result.currentStreak ?? user.loginStreakDays,
+      longestStreak: result.longestStreak ?? user.longestStreak,
       reward: result.reward,
       dailyTasks,
+      scoutMessage: result.scoutMessage,
+      shieldUsed: result.shieldUsed,
+      grants: result.grants,
+      comeback: result.comeback,
+      milestone: result.milestone,
+      hiddenAchievements: result.hiddenAchievements,
+      status: result.status,
     });
   } catch (error) {
     console.error('Claim daily login error:', error);

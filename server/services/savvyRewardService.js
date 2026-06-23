@@ -2,10 +2,8 @@ const SavvyPoint = require('../models/SavvyPoint');
 const SavvyRewardLog = require('../models/SavvyRewardLog');
 const {
   SAVVY_REWARD_TYPES,
-  REWARDS,
   utcDayKey,
   yesterdayKey,
-  computeDailyLoginSavvy,
 } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { auditRewardGrant } = require('./auditLogger');
@@ -124,89 +122,32 @@ async function grantSavvyReward(user, {
 }
 
 /**
- * Daily login: task flag + Savvy grant (tier × base + streak milestone).
+ * Daily login — delegates to daily streak system (milestones, shields, comeback).
  */
 async function claimDailyLoginReward(user) {
-  const today = utcDayKey();
-  if (typeof user.resetDailyTasks === 'function') {
-    user.resetDailyTasks();
-  }
-
-  const idempotencyKey = `daily_login:${user._id}:${today}`;
-  const existingLog = await SavvyRewardLog.findOne({ idempotencyKey }).lean();
-  const alreadyClaimed =
-    Boolean(user.dailyTasks?.completed?.dailyLogin) || Boolean(existingLog);
-
-  if (alreadyClaimed) {
-    return {
-      granted: false,
-      alreadyClaimed: true,
-      savvyPointsEarned: 0,
-      added: 0,
-      newBalance: Number(user.savvyPoints) || 0,
-      streakDays: Number(user.loginStreakDays) || 0,
-      reward: existingLog
-        ? {
-            type: existingLog.rewardType,
-            amount: existingLog.amount,
-            baseAmount: existingLog.baseAmount,
-            multiplier: existingLog.multiplier,
-            streakBonus: existingLog.streakBonus,
-            streakDays: existingLog.streakDays,
-            timestamp: existingLog.createdAt,
-          }
-        : null,
-    };
-  }
-
-  const streakDays = updateLoginStreak(user, today);
-  const tier = readTier(user);
-  const breakdown = computeDailyLoginSavvy(tier, streakDays);
-  user.dailyTasks.completed.dailyLogin = true;
-  user.dailyTasks.pointsEarned += REWARDS.daily_login.legacyPoints;
-  user.points += REWARDS.daily_login.legacyPoints;
-  user.lastDailyClaim = today;
-
-  const grant = await grantSavvyReward(user, {
-    rewardType: SAVVY_REWARD_TYPES.DAILY_LOGIN,
-    amount: breakdown.totalSavvy,
-    baseAmount: breakdown.baseSavvy,
-    multiplier: breakdown.tierMultiplier,
-    streakBonus: breakdown.streakBonusSavvy,
-    streakDays,
-    idempotencyKey,
-    note: `Daily login +${breakdown.totalSavvy} (${breakdown.tierMultiplier}x tier)`,
-    meta: { scaledBase: breakdown.scaledBase },
-  });
-
-  if (typeof user.awardXP === 'function' && grant.granted) {
-    await user.awardXP(REWARDS.daily_login.battlePassXp, 'daily_login');
-    await user.updateLevelStats('totalDaysActive');
-  }
-
-  await user.save();
-
-  const reward = {
-    type: SAVVY_REWARD_TYPES.DAILY_LOGIN,
-    amount: grant.amount,
-    baseAmount: breakdown.baseSavvy,
-    multiplier: breakdown.tierMultiplier,
-    streakBonus: breakdown.streakBonusSavvy,
-    streakDays,
-    scaledBase: breakdown.scaledBase,
-    timestamp: new Date().toISOString(),
-  };
+  const { claimDailyStreak } = require('./dailyStreakService');
+  const result = await claimDailyStreak(user);
 
   return {
-    granted: grant.granted,
-    alreadyClaimed: false,
-    savvyPointsEarned: grant.amount,
-    added: grant.amount,
-    newBalance: grant.newBalance,
-    legacyPointsEarned: REWARDS.daily_login.legacyPoints,
-    streakDays,
-    reward,
-    duplicate: grant.duplicate,
+    granted: result.granted,
+    alreadyClaimed: result.alreadyClaimed,
+    savvyPointsEarned: result.savvyPointsEarned ?? result.totalSavvy ?? 0,
+    added: result.added ?? result.totalSavvy ?? 0,
+    newBalance: result.newBalance,
+    legacyPointsEarned: result.legacyPointsEarned || 0,
+    streakDays: result.streakDays ?? result.currentStreak ?? 0,
+    currentStreak: result.currentStreak,
+    longestStreak: result.longestStreak,
+    reward: result.reward,
+    duplicate: false,
+    streakClaim: result,
+    scoutMessage: result.scoutMessage,
+    shieldUsed: result.shieldUsed,
+    grants: result.grants,
+    comeback: result.comeback,
+    milestone: result.milestone,
+    hiddenAchievements: result.hiddenAchievements,
+    status: result.status,
   };
 }
 

@@ -70,6 +70,7 @@ const Navigation = () => {
     { name: 'Leaderboard', path: '/leaderboard', icon: '🏆' },
     { name: 'Build Wars', path: '/build-wars', icon: '⚔️' },
     { name: 'Battle Pass', path: '/battle-pass', icon: '🎯' },
+    { name: 'Daily Streak', path: '/daily-streak', icon: '🔥' },
     { name: 'Customize', path: '/customization', icon: '🎖️' },
     ...(showAdminNav
       ? [

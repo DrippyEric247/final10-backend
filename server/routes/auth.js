@@ -81,7 +81,17 @@ function serializeAuthMePayload(user) {
     referredBy: user.referredBy || null,
     premiumTier: user.premiumTier || user.membershipTier || 'free',
     leaderboardScore: user.leaderboardScore ?? 0,
-    currentStreak: user.currentStreak ?? 0,
+    currentStreak: user.loginStreakDays ?? user.currentStreak ?? 0,
+    loginStreakDays: user.loginStreakDays ?? 0,
+    longestStreak: user.longestStreak ?? user.loginStreakDays ?? 0,
+    lastLoginDate: user.lastLoginDay ?? null,
+    scoutShields: user.dailyStreak?.scoutShields ?? 0,
+    scoutEggs: user.dailyStreak?.scoutEggs ?? {
+      common: 0,
+      rare: 0,
+      epic: 0,
+      legendary: 0,
+    },
     powerMultiplier: user.powerMultiplier ?? 1,
     equippedCosmetics: user.equippedCosmetics || {
       emblemId: 'sigil_starter',

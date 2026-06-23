@@ -43,6 +43,26 @@ export default function Login() {
             /* ignore */
           }
         }
+        if (claim?.granted && !claim?.alreadyClaimed) {
+          nav(
+            hasCompletedOnboarding(onboardingUserId(signedInUser))
+              ? '/daily-streak'
+              : '/onboarding/preferences',
+            {
+              replace: true,
+              state: {
+                streakClaim: {
+                  scoutMessage: claim.scoutMessage,
+                  grants: claim.grants,
+                  shieldUsed: claim.shieldUsed,
+                  hiddenAchievements: claim.hiddenAchievements,
+                  comeback: claim.comeback,
+                },
+              },
+            }
+          );
+          return;
+        }
       } catch {
         /* already claimed or network — wallet stays on server balance */
       }

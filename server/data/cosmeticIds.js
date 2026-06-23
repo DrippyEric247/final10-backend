@@ -60,6 +60,10 @@ const CALLING_CARD_IDS = new Set([
   'card_founders_circle',
   'card_savvy_elite',
   'card_the_signal',
+  // Daily streak rewards
+  'card_streak_30',
+  'card_welcome_back',
+  'card_legacy_loyalist',
 ]);
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);

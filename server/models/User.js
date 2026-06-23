@@ -21,6 +21,21 @@ const userSchema = new mongoose.Schema({
   lastDailyClaim: { type: String, default: null },    // YYYY-MM-DD format
   lastLoginDay: { type: String, default: null },      // UTC YYYY-MM-DD for streak
   loginStreakDays: { type: Number, default: 0 },
+  longestStreak: { type: Number, default: 0 },
+  /** Daily streak inventory: shields, eggs, milestone history */
+  dailyStreak: {
+    scoutShields: { type: Number, default: 0 },
+    scoutEggs: {
+      common: { type: Number, default: 0 },
+      rare: { type: Number, default: 0 },
+      epic: { type: Number, default: 0 },
+      legendary: { type: Number, default: 0 },
+    },
+    claimedMilestoneDays: [{ type: Number }],
+    claimedComebackTiers: [{ type: String }],
+    legacyLoyalistUnlocked: { type: Boolean, default: false },
+    shieldsConsumed: { type: Number, default: 0 },
+  },
   lastActive: Date,
 
   // ---- referrals ----

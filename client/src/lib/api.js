@@ -178,6 +178,18 @@ export async function claimDailyLogin() {
   return data;
 }
 
+/** GET /api/streak/status — daily streak calendar + claim eligibility */
+export async function getDailyStreakStatus() {
+  const { data } = await api.get("/streak/status");
+  return data;
+}
+
+/** POST /api/streak/claim — claim today's streak reward */
+export async function claimDailyStreak() {
+  const { data } = await api.post("/streak/claim");
+  return data;
+}
+
 /** POST /api/scout-missions/claim — persist Savvy Scout mission reward to wallet. */
 export async function claimScoutMissionReward({ missionId, periodKey }) {
   const { data } = await api.post("/scout-missions/claim", { missionId, periodKey });
