@@ -5,6 +5,7 @@ const User = require('../models/User');
 const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
 const { isBetaTester, getTierConfigForUser, logBetaUsage } = require('../services/betaTesterService');
 const { auditAlertCreated } = require('../services/auditLogger');
+const { normalizeAlertKeywords } = require('../lib/alertKeywords');
 
 // Get my alerts
 router.get('/', auth, async (req, res) => {
@@ -44,10 +45,15 @@ router.post('/', auth, async (req, res) => {
     });
   }
 
+  const normalizedKeywords = normalizeAlertKeywords(keywords);
+  if (!normalizedKeywords.length) {
+    return res.status(400).json({ message: 'At least one keyword is required' });
+  }
+
   const alert = await Alert.create({
     user: req.user.id,
     name,
-    keywords: keywords.map(k => String(k).trim()).filter(Boolean),
+    keywords: normalizedKeywords,
     maxPrice,
     minConfidence,
     sources,
@@ -62,6 +68,9 @@ router.post('/', auth, async (req, res) => {
         : normalizeTier(user.subscription?.tier || user.membershipTier || 'free'),
     },
   });
+
+  // Opt users into match emails when they create an alert (can disable in settings later).
+  await User.findByIdAndUpdate(req.user.id, { alertEmailOnMatch: true });
 
   if (isBetaTester(user)) {
     void logBetaUsage(user._id, 'alert_created', { name: String(name).slice(0, 80) });
@@ -104,7 +113,10 @@ router.patch('/:id', auth, async (req, res) => {
   const body = req.body || {};
   if (body.name != null) alert.name = String(body.name).trim().slice(0, 200);
   if (Array.isArray(body.keywords)) {
-    alert.keywords = body.keywords.map((k) => String(k).trim()).filter(Boolean);
+    alert.keywords = normalizeAlertKeywords(body.keywords);
+    if (!alert.keywords.length) {
+      return res.status(400).json({ message: 'At least one keyword is required' });
+    }
   }
   if (body.maxPrice !== undefined) {
     alert.maxPrice =

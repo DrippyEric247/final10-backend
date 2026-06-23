@@ -4,6 +4,28 @@
  */
 const { info, warn, error } = require('./structuredLog');
 
+const AUDIT_RING_CAP = 50;
+/** @type {Array<{ event: string, at: string, meta: object }>} */
+const auditRingBuffer = [];
+
+function pushAuditRing(event, meta = {}) {
+  auditRingBuffer.unshift({
+    event,
+    at: new Date().toISOString(),
+    meta,
+  });
+  if (auditRingBuffer.length > AUDIT_RING_CAP) auditRingBuffer.length = AUDIT_RING_CAP;
+}
+
+function getRecentAuditEvents(limit = 10, filterEvent = null) {
+  const n = Math.max(1, Math.min(AUDIT_RING_CAP, Number(limit) || 10));
+  let rows = auditRingBuffer;
+  if (filterEvent) {
+    rows = rows.filter((r) => r.event === filterEvent);
+  }
+  return rows.slice(0, n);
+}
+
 function audit(event, meta = {}) {
   info(event, { audit: true, ...meta });
 }
@@ -57,10 +79,12 @@ function auditAlertCreated(meta = {}) {
 }
 
 function auditAlertDelivery(meta = {}) {
+  pushAuditRing('AUDIT_ALERT_DELIVERY', meta);
   audit('AUDIT_ALERT_DELIVERY', meta);
 }
 
 function auditEmailDelivery(meta = {}) {
+  pushAuditRing('AUDIT_EMAIL_DELIVERY', meta);
   audit('AUDIT_EMAIL_DELIVERY', meta);
 }
 
@@ -100,4 +124,5 @@ module.exports = {
   auditOnboarding,
   auditAlertTest,
   auditEmailPipelineStep,
+  getRecentAuditEvents,
 };

@@ -131,6 +131,9 @@ const ownerControlRoutes = require('./routes/ownerControl');
 const { requireOwnerGrantAccess } = require('./middleware/requireOwnerGrantAccess');
 const { grantFoundingAccessHandler } = require('./handlers/grantFoundingAccess');
 const { grantFounderAdminHandler } = require('./handlers/grantFounderAdminHandler');
+const User = require('./models/User');
+const { runRealAlertE2eVerify } = require('./services/alertE2eVerifyService');
+const { getRecentAuditEvents } = require('./services/auditLogger');
 const progressionRoutes = require('./routes/progressionRoutes');
 const cosmeticRoutes = require('./routes/cosmeticRoutes');
 const entitlementRoutes = require('./routes/entitlementRoutes');
@@ -204,6 +207,42 @@ app.post(
   grantFounderAdminHandler
 );
 
+/** Real-path alert E2E verify — owner secret only (no JWT, no test-mode gate). */
+app.post('/api/owner/verify-alert-e2e', requireOwnerGrantAccess, async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ ok: false, message: 'email is required in body' });
+    }
+    const user = await User.findOne({ email }).select(
+      'username email savvyPoints pointsBalance membershipTier isPremium subscription alertEmailOnMatch'
+    );
+    if (!user) {
+      return res.status(404).json({ ok: false, message: `No user for ${email}` });
+    }
+    const result = await runRealAlertE2eVerify(user, {
+      searchQuery: req.body?.searchQuery,
+      maxPrice: req.body?.maxPrice,
+      limit: req.body?.limit,
+    });
+    return res.status(result.ok ? 200 : 422).json({
+      ...result,
+      via: 'owner-grant-secret',
+      auditRecent: {
+        emailDelivery: getRecentAuditEvents(10, 'AUDIT_EMAIL_DELIVERY'),
+        alertDelivery: getRecentAuditEvents(10, 'AUDIT_ALERT_DELIVERY'),
+      },
+    });
+  } catch (err) {
+    console.error('[owner/verify-alert-e2e] error:', err?.message || err);
+    return res.status(500).json({
+      ok: false,
+      message: 'E2E verification failed',
+      error: String(err?.message || err).slice(0, 200),
+    });
+  }
+});
+
 app.use('/api/owner', ownerControlRoutes);
 app.use('/api/progression', progressionRoutes);
 app.use('/api/cosmetics', cosmeticRoutes);
@@ -243,6 +282,14 @@ app.get('/api/health', (_req, res) => {
     emailProvider: getEmailProvider(),
     emailConfigured: isEmailConfigured(),
     alertEmailEnabled: String(process.env.ALERT_EMAIL_ENABLED || '').toLowerCase() === 'true',
+    alertEmailDefault: (() => {
+      const raw = process.env.ALERT_EMAIL_DEFAULT;
+      if (raw != null && String(raw).trim() !== '') {
+        return String(raw).toLowerCase() === 'true';
+      }
+      const { isProduction } = require('./config/envValidation');
+      return isProduction();
+    })(),
     emailFromAudit: auditEmailFrom(),
   });
 });

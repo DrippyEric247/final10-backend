@@ -2,6 +2,15 @@ const User = require('../models/User');
 const SavvyPoint = require('../models/SavvyPoint');
 const { sendAlertMatchEmail } = require('./emailService');
 const { auditAlertDelivery } = require('./auditLogger');
+const { isProduction } = require('../config/envValidation');
+
+function isAlertEmailDefaultEnabled() {
+  const raw = process.env.ALERT_EMAIL_DEFAULT;
+  if (raw != null && String(raw).trim() !== '') {
+    return String(raw).toLowerCase() === 'true';
+  }
+  return isProduction();
+}
 
 /**
  * Deliver an alert match: in-app notification, optional email, Savvy points.
@@ -40,8 +49,7 @@ async function deliverAlertMatch(userId, auction, alert) {
   });
 
   const emailWanted =
-    Boolean(user.alertEmailOnMatch) ||
-    String(process.env.ALERT_EMAIL_DEFAULT || '').toLowerCase() === 'true';
+    Boolean(user.alertEmailOnMatch) || isAlertEmailDefaultEnabled();
 
   if (emailWanted && user.email) {
     console.log(
@@ -147,4 +155,4 @@ async function deliverAlertMatch(userId, auction, alert) {
   return { delivered: true };
 }
 
-module.exports = { deliverAlertMatch };
+module.exports = { deliverAlertMatch, isAlertEmailDefaultEnabled };

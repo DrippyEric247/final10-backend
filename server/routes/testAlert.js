@@ -7,6 +7,8 @@ const {
   alertTestPublicSecretConfigured,
 } = require('../lib/alertTestPublicAccess');
 const { runAlertTestPipeline } = require('../services/alertTestModeService');
+const { runRealAlertE2eVerify } = require('../services/alertE2eVerifyService');
+const { getRecentAuditEvents } = require('../services/auditLogger');
 const { sendTestEmail, getEmailConfigStatus } = require('../services/emailService');
 const { isProduction } = require('../config/envValidation');
 
@@ -180,6 +182,99 @@ router.post('/public', async (req, res) => {
     return res.status(500).json({
       ok: false,
       message: 'Public alert test failed.',
+      error: String(err?.message || err).slice(0, 200),
+    });
+  }
+});
+
+/**
+ * GET /api/test-alert/audit-recent — last N in-memory audit delivery events (JWT or public secret).
+ */
+router.get('/audit-recent', async (req, res) => {
+  if (!testModeAllowed()) {
+    return res.status(403).json({ ok: false, message: 'Alert test mode is disabled.' });
+  }
+  const publicOk = isAlertTestPublicAccess(req);
+  if (!publicOk) {
+    return auth(req, res, () => {
+      const limit = Number(req.query.limit) || 10;
+      return res.json({
+        ok: true,
+        emailDelivery: getRecentAuditEvents(limit, 'AUDIT_EMAIL_DELIVERY'),
+        alertDelivery: getRecentAuditEvents(limit, 'AUDIT_ALERT_DELIVERY'),
+      });
+    });
+  }
+  const limit = Number(req.query.limit) || 10;
+  return res.json({
+    ok: true,
+    emailDelivery: getRecentAuditEvents(limit, 'AUDIT_EMAIL_DELIVERY'),
+    alertDelivery: getRecentAuditEvents(limit, 'AUDIT_ALERT_DELIVERY'),
+  });
+});
+
+/**
+ * POST /api/test-alert/e2e-real
+ * Full production path: PS5 alert → Browse ingest → checkAlerts → deliverAlertMatch → email.
+ * JWT auth, or public secret with body { to }.
+ */
+router.post('/e2e-real', async (req, res) => {
+  try {
+    if (!testModeAllowed()) {
+      return res.status(403).json({
+        ok: false,
+        message: 'Alert test mode is disabled. Set ALERT_TEST_MODE_ENABLED=true on the server.',
+      });
+    }
+
+    let user = null;
+    const viaPublic = isAlertTestPublicAccess(req);
+
+    if (viaPublic) {
+      const to = String(req.body?.to || '').trim().toLowerCase();
+      if (!to || !to.includes('@')) {
+        return res.status(400).json({ ok: false, message: 'Body field "to" (email) is required with public secret.' });
+      }
+      user = await User.findOne({ email: to }).select(
+        'username email savvyPoints pointsBalance membershipTier isPremium subscription alertEmailOnMatch'
+      );
+      if (!user) {
+        return res.status(404).json({ ok: false, message: `No account for ${to}` });
+      }
+    } else {
+      const token = req.header('Authorization')?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ ok: false, message: 'Authentication required (Bearer token or public secret).' });
+      }
+      const jwt = require('jsonwebtoken');
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+      } catch {
+        return res.status(401).json({ ok: false, message: 'Invalid token.' });
+      }
+      const userId = decoded.sub || decoded.userId || decoded.id;
+      user = await User.findById(userId).select(
+        'username email savvyPoints pointsBalance membershipTier isPremium subscription alertEmailOnMatch'
+      );
+      if (!user) return res.status(404).json({ ok: false, message: 'User not found.' });
+    }
+
+    const result = await runRealAlertE2eVerify(user, {
+      searchQuery: req.body?.searchQuery || req.query?.q,
+      maxPrice: req.body?.maxPrice,
+      limit: req.body?.limit,
+    });
+
+    return res.status(result.ok ? 200 : 422).json({
+      ...result,
+      via: viaPublic ? 'public-test-secret' : 'jwt',
+    });
+  } catch (err) {
+    console.error('[test-alert/e2e-real] error:', err?.message || err);
+    return res.status(500).json({
+      ok: false,
+      message: 'E2E alert verification failed.',
       error: String(err?.message || err).slice(0, 200),
     });
   }

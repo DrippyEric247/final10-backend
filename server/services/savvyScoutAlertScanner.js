@@ -1,12 +1,10 @@
 const Alert = require('../models/Alert');
 const Auction = require('../models/Auction');
-const AuctionAggregator = require('./AuctionAggregator');
 const marketScanner = require('./marketScanner');
+const { searchEbayBrowseAndSave } = require('./ebayBrowseIngestService');
 const { isEbayVerboseLogEnabled } = require('../lib/backgroundJobFlags');
 const { isProduction } = require('../config/envValidation');
 const { auditAlertScan } = require('./auditLogger');
-
-const aggregator = new AuctionAggregator();
 
 const MAX_RECENT_AUCTIONS = isProduction() ? 30 : 80;
 const LANE_RESULT_LIMIT = isProduction() ? 5 : 6;
@@ -133,7 +131,7 @@ async function runSavvyScoutAlertScan() {
       });
 
       try {
-        const { savedAuctions = [] } = await aggregator.searchAndSave(query, LANE_RESULT_LIMIT);
+        const savedAuctions = await searchEbayBrowseAndSave(query, LANE_RESULT_LIMIT);
         scoutLog(
           `[SavvyScout] lane results query="${query}" listingsFound=${savedAuctions.length}`
         );
