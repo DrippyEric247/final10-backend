@@ -376,11 +376,10 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
       isProduction() &&
       String(process.env.ALERT_E2E_BOOT_DISABLED || '').toLowerCase() !== 'true'
     ) {
-      const bootE2eEmail = String(
-        process.env.ALERT_E2E_BOOT_EMAIL || 'ericvasquez012@gmail.com'
-      )
+      const bootE2eEmail = String(process.env.ALERT_E2E_BOOT_EMAIL || '')
         .trim()
         .toLowerCase();
+      if (bootE2eEmail) {
       const e2eDelayMs = 90_000;
       setTimeout(() => {
         void (async () => {
@@ -424,6 +423,7 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
       console.log(
         `🧪 Production boot alert E2E scheduled in ${e2eDelayMs / 1000}s for ${bootE2eEmail} (set ALERT_E2E_BOOT_DISABLED=true to skip)`
       );
+      }
     }
   })
   .catch((error) => {

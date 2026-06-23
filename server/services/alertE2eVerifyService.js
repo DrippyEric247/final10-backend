@@ -96,6 +96,7 @@ async function runRealAlertE2eVerify(user, opts = {}) {
         title: String(auction.title || '').slice(0, 120),
         dealPotential: auction.aiScore?.dealPotential ?? null,
       });
+      break;
     }
   }
 
