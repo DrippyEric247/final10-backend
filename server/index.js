@@ -48,6 +48,9 @@ const shieldProactiveInvestigation = require('./services/shieldProactiveInvestig
 
 const app = express();
 
+/** Last production boot E2E verify snapshot (for /api/health diagnostics). */
+let lastBootAlertE2e = null;
+
 // --- Trust Proxy (for rate limiting behind reverse proxies) ---
 app.set('trust proxy', 1);
 
@@ -291,6 +294,7 @@ app.get('/api/health', (_req, res) => {
       return isProduction();
     })(),
     emailFromAudit: auditEmailFrom(),
+    lastBootAlertE2e,
   });
 });
 
@@ -366,6 +370,60 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
       }, bootDelayMs);
     } else {
       console.log('⏸ Savvy Scout background scan disabled (DISABLE_SAVVY_SCOUT_SCAN=true)');
+    }
+
+    if (
+      isProduction() &&
+      String(process.env.ALERT_E2E_BOOT_DISABLED || '').toLowerCase() !== 'true'
+    ) {
+      const bootE2eEmail = String(
+        process.env.ALERT_E2E_BOOT_EMAIL || 'ericvasquez012@gmail.com'
+      )
+        .trim()
+        .toLowerCase();
+      const e2eDelayMs = 90_000;
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const user = await User.findOne({ email: bootE2eEmail }).select(
+              'username email savvyPoints pointsBalance membershipTier isPremium subscription alertEmailOnMatch'
+            );
+            if (!user) {
+              lastBootAlertE2e = {
+                at: new Date().toISOString(),
+                ok: false,
+                message: `boot e2e user not found: ${bootE2eEmail}`,
+              };
+              return;
+            }
+            console.log('[BOOT] Running alert E2E verify for', bootE2eEmail);
+            const result = await runRealAlertE2eVerify(user, { limit: 6 });
+            lastBootAlertE2e = {
+              at: new Date().toISOString(),
+              ok: result.ok,
+              matchFound: result.matchFound,
+              newMatches: result.newMatches,
+              emailAttempted: result.emailAttempted,
+              emailSent: result.emailSent,
+              emailFailure: result.emailFailure,
+              message: result.message,
+              alert: result.alert,
+              audit: result.audit,
+            };
+            console.log('[BOOT] alert E2E verify result:', JSON.stringify(lastBootAlertE2e));
+          } catch (err) {
+            lastBootAlertE2e = {
+              at: new Date().toISOString(),
+              ok: false,
+              error: String(err?.message || err).slice(0, 200),
+            };
+            console.error('[BOOT] alert E2E verify failed:', err?.message || err);
+          }
+        })();
+      }, e2eDelayMs);
+      console.log(
+        `🧪 Production boot alert E2E scheduled in ${e2eDelayMs / 1000}s for ${bootE2eEmail} (set ALERT_E2E_BOOT_DISABLED=true to skip)`
+      );
     }
   })
   .catch((error) => {
