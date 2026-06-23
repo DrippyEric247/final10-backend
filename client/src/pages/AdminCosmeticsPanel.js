@@ -22,6 +22,9 @@ import {
   listGrantsForUser,
   readAuditLog,
   revokeCard,
+  syncGrantsToServer,
+  fetchServerUnlockState,
+  collectGrantsForServerSync,
   userKeyFor,
 } from "../lib/adminCosmetics";
 import CallingCard from "../components/CallingCard";
@@ -59,6 +62,8 @@ export default function AdminCosmeticsPanel() {
   const [note, setNote] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [confirmRevoke, setConfirmRevoke] = useState(null);
+  const [serverState, setServerState] = useState(null);
+  const [serverBusy, setServerBusy] = useState(false);
 
   const canManage = isCosmeticsAdmin(user);
 
@@ -98,6 +103,62 @@ export default function AdminCosmeticsPanel() {
     return readAuditLog(25);
   }, [tick]);
 
+  const syncableGrantCount = useMemo(() => {
+    void tick;
+    const key = targetKey.trim();
+    return key ? collectGrantsForServerSync(key).length : 0;
+  }, [tick, targetKey]);
+
+  const runServerSync = useCallback(() => {
+    const key = targetKey.trim();
+    if (!key) {
+      setFeedback({ tone: "error", message: "Enter a user id, username, or email first." });
+      return;
+    }
+    setServerBusy(true);
+    void (async () => {
+      try {
+        const n = await syncGrantsToServer(key);
+        setFeedback({
+          tone: "ok",
+          message: `Synced ${n} grant(s) to server for ${key}.`,
+        });
+        setTick((t) => t + 1);
+      } catch (err) {
+        setFeedback({
+          tone: "error",
+          message: err instanceof AdminGrantError ? err.message : "Server sync failed.",
+        });
+      } finally {
+        setServerBusy(false);
+      }
+    })();
+  }, [targetKey]);
+
+  const runServerInspect = useCallback(() => {
+    const key = targetKey.trim();
+    if (!key) {
+      setFeedback({ tone: "error", message: "Enter a user id, username, or email first." });
+      return;
+    }
+    setServerBusy(true);
+    void (async () => {
+      try {
+        const data = await fetchServerUnlockState(key);
+        setServerState(data);
+        setFeedback({ tone: "ok", message: `Loaded server unlock state for ${key}.` });
+      } catch (err) {
+        setServerState(null);
+        setFeedback({
+          tone: "error",
+          message: err instanceof AdminGrantError ? err.message : "Could not load server state.",
+        });
+      } finally {
+        setServerBusy(false);
+      }
+    })();
+  }, [targetKey]);
+
   const doGrant = useCallback(
     (itemId) => {
       const key = targetKey.trim();
@@ -105,20 +166,22 @@ export default function AdminCosmeticsPanel() {
         setFeedback({ tone: "error", message: "Enter a user id, username, or email first." });
         return;
       }
-      try {
-        grantCard({
-          userKey: key,
-          itemId,
-          grantedBy: userKeyFor(user) || "admin",
-          note: note.trim(),
-        });
-        setFeedback({ tone: "ok", message: `Granted ${itemId} to ${key}.` });
-      } catch (err) {
-        setFeedback({
-          tone: "error",
-          message: err instanceof AdminGrantError ? err.message : "Grant failed.",
-        });
-      }
+      void (async () => {
+        try {
+          await grantCard({
+            userKey: key,
+            itemId,
+            grantedBy: userKeyFor(user) || "admin",
+            note: note.trim(),
+          });
+          setFeedback({ tone: "ok", message: `Granted ${itemId} to ${key}.` });
+        } catch (err) {
+          setFeedback({
+            tone: "error",
+            message: err instanceof AdminGrantError ? err.message : "Grant failed.",
+          });
+        }
+      })();
     },
     [note, targetKey, user]
   );
@@ -127,21 +190,23 @@ export default function AdminCosmeticsPanel() {
     (itemId) => {
       const key = targetKey.trim();
       if (!key) return;
-      try {
-        revokeCard({
-          userKey: key,
-          itemId,
-          revokedBy: userKeyFor(user) || "admin",
-          note: note.trim(),
-        });
-        setFeedback({ tone: "ok", message: `Revoked ${itemId} from ${key}.` });
-        setConfirmRevoke(null);
-      } catch (err) {
-        setFeedback({
-          tone: "error",
-          message: err instanceof AdminGrantError ? err.message : "Revoke failed.",
-        });
-      }
+      void (async () => {
+        try {
+          await revokeCard({
+            userKey: key,
+            itemId,
+            revokedBy: userKeyFor(user) || "admin",
+            note: note.trim(),
+          });
+          setFeedback({ tone: "ok", message: `Revoked ${itemId} from ${key}.` });
+          setConfirmRevoke(null);
+        } catch (err) {
+          setFeedback({
+            tone: "error",
+            message: err instanceof AdminGrantError ? err.message : "Revoke failed.",
+          });
+        }
+      })();
     },
     [note, targetKey, user]
   );
@@ -210,10 +275,51 @@ export default function AdminCosmeticsPanel() {
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
+
+        <div className="ac-server-sync">
+          <div className="ac-server-sync-head">
+            <strong>Server persistence</strong>
+            <p>
+              Grants in the audit log below are browser-local until synced to MongoDB.
+              After deploying the backend fix, use sync so equip works on production.
+            </p>
+          </div>
+          <div className="ac-server-sync-actions">
+            <button
+              type="button"
+              className="ac-btn ac-btn--primary"
+              disabled={!targetKey.trim() || serverBusy}
+              onClick={runServerSync}
+            >
+              {serverBusy ? "Working…" : "Sync local grants to server"}
+            </button>
+            <button
+              type="button"
+              className="ac-btn ac-btn--ghost"
+              disabled={!targetKey.trim() || serverBusy}
+              onClick={runServerInspect}
+            >
+              Inspect server unlock state
+            </button>
+          </div>
+          {targetKey.trim() ? (
+            <p className="ac-server-sync-meta">
+              {syncableGrantCount > 0
+                ? `${syncableGrantCount} grant(s) ready to sync for “${targetKey.trim()}”.`
+                : `No local grants matched “${targetKey.trim()}” — check the audit log user key matches exactly.`}
+            </p>
+          ) : (
+            <p className="ac-server-sync-meta">Enter a target user above to enable server sync.</p>
+          )}
+          {serverState ? (
+            <pre className="ac-server-state">{JSON.stringify(serverState, null, 2)}</pre>
+          ) : null}
+        </div>
+
         {targetKey.trim() ? (
           <div className="ac-target-summary">
             {targetGrants.length === 0 ? (
-              <span className="ac-pill ac-pill--muted">No grants yet</span>
+              <span className="ac-pill ac-pill--muted">No active grant store entries</span>
             ) : (
               targetGrants.map((g) => (
                 <span key={g.itemId} className="ac-pill ac-pill--ok">
@@ -420,7 +526,14 @@ export default function AdminCosmeticsPanel() {
                 <span className="ac-audit-action">{entry.action}</span>
                 <span className="ac-audit-item">{entry.itemId}</span>
                 <span>→</span>
-                <code>{entry.userKey}</code>
+                <button
+                  type="button"
+                  className="ac-audit-user"
+                  onClick={() => setTargetKey(entry.userKey || "")}
+                  title="Use as target user"
+                >
+                  <code>{entry.userKey}</code>
+                </button>
                 <span className="ac-muted">by</span>
                 <code>{entry.grantedBy}</code>
                 <time>{formatTime(entry.at)}</time>

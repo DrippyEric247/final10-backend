@@ -48,6 +48,17 @@ exports.cosmeticsEquipBody = Joi.object({
   itemId: Joi.string().trim().min(1).max(128).required(),
 });
 
+exports.cosmeticsAdminGrantBody = Joi.object({
+  userKey: Joi.string().trim().min(1).max(256).required(),
+  itemId: Joi.string().trim().min(1).max(128).required(),
+  note: Joi.string().trim().max(240).allow('').optional(),
+});
+
+exports.cosmeticsAdminRevokeBody = Joi.object({
+  userKey: Joi.string().trim().min(1).max(256).required(),
+  itemId: Joi.string().trim().min(1).max(128).required(),
+});
+
 // Phase B: creator/referral attribution payload captured client-side and
 // forwarded on signup. Loose by design — never block signup on attribution.
 const attributionPayload = Joi.object({

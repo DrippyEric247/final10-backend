@@ -12,6 +12,8 @@
  */
 
 import { hasAdminRole, isSuperAdminUser } from "./adminAccess";
+import { api } from "./api";
+import { parseApiError } from "./apiErrorParsing";
 
 const GRANTS_KEY = "f10_exclusive_grants_v1";
 const AUDIT_KEY = "f10_exclusive_audit_v1";
@@ -205,13 +207,34 @@ export class AdminGrantError extends Error {
 
 /**
  * Grant an exclusive card or emblem to a user.
+ * Persists to the server (CosmeticInventory) and mirrors to localStorage for instant UI.
  * @param {{userKey: string, itemId: string, grantedBy?: string, note?: string}} args
  */
-export function grantCard({ userKey, itemId, grantedBy, note } = {}) {
+export async function grantCard({ userKey, itemId, grantedBy, note } = {}) {
   const user = String(userKey || "").trim();
   const id = String(itemId || "").trim();
   if (!user) throw new AdminGrantError("missing_user", "User key required.");
   if (!id) throw new AdminGrantError("missing_item", "Item id required.");
+
+  let serverSynced = false;
+  try {
+    await api.post("/cosmetics/admin/grant", {
+      userKey: user,
+      itemId: id,
+      note: String(note || "").slice(0, 240),
+    });
+    serverSynced = true;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    const isMissingRoute = parsed.status === 404 || /route not found/i.test(parsed.message || "");
+    if (!isMissingRoute) {
+      throw new AdminGrantError(
+        "server_sync_failed",
+        parsed.message || "Server grant failed — cosmetic was not persisted."
+      );
+    }
+    console.warn("[adminCosmetics] server grant route unavailable; saved to localStorage only");
+  }
 
   const grants = readGrants();
   const userGrants = { ...(grants[user] || {}) };
@@ -233,14 +256,24 @@ export function grantCard({ userKey, itemId, grantedBy, note } = {}) {
     note: userGrants[id].note,
   });
   emitUpdate();
-  return userGrants[id];
+  return { ...userGrants[id], serverSynced };
 }
 
-export function revokeCard({ userKey, itemId, revokedBy, note } = {}) {
+export async function revokeCard({ userKey, itemId, revokedBy, note } = {}) {
   const user = String(userKey || "").trim();
   const id = String(itemId || "").trim();
   if (!user) throw new AdminGrantError("missing_user", "User key required.");
   if (!id) throw new AdminGrantError("missing_item", "Item id required.");
+
+  try {
+    await api.post("/cosmetics/admin/revoke", { userKey: user, itemId: id });
+  } catch (err) {
+    const parsed = parseApiError(err);
+    throw new AdminGrantError(
+      "server_sync_failed",
+      parsed.message || "Server revoke failed."
+    );
+  }
 
   const grants = readGrants();
   const userGrants = { ...(grants[user] || {}) };
@@ -262,6 +295,68 @@ export function revokeCard({ userKey, itemId, revokedBy, note } = {}) {
   });
   emitUpdate();
   return true;
+}
+
+function normalizeUserKey(key) {
+  const s = String(key || "").trim();
+  return s.includes("@") ? s.toLowerCase() : s;
+}
+
+/** Item ids from audit log grant events for a user key (case-insensitive email). */
+export function listAuditGrantItemIdsForUser(userKey) {
+  const norm = normalizeUserKey(userKey);
+  const seen = new Set();
+  const rows = [];
+  for (const entry of readAuditLog(AUDIT_CAP)) {
+    if (entry.action !== "grant" || !entry.itemId) continue;
+    if (normalizeUserKey(entry.userKey) !== norm) continue;
+    if (seen.has(entry.itemId)) continue;
+    seen.add(entry.itemId);
+    rows.push({ itemId: entry.itemId, note: entry.note || "" });
+  }
+  return rows;
+}
+
+/** Merge active grants store + audit log grants for a user key. */
+export function collectGrantsForServerSync(userKey) {
+  const key = String(userKey || "").trim();
+  const byId = new Map();
+  for (const row of listGrantsForUser(key)) {
+    byId.set(row.itemId, { itemId: row.itemId, note: row.note || "" });
+  }
+  for (const row of listAuditGrantItemIdsForUser(key)) {
+    if (!byId.has(row.itemId)) byId.set(row.itemId, row);
+  }
+  return [...byId.values()];
+}
+
+/** Push local + audit grants for a user to the server (idempotent migration). */
+export async function syncGrantsToServer(userKey) {
+  const key = String(userKey || "").trim();
+  if (!key) throw new AdminGrantError("missing_user", "User key required.");
+  const grants = collectGrantsForServerSync(key);
+  if (!grants.length) {
+    throw new AdminGrantError(
+      "no_grants",
+      "No local grants or audit entries found for this user key. Enter the exact email/username used when granting."
+    );
+  }
+  for (const row of grants) {
+    await api.post("/cosmetics/admin/grant", {
+      userKey: key,
+      itemId: row.itemId,
+      note: row.note || "synced from local grant store",
+    });
+  }
+  return grants.length;
+}
+
+/** Fetch server-side unlock state for debugging (owner panel). */
+export async function fetchServerUnlockState(userKey) {
+  const key = String(userKey || "").trim();
+  if (!key) throw new AdminGrantError("missing_user", "User key required.");
+  const { data } = await api.get("/cosmetics/admin/inspect", { params: { userKey: key } });
+  return data;
 }
 
 // ----- guards ---------------------------------------------------------------
