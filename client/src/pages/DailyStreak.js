@@ -126,7 +126,7 @@ export default function DailyStreak() {
   }, [location.state]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
       setAdminPanelAllowed(false);
       return undefined;
     }
@@ -134,8 +134,13 @@ export default function DailyStreak() {
     let cancelled = false;
 
     async function resolveAdminAccess() {
-      const freshUser = (await refreshProfile()) || user;
+      const freshUser = await refreshProfile();
       if (cancelled) return;
+
+      if (!freshUser?.id) {
+        setAdminPanelAllowed(false);
+        return;
+      }
 
       if (shouldShowAdminNav(freshUser)) {
         setAdminPanelAllowed(true);
