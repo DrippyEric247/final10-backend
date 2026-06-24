@@ -7,6 +7,9 @@ import { recordScoutMissionAction } from '../../lib/savvyScoutMissions';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import QuickSnipeSavvyRewards from './QuickSnipeSavvyRewards';
 import { getConfidenceLabel, rankQuickSnipeListings } from '../../lib/quickSnipesBestMove';
+import ListingCardImage from '../listings/ListingCardImage';
+import { NO_PERFECT_MATCH_MESSAGE } from '../../lib/bestMoveFallbackConfig';
+import { isBestMoveDisplayable, resolveDirectItemUrl } from '../../lib/bestMoveListingValidation';
 
 const TRENDING_SNEAKERS = [
   { label: 'Jordan 1', query: 'air jordan 1' },
@@ -193,7 +196,7 @@ function OpportunityCard({
   const bids = Number(item.bidCount || 0);
   const badges = buildTrustBadges(item);
   const snipeTags = buildSnipeTags(scored);
-  const url = item.itemWebUrl || item.itemUrl;
+  const url = resolveDirectItemUrl(item);
   const isHero = variant === 'hero';
   const heroConf = isHero ? getHeroConfidenceTier(scored) : null;
 
@@ -219,18 +222,14 @@ function OpportunityCard({
       ) : null}
 
       <div className={`qscc-savvy-card__media relative aspect-[4/3] bg-slate-950 ${isHero ? 'md:aspect-[16/9]' : ''}`}>
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={String(item.title || 'Listing')}
-            className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-[1.04]"
-            loading="lazy"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-bold tracking-wide">
-            No photo
-          </div>
-        )}
+        <ListingCardImage
+          item={item}
+          alt={String(item.title || 'Listing')}
+          aspectRatio={isHero ? '16 / 9' : '4 / 3'}
+          borderRadius="0"
+          frameClassName="absolute inset-0 w-full h-full bg-slate-950"
+          imgClassName="transition duration-500 group-hover:scale-[1.04]"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-90 pointer-events-none" />
         <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1">
           {snipeTags.map((t) => (
@@ -339,7 +338,7 @@ function BestMoveFallbackCard({
   const savingsPct = Number(fallback.savingsPct) || (market > 0 ? (savings / market) * 100 : 0);
   const trust = Math.round(Number(fallback.trustScore ?? item.trustScore) || 0);
   const confidence = fallback.confidence || getConfidenceLabel(fallback.confidenceScore ?? item.confidenceScore);
-  const url = item.itemWebUrl || item.itemUrl;
+  const url = resolveDirectItemUrl(item);
   const seconds = Math.max(0, Number(item.secondsRemaining || 0) - liveTick);
   const bids = Math.max(1, Number(item.bidCount || 0));
 
@@ -353,21 +352,18 @@ function BestMoveFallbackCard({
       <div className="px-5 py-4 border-b border-cyan-400/25 bg-cyan-500/10">
         <div className="text-[10px] font-black tracking-[0.22em] text-cyan-200 uppercase">Best Move Available Right Now</div>
         <p className="mt-2 text-sm text-cyan-50/95 leading-relaxed">
-          Savvy Scout is still scanning for legendary finds. Here&apos;s the strongest move available right now.
+          {NO_PERFECT_MATCH_MESSAGE}
         </p>
       </div>
       <div className="grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] gap-0">
         <div className="qscc-savvy-card__media relative aspect-[4/3] md:aspect-auto md:min-h-[260px] bg-slate-950">
-          {item.imageUrl ? (
-            <img
-              src={item.imageUrl}
-              alt={String(item.title || 'Listing')}
-              className="absolute inset-0 w-full h-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-bold">No photo</div>
-          )}
+          <ListingCardImage
+            item={item}
+            alt={String(item.title || 'Listing')}
+            aspectRatio="4 / 3"
+            borderRadius="0"
+            frameClassName="absolute inset-0 w-full h-full bg-slate-950"
+          />
           <div className="absolute top-3 left-3">
             <span className={`qscc-confidence-badge qscc-confidence-badge--${confidence.key}`}>
               {confidence.label}
@@ -461,16 +457,26 @@ export default function QuickSnipesSavvyResults({
     setShowAllSnipes(false);
   }, [searchQuery, items?.length]);
 
-  const ranked = useMemo(() => rankQuickSnipeListings(items || [], liveTick), [items, liveTick]);
+  const ranked = useMemo(() => {
+    const all = rankQuickSnipeListings(items || [], liveTick);
+    return all.filter((row) => isBestMoveDisplayable(row.item, { requireTrust: true, log: false }));
+  }, [items, liveTick]);
+
+  const displayFallback = useMemo(() => {
+    if (!fallbackBestMove?.item) return null;
+    return isBestMoveDisplayable(fallbackBestMove.item, { requireTrust: true, log: false })
+      ? fallbackBestMove
+      : null;
+  }, [fallbackBestMove]);
   const heroDeal = ranked[0] || null;
   const snipeDeals = ranked.slice(1);
   const INITIAL_SNIPE_VISIBLE = 11;
   const visibleSnipes = showAllSnipes ? snipeDeals : snipeDeals.slice(0, INITIAL_SNIPE_VISIBLE);
   const hiddenSnipeCount = Math.max(0, snipeDeals.length - INITIAL_SNIPE_VISIBLE);
-  const showFallbackCard = ranked.length === 0 && Boolean(fallbackBestMove?.item);
+  const showFallbackCard = ranked.length === 0 && Boolean(displayFallback?.item);
 
   const headerStats = useMemo(() => {
-    const n = ranked.length || (fallbackBestMove?.item ? 1 : 0);
+    const n = ranked.length || (displayFallback?.item ? 1 : 0);
     if (!n) return { count: 0, lowComp: false, searchStrength: null };
     const lowBids = ranked.filter((r) => Number(r.item.bidCount || 0) <= 2).length;
     const lowComp = lowBids / n >= 0.38;
@@ -479,7 +485,7 @@ export default function QuickSnipesSavvyResults({
       lowComp,
       searchStrength: getSearchStrengthLabel(n),
     };
-  }, [ranked, fallbackBestMove]);
+  }, [ranked, displayFallback]);
 
   const saveAlert = useCallback((item, alertQuery = '') => {
     try {
@@ -603,7 +609,7 @@ export default function QuickSnipesSavvyResults({
 
       {showFallbackCard ? (
         <BestMoveFallbackCard
-          fallback={fallbackBestMove}
+          fallback={displayFallback}
           liveTick={liveTick}
           onMeaningfulView={onMeaningfulView}
           saveAlert={saveAlert}

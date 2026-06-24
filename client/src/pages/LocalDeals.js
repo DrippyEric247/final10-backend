@@ -47,6 +47,7 @@ import {
   rankQuickSnipeListings,
   resolveQuickSnipesBestMove,
 } from '../lib/quickSnipesBestMove';
+import { isBestMoveDisplayable } from '../lib/bestMoveListingValidation';
 import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
 import '../styles/QuickSnipesCommandCenter.css';
 
@@ -451,6 +452,9 @@ const LocalDeals = () => {
     if (extraordinary) return null;
     const top = quickSnipesRanked[0];
     if (!top?.item) return null;
+    if (!isBestMoveDisplayable(top.item, { category: categoryId, query, requireTrust: true })) {
+      return null;
+    }
     return {
       item: top.item,
       savings: top.savings,
@@ -462,7 +466,7 @@ const LocalDeals = () => {
       isFallback: true,
       extraordinary: false,
     };
-  }, [quickSnipesRanked]);
+  }, [quickSnipesRanked, categoryId, query]);
 
   const needsExternalFallback =
     Boolean(query) &&
@@ -474,7 +478,7 @@ const LocalDeals = () => {
   const externalFallbackQuery = useQuery({
     queryKey: ['quickSnipesBestMoveFallback', query, categoryId],
     enabled: needsExternalFallback,
-    queryFn: () => resolveQuickSnipesBestMove({ query, primaryItems: [], liveTick }),
+    queryFn: () => resolveQuickSnipesBestMove({ query, category: categoryId, primaryItems: [], liveTick }),
     staleTime: 60_000,
   });
 

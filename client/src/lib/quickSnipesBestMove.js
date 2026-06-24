@@ -8,6 +8,16 @@ import { evaluateBestMove } from './bestMoveEngine';
 import { evaluateTrustScore, trustScoreInputFromListing } from './trustScoreEngine';
 import { scoreListing } from './listingSectionsEngine';
 import { getTopCategories } from './userBehavior';
+import {
+  getCategoryFallbackQueries,
+  inferCategoryFromQuery,
+  normalizeBestMoveCategory,
+  pickCategoryFallbackQuery,
+} from './bestMoveFallbackConfig';
+import {
+  normalizeBestMoveListing,
+  validateBestMoveListing,
+} from './bestMoveListingValidation';
 
 const LOG_PREFIX = '[QuickSnipesBestMove]';
 
@@ -18,15 +28,6 @@ export const FALLBACK_SOURCES = Object.freeze({
   TRENDING: 'trending',
   CURATED: 'curated_category',
 });
-
-const CURATED_FALLBACK_QUERIES = Object.freeze([
-  { query: 'playstation 5 console', category: 'gaming', label: 'Gaming' },
-  { query: 'rtx 4090 graphics card', category: 'gaming', label: 'PC Gaming' },
-  { query: 'air jordan 1 retro', category: 'sneakers', label: 'Sneakers' },
-  { query: 'bmw m performance parts', category: 'auto', label: 'Automotive' },
-  { query: 'gaming desk setup', category: 'home', label: 'Home Tech' },
-  { query: 'iphone unlocked', category: 'electronics', label: 'Electronics' },
-]);
 
 function qsLog(event, payload = {}) {
   // eslint-disable-next-line no-console
@@ -61,33 +62,39 @@ export function getConfidenceLabel(confidenceScore) {
 
 /** Enrich raw eBay listing with trust + Best Move decision (same shape as LocalDeals). */
 export function enrichQuickSnipeItem(item) {
-  const baseTrustInput = trustScoreInputFromListing(item);
+  const normalized = normalizeBestMoveListing(item) || item;
+  const baseTrustInput = trustScoreInputFromListing(normalized);
   const trust = evaluateTrustScore({
     ...baseTrustInput,
-    imageUrl: item.imageUrl || baseTrustInput.imageUrl,
-    seller: item.seller || baseTrustInput.seller,
-    savvyVerifiedSeller: item.savvyVerifiedSeller ?? baseTrustInput.savvyVerifiedSeller,
+    imageUrl: normalized.imageUrl || baseTrustInput.imageUrl,
+    seller: normalized.seller || baseTrustInput.seller,
+    savvyVerifiedSeller: normalized.savvyVerifiedSeller ?? baseTrustInput.savvyVerifiedSeller,
   });
 
   const decision = evaluateBestMove({
-    currentBid: item.currentBidPrice,
-    buyNowPrice: item.buyNowPrice,
-    marketValue: item.marketValue,
-    marketConfidence: item.marketConfidence,
+    currentBid: normalized.currentBidPrice,
+    buyNowPrice: normalized.buyNowPrice,
+    marketValue: normalized.marketValue,
+    marketConfidence: normalized.marketConfidence,
     trustScore: trust.trustScore,
-    bidCount: item.bidCount,
-    secondsRemaining: item.secondsRemaining,
-    condition: item.condition,
-    shippingCost: item.shippingCost,
-    isAuction: item.isAuction,
-    isBuyNow: item.isBuyNow,
+    bidCount: normalized.bidCount,
+    secondsRemaining: normalized.secondsRemaining,
+    condition: normalized.condition,
+    shippingCost: normalized.shippingCost,
+    isAuction: normalized.isAuction,
+    isBuyNow: normalized.isBuyNow,
   });
 
   return {
-    ...item,
-    source: item.source || 'ebay',
-    marketValue: item.marketValue ?? item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? null,
-    shippingCost: item.shippingCost ?? 0,
+    ...normalized,
+    source: normalized.source || 'ebay',
+    marketValue:
+      normalized.marketValue ??
+      normalized.buyNowPrice ??
+      normalized.currentBidPrice ??
+      normalized.price ??
+      null,
+    shippingCost: normalized.shippingCost ?? 0,
     dealScore: decision.dealScore,
     recommendationType: decision.recommendationType,
     recommendationReason: decision.recommendationReason,
@@ -264,32 +271,53 @@ function pickToBestMove(scored, source, { isFallback = false } = {}) {
   };
 }
 
+function validationOptions({ category, query, source, isFallback }) {
+  return {
+    category,
+    query,
+    source,
+    enforceCategory: Boolean(category) && !isFallback,
+    requireTrust: true,
+    log: true,
+  };
+}
+
+function pickValidatedBestMove(ranked, source, ctx) {
+  const { isFallback = false, category = '', query = '' } = ctx;
+  const opts = validationOptions({ category, query, source, isFallback });
+
+  if (!isFallback) {
+    const extraordinary = ranked.find((row) => {
+      if (!row.extraordinary) return false;
+      return validateBestMoveListing(row.item, opts).valid;
+    });
+    if (extraordinary) {
+      return pickToBestMove(extraordinary, source, { isFallback: false });
+    }
+  }
+
+  for (const row of ranked) {
+    const check = validateBestMoveListing(row.item, opts);
+    if (!check.valid) continue;
+    return pickToBestMove(row, source, { isFallback });
+  }
+
+  qsLog('all_candidates_rejected', {
+    query,
+    category,
+    source,
+    rankedCount: ranked.length,
+  });
+  return null;
+}
+
 function itemsFromEbayPayload(data) {
   const raw = data?.normalizedItems || data?.items || [];
   return raw.map(enrichQuickSnipeItem);
 }
 
-function inferTrendingCategory(query) {
-  const q = String(query || '').toLowerCase();
-  if (/ps5|xbox|gaming|rtx|nintendo|desk/.test(q)) return 'gaming';
-  if (/bmw|m760|carbon|automotive|wheel|exhaust/.test(q)) return 'auto';
-  if (/desk|chair|home|kitchen|smart home/.test(q)) return 'home';
-  if (/jordan|sneaker|nike|yeezy/.test(q)) return 'sneakers';
-  if (/iphone|macbook|tech|electronics|airpods/.test(q)) return 'electronics';
-  if (/rolex|watch|omega|luxury/.test(q)) return 'luxury';
-  if (/pokemon|card|collectible/.test(q)) return 'collectibles';
-  if (/fashion|jacket|designer/.test(q)) return 'fashion';
-  return 'all';
-}
-
-function pickCuratedQuery(query) {
-  const q = String(query || '').toLowerCase();
-  const match = CURATED_FALLBACK_QUERIES.find((c) => q.includes(c.query.split(' ')[0]) || c.query.includes(q.split(' ')[0]));
-  if (match) return match;
-  if (/ps5|playstation/.test(q)) return CURATED_FALLBACK_QUERIES[0];
-  if (/m760|bmw|carbon/.test(q)) return CURATED_FALLBACK_QUERIES[3];
-  if (/desk|gaming desk/.test(q)) return CURATED_FALLBACK_QUERIES[4];
-  return CURATED_FALLBACK_QUERIES[Math.floor(Math.random() * CURATED_FALLBACK_QUERIES.length)];
+function resolveLaneCategory(category, query) {
+  return normalizeBestMoveCategory(category) || inferCategoryFromQuery(query) || '';
 }
 
 const BETA_FETCH_LIMIT = 20;
@@ -303,14 +331,14 @@ async function fetchAuctionsLane(query, limit = BETA_FETCH_LIMIT) {
   return itemsFromEbayPayload(data);
 }
 
-async function fetchTrendingLane(query, limit = BETA_FETCH_LIMIT) {
-  const category = inferTrendingCategory(query);
-  const data = await ebayService.getTrendingItems(category, Math.min(limit, BETA_FETCH_LIMIT));
+async function fetchTrendingLane(query, category, limit = BETA_FETCH_LIMIT) {
+  const laneCategory = resolveLaneCategory(category, query) || 'all';
+  const data = await ebayService.getTrendingItems(laneCategory, Math.min(limit, BETA_FETCH_LIMIT));
   return itemsFromEbayPayload(data);
 }
 
-async function fetchCuratedLane(query, limit = BETA_FETCH_LIMIT) {
-  const curated = pickCuratedQuery(query);
+async function fetchCuratedLane(query, category, attemptIndex = 0, limit = BETA_FETCH_LIMIT) {
+  const curated = pickCategoryFallbackQuery(category || inferCategoryFromQuery(query), query, attemptIndex);
   const data = await ebayService.searchItems({
     q: curated.query,
     listingMode: 'mixed',
@@ -325,35 +353,45 @@ async function fetchCuratedLane(query, limit = BETA_FETCH_LIMIT) {
  */
 export async function resolveQuickSnipesBestMove({
   query = '',
+  category = '',
   primaryItems = [],
   liveTick = 0,
 } = {}) {
   const q = String(query || '').trim();
-  qsLog('query_start', { query: q, primaryRawCount: primaryItems.length });
+  const laneCategory = resolveLaneCategory(category, q);
+  qsLog('query_start', { query: q, category: laneCategory, primaryRawCount: primaryItems.length });
 
   const tryPick = (items, source, isFallback) => {
     const ranked = rankQuickSnipeListings(items, liveTick);
     qsLog('filter_stats', {
       query: q,
+      category: laneCategory,
       source,
       rawCount: items.length,
       afterRank: ranked.length,
       extraordinaryCount: ranked.filter((r) => r.extraordinary).length,
     });
     if (!ranked.length) return null;
-    const extraordinary = ranked.find((r) => r.extraordinary);
-    if (extraordinary && !isFallback) {
-      return pickToBestMove(extraordinary, source, { isFallback: false });
-    }
-    return pickToBestMove(ranked[0], source, { isFallback: true });
+    return pickValidatedBestMove(ranked, source, {
+      isFallback,
+      category: laneCategory,
+      query: q,
+    });
   };
 
   if (primaryItems.length > 0) {
-    const extraordinary = rankQuickSnipeListings(primaryItems, liveTick).filter((r) => r.extraordinary);
-    if (extraordinary.length > 0) {
-      const pick = pickToBestMove(extraordinary[0], FALLBACK_SOURCES.QUICK_SNIPES, { isFallback: false });
-      qsLog('final_pick', { query: q, source: pick.source, isFallback: false, title: pick.item?.title });
-      return pick;
+    const ranked = rankQuickSnipeListings(primaryItems, liveTick);
+    const extraordinary = ranked.find((row) => row.extraordinary);
+    if (extraordinary) {
+      const pick = pickValidatedBestMove([extraordinary], FALLBACK_SOURCES.QUICK_SNIPES, {
+        isFallback: false,
+        category: laneCategory,
+        query: q,
+      });
+      if (pick) {
+        qsLog('final_pick', { query: q, source: pick.source, isFallback: false, title: pick.item?.title });
+        return pick;
+      }
     }
     const relaxed = tryPick(primaryItems, FALLBACK_SOURCES.QUICK_SNIPES_RELAXED, true);
     if (relaxed) {
@@ -362,20 +400,22 @@ export async function resolveQuickSnipesBestMove({
     }
   }
 
-  if (q) {
-    try {
-      const auctionItems = await fetchAuctionsLane(q);
-      const pick = tryPick(auctionItems, FALLBACK_SOURCES.AUCTIONS, true);
-      if (pick) {
-        qsLog('final_pick', { query: q, source: pick.source, fallbackSource: 'auctions', title: pick.item?.title });
-        return pick;
+  if (q || laneCategory) {
+    if (q) {
+      try {
+        const auctionItems = await fetchAuctionsLane(q);
+        const pick = tryPick(auctionItems, FALLBACK_SOURCES.AUCTIONS, true);
+        if (pick) {
+          qsLog('final_pick', { query: q, source: pick.source, fallbackSource: 'auctions', title: pick.item?.title });
+          return pick;
+        }
+      } catch (err) {
+        qsLog('auctions_fallback_error', { query: q, error: err?.message || String(err) });
       }
-    } catch (err) {
-      qsLog('auctions_fallback_error', { query: q, error: err?.message || String(err) });
     }
 
     try {
-      const trendingItems = await fetchTrendingLane(q);
+      const trendingItems = await fetchTrendingLane(q, laneCategory);
       const pick = tryPick(trendingItems, FALLBACK_SOURCES.TRENDING, true);
       if (pick) {
         qsLog('final_pick', { query: q, source: pick.source, fallbackSource: 'trending', title: pick.item?.title });
@@ -385,26 +425,30 @@ export async function resolveQuickSnipesBestMove({
       qsLog('trending_fallback_error', { query: q, error: err?.message || String(err) });
     }
 
-    try {
-      const { items: curatedItems, curated } = await fetchCuratedLane(q);
-      const pick = tryPick(curatedItems, FALLBACK_SOURCES.CURATED, true);
-      if (pick) {
-        qsLog('final_pick', {
-          query: q,
-          source: pick.source,
-          fallbackSource: 'curated',
-          curatedQuery: curated.query,
-          title: pick.item?.title,
-        });
-        pick.pickReason = `${pick.pickReason} Pulled from curated ${curated.label} lane while Savvy keeps scanning for legendary finds.`;
-        return pick;
+    const fallbackQueries = getCategoryFallbackQueries(laneCategory);
+    for (let i = 0; i < fallbackQueries.length; i += 1) {
+      try {
+        const { items: curatedItems, curated } = await fetchCuratedLane(q, laneCategory, i);
+        const pick = tryPick(curatedItems, FALLBACK_SOURCES.CURATED, true);
+        if (pick) {
+          qsLog('final_pick', {
+            query: q,
+            category: laneCategory,
+            source: pick.source,
+            fallbackSource: 'curated',
+            curatedQuery: curated.query,
+            title: pick.item?.title,
+          });
+          pick.pickReason = `${pick.pickReason} Pulled from curated ${curated.label} lane while Savvy keeps scanning for legendary finds.`;
+          return pick;
+        }
+      } catch (err) {
+        qsLog('curated_fallback_error', { query: q, attempt: i, error: err?.message || String(err) });
       }
-    } catch (err) {
-      qsLog('curated_fallback_error', { query: q, error: err?.message || String(err) });
     }
   }
 
-  qsLog('final_pick', { query: q, source: null, exhausted: true });
+  qsLog('final_pick', { query: q, category: laneCategory, source: null, exhausted: true });
   return null;
 }
 
@@ -413,13 +457,17 @@ export function applyIntentPoolFallback(allItems, intentFiltered, liveTick = 0) 
   if (intentFiltered.length > 0) return { items: intentFiltered, usedPoolFallback: false };
   if (!allItems.length) return { items: [], usedPoolFallback: false };
   const ranked = rankQuickSnipeListings(allItems, liveTick);
+  const valid = ranked
+    .filter((row) => validateBestMoveListing(row.item, { requireTrust: true, log: true, source: 'intent_pool' }).valid)
+    .slice(0, 10)
+    .map((r) => r.item);
   qsLog('intent_pool_fallback', {
     rawCount: allItems.length,
     intentFilteredCount: 0,
-    poolFallbackCount: Math.min(10, ranked.length),
+    poolFallbackCount: valid.length,
   });
   return {
-    items: ranked.slice(0, 10).map((r) => r.item),
-    usedPoolFallback: true,
+    items: valid,
+    usedPoolFallback: valid.length > 0,
   };
 }

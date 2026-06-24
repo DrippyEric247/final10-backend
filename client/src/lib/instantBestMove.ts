@@ -27,8 +27,16 @@ import {
 } from "./categoryHeroSearchMap";
 import { getInterestConfig, labelForInterest } from "./onboardingInterests";
 import type { InterestId } from "./onboardingPreferences";
-import { getBestListingImageUrl } from "./listingImageUrl";
 import { buildApiUrl } from "./runtimeApi";
+import {
+  getCategoryFallbackQueries,
+  NO_PERFECT_MATCH_MESSAGE,
+  normalizeBestMoveCategory,
+} from "./bestMoveFallbackConfig";
+import {
+  normalizeBestMoveListing,
+  validateBestMoveListing,
+} from "./bestMoveListingValidation";
 
 const ebayApi = (path: string) => buildApiUrl(`/ebay${path.startsWith("/") ? path : `/${path}`}`);
 const DEFAULT_PER_CATEGORY_LIMIT = 20;
@@ -36,13 +44,20 @@ const MIN_ACCEPTABLE_SCORE = 50;
 const HIGH_TRUST_FLOOR = 60;
 const MEDIUM_TRUST_FLOOR = 55;
 
-/** Broad live queries when interest/category searches return thin results. */
+/** @deprecated Use getCategoryFallbackQueries(interest) — kept for legacy imports. */
 export const DEFAULT_TRENDING_QUERIES = [
-  "PlayStation 5 console",
-  "Air Jordan sneakers",
-  "NVIDIA RTX 4070 graphics card",
-  "BMW wheels",
+  "playstation 5 console",
+  "car diagnostic scanner obd2",
+  "office chair ergonomic",
+  "airpods pro",
+  "air jordan sneakers",
 ] as const;
+
+function mapInterestToBestMoveCategory(interest: InterestId): string {
+  if (interest === "tech") return "electronics";
+  if (interest === "sneakers") return "fashion";
+  return normalizeBestMoveCategory(interest) || interest;
+}
 
 export const WIDENED_SEARCH_MESSAGE =
   "Savvy Scout widened the search to find a safer Best Move.";
@@ -202,29 +217,17 @@ function listingIdentity(item: RawListing): string {
 }
 
 function normalizeListing(item: RawListing): RawListing {
-  const withUrl =
-    item.imageUrl || !item.image ? item : { ...item, imageUrl: String(item.image).trim() };
-  const best = getBestListingImageUrl(withUrl);
-  if (!best) return withUrl;
-  return { ...withUrl, imageUrl: best };
-}
-
-function hasValidTitle(item: RawListing): boolean {
-  return typeof item.title === "string" && item.title.trim().length >= 4;
-}
-
-function hasValidImage(item: RawListing): boolean {
-  const image = String(item.imageUrl || "").trim();
-  return image.length > 0;
-}
-
-function hasValidPrice(item: RawListing): boolean {
-  const price = pickComparablePrice(item);
-  return Number.isFinite(price) && (price as number) > 0;
+  const normalized = normalizeBestMoveListing(item);
+  if (!normalized) return item;
+  return normalized as RawListing;
 }
 
 function isRenderableListing(item: RawListing): boolean {
-  return hasValidTitle(item) && hasValidImage(item) && hasValidPrice(item);
+  return validateBestMoveListing(item, {
+    requireTrust: false,
+    log: true,
+    source: "instant_best_move",
+  }).valid;
 }
 
 function isValidEbayCategoryId(categoryId?: string): boolean {
@@ -513,18 +516,22 @@ async function searchTrendingGlobal(
   }
 }
 
-async function searchDefaultTrendingQueries(
+async function searchCategoryFallbackQueries(
+  interest: InterestId,
   signal?: AbortSignal,
   limit: number = DEFAULT_PER_CATEGORY_LIMIT
 ): Promise<RawListing[]> {
+  const category = mapInterestToBestMoveCategory(interest);
+  const queries = getCategoryFallbackQueries(category);
   const seen = new Set<string>();
   const merged: RawListing[] = [];
-  for (const q of DEFAULT_TRENDING_QUERIES) {
+  for (const q of queries) {
     const { items } = await searchWithCategoryFallback({
       q,
       signal,
       limit: Math.max(8, Math.floor(limit / 2)),
-      engine: "trending_default_query",
+      engine: "category_fallback_query",
+      interest,
     });
     for (const item of items) {
       const id = listingIdentity(item);
@@ -533,18 +540,21 @@ async function searchDefaultTrendingQueries(
       merged.push(item);
     }
   }
-  debugLog("trending_default_queries_merged", { resultCount: merged.length });
+  debugLog("category_fallback_queries_merged", { interest, category, resultCount: merged.length });
   return merged;
 }
 
-function buildMockSafeDeal(interest: InterestId): InstantBestMoveCandidate {
+function buildMockSafeDeal(interest: InterestId): InstantBestMoveCandidate | null {
+  const category = mapInterestToBestMoveCategory(interest);
+  const queries = getCategoryFallbackQueries(category);
+  const titleHint = queries[0] || "electronics deal";
   const listing = normalizeListing({
-    id: "f10-mock-safe-best-move",
-    itemId: "f10-mock-safe-best-move",
-    title: "Sony PS5 Console Bundle — Savvy starter Best Move",
+    id: `f10-mock-safe-best-move-${interest}`,
+    itemId: `f10-mock-safe-best-move-${interest}`,
+    title: `${titleHint} — Savvy starter Best Move`,
     imageUrl:
-      "https://via.placeholder.com/960x720/111827/22D3EE?text=Final10+Best+Move",
-    itemWebUrl: "https://www.ebay.com/sch/i.html?_nkw=playstation+5+console",
+      "https://i.ebayimg.com/images/g/placeholder/v1|0|0.jpg",
+    itemWebUrl: `https://www.ebay.com/itm/f10-mock-safe-best-move-${interest}`,
     buyNowPrice: 449.99,
     marketValue: 519.99,
     currency: "USD",
@@ -557,6 +567,7 @@ function buildMockSafeDeal(interest: InterestId): InstantBestMoveCandidate {
     condition: "Used",
     shippingCost: 0,
   });
+  if (!isRenderableListing(listing)) return null;
   return scoreListing(listing, interest);
 }
 
@@ -936,10 +947,12 @@ async function searchInterestSet(
       return;
     }
     for (const raw of items) {
-      const id = listingIdentity(raw);
+      const listing = normalizeListing(raw);
+      if (!isRenderableListing(listing)) continue;
+      const id = listingIdentity(listing);
       if (seen.has(id)) continue;
       seen.add(id);
-      candidates.push(scoreListing(raw, interest));
+      candidates.push(scoreListing(listing, interest));
     }
   });
 
@@ -953,10 +966,12 @@ function mergeCandidates(
   interest: InterestId
 ) {
   for (const raw of items) {
-    const id = listingIdentity(raw);
+    const listing = normalizeListing(raw);
+    if (!isRenderableListing(listing)) continue;
+    const id = listingIdentity(listing);
     if (seen.has(id)) continue;
     seen.add(id);
-    target.push(scoreListing(raw, interest));
+    target.push(scoreListing(listing, interest));
   }
 }
 
@@ -1008,16 +1023,30 @@ export async function fetchInstantBestMove(
 
   if (unique.length === 0) {
     const mock = buildMockSafeDeal("gaming");
-    return buildSuccessResult(mock, [mock], {
-      matchType: "cached_fallback",
-      matchLabel: "Savvy Pick",
-      matchMessage: WIDENED_SEARCH_MESSAGE,
-      pickedReason: "Showing a safe starter pick while you choose interests.",
+    if (mock) {
+      return buildSuccessResult(mock, [mock], {
+        matchType: "cached_fallback",
+        matchLabel: "Savvy Pick",
+        matchMessage: WIDENED_SEARCH_MESSAGE,
+        pickedReason: "Showing a safe starter pick while you choose interests.",
+        searchedInterests: [],
+        emptyInterests: [],
+        totalCandidates: 1,
+        widenedSearch: true,
+      });
+    }
+    return {
+      pick: null,
+      alternates: [],
+      matchType: "watching",
+      matchLabel: "Savvy Watching",
+      matchMessage: NO_PERFECT_MATCH_MESSAGE,
+      pickedReason: "Choose interests to personalize your Best Move.",
       searchedInterests: [],
       emptyInterests: [],
-      totalCandidates: 1,
-      widenedSearch: true,
-    });
+      totalCandidates: 0,
+      widenedSearch: false,
+    };
   }
 
   try {
@@ -1094,8 +1123,9 @@ export async function fetchInstantBestMove(
       });
     }
 
-    // 3) Default trending queries (PS5, Jordan, RTX, BMW wheels, …)
-    const trendingItems = await searchDefaultTrendingQueries(
+    // 3) Category-specific fallback queries (stays inside user's interest lane)
+    const trendingItems = await searchCategoryFallbackQueries(
+      primary,
       options.signal,
       options.perCategoryLimit
     );
@@ -1112,7 +1142,7 @@ export async function fetchInstantBestMove(
       return buildSuccessResult(pick, ranked, {
         matchType: "next_best_win",
         matchLabel: "Next Best Win",
-        matchMessage: `Nothing strong in ${interestLabelList(unique)} right now — found a high-trust trending win.`,
+        matchMessage: `Nothing strong in ${interestLabelList(unique)} right now — ${NO_PERFECT_MATCH_MESSAGE}`,
         pickedReason: "Picked from Savvy’s widened trending search.",
         searchedInterests,
         emptyInterests,
@@ -1197,37 +1227,53 @@ export async function fetchInstantBestMove(
       });
     }
 
-    // 6) Last resort — cached safe deal card (never dead-end the user)
+    // 6) Last resort — closest validated direct listings only (no search-page mocks)
     debugLog("fallback_step_used", {
       step: 6,
-      label: "cached_mock_safe_deal",
+      label: "validated_closest_options",
       totalResults: allCandidates.length,
     });
-    const mock = buildMockSafeDeal(primary);
-    return buildSuccessResult(mock, [mock, ...ranked.slice(0, 3)], {
-      matchType: "cached_fallback",
-      matchLabel: "Savvy Pick",
-      matchMessage: "Live inventory is thin — Savvy Scout selected a safe starter Best Move while scanning new lanes.",
-      pickedReason: "Cached safe deal so you always get a trusted first move.",
+    const displayable = ranked.filter((c) => isRenderableListing(c.listing));
+    if (displayable.length > 0) {
+      return buildSuccessResult(displayable[0], displayable, {
+        matchType: "closest_strong_match",
+        matchLabel: "Closest Strong Match",
+        matchMessage: NO_PERFECT_MATCH_MESSAGE,
+        pickedReason: "Strongest direct listing after full fallback ladder.",
+        searchedInterests,
+        emptyInterests,
+        totalCandidates: allCandidates.length,
+        widenedSearch: true,
+      });
+    }
+
+    return {
+      pick: null,
+      alternates: [],
+      matchType: "watching",
+      matchLabel: "Savvy Watching",
+      matchMessage: NO_PERFECT_MATCH_MESSAGE,
+      pickedReason: "No direct listings passed quality checks yet.",
       searchedInterests,
       emptyInterests,
-      totalCandidates: Math.max(allCandidates.length, 1),
+      totalCandidates: allCandidates.length,
       widenedSearch: true,
-    });
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     debugLog("best_move_fatal", { error: message });
-    const mock = buildMockSafeDeal(primary);
-    return buildSuccessResult(mock, [mock], {
-      matchType: "cached_fallback",
-      matchLabel: "Savvy Pick",
-      matchMessage: WIDENED_SEARCH_MESSAGE,
-      pickedReason: "Recovered with a safe offline pick after a live search error.",
+    return {
+      pick: null,
+      alternates: [],
+      matchType: "watching",
+      matchLabel: "Savvy Watching",
+      matchMessage: NO_PERFECT_MATCH_MESSAGE,
+      pickedReason: "Live search hit an error — try again in a moment.",
       searchedInterests: unique,
       emptyInterests: unique,
-      totalCandidates: 1,
+      totalCandidates: 0,
       widenedSearch: true,
-    });
+    };
   }
 }
 

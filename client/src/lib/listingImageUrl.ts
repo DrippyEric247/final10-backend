@@ -74,6 +74,26 @@ export function getBestListingImageUrl(item: unknown): string {
     }
   }
 
+  const thumb = o.thumbnailImages;
+  if (Array.isArray(thumb)) {
+    for (const entry of thumb) {
+      if (typeof entry === "string") pushUrl(urls, entry);
+      else if (entry && typeof entry === "object") {
+        collectImageUrlsFromObject(entry as UnknownRecord, urls);
+      }
+    }
+  }
+
+  const additional = o.additionalImages;
+  if (Array.isArray(additional)) {
+    for (const entry of additional) {
+      if (typeof entry === "string") pushUrl(urls, entry);
+      else if (entry && typeof entry === "object") {
+        collectImageUrlsFromObject(entry as UnknownRecord, urls);
+      }
+    }
+  }
+
   const list = [...urls];
   if (!list.length) return "";
 
@@ -89,4 +109,20 @@ export function getBestListingImageUrl(item: unknown): string {
   }
 
   return upgradeEbayPictureUrl(best);
+}
+
+const PLACEHOLDER_IMAGE_PATTERNS = [
+  /fallback\.png/i,
+  /placeholder/i,
+  /via\.placeholder\.com/i,
+  /no[-_]?image/i,
+  /data:image\/svg/i,
+];
+
+/** True when URL is a real remote product photo (not app placeholder / blank). */
+export function isValidProductImageUrl(url: unknown): boolean {
+  const u = String(url || "").trim();
+  if (!u || !/^https?:\/\//i.test(u)) return false;
+  if (PLACEHOLDER_IMAGE_PATTERNS.some((pat) => pat.test(u))) return false;
+  return true;
 }
