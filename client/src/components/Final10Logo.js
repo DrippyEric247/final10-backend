@@ -1,5 +1,6 @@
 import React from 'react';
 import SavvyMark from './SavvyMark';
+import { SAVVY_UNIVERSE_LABEL } from '../config/final10Branding';
 
 const Final10Logo = ({ size = 'large', showTaglines = true, className = '' }) => {
   const px = size === 'small' ? 20 : size === 'medium' ? 28 : 36;
@@ -17,18 +18,14 @@ const Final10Logo = ({ size = 'large', showTaglines = true, className = '' }) =>
         padding: '10px 0',
       }}
     >
-      {showTaglines && (
-        <div style={{ color: '#94a3b8', fontSize: tagPx, letterSpacing: '0.08em' }}>SAVVY ECOSYSTEM</div>
-      )}
-      <SavvyMark variant="product" appName="Final10" size={px} glow animated={size !== 'small'} />
-      {showTaglines && (
-        <div style={{ color: '#94a3b8', fontSize: tagPx, letterSpacing: '0.06em' }}>
-          POINTS THAT TRAVEL WITH YOU
+      {showTaglines ? (
+        <div style={{ color: '#94a3b8', fontSize: tagPx, letterSpacing: '0.08em' }}>
+          {SAVVY_UNIVERSE_LABEL.toUpperCase()}
         </div>
-      )}
+      ) : null}
+      <SavvyMark variant="product" appName="Final10" size={px} glow animated={size !== 'small'} />
     </div>
   );
 };
 
 export default Final10Logo;
-

@@ -1,0 +1,341 @@
+.f10-subscription-page {
+  min-height: 100vh;
+  background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(139, 92, 246, 0.18), transparent 55%),
+    linear-gradient(180deg, #0b0f1a 0%, #020617 100%);
+  padding: 5.5rem 1rem 3rem;
+}
+
+.f10-subscription-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.f10-subscription-hero {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.f10-subscription-hero h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.f10-subscription-hero p {
+  margin: 0.65rem auto 0;
+  max-width: 36rem;
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  line-height: 1.55;
+  color: #94a3b8;
+}
+
+.f10-subscription-slogan {
+  margin-top: 1rem;
+}
+
+.f10-subscription-billing {
+  display: inline-flex;
+  margin-top: 1.25rem;
+  padding: 0.25rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.f10-subscription-billing button {
+  border: none;
+  border-radius: 0.65rem;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.f10-subscription-billing button.is-active-monthly {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  color: #fff;
+}
+
+.f10-subscription-billing button.is-active-yearly {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #111827;
+}
+
+.f10-subscription-billing button:not(.is-active-monthly):not(.is-active-yearly) {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.f10-subscription-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 768px) {
+  .f10-subscription-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+}
+
+.f10-subscription-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.72);
+  padding: 1.35rem;
+  backdrop-filter: blur(8px);
+}
+
+.f10-subscription-card--free {
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.f10-subscription-card--premium {
+  border-color: rgba(167, 139, 250, 0.45);
+  box-shadow: 0 0 32px rgba(139, 92, 246, 0.12);
+}
+
+.f10-subscription-card--pro {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 36px rgba(251, 191, 36, 0.14);
+}
+
+.f10-subscription-card.is-popular {
+  transform: translateY(-2px);
+}
+
+.f10-subscription-badge {
+  position: absolute;
+  top: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.f10-subscription-badge--popular {
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  color: #fff;
+}
+
+.f10-subscription-badge--pro {
+  background: linear-gradient(90deg, #fbbf24, #f97316);
+  color: #111827;
+}
+
+.f10-subscription-card-hd {
+  margin-bottom: 0.85rem;
+}
+
+.f10-subscription-card-name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.f10-subscription-card-desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.f10-subscription-price {
+  margin: 0.5rem 0 0;
+  font-size: 2.25rem;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+}
+
+.f10-subscription-price-sub {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.f10-subscription-savings {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.f10-subscription-bestmoves {
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.f10-subscription-event {
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  color: #a5b4fc;
+}
+
+.f10-subscription-features {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  flex: 1;
+}
+
+.f10-subscription-features li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin-bottom: 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #e2e8f0;
+}
+
+.f10-subscription-features svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: #4ade80;
+}
+
+.f10-subscription-cta {
+  margin-top: 1.15rem;
+  width: 100%;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
+}
+
+.f10-subscription-cta:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.f10-subscription-cta:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.f10-subscription-cta--free {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #e2e8f0;
+}
+
+.f10-subscription-cta--premium {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  color: #fff;
+}
+
+.f10-subscription-cta--pro {
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  color: #111827;
+}
+
+.f10-subscription-usage {
+  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.55);
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.f10-subscription-footnote {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.f10-subscription-footnote h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.f10-subscription-footnote p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #a5f3fc;
+}
+
+.f10-subscription-msg {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.f10-subscription-msg--ok {
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+}
+
+.f10-subscription-msg--err {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+.f10-subscription-beta {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.1);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.f10-best-move-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.f10-best-move-upgrade-hint {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #c4b5fd;
+  font-weight: 600;
+}

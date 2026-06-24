@@ -17,6 +17,8 @@ import { parseApiError } from '../lib/apiErrorParsing';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import EmptyState from '../components/ui/states/EmptyState';
+import Final10Slogan from '../components/branding/Final10Slogan';
+import { FINAL10_TIERS } from '../lib/final10SubscriptionTiers';
 
 // tiny helpers
 const fmt = n => (n ?? 0).toLocaleString();
@@ -292,34 +294,39 @@ export default function PointsPage() {
         </section>
       )}
 
-      {/* Free vs Premium Quick Comparison */}
+      {/* Membership tiers */}
       <section style={{ marginBottom: 24, padding: 20, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid #2a2a2a' }}>
-        <h3 style={{ marginTop: 0, marginBottom: 16 }}>Free vs Premium</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* Free Tier */}
-          <div style={{ padding: 16, borderRadius: 8, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-            <h4 style={{ margin: '0 0 12px', color: '#60a5fa' }}>Free Tier</h4>
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ 5 searches per day</li>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Basic auction browsing</li>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Daily tasks & points</li>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Community features</li>
-            </ul>
-            <div style={{ marginTop: 12, fontSize: 18, fontWeight: 'bold', color: '#60a5fa' }}>$0/month</div>
-          </div>
-
-          {/* Premium Tier */}
-          <div style={{ padding: 16, borderRadius: 8, background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-            <h4 style={{ margin: '0 0 12px', color: '#a855f7' }}>Premium</h4>
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Unlimited searches</li>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Premium auction access</li>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Advanced filters & AI</li>
-              <li style={{ marginBottom: 8, fontSize: 14, color: '#d1d5db' }}>✓ Priority support</li>
-            </ul>
-            <div style={{ marginTop: 12, fontSize: 18, fontWeight: 'bold', color: '#a855f7' }}>$7/month</div>
-          </div>
+        <h3 style={{ marginTop: 0, marginBottom: 8 }}>Final10 Membership</h3>
+        <Final10Slogan variant="footer" as="p" style={{ marginBottom: 16 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+          {FINAL10_TIERS.map((tier) => (
+            <div
+              key={tier.id}
+              style={{
+                padding: 16,
+                borderRadius: 8,
+                background: tier.id === 'pro' ? 'rgba(251, 191, 36, 0.08)' : tier.id === 'core' ? 'rgba(168, 85, 247, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                border: `1px solid ${tier.id === 'pro' ? 'rgba(251, 191, 36, 0.35)' : tier.id === 'core' ? 'rgba(168, 85, 247, 0.35)' : 'rgba(59, 130, 246, 0.3)'}`,
+              }}
+            >
+              <h4 style={{ margin: '0 0 8px', color: tier.id === 'pro' ? '#fbbf24' : tier.id === 'core' ? '#a855f7' : '#60a5fa' }}>{tier.name}</h4>
+              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>Best Moves: {tier.bestMovesLabel}</div>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 13, color: '#d1d5db' }}>
+                {tier.features.slice(0, 4).map((f) => (
+                  <li key={f} style={{ marginBottom: 6 }}>✓ {f}</li>
+                ))}
+              </ul>
+              <div style={{ marginTop: 10, fontWeight: 'bold', color: '#f8fafc' }}>{tier.priceLabel}</div>
+            </div>
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={() => { window.location = '/premium'; }}
+          style={{ marginTop: 16, padding: '10px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#a855f7)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}
+        >
+          View upgrade options
+        </button>
         
         {/* Multi-App Future */}
         <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
@@ -517,8 +524,9 @@ export default function PointsPage() {
         </div>
       </section>
 
-      <footer style={{ opacity: 0.7, textAlign: 'center', padding: '24px 0' }}>
-        © {new Date().getFullYear()} Final10 · Stay Earning. Stay Savvy.
+      <footer style={{ opacity: 0.85, textAlign: 'center', padding: '24px 0' }}>
+        <Final10Slogan variant="footer" as="p" style={{ marginBottom: 8 }} />
+        <div>© {new Date().getFullYear()} Final10 · Savvy Universe</div>
       </footer>
     </div>
   );

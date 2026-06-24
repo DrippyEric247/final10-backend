@@ -23,6 +23,7 @@ import { ANALYTICS_EVENTS, trackEvent, trackPointsEarned } from "../lib/analytic
 import { ONBOARDING_FIRST_MOVE_SAVVY } from "../config/savvyRewards";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
+import Final10Slogan from "../components/branding/Final10Slogan";
 import "../styles/OnboardingBestMove.css";
 
 const LOADING_STAGES = [
@@ -795,6 +796,7 @@ function ResultPanel({
         <strong>{interestLabelList(interests)}</strong> · we only surface picks
         that clear our trust bar.
       </div>
+      <Final10Slogan variant="section" as="p" className="onboard-move-slogan" />
     </div>
   );
 }

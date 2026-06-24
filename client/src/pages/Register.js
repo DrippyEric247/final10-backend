@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
+import Final10Slogan from '../components/branding/Final10Slogan';
 import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
@@ -97,7 +98,8 @@ export default function Register() {
         <Final10Logo size="large" showTaglines={true} />
       </div>
       
-      <h1 className="text-3xl font-bold mb-4 text-center">Join FINAL10</h1>
+      <h1 className="text-3xl font-bold mb-2 text-center">Join FINAL10</h1>
+      <Final10Slogan variant="auth" className="mb-4" />
       {attribution?.creatorHandle ? (
         <div className="mb-4 p-3 rounded-lg border border-purple-400/40 bg-purple-900/30 text-purple-100 text-sm">
           You're joining through{' '}

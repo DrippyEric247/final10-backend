@@ -17,6 +17,8 @@ const {
   emailProductFallbackImageUrl,
   savvyScoutHeroImageUrl,
   final10LogoImageUrl,
+  emailBrandingFooterHtml,
+  emailBrandingFooterText,
 } = require('./emailTemplateUtils');
 
 const COLORS = {
@@ -482,6 +484,8 @@ function buildSavvyScoutDealFoundHtml(raw = {}) {
                 &nbsp;·&nbsp;
                 <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:${COLORS.purple};text-decoration:underline;">Unsubscribe</a>
                 <br/><br/>
+                ${emailBrandingFooterHtml({ mutedColor: COLORS.dim, marginTop: 8 })}
+                <br/>
                 © ${new Date().getFullYear()} Final10 App · Savvy Universe
               </div>
             </td>
@@ -539,6 +543,8 @@ function buildSavvyScoutDealFoundText(raw = {}) {
     `Next tier: ${d.nextRewardTier} (${d.progressPercent}%)`,
     '',
     'WE HUNT. YOU WIN. — Savvy Scout',
+    '',
+    emailBrandingFooterText(),
     '',
     `Manage preferences: ${d.preferencesUrl}`,
     `Unsubscribe: ${d.unsubscribeUrl}`,

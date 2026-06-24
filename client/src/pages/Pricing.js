@@ -2,11 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   Check, 
-  Crown, 
-  Zap, 
-  Shield, 
   Star, 
-  ArrowRight,
   CreditCard,
   Smartphone,
   DollarSign,
@@ -14,6 +10,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FINAL10_TIERS, getMostPopularTierId } from '../lib/final10SubscriptionTiers';
+import Final10Slogan from '../components/branding/Final10Slogan';
+import '../styles/subscriptionPlans.css';
 
 const Pricing = () => {
   const mostPopularTier = getMostPopularTierId();
@@ -31,80 +29,71 @@ const Pricing = () => {
               Choose Your Plan
             </h1>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Start free and upgrade when you're ready. All plans include our core features with premium offering unlimited access and exclusive benefits.
+              Free, Premium, and Pro — three clear tiers with more Best Moves, faster alerts, and bigger rewards as you upgrade.
             </p>
+            <Final10Slogan variant="section" as="p" className="mt-4 max-w-2xl mx-auto" />
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-16">
+          <div className="f10-subscription-grid mb-16">
             {FINAL10_TIERS.map((tier, idx) => {
-              const isPro = tier.id === "pro" || tier.id === "elite";
+              const isPro = tier.id === 'pro';
+              const isPremium = tier.id === 'core';
               const isPopular = tier.id === mostPopularTier;
+              const cardClass = tier.id === 'free'
+                ? 'f10-subscription-card--free'
+                : isPremium
+                ? 'f10-subscription-card--premium'
+                : 'f10-subscription-card--pro';
               return (
                 <motion.div
                   key={tier.id}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 + idx * 0.08 }}
-                  className={`rounded-2xl p-8 border relative ${
-                    isPro
-                      ? "bg-gradient-to-br from-amber-500/18 via-purple-600/16 to-pink-600/18 border-amber-400/50 shadow-[0_0_34px_rgba(250,204,21,0.18)]"
-                      : tier.id === "core"
-                      ? "bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/35"
-                      : "bg-gray-800 border-gray-700"
-                  }`}
-                  style={isPro ? { animation: "pulse 3.1s ease-in-out infinite" } : undefined}
+                  className={`f10-subscription-card ${cardClass} ${isPopular ? 'is-popular' : ''}`}
                 >
                   {isPopular ? (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full text-sm font-semibold">
-                        Most Popular
-                      </span>
-                    </div>
+                    <span className="f10-subscription-badge f10-subscription-badge--popular">Most Popular</span>
                   ) : null}
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className={`p-4 rounded-xl ${isPro ? "bg-amber-400/20" : tier.id === "core" ? "bg-purple-500/20" : "bg-blue-500/20"}`}>
-                      {isPro ? (
-                        <Shield className="h-8 w-8 text-amber-300" />
-                      ) : tier.id === "core" ? (
-                        <Crown className="h-8 w-8 text-purple-300" />
-                      ) : (
-                        <Zap className="h-8 w-8 text-blue-400" />
-                      )}
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">{tier.name}</h2>
-                      <p className="text-gray-300">{tier.description}</p>
-                    </div>
+                  {isPro ? (
+                    <span className="f10-subscription-badge f10-subscription-badge--pro">Full Power</span>
+                  ) : null}
+                  <div className="f10-subscription-card-hd">
+                    <h2 className="f10-subscription-card-name">{tier.name}</h2>
+                    <p className="f10-subscription-card-desc">{tier.description}</p>
                   </div>
 
-                  <div className="mb-8">
-                    <div className="text-4xl font-bold text-white mb-2">{tier.priceLabel}</div>
-                    <div className="text-gray-300">{tier.subLabel}</div>
-                  </div>
+                  <div className="f10-subscription-price">{tier.priceLabel}</div>
+                  <div className="f10-subscription-price-sub">{tier.subLabel}</div>
+                  <div className="f10-subscription-bestmoves">Best Moves: {tier.bestMovesLabel}</div>
+                  {tier.eventBonus ? (
+                    <div className="f10-subscription-event">Event bonus: {tier.eventBonus}</div>
+                  ) : null}
 
-                  <div className="space-y-4 mb-8">
+                  <ul className="f10-subscription-features">
                     {tier.features.map((feature) => (
-                      <div key={feature} className="flex items-center gap-3">
-                        <Check className="h-5 w-5 text-green-400" />
-                        <span className={`text-gray-200 ${feature === tier.savvyMultiplier ? "font-semibold" : ""}`}>
-                          {feature}
-                        </span>
-                      </div>
+                      <li key={feature}>
+                        <Check size={16} aria-hidden />
+                        <span>{feature}</span>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
 
                   <Link
                     to={tier.ctaPath}
-                    className={`w-full block text-center ${
-                      tier.id === "free" ? "btn btn-outline" : "btn btn-primary"
+                    className={`f10-subscription-cta ${
+                      tier.id === 'free'
+                        ? 'f10-subscription-cta--free'
+                        : isPremium
+                        ? 'f10-subscription-cta--premium'
+                        : 'f10-subscription-cta--pro'
                     }`}
+                    style={{ textDecoration: 'none', textAlign: 'center', display: 'block' }}
                   >
-                    {tier.id !== "free" ? <Crown className="w-5 h-5 inline mr-2" /> : null}
                     {tier.ctaLabel}
-                    {tier.id !== "free" ? <ArrowRight className="w-5 h-5 inline ml-2" /> : null}
                   </Link>
-                  {tier.id === "free" ? (
+                  {tier.id === 'free' ? (
                     <p className="text-xs text-gray-400 mt-3 text-center">
                       Free stays fully usable. Upgrade only for speed and advantage.
                     </p>

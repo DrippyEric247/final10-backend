@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { SCOUT_MISSION_POPUP_EVENT } from "../../lib/savvyScoutMissions";
+import Final10Slogan from "../branding/Final10Slogan";
 import "../../styles/SavvyScoutMissions.css";
 
 export default function SavvyScoutMissionPopupHost({ onOpenMissions }) {
@@ -59,6 +60,7 @@ export default function SavvyScoutMissionPopupHost({ onOpenMissions }) {
       {popup.rewardSavvy ? (
         <div className="scout-mission-popup__reward">+{popup.rewardSavvy} Savvy</div>
       ) : null}
+      <Final10Slogan variant="toast" as="p" className="scout-mission-popup__slogan" />
     </div>
   );
 }

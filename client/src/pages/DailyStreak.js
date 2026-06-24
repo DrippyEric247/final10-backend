@@ -9,6 +9,7 @@ import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { formatMilestoneRewards } from '../config/dailyStreakRewards';
 import LoadingState from '../components/ui/states/LoadingState';
 import DailyStreakAdminPanel from '../components/streak/DailyStreakAdminPanel';
+import Final10Slogan from '../components/branding/Final10Slogan';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import '../styles/DailyStreak.css';
 
@@ -297,7 +298,8 @@ export default function DailyStreak() {
     <div className="daily-streak-page">
       <header className="daily-streak-header">
         <h1>Daily Login Streak</h1>
-        <p>Claim once per day. Scout Shields protect a missed day.</p>
+        <Final10Slogan variant="section" />
+        <p className="daily-streak-subcopy">Claim once per day. Scout Shields protect a missed day.</p>
       </header>
 
       {error ? (
@@ -349,6 +351,7 @@ export default function DailyStreak() {
       ) : null}
 
       <section className="streak-calendar" aria-labelledby="calendar-heading">
+        <Final10Slogan variant="calendar" as="p" />
         <h2 id="calendar-heading">Rewards Calendar</h2>
         <div className="streak-calendar-grid">
           {(status?.calendar || []).map((row) => {

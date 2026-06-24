@@ -12,6 +12,7 @@ const { enrichItemsWithMarketValue } = require('./marketValueService');
 const { sendSavvyScoutDealFoundEmail } = require('./emailService');
 const { getTierConfigForUser } = require('./betaTesterService');
 const { normalizeTier } = require('../config/subscriptionPlans');
+const { applyTierEventMultiplier } = require('../lib/pointsEventMultipliers');
 const {
   PS5_SEARCH_TERMS,
   TEST_ALERT_NAME,
@@ -183,7 +184,10 @@ function computeSavvyRewards(user, listing, pointsMultiplier) {
     ? Math.round(baseReward * 0.35)
     : 0;
   const seasonPassBonus = Math.round(baseReward * 0.2);
-  const eventMult = Math.max(1, pointsMultiplier);
+  const rawEventMult = Math.max(1, pointsMultiplier);
+  const userTier = normalizeTier(user?.subscription?.tier || user?.membershipTier);
+  const eventMult =
+    rawEventMult >= 2 ? applyTierEventMultiplier(rawEventMult, userTier) : 1;
   const doublePointBonus =
     eventMult >= 2 ? Math.round((baseReward + premiumBonus) * (eventMult - 1)) : 0;
   const estimatedReward = baseReward + premiumBonus + seasonPassBonus + doublePointBonus;
@@ -198,7 +202,7 @@ function computeSavvyRewards(user, listing, pointsMultiplier) {
     triplePointActive: eventMult >= 3,
     pointsEventLabel:
       eventMult >= 3 ? '3X REWARDS ACTIVE!' : eventMult >= 2 ? '2X REWARDS ACTIVE!' : null,
-    currentMultiplier: `${(mult * eventMult).toFixed(1)}X`,
+    currentMultiplier: `${(mult * eventMult).toFixed(2).replace(/\.?0+$/, '')}X`,
   };
 }
 

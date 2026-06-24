@@ -1,88 +1,87 @@
 export const FINAL10_TIERS = Object.freeze([
   {
-    id: "free",
-    name: "Free",
-    priceLabel: "$0",
-    subLabel: "Always available",
-    description: "Start smart, keep full control.",
-    savvyMultiplier: "1.0x Savvy multiplier",
+    id: 'free',
+    name: 'FREE',
+    priceLabel: '$0',
+    subLabel: 'Always available',
+    description: 'Everything you need to hunt smart from day one.',
+    monthlyPrice: 0,
+    bestMovesLabel: '5 / day',
     features: [
-      "Basic alerts (delayed)",
-      "Text-based Savvy Scout assistant",
-      "AI alert suggestions + deal explanations",
-      "Limited snipes per day",
-      "1.0x Savvy multiplier",
+      '5 Best Moves per day',
+      'Daily Login Streaks',
+      'Free Battle Pass Track',
+      'Basic Deal Alerts',
+      'Savvy Points',
+      'Calling Cards & Emblems',
+      'Egg Collection',
+      'Watchlist',
+      'Referral Rewards',
+      'Standard event multipliers',
     ],
-    ctaLabel: "Keep Using Free",
-    ctaPath: "/auctions",
+    ctaLabel: 'Keep Using Free',
+    ctaPath: '/auctions',
   },
   {
-    id: "core",
-    name: "CORE",
-    priceLabel: "$15/mo",
-    subLabel: "$129/yr option",
-    description: "Solid edge with faster alerts and better multipliers.",
-    savvyMultiplier: "1.25x Savvy multiplier",
+    id: 'core',
+    name: 'PREMIUM',
+    priceLabel: '$7/mo',
+    subLabel: '$70/yr — save $14',
+    description: 'Faster alerts, premium rewards, and more daily Best Moves.',
+    monthlyPrice: 7,
+    yearlyPrice: 70,
+    bestMovesLabel: '10 / day',
+    eventBonus: 'Double 2.2× · Triple 3.3×',
     features: [
-      "Semi-fast alerts",
-      "Best Moves: 5/day",
-      "Alerts: 10 max",
-      "Voice AI input (e.g. 'Find PS5 under $375')",
-      "Voice-to-alert auto creation",
-      "Basic smart suggestions",
-      "1.25x Savvy multiplier",
-      "Daily login bonus +0.75",
+      '10 Best Moves per day',
+      'Faster Alert Notifications',
+      'Premium Battle Pass Track',
+      'Premium Egg Drops',
+      'Extra Watchlist Capacity',
+      'Priority Deal Discovery',
+      'Premium Calling Cards & Emblems',
+      '+10% bonus during Double Points and Triple Points events',
     ],
-    ctaLabel: "Upgrade to CORE",
-    ctaPath: "/premium?tier=core",
+    ctaLabel: 'Upgrade to Premium',
+    ctaPath: '/premium?tier=core',
   },
   {
-    id: "pro",
-    name: "PRO",
-    priceLabel: "$25/mo",
-    subLabel: "$219/yr option",
-    description: "Execution speed with real-time signals.",
-    savvyMultiplier: "1.5x Savvy multiplier",
+    id: 'pro',
+    name: 'PRO',
+    priceLabel: '$14/mo',
+    subLabel: '$140/yr — save $28',
+    description: 'Unlimited Best Moves, voice features, and maximum advantage.',
+    monthlyPrice: 14,
+    yearlyPrice: 140,
+    bestMovesLabel: 'Unlimited',
+    eventBonus: 'Double 2.5× · Triple 3.75×',
     features: [
-      "Real-time alerts",
-      "Best Moves: 15/day",
-      "Alerts: 25 max",
-      "Execution AI: Ready to Buy flow",
-      "Smart filters (trust + price + condition)",
-      "Optional auto-confirm rules (countdown + cancel)",
-      "1.5x Savvy multiplier",
-      "Daily login bonus +1.0",
+      'Unlimited Best Moves',
+      'Fastest Alert Notifications',
+      'Highest Alert Priority',
+      'Voice Features',
+      'Early Access Features',
+      'Pro Profile Badge',
+      'Exclusive Mythic Reward Opportunities',
+      'Increased Egg Drop Chances',
+      '+25% bonus during Double Points and Triple Points events',
     ],
-    ctaLabel: "Upgrade to PRO",
-    ctaPath: "/premium?tier=pro",
-  },
-  {
-    id: "elite",
-    name: "ELITE",
-    priceLabel: "$35/mo",
-    subLabel: "$299/yr option",
-    description: "Full power with priority automation.",
-    savvyMultiplier: "2.0x Savvy multiplier",
-    features: [
-      "Priority alerts (unlimited)",
-      "Best Moves: unlimited",
-      "Execution AI + priority timing",
-      "2.0x Savvy multiplier",
-      "Daily login bonus +1.25",
-      "Highest Savvy rewards",
-    ],
-    ctaLabel: "Go ELITE",
-    ctaPath: "/premium?tier=elite",
+    ctaLabel: 'Upgrade to Pro',
+    ctaPath: '/premium?tier=pro',
   },
 ]);
 
 export function getMostPopularTierId() {
-  const allowed = new Set(["core", "pro", "elite"]);
-  if (typeof window !== "undefined") {
-    const qs = new URLSearchParams(window.location.search || "");
-    const fromUrl = String(qs.get("popular") || "").toLowerCase();
+  const allowed = new Set(['core', 'pro']);
+  if (typeof window !== 'undefined') {
+    const qs = new URLSearchParams(window.location.search || '');
+    const fromUrl = String(qs.get('popular') || '').toLowerCase();
     if (allowed.has(fromUrl)) return fromUrl;
   }
-  const fromEnv = String(process.env.REACT_APP_FINAL10_MOST_POPULAR_TIER || "").toLowerCase();
-  return allowed.has(fromEnv) ? fromEnv : "pro";
+  const fromEnv = String(process.env.REACT_APP_FINAL10_MOST_POPULAR_TIER || '').toLowerCase();
+  return allowed.has(fromEnv) ? fromEnv : 'core';
+}
+
+export function getTierById(id) {
+  return FINAL10_TIERS.find((t) => t.id === id) || FINAL10_TIERS[0];
 }

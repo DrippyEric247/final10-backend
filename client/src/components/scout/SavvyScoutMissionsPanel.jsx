@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { SAVVY_SCOUT } from "../../config/savvyScoutBranding";
+import Final10Slogan from "../branding/Final10Slogan";
 import "../../styles/SavvyScoutMissions.css";
 
 function cadenceLabel(cadence) {
@@ -107,9 +108,16 @@ export default function SavvyScoutMissionsPanel({
       ) : null}
 
       {contextual.length === 0 && claimable.length === 0 ? (
-        <p className="scout-missions-empty">
-          Savvy Scout is scanning for new earning opportunities. Keep hunting — missions appear as you move.
-        </p>
+        <div className="scout-missions-empty-wrap">
+          <p className="scout-missions-empty">
+            Savvy Scout is scanning for new earning opportunities. Keep hunting — missions appear as you move.
+          </p>
+          <Final10Slogan variant="empty" as="p" />
+        </div>
+      ) : null}
+
+      {claimable.length > 0 ? (
+        <Final10Slogan variant="empty" as="p" className="scout-missions-complete-slogan" />
       ) : null}
     </div>
   );

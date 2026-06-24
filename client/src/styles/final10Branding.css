@@ -1,0 +1,87 @@
+.f10-slogan {
+  margin: 0;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+}
+
+.f10-slogan--auth {
+  max-width: 22rem;
+  margin: 0.35rem auto 0;
+  padding: 0.65rem 1rem;
+  text-align: center;
+  font-size: clamp(0.82rem, 2.8vw, 0.95rem);
+  font-weight: 500;
+  color: #e9d5ff;
+  background: linear-gradient(
+    135deg,
+    rgba(88, 28, 135, 0.22),
+    rgba(15, 23, 42, 0.55)
+  );
+  border: 1px solid rgba(192, 132, 252, 0.28);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 28px rgba(88, 28, 135, 0.12);
+}
+
+.f10-slogan--hero {
+  max-width: 36rem;
+  margin-top: 0.65rem;
+  font-size: clamp(0.9rem, 2.4vw, 1.05rem);
+  font-weight: 600;
+  background: linear-gradient(90deg, #fde68a, #fbbf24 45%, #c4b5fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.f10-slogan--section {
+  max-width: 34rem;
+  margin: 0.35rem auto 0;
+  text-align: center;
+  font-size: clamp(0.82rem, 2.2vw, 0.92rem);
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.f10-slogan--calendar {
+  max-width: 34rem;
+  margin: 0 auto 1.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(251, 191, 36, 0.88);
+}
+
+.f10-slogan--footer {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.88);
+  font-style: italic;
+}
+
+.f10-slogan--toast {
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(192, 132, 252, 0.2);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: rgba(226, 232, 240, 0.62);
+  font-style: italic;
+}
+
+.f10-slogan--banner {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fde68a;
+  font-style: italic;
+}
+
+.f10-slogan--empty {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: rgba(196, 181, 253, 0.75);
+  font-style: italic;
+  text-align: center;
+}
+
+.f10-slogan--inline {
+  font-size: inherit;
+  color: inherit;
+}

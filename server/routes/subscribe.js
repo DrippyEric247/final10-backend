@@ -9,6 +9,7 @@ const {
   normalizeBilling,
   getTierConfig,
   computeSavings,
+  getPaidSubscriptionPlans,
 } = require('../config/subscriptionPlans');
 
 const router = express.Router();
@@ -27,12 +28,11 @@ function legacyMembershipForTier(tier) {
 }
 
 router.get('/plans', auth, async (_req, res) => {
-  const plans = Object.values(SUBSCRIPTION_TIERS)
-    .filter((p) => p.id !== 'free')
-    .map((p) => ({
-      ...p,
-      savings: computeSavings(p),
-    }));
+  const plans = getPaidSubscriptionPlans().map((p) => ({
+    ...p,
+    savings: computeSavings(p),
+    bestMovesLabel: Number.isFinite(p.bestMovesPerDay) ? `${p.bestMovesPerDay}/day` : 'Unlimited',
+  }));
   res.json({ plans, yearlyBonus: YEARLY_BONUS });
 });
 

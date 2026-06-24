@@ -11,6 +11,7 @@ import {
   type InterestId,
 } from "../lib/onboardingPreferences";
 import { onboardingAnalytics } from "../lib/onboardingAnalytics";
+import Final10Slogan from "../components/branding/Final10Slogan";
 import "../styles/OnboardingPreferences.css";
 
 const TRANSITION_STAGES = [
@@ -184,6 +185,7 @@ export default function OnboardingPreferences() {
         <p className="onboard-pref-secondary">
           You can change this anytime later.
         </p>
+        <Final10Slogan variant="section" as="p" className="onboard-pref-slogan" />
           </>
         ) : null}
       </div>

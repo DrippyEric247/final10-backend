@@ -20,6 +20,21 @@
   color: #c4b5fd;
 }
 
+.scout-mission-log-slogan,
+.scout-missions-complete-slogan {
+  margin-top: 0.85rem;
+}
+
+.scout-missions-empty-wrap {
+  text-align: center;
+}
+
+.onboard-move-slogan,
+.onboard-pref-slogan {
+  margin-top: 1rem;
+  text-align: center;
+}
+
 .scout-missions-panel__tagline {
   margin: 0.35rem 0 0;
   font-size: 12px;
@@ -238,6 +253,12 @@
   font-size: 11px;
   font-weight: 900;
   color: #6ee7b7;
+}
+
+.scout-mission-popup__slogan {
+  margin-top: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .scout-mission-log-page {

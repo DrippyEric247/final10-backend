@@ -18,7 +18,6 @@ import { emitTourAction } from '../lib/tourGuide';
 import { recordSearchSignal } from '../lib/sellerTrendEngine';
 import { api } from '../lib/api';
 import {
-  DEV_BEST_MOVE_USAGE_RESET_EVENT,
   DEV_SUBSCRIPTION_TOOLS_EVENT,
   formatTierMultiplierLabel,
   getAdvantageTier,
@@ -27,6 +26,13 @@ import {
   getTierForQuickSnipesBoost,
   setCurrentSubscriptionTier,
 } from '../lib/tierMultiplier';
+import {
+  formatBestMoveUsageLine,
+  getBestMoveUpgradePrompt,
+  readBestMoveUsage,
+  subscribeBestMoveUsage,
+  tryConsumeBestMoveCredit,
+} from '../lib/bestMoveUsage';
 import { isBetaTester, FOUNDING_TESTER_BADGE } from '../lib/betaTesterAccess';
 import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trackBetaTesterUsage } from '../lib/analytics';
 import LoadingState from '../components/ui/states/LoadingState';
@@ -44,33 +50,8 @@ import {
 import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
 import '../styles/QuickSnipesCommandCenter.css';
 
-const BOOSTED_POWER_KEY = "f10_best_move_power_daily_v1";
-
 /** Survives React Strict Mode remounts so `?q=` hydration does not double-consume boosts. */
 let __localDealsLastInitUrlKey = null;
-
-function todayKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function readPowerUsage() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(BOOSTED_POWER_KEY) || "{}");
-    if (raw.date !== todayKey()) return { date: todayKey(), used: 0 };
-    return { date: todayKey(), used: Math.max(0, Number(raw.used) || 0) };
-  } catch {
-    return { date: todayKey(), used: 0 };
-  }
-}
-
-function writePowerUsage(used) {
-  try {
-    localStorage.setItem(BOOSTED_POWER_KEY, JSON.stringify({ date: todayKey(), used }));
-  } catch {
-    /* ignore */
-  }
-}
 
 /**
  * Hunt tiles: `title` + `preview` are display-only; `query` is the only string sent to search.
@@ -204,7 +185,7 @@ const LocalDeals = () => {
   const [mode, setMode] = useState('auction');
   const [showPass, setShowPass] = useState(false);
   const [seen, setSeen] = useState({});
-  const [boostedUsed, setBoostedUsed] = useState(() => readPowerUsage().used);
+  const [boostedUsed, setBoostedUsed] = useState(() => readBestMoveUsage().used);
   const [boostedActive, setBoostedActive] = useState(false);
   const [boostExhaustedOpen, setBoostExhaustedOpen] = useState(false);
   const [pendingBoostQuery, setPendingBoostQuery] = useState('');
@@ -237,15 +218,9 @@ const LocalDeals = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const syncUsage = () => setBoostedUsed(readPowerUsage().used);
-    window.addEventListener(DEV_BEST_MOVE_USAGE_RESET_EVENT, syncUsage);
-    window.addEventListener(DEV_SUBSCRIPTION_TOOLS_EVENT, syncUsage);
-    return () => {
-      window.removeEventListener(DEV_BEST_MOVE_USAGE_RESET_EVENT, syncUsage);
-      window.removeEventListener(DEV_SUBSCRIPTION_TOOLS_EVENT, syncUsage);
-    };
-  }, []);
+  useEffect(() => subscribeBestMoveUsage((usage) => {
+    setBoostedUsed(usage.used);
+  }), []);
 
   /** Consumes one boosted credit when capped; returns whether boosted mode is on. */
   const tryConsumeBoostedCredit = useCallback(() => {
@@ -260,17 +235,19 @@ const LocalDeals = () => {
       setBoostedActive(true);
       return true;
     }
-    const { used } = readPowerUsage();
+    const { used } = readBestMoveUsage();
     const remaining = Math.max(0, cap - used);
     if (remaining <= 0) {
       setBoostedActive(false);
       return false;
     }
-    const nextUsed = used + 1;
-    setBoostedUsed(nextUsed);
-    writePowerUsage(nextUsed);
-    setBoostedActive(true);
-    return true;
+    if (tryConsumeBestMoveCredit(tier)) {
+      setBoostedUsed(readBestMoveUsage().used);
+      setBoostedActive(true);
+      return true;
+    }
+    setBoostedActive(false);
+    return false;
   }, []);
 
   const runBoostedSearch = (raw) => {
@@ -704,8 +681,13 @@ const LocalDeals = () => {
             </button>
           </div>
           <div className="mt-3 text-xs text-slate-300">
-            ⚡ {tierLabel} · Boosted opportunities left: {Number.isFinite(boostedCap) ? `${Math.max(0, boostedRemaining)} / ${boostedCap}` : 'Unlimited'} · {formatTierMultiplierLabel(subscriptionTier)} Savvy
+            <span className="f10-best-move-usage">{formatBestMoveUsageLine(quickSnipesBoostTier)}</span>
+            <span className="mx-2 opacity-50">·</span>
+            ⚡ {tierLabel} · {formatTierMultiplierLabel(subscriptionTier)} Savvy
           </div>
+          {getBestMoveUpgradePrompt(quickSnipesBoostTier) ? (
+            <p className="f10-best-move-upgrade-hint">{getBestMoveUpgradePrompt(quickSnipesBoostTier)}</p>
+          ) : null}
         </div>
 
         <section className="qscc-live-hero">
@@ -886,10 +868,14 @@ const LocalDeals = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 id="boost-exhausted-title" className="text-lg font-extrabold text-amber-100 mb-3">
-                Boosted Best Move unavailable
+                Daily Best Move limit reached
               </h2>
-              <p className="text-sm text-gray-300 leading-relaxed mb-6">
-                You&apos;re out of boosted Best Moves today. Continue with normal search or upgrade for more power.
+              <p className="text-sm text-gray-300 leading-relaxed mb-2">
+                {getBestMoveUpgradePrompt(quickSnipesBoostTier) ||
+                  "You're out of Best Moves today. Continue with normal search or upgrade for more."}
+              </p>
+              <p className="text-xs text-slate-400 mb-6">
+                {formatBestMoveUsageLine(quickSnipesBoostTier)}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-end">
                 <button

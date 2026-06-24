@@ -50,9 +50,9 @@ import {
   DEV_SUBSCRIPTION_TOOLS_EVENT,
   formatTierMultiplierLabel,
   getAdvantageTier,
-  getBestMoveBoostedCap,
   getEffectiveSubscriptionTier,
 } from '../lib/tierMultiplier';
+import { formatBestMoveUsageLine, subscribeBestMoveUsage } from '../lib/bestMoveUsage';
 import '../styles/SavvyPrograms.css';
 import { resetOnboardingPreferences, onboardingUserId } from '../lib/onboardingPreferences';
 
@@ -96,17 +96,6 @@ const getDayKey = (timestampMs) => {
   return `${y}-${m}-${day}`;
 };
 
-const getBestMovePowerUsedToday = () => {
-  try {
-    const raw = JSON.parse(localStorage.getItem("f10_best_move_power_daily_v1") || "{}");
-    const today = getDayKey(Date.now());
-    if (raw.date !== today) return 0;
-    return Math.max(0, Number(raw.used) || 0);
-  } catch {
-    return 0;
-  }
-};
-
 const Profile = () => {
   const { user, refreshProfile } = useAuth();
   const savvyLive = useSavvyPoints();
@@ -119,6 +108,12 @@ const Profile = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
   const [advTierTick, bumpAdvTier] = useReducer((n) => n + 1, 0);
   void advTierTick;
+
+  const [bestMoveUsageLine, setBestMoveUsageLine] = useState(() => formatBestMoveUsageLine());
+
+  useEffect(() => subscribeBestMoveUsage(() => {
+    setBestMoveUsageLine(formatBestMoveUsageLine());
+  }), []);
 
   useEffect(() => {
     const bump = () => bumpAdvTier();
@@ -1053,10 +1048,6 @@ const Profile = () => {
   const tasks = dailyTasks.tasks || {};
   const advantageTierId = getEffectiveSubscriptionTier();
   const advantageTier = getAdvantageTier(advantageTierId);
-  const boostedCap = getBestMoveBoostedCap(advantageTierId);
-  const boostedRemaining = Number.isFinite(boostedCap)
-    ? Math.max(0, boostedCap - getBestMovePowerUsedToday())
-    : Number.POSITIVE_INFINITY;
 
   const levelInfo = levelData?.level || {};
 
@@ -1109,7 +1100,7 @@ const Profile = () => {
         showSuccessMessage={showSuccessMessage}
         advantageLevel={advantageTier.label}
         advantageMultiplier={formatTierMultiplierLabel(advantageTierId)}
-        bestMovePowerLine={Number.isFinite(boostedCap) ? `${boostedRemaining} / ${boostedCap}` : "Unlimited"}
+        bestMovePowerLine={bestMoveUsageLine}
         savvyNextUnlock={savvyNextUnlock}
         leaderboardScore={leaderboardScore}
         permanentRank={permanentRank}

@@ -27,6 +27,7 @@ import type { TaskResolverContext } from "../types/battlePassTasks";
 import { BATTLE_PASS_ACTION_EVENT } from "../lib/battlePassActionBus";
 import { createBattlePassActionEvent } from "../lib/battlePassActionEventFactory";
 import SavvyMark from "../components/SavvyMark";
+import Final10Slogan from "../components/branding/Final10Slogan";
 import { SavvyPointsIcon } from "../components/rewards/SavvyPointsIcon";
 import { useSavvyPoints } from "../store/savvyStore";
 import "../styles/BattlePassPage.css";
@@ -476,6 +477,7 @@ export default function BattlePassPage() {
             {BATTLE_PASS_SEASON.name}
           </h1>
           <p className="sub">{BATTLE_PASS_SEASON.subtitle}</p>
+          <Final10Slogan variant="hero" as="p" />
           <p className="sub" style={{ fontSize: "0.82rem", opacity: 0.85 }}>
             Build your position from saves, scans, runs, streaks, and wins - the same actions that feed your Power bar.
           </p>

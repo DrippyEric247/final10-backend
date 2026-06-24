@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Zap, Twitter, Instagram, Facebook, Mail } from 'lucide-react';
+import Final10Slogan from './branding/Final10Slogan';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -51,10 +52,10 @@ const Footer = () => {
               </div>
               <span className="text-xl font-bold text-gradient">Final10</span>
             </Link>
-            <p className="text-gray-400 mb-6 max-w-md">
-              AI-powered auction platform for the next generation of buyers and sellers. 
-              Find the best deals with 10 minutes left, low competition, and high potential.
+            <p className="text-gray-400 mb-4 max-w-md">
+              AI-powered deals platform for the Savvy Universe — smart alerts, streak rewards, and Savvy that travels with you.
             </p>
+            <Final10Slogan variant="footer" as="p" className="mb-6 max-w-md" />
             <div className="flex space-x-4">
               {socialLinks.map((social) => (
                 <a

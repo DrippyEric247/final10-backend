@@ -9,7 +9,7 @@ export function getAlertCreationCapabilities(tier = getEffectiveSubscriptionTier
   const missionTier = getScoutMissionTier(tier);
   const normalized = missionTier === "elite" ? "elite" : missionTier;
   const textAi = normalized === "pro" || normalized === "elite" || isBetaTester();
-  const voiceAi = normalized === "elite" || isBetaTester();
+  const voiceAi = normalized === "pro" || normalized === "elite" || isBetaTester();
   const adv = getAdvantageTier(missionTier);
   const alertsMax = isBetaTester() ? Number.POSITIVE_INFINITY : adv.alertsMax;
   return {
@@ -21,9 +21,9 @@ export function getAlertCreationCapabilities(tier = getEffectiveSubscriptionTier
     alertsMode: adv.alertsMode,
     checkNote:
       normalized === "free"
-        ? "Delayed checks on Free — Savvy+ and Pro are faster."
+        ? "Basic delayed checks on Free — Premium and Pro are faster."
         : normalized === "core"
-          ? "Faster checks than Free — Pro adds real-time priority."
-          : "Real-time / priority checks on your plan.",
+          ? "Faster checks than Free — Pro adds fastest priority."
+          : "Fastest / priority checks on your plan.",
   };
 }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSavvyScoutMissions } from "../context/SavvyScoutMissionsContext";
 import SavvyScoutMissionsPanel from "../components/scout/SavvyScoutMissionsPanel";
+import Final10Slogan from "../components/branding/Final10Slogan";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import { SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import "../styles/SavvyScoutMissions.css";
@@ -44,6 +45,7 @@ export default function MissionLog() {
           <p className="scout-mission-log-sub">
             Secondary log for active, completed, and claimed missions. Your primary guide is the floating Savvy Scout bubble.
           </p>
+          <Final10Slogan variant="empty" as="p" />
         </header>
 
         <SavvyScoutMissionsPanel
@@ -112,6 +114,7 @@ export default function MissionLog() {
         <p className="scout-mission-log-foot">
           <Link to="/">← Back to app</Link>
         </p>
+        <Final10Slogan variant="footer" as="p" className="scout-mission-log-slogan" />
       </div>
     </div>
   );

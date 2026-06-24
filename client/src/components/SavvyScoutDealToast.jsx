@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import scoutMascot from "../assets/savvy-scout-mascot.png";
+import Final10Slogan from "./branding/Final10Slogan";
 import "../styles/SavvyScoutDealToast.css";
 
 /**
@@ -71,6 +72,7 @@ export default function SavvyScoutDealToast({
         <button type="button" className="savvy-scout-deal-toast__cta" onClick={onViewDeal}>
           View Deal
         </button>
+        <Final10Slogan variant="toast" as="p" />
       </div>
     </div>
   );

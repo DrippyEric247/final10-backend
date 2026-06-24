@@ -27,7 +27,7 @@ export default function ProfilePageLayout({
   showSuccessMessage,
   advantageLevel = "Explorer",
   advantageMultiplier = "1.0x",
-  bestMovePowerLine = "3 / 3",
+  bestMovePowerLine = "Best Moves: 0 / 5 used today",
   savvyNextUnlock,
   leaderboardScore,
   permanentRank,
@@ -172,7 +172,7 @@ export default function ProfilePageLayout({
             <strong className="text-cyan-300">{advantageLevel}</strong>
           </div>
           <div className="f10-profile-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.6rem", alignItems: "center" }}>
-            <span className="text-gray-200">Best Move Power</span>
+            <span className="text-gray-200">Best Moves today</span>
             <strong className="text-amber-300">{bestMovePowerLine}</strong>
           </div>
           <div className="f10-profile-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.6rem", alignItems: "center" }}>

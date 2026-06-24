@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const { auditEmailDelivery } = require('./auditLogger');
 const { buildSavvyScoutDealFoundEmail } = require('../templates/email/savvyScoutDealFoundTemplate');
+const { emailBrandingFooterHtml, emailBrandingFooterText } = require('../templates/email/emailTemplateUtils');
 const {
   resolveEmailFrom,
   auditEmailFrom,
@@ -685,12 +686,15 @@ async function sendTestEmail({ to, useDealTemplate = true }) {
     `Provider: ${provider}`,
     'If you received this, email delivery is configured correctly on the server.',
     `Time: ${new Date().toISOString()}`,
+    '',
+    emailBrandingFooterText(),
   ].join('\n');
   const html = `
     <p><strong>Savvy Scout</strong> test email from Final10.</p>
     <p>Provider: <code>${provider}</code></p>
     <p>If you received this, email delivery is configured correctly on the server.</p>
     <p><small>${new Date().toISOString()}</small></p>
+    ${emailBrandingFooterHtml()}
   `;
 
   const result = await sendMailMessage({

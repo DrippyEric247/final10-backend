@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
+import Final10Slogan from '../components/branding/Final10Slogan';
 import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
@@ -86,6 +87,7 @@ export default function Login() {
       {/* FINAL10 APP Logo */}
       <div className="text-center mb-12 mt-4">
         <Final10Logo size="large" showTaglines={true} />
+        <Final10Slogan variant="auth" />
       </div>
       
       <h1 className="text-3xl font-bold mb-4 text-center">Welcome Back</h1>

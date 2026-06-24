@@ -27,17 +27,15 @@ const STEPS = [
 function TierPitch({ caps }) {
   const { tier, textAi, voiceAi, alertsMax, checkNote } = caps;
   let pitch =
-    "Savvy+ adds more smart alerts and faster checks. Pro and Elite unlock the full assistant experience.";
+    "Upgrade to Premium for faster alerts and 10 daily Best Moves, or Pro for unlimited Best Moves and voice features.";
   if (tier === "free") {
     pitch =
-      "Free includes manual alerts with Savvy monitoring — upgrade for more smart capacity and richer target coaching.";
+      "Free includes basic deal alerts and 5 Best Moves per day — upgrade for more capacity and faster notifications.";
   } else if (tier === "core") {
     pitch =
-      "Core includes a limited set of smart alerts with improved check speed. Pro adds deeper AI phrasing on targets.";
-  } else if (tier === "pro") {
-    pitch = "Pro unlocks more alerts, better suggestions, and real-time style monitoring on your watches.";
-  } else if (tier === "elite") {
-    pitch = "Elite adds voice-first alert setup and maximum real-time priority across the board.";
+      "Premium includes 10 Best Moves per day and faster alerts. Upgrade to Pro for unlimited Best Moves and voice features.";
+  } else if (tier === "pro" || tier === "elite") {
+    pitch = "Pro unlocks unlimited Best Moves, fastest alert priority, voice features, and +25% event bonuses.";
   }
   return (
     <div className="rounded-xl border border-violet-500/30 bg-violet-950/40 p-4 text-sm text-violet-100/95">
@@ -46,7 +44,7 @@ function TierPitch({ caps }) {
       <ul className="list-disc pl-5 space-y-1 text-violet-200/80 text-xs">
         <li>Up to {alertsMax === Infinity ? "unlimited" : alertsMax} alerts on this tier.</li>
         <li>AI phrasing on targets: {textAi ? "On" : "Limited (client hints only)"}.</li>
-        <li>Voice setup: {voiceAi ? "Available" : "Elite only"}.</li>
+        <li>Voice setup: {voiceAi ? "Available" : "Pro only"}.</li>
         <li>{checkNote}</li>
       </ul>
     </div>

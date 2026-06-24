@@ -30,6 +30,7 @@ import {
   saveReferralPlaceholder,
   unlockFoundingTesterBadge,
 } from "../lib/foundingTesterMission";
+import Final10Slogan from "../components/branding/Final10Slogan";
 
 const RANK_LADDER = [
   { tier: 1, label: "Bronze Tester", blurb: "Boots on the ground" },
@@ -191,6 +192,7 @@ export default function FoundingTesterMission() {
               <p className="text-sm font-medium text-cyan-200/90 italic border-l-2 border-cyan-400/50 pl-4">
                 Community Tested Builds Improve Faster
               </p>
+              <Final10Slogan variant="banner" as="p" className="pt-1" />
             </div>
             <div
               className={`rounded-2xl border bg-gradient-to-br px-5 py-4 shadow-lg ${rank.accent} border-white/15 ring-2 ${rank.ring}`}

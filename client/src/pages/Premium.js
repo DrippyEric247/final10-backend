@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Check, Crown, Flame, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   getSubscriptionPlans,
@@ -8,38 +8,81 @@ import {
   trackSubscriptionMetric,
 } from '../lib/api';
 import { trackUpgradeClicked } from '../lib/analytics';
-import { setCurrentSubscriptionTier } from '../lib/tierMultiplier';
+import {
+  getEffectiveSubscriptionTier,
+  setCurrentSubscriptionTier,
+} from '../lib/tierMultiplier';
+import { FINAL10_TIERS, getTierById } from '../lib/final10SubscriptionTiers';
+import {
+  formatBestMoveUsageLine,
+  subscribeBestMoveUsage,
+} from '../lib/bestMoveUsage';
+import Final10Slogan from '../components/branding/Final10Slogan';
+import '../styles/subscriptionPlans.css';
+
+const PAID_TIER_IDS = new Set(['core', 'pro']);
+
+function mergePlanWithMarketing(apiPlan) {
+  const marketing = getTierById(apiPlan.id);
+  return {
+    ...marketing,
+    ...apiPlan,
+    label: apiPlan.label || marketing.name,
+    features: apiPlan.features?.length ? apiPlan.features : marketing.features,
+    bestMovesLabel: Number.isFinite(apiPlan.bestMovesPerDay)
+      ? `${apiPlan.bestMovesPerDay} / day`
+      : 'Unlimited',
+  };
+}
 
 const Premium = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isFoundingTester = Boolean(user?.foundingTesterAccess || user?.betaTester || user?.foundingAccess);
-  const [billing, setBilling] = useState('yearly');
-  const [plans, setPlans] = useState([]);
+  const [billing, setBilling] = useState('monthly');
+  const [apiPlans, setApiPlans] = useState([]);
   const [busyTier, setBusyTier] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [usageLine, setUsageLine] = useState(() => formatBestMoveUsageLine());
+
+  const currentTier = getEffectiveSubscriptionTier();
+
+  useEffect(() => subscribeBestMoveUsage(() => {
+    setUsageLine(formatBestMoveUsageLine());
+  }), []);
+
   useEffect(() => {
     if (!user) return;
     const fetch = async () => {
       try {
         const response = await getSubscriptionPlans();
-        setPlans(response?.plans || []);
-      } catch (e) {
+        setApiPlans(response?.plans || []);
+      } catch {
         setError('Failed to load plans');
       }
     };
     fetch();
   }, [user]);
 
-  const sortedPlans = useMemo(
-    () => [...plans].sort((a, b) => Number(a.monthlyPrice) - Number(b.monthlyPrice)),
-    [plans]
-  );
+  const displayTiers = useMemo(() => {
+    const freeTier = FINAL10_TIERS[0];
+    const paidFromApi = apiPlans
+      .filter((p) => PAID_TIER_IDS.has(p.id))
+      .map(mergePlanWithMarketing);
+    const paidFallback = FINAL10_TIERS.filter((t) => PAID_TIER_IDS.has(t.id));
+    const paid = paidFromApi.length ? paidFromApi : paidFallback;
+    return [freeTier, ...paid];
+  }, [apiPlans]);
 
   const onSelectPlan = async (tierId) => {
+    if (tierId === 'free') {
+      navigate('/auctions');
+      return;
+    }
     if (isFoundingTester) {
-      setMessage("Founding Tester Access is active. Pricing is preview-only during beta. Coming after beta.");
-      setError("");
+      setMessage('Founding Tester Access is active. Pricing is preview-only during beta.');
+      setError('');
       return;
     }
     setBusyTier(tierId);
@@ -58,7 +101,7 @@ const Premium = () => {
       await trackSubscriptionMetric('conversion_rate', tierId, billing, { converted: true });
       setCurrentSubscriptionTier(String(tierId || '').toLowerCase());
       setMessage(
-        `Subscribed to ${result.subscription.tier} (${billing}). Multiplier now ${result.subscription.multiplier.toFixed(2)}x.`
+        `Subscribed to ${result.subscription.tier} (${billing}). Multiplier now ${Number(result.subscription.multiplier).toFixed(2)}×.`
       );
     } catch (e) {
       setError(e?.response?.data?.message || 'Subscription failed. Try again.');
@@ -69,8 +112,8 @@ const Premium = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-900 pt-20">
-        <div className="max-w-5xl mx-auto px-4 py-8 text-center text-gray-300">
+      <div className="f10-subscription-page">
+        <div className="f10-subscription-inner text-center text-gray-300">
           Log in to upgrade.
         </div>
       </div>
@@ -78,104 +121,128 @@ const Premium = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-20">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white">Final10 Advantage Plans</h1>
-            <p className="mt-2 text-gray-300">
-              You are not paying, you are gaining an advantage.
-            </p>
-            {isFoundingTester ? (
-              <div className="mt-3 inline-block rounded-lg border border-amber-300/45 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-100">
-                Founding Tester Access is active. Coming after beta.
-              </div>
-            ) : null}
-            <div className="mt-4 inline-flex rounded-xl border border-gray-600 p-1">
-              <button
-                type="button"
-                className={`px-4 py-2 rounded-lg text-sm font-bold ${billing === 'monthly' ? 'bg-purple-500 text-white' : 'text-gray-300'}`}
-                onClick={() => setBilling('monthly')}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                className={`px-4 py-2 rounded-lg text-sm font-bold ${billing === 'yearly' ? 'bg-amber-400 text-gray-900' : 'text-gray-300'}`}
-                onClick={() => setBilling('yearly')}
-              >
-                Yearly 🔥 BEST VALUE
-              </button>
-            </div>
+    <div className="f10-subscription-page">
+      <div className="f10-subscription-inner">
+        <div className="f10-subscription-hero">
+          <h1>Final10 Membership</h1>
+          <p>Choose the plan that matches your hunt. Upgrade for more Best Moves, faster alerts, and bigger event bonuses.</p>
+          <Final10Slogan variant="section" as="p" className="f10-subscription-slogan" />
+          {isFoundingTester ? (
+            <div className="f10-subscription-beta">Founding Tester Access is active. Coming after beta.</div>
+          ) : null}
+          <div className="f10-subscription-billing" role="group" aria-label="Billing period">
+            <button
+              type="button"
+              className={billing === 'monthly' ? 'is-active-monthly' : ''}
+              onClick={() => setBilling('monthly')}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              className={billing === 'yearly' ? 'is-active-yearly' : ''}
+              onClick={() => setBilling('yearly')}
+            >
+              Yearly — best value
+            </button>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {sortedPlans.map((plan) => {
-              const yearly = Number(plan.yearlyPrice);
-              const monthly = Number(plan.monthlyPrice);
-              const price = billing === 'yearly' ? yearly : monthly;
-              const savings = Math.max(0, monthly * 12 - yearly);
-              const isPopular = billing === 'yearly' && plan.id === 'pro';
-              const isFullPower = billing === 'yearly' && plan.id === 'elite';
-              return (
-                <div
-                  key={plan.id}
-                  className={`rounded-2xl border p-5 ${isPopular ? 'border-purple-400 bg-purple-500/10' : isFullPower ? 'border-amber-300 bg-amber-500/10' : 'border-gray-700 bg-gray-800/70'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-extrabold text-white">{String(plan.label || plan.id).toUpperCase()}</h3>
-                    {isPopular ? <span className="text-xs font-bold text-purple-200">🔥 MOST POPULAR</span> : null}
-                    {isFullPower ? <span className="text-xs font-bold text-amber-200">⚡ FULL POWER</span> : null}
-                  </div>
-                  <div className="mt-2 text-3xl font-black text-white">${price}</div>
-                  <div className="text-xs text-gray-300">{billing === 'yearly' ? 'per year' : 'per month'}</div>
-                  {billing === 'yearly' ? (
-                    <div className="mt-2 text-xs font-semibold text-emerald-300">
-                      Save ${savings} per year
-                    </div>
-                  ) : null}
-                  <ul className="mt-3 space-y-1 text-sm text-gray-200">
-                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-400" />{plan.multiplier}x multiplier</li>
-                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-400" />Best Moves: {Number.isFinite(plan.bestMovesPerDay) ? plan.bestMovesPerDay : 'Unlimited'}</li>
-                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-400" />Alerts: {Number.isFinite(plan.alertsMax) ? plan.alertsMax : 'Unlimited'} ({plan.alertsSpeed})</li>
-                  </ul>
-                  <button
-                    type="button"
-                    className={`mt-4 w-full rounded-lg px-4 py-2 font-bold ${isFullPower ? 'bg-amber-300 text-gray-900' : 'bg-purple-500 text-white'}`}
-                    onClick={() => onSelectPlan(plan.id)}
-                    disabled={busyTier === plan.id}
-                  >
-                    {busyTier === plan.id ? 'Processing...' : isFoundingTester ? 'Coming after beta' : `Upgrade to ${String(plan.label || plan.id).toUpperCase()}`}
-                  </button>
+        <div className="f10-subscription-usage" aria-live="polite">
+          {usageLine}
+        </div>
+
+        <div className="f10-subscription-grid">
+          {displayTiers.map((tier) => {
+            const isFree = tier.id === 'free';
+            const isPremium = tier.id === 'core';
+            const isPro = tier.id === 'pro';
+            const yearly = Number(tier.yearlyPrice || 0);
+            const monthly = Number(tier.monthlyPrice || 0);
+            const price = billing === 'yearly' && !isFree ? yearly : monthly;
+            const savings = Math.max(0, monthly * 12 - yearly);
+            const isCurrent = currentTier === tier.id || (isPro && currentTier === 'elite');
+            const cardClass = isFree
+              ? 'f10-subscription-card--free'
+              : isPremium
+              ? 'f10-subscription-card--premium is-popular'
+              : 'f10-subscription-card--pro';
+
+            return (
+              <article
+                key={tier.id}
+                className={`f10-subscription-card ${cardClass}`}
+                aria-label={`${tier.name} plan`}
+              >
+                {isPremium ? (
+                  <span className="f10-subscription-badge f10-subscription-badge--popular">Most popular</span>
+                ) : null}
+                {isPro ? (
+                  <span className="f10-subscription-badge f10-subscription-badge--pro">Full power</span>
+                ) : null}
+                <header className="f10-subscription-card-hd">
+                  <h2 className="f10-subscription-card-name">{tier.name}</h2>
+                  <p className="f10-subscription-card-desc">{tier.description}</p>
+                </header>
+                <div className="f10-subscription-price">
+                  {isFree ? '$0' : `$${price}`}
                 </div>
-              );
-            })}
-          </div>
+                <div className="f10-subscription-price-sub">
+                  {isFree ? 'Always available' : billing === 'yearly' ? 'per year' : 'per month'}
+                </div>
+                {!isFree && billing === 'yearly' && savings > 0 ? (
+                  <div className="f10-subscription-savings">Save ${savings} per year</div>
+                ) : null}
+                <div className="f10-subscription-bestmoves">
+                  Best Moves: {tier.bestMovesLabel || (isFree ? '5 / day' : '—')}
+                </div>
+                {tier.eventBonus ? (
+                  <div className="f10-subscription-event">Event bonus: {tier.eventBonus}</div>
+                ) : null}
+                <ul className="f10-subscription-features">
+                  {tier.features.map((feature) => (
+                    <li key={feature}>
+                      <Check size={16} aria-hidden />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className={`f10-subscription-cta ${
+                    isFree
+                      ? 'f10-subscription-cta--free'
+                      : isPremium
+                      ? 'f10-subscription-cta--premium'
+                      : 'f10-subscription-cta--pro'
+                  }`}
+                  onClick={() => onSelectPlan(tier.id)}
+                  disabled={busyTier === tier.id || (isCurrent && !isFree)}
+                >
+                  {busyTier === tier.id
+                    ? 'Processing…'
+                    : isCurrent && !isFree
+                    ? 'Current plan'
+                    : isFoundingTester && !isFree
+                    ? 'Coming after beta'
+                    : isFree
+                    ? 'Continue free'
+                    : `Upgrade to ${tier.name}`}
+                </button>
+              </article>
+            );
+          })}
+        </div>
 
-          <div className="mt-8 rounded-2xl border border-cyan-400/35 bg-cyan-500/10 p-5">
-            <div className="text-lg font-extrabold text-white">Why upgrade?</div>
-            <div className="mt-3 grid gap-2 text-sm text-cyan-100 md:grid-cols-2">
-              <div className="flex items-center gap-2"><Zap className="h-4 w-4" />Earn more Savvy per action</div>
-              <div className="flex items-center gap-2"><Crown className="h-4 w-4" />Unlock better deals faster</div>
-              <div className="flex items-center gap-2"><Flame className="h-4 w-4" />Automated alerts</div>
-              <div className="flex items-center gap-2"><Check className="h-4 w-4" />Higher multipliers</div>
-            </div>
-            <div className="mt-3 text-sm font-semibold text-amber-200">
-              Lock your price forever (early users only).
-            </div>
-            {billing === 'yearly' ? (
-              <div className="mt-2 text-xs text-emerald-200">
-                Yearly bonus: +1000 Savvy Points, +0.25 multiplier boost, Early Adopter badge.
-              </div>
-            ) : null}
-          </div>
+        <div className="f10-subscription-footnote">
+          <h2>Double &amp; Triple Points</h2>
+          <p>
+            Free members earn standard event multipliers. Premium adds +10% (2.2× / 3.3×). Pro adds +25% (2.5× / 3.75×) during active events.
+          </p>
+        </div>
 
-          {message ? <div className="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-200">{message}</div> : null}
-          {error ? <div className="mt-4 rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-rose-200">{error}</div> : null}
-        </motion.div>
+        {message ? <div className="f10-subscription-msg f10-subscription-msg--ok">{message}</div> : null}
+        {error ? <div className="f10-subscription-msg f10-subscription-msg--err">{error}</div> : null}
       </div>
     </div>
   );

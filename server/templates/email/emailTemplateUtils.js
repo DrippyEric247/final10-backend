@@ -1,6 +1,4 @@
-/**
- * Shared helpers for Final10 HTML email templates (email-client safe).
- */
+const { FINAL10_OFFICIAL_SLOGAN } = require('../../config/final10Branding');
 
 function escapeHtml(raw) {
   return String(raw ?? '')
@@ -154,6 +152,15 @@ function final10LogoImageUrl() {
   return `${getEmailAssetsBaseUrl()}/assets/final10-logo.png`;
 }
 
+/** Official slogan footer for all Final10 HTML emails. */
+function emailBrandingFooterHtml({ mutedColor = '#6b7280', marginTop = 12 } = {}) {
+  return `<div style="margin-top:${marginTop}px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${mutedColor};font-style:italic;line-height:1.55;text-align:center;">${escapeHtml(FINAL10_OFFICIAL_SLOGAN)}</div>`;
+}
+
+function emailBrandingFooterText() {
+  return FINAL10_OFFICIAL_SLOGAN;
+}
+
 module.exports = {
   escapeHtml,
   pick,
@@ -171,4 +178,6 @@ module.exports = {
   emailProductFallbackImageUrl,
   savvyScoutHeroImageUrl,
   final10LogoImageUrl,
+  emailBrandingFooterHtml,
+  emailBrandingFooterText,
 };

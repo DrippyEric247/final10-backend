@@ -93,7 +93,9 @@ import FoundingTesterBadge from "./components/beta/FoundingTesterBadge";
 import { SavvyScoutMissionsProvider } from './context/SavvyScoutMissionsContext';
 import MissionLog from './pages/MissionLog';
 import DailyStreak from './pages/DailyStreak';
+import Final10Slogan from './components/branding/Final10Slogan';
 import './styles/SavvyScoutMissions.css';
+import './styles/final10Branding.css';
 
 /* Protect any route by requiring a token/user */
 function ProtectedRoute({ children }) {
@@ -591,6 +593,7 @@ export default function App() {
         </AppErrorBoundary>
       </main>
       <footer className="container px-6 pb-8 text-sm text-gray-400">
+        <Final10Slogan variant="footer" as="p" className="mb-3 text-center md:text-left" />
         <div className="flex flex-wrap gap-4 border-t border-gray-800 pt-4">
           <Link to="/privacy" className="hover:text-gray-200">Privacy</Link>
           <Link to="/terms" className="hover:text-gray-200">Terms</Link>

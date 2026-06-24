@@ -11,9 +11,9 @@ const TIER_STORAGE_KEY = "f10_subscription_tier_v1";
 
 export const SAVVY_TIER_MULTIPLIERS = Object.freeze({
   free: 1.0,
-  core: 1.25,
-  pro: 1.5,
-  elite: 2.0,
+  core: 1.15,
+  pro: 1.35,
+  elite: 1.35,
 });
 
 export const ADVANTAGE_TIER_CONFIG = Object.freeze({
@@ -22,10 +22,11 @@ export const ADVANTAGE_TIER_CONFIG = Object.freeze({
     label: "Free",
     marketing: "FREE",
     multiplier: 1.0,
-    bestMoveBoostedPerDay: 3,
-    alertsMode: "delayed",
-    alertsMax: 3,
+    bestMoveBoostedPerDay: 5,
+    alertsMode: "basic",
+    alertsMax: 5,
     dailyLoginBonus: 0.5,
+    eventPointsBonusPct: 0,
     sellerSignals: false,
     visibilityBoost: false,
     projectAlertsEnabled: false,
@@ -40,18 +41,19 @@ export const ADVANTAGE_TIER_CONFIG = Object.freeze({
   },
   core: {
     id: "core",
-    label: "CORE",
-    marketing: "CORE",
-    multiplier: 1.25,
-    bestMoveBoostedPerDay: 5,
-    alertsMode: "semi_fast",
-    alertsMax: 10,
+    label: "Premium",
+    marketing: "PREMIUM",
+    multiplier: 1.15,
+    bestMoveBoostedPerDay: 10,
+    alertsMode: "faster",
+    alertsMax: 15,
     dailyLoginBonus: 0.75,
+    eventPointsBonusPct: 0.1,
     sellerSignals: false,
-    visibilityBoost: false,
+    visibilityBoost: true,
     projectAlertsEnabled: true,
-    projectActiveMax: 1,
-    projectItemsMaxPerProject: 5,
+    projectActiveMax: 2,
+    projectItemsMaxPerProject: 8,
     projectBundleSavings: false,
     projectPriceTargetsPerItem: false,
     projectAiPartsList: false,
@@ -61,34 +63,36 @@ export const ADVANTAGE_TIER_CONFIG = Object.freeze({
   },
   pro: {
     id: "pro",
-    label: "PRO",
+    label: "Pro",
     marketing: "PRO",
-    multiplier: 1.5,
-    bestMoveBoostedPerDay: 15,
-    alertsMode: "real_time",
-    alertsMax: 25,
+    multiplier: 1.35,
+    bestMoveBoostedPerDay: Number.POSITIVE_INFINITY,
+    alertsMode: "fastest",
+    alertsMax: Number.POSITIVE_INFINITY,
     dailyLoginBonus: 1.0,
+    eventPointsBonusPct: 0.25,
     sellerSignals: true,
     visibilityBoost: true,
     projectAlertsEnabled: true,
-    projectActiveMax: 3,
-    projectItemsMaxPerProject: 15,
+    projectActiveMax: 5,
+    projectItemsMaxPerProject: 20,
     projectBundleSavings: true,
     projectPriceTargetsPerItem: true,
-    projectAiPartsList: false,
-    projectVoiceCreation: false,
-    projectAllPartsReadyNotify: false,
-    projectPriorityAlerts: false,
+    projectAiPartsList: true,
+    projectVoiceCreation: true,
+    projectAllPartsReadyNotify: true,
+    projectPriorityAlerts: true,
   },
   elite: {
     id: "elite",
-    label: "ELITE",
-    marketing: "ELITE",
-    multiplier: 2.0,
+    label: "Pro",
+    marketing: "PRO",
+    multiplier: 1.35,
     bestMoveBoostedPerDay: Number.POSITIVE_INFINITY,
-    alertsMode: "priority",
+    alertsMode: "fastest",
     alertsMax: Number.POSITIVE_INFINITY,
-    dailyLoginBonus: 1.25,
+    dailyLoginBonus: 1.0,
+    eventPointsBonusPct: 0.25,
     sellerSignals: true,
     visibilityBoost: true,
     projectAlertsEnabled: true,
@@ -106,9 +110,9 @@ export const ADVANTAGE_TIER_CONFIG = Object.freeze({
 export function normalizeSubscriptionTier(rawTier, isPremium = false) {
   const tier = String(rawTier || "").toLowerCase();
   if (!isPremium) return "free";
-  if (tier === "elite" || tier.includes("35")) return "elite";
+  if (tier === "elite" || tier.includes("35")) return "pro";
   if (tier === "pro" || tier.includes("14") || tier === "savvy_pro") return "pro";
-  if (tier === "core" || tier.includes("plus") || tier.includes("premium") || tier.includes("7") || tier === "savvy_plus") return "core";
+  if (tier === "core" || tier === "premium" || tier.includes("plus") || tier.includes("7") || tier === "savvy_plus") return "core";
   return "core";
 }
 
@@ -128,7 +132,10 @@ export function getCurrentSubscriptionTier() {
     const raw = localStorage.getItem(TIER_STORAGE_KEY);
     if (!raw) return "free";
     const tier = String(raw).toLowerCase();
-    if (tier === "core" || tier === "pro" || tier === "elite" || tier === "free") return tier;
+    if (tier === "elite") return "elite";
+    if (tier === "core" || tier === "pro" || tier === "free" || tier === "premium") {
+      return tier === "premium" ? "core" : tier;
+    }
     if (tier === "savvy_plus") return "core";
     if (tier === "savvy_pro") return "pro";
   } catch {
@@ -211,9 +218,8 @@ export function getAdvantageTier(tier = getEffectiveSubscriptionTier()) {
 export function formatTierMultiplierLabel(tier = getEffectiveSubscriptionTier()) {
   const mult = getTierMultiplier(tier);
   if (mult === 1) return "1.0x";
-  if (mult === 1.25) return "1.25x";
-  if (mult === 1.5) return "1.5x";
-  if (mult === 2) return "2.0x";
+  if (mult === 1.15) return "1.15x";
+  if (mult === 1.35) return "1.35x";
   return `${mult.toFixed(2)}x`;
 }
 
@@ -225,15 +231,7 @@ export function applyTierMultiplier(amount, tier = getEffectiveSubscriptionTier(
 
 export function buildDailyLoginReward(baseReward = DAILY_LOGIN_BASE_SAVVY, tier = getEffectiveSubscriptionTier()) {
   const amount = applyTierMultiplier(baseReward, tier);
-  if (tier === "elite") {
-    return {
-      amount,
-      title: `+${amount} Savvy`,
-      subtitle: "⚡ Elite Boost Applied",
-      multiplierLabel: formatTierMultiplierLabel(tier),
-    };
-  }
-  if (tier === "pro") {
+  if (tier === "elite" || tier === "pro") {
     return {
       amount,
       title: `+${amount} Savvy`,
@@ -245,7 +243,7 @@ export function buildDailyLoginReward(baseReward = DAILY_LOGIN_BASE_SAVVY, tier 
     return {
       amount,
       title: `+${amount} Savvy`,
-      subtitle: "Core Boost Applied",
+      subtitle: "Premium Boost Applied",
       multiplierLabel: formatTierMultiplierLabel(tier),
     };
   }

@@ -22,6 +22,11 @@
   margin: 0;
 }
 
+.daily-streak-subcopy {
+  margin-top: 0.65rem !important;
+  font-size: 0.9rem;
+}
+
 .streak-hero {
   display: grid;
   grid-template-columns: 1fr 1fr;
