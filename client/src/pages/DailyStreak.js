@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { claimDailyStreak, getDailyStreakStatus } from '../lib/api';
+import { claimDailyStreak, getDailyStreakStatus, checkStreakAdminAccess } from '../lib/api';
 import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
 import { triggerDailyLoginReward } from '../lib/rewardEngine';
@@ -9,7 +9,7 @@ import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { formatMilestoneRewards } from '../config/dailyStreakRewards';
 import LoadingState from '../components/ui/states/LoadingState';
 import DailyStreakAdminPanel from '../components/streak/DailyStreakAdminPanel';
-import { isAdminUser } from '../lib/adminAccess';
+import { shouldShowAdminNav } from '../lib/adminAccess';
 import '../styles/DailyStreak.css';
 
 function StreakFlame({ active }) {
@@ -112,7 +112,7 @@ function ScoutClaimModal({ open, onClose, scoutMessage, grants, shieldUsed, hidd
 export default function DailyStreak() {
   const { user, refreshProfile } = useAuth();
   const location = useLocation();
-  const showAdminPanel = isAdminUser(user);
+  const [adminPanelAllowed, setAdminPanelAllowed] = useState(false);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
@@ -124,6 +124,38 @@ export default function DailyStreak() {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (!user) {
+      setAdminPanelAllowed(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function resolveAdminAccess() {
+      const freshUser = (await refreshProfile()) || user;
+      if (cancelled) return;
+
+      if (shouldShowAdminNav(freshUser)) {
+        setAdminPanelAllowed(true);
+        return;
+      }
+
+      try {
+        await checkStreakAdminAccess();
+        if (!cancelled) setAdminPanelAllowed(true);
+      } catch {
+        if (!cancelled) setAdminPanelAllowed(false);
+      }
+    }
+
+    void resolveAdminAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, refreshProfile]);
 
   const loadStatus = useCallback(async (nextStatus) => {
     if (nextStatus) {
@@ -341,6 +373,12 @@ export default function DailyStreak() {
         {claiming ? 'Claiming…' : canClaim ? 'Claim Daily Streak' : 'Claimed Today ✓'}
       </button>
 
+      {adminPanelAllowed ? (
+        <p className="streak-admin-scroll-hint">
+          Admin tools below — scroll down if you do not see the red Admin Testing section.
+        </p>
+      ) : null}
+
       <ScoutClaimModal
         open={Boolean(claimModal)}
         onClose={() => setClaimModal(null)}
@@ -351,7 +389,7 @@ export default function DailyStreak() {
         comeback={claimModal?.comeback}
       />
 
-      {showAdminPanel ? (
+      {adminPanelAllowed ? (
         <DailyStreakAdminPanel
           onStatusRefresh={loadStatus}
           onTestResult={handleAdminTestResult}

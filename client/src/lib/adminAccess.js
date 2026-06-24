@@ -47,9 +47,7 @@ export function isSuperAdminUser(user) {
 }
 
 export function isAdminUser(user) {
-  if (hasAdminRole(user)) return true;
-  if (user?.isAdmin === true || isSuperAdminUser(user)) return true;
-  return getUserRole(user) === "admin";
+  return shouldShowAdminNav(user);
 }
 
 export function hasAdminPermission(user, permissionKey) {

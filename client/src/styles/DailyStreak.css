@@ -1,7 +1,8 @@
 .daily-streak-page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 1.5rem 1rem 7rem;
+  padding-bottom: max(7rem, calc(env(safe-area-inset-bottom, 0px) + 6rem));
 }
 
 .daily-streak-header {
@@ -207,6 +208,14 @@
   cursor: not-allowed;
 }
 
+.streak-admin-scroll-hint {
+  margin: 1rem auto 0;
+  max-width: 420px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(252, 165, 165, 0.85);
+}
+
 .streak-scout-overlay {
   position: fixed;
   inset: 0;
@@ -319,9 +328,13 @@
 
 /* Admin testing panel */
 .streak-admin-panel {
-  margin-top: 3rem;
+  margin-top: 2rem;
+  padding: 1.25rem 1rem 1.5rem;
   padding-top: 1.5rem;
-  border-top: 2px dashed rgba(239, 68, 68, 0.45);
+  border-top: 2px dashed rgba(239, 68, 68, 0.55);
+  border-radius: 0.75rem;
+  background: rgba(40, 10, 10, 0.35);
+  scroll-margin-bottom: 6rem;
 }
 
 .streak-admin-label {

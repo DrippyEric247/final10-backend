@@ -114,7 +114,7 @@ router.post('/admin/set-milestone', auth, requireAdminAccess(), async (req, res,
 });
 
 router.get('/admin/milestones', auth, requireAdminAccess(), (req, res) => {
-  res.json({ milestones: ADMIN_MILESTONE_DAYS });
+  res.json({ allowed: true, milestones: ADMIN_MILESTONE_DAYS });
 });
 
 module.exports = router;

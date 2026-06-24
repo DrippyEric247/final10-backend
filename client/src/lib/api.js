@@ -191,7 +191,10 @@ export async function claimDailyStreak() {
 }
 
 /** Admin-only streak testing */
-export async function adminForceStreakClaim() {
+export async function checkStreakAdminAccess() {
+  const { data } = await api.get("/streak/admin/milestones");
+  return data;
+}
   const { data } = await api.post("/streak/admin/force-claim");
   return data;
 }
