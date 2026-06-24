@@ -195,6 +195,8 @@ export async function checkStreakAdminAccess() {
   const { data } = await api.get("/streak/admin/milestones");
   return data;
 }
+
+export async function adminForceStreakClaim() {
   const { data } = await api.post("/streak/admin/force-claim");
   return data;
 }

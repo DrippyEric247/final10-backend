@@ -3,8 +3,8 @@ import {
   adminAdvanceStreakDay,
   adminForceStreakClaim,
   adminSetStreakMilestone,
-} from '../lib/api';
-import { CALENDAR_DAYS } from '../config/dailyStreakRewards';
+} from '../../lib/api';
+import { CALENDAR_DAYS } from '../../config/dailyStreakRewards';
 
 function formatLogTime(iso) {
   try {
