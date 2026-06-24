@@ -192,13 +192,14 @@ async function applyComebackRewards(user, inactiveDays, grants, today) {
   };
 }
 
-async function applyHiddenAchievements(user, streak, grants, today) {
+async function applyHiddenAchievements(user, streak, grants, today, opts = {}) {
   const ds = ensureDailyStreakDoc(user);
+  const adminRunId = opts.adminRunId ? String(opts.adminRunId) : null;
   let totalSavvy = 0;
   const unlocked = [];
 
   for (const ach of HIDDEN_ACHIEVEMENTS) {
-    if (ds.legacyLoyalistUnlocked && ach.id === 'legacy_loyalist') continue;
+    if (!adminRunId && ds.legacyLoyalistUnlocked && ach.id === 'legacy_loyalist') continue;
     if (streak < ach.requiredStreakDay) continue;
 
     if (ach.id === 'legacy_loyalist') {
@@ -206,21 +207,25 @@ async function applyHiddenAchievements(user, streak, grants, today) {
     }
 
     if (ach.savvy > 0) {
-      const key = `streak_hidden:${user._id}:${ach.id}:${today}`;
+      const key = adminRunId
+        ? `streak_admin_hidden:${user._id}:${ach.id}:${adminRunId}`
+        : `streak_hidden:${user._id}:${ach.id}:${today}`;
       const grant = await grantSavvyReward(user, {
-        rewardType: 'streak_hidden',
+        rewardType: adminRunId ? 'daily_streak_admin' : 'streak_hidden',
         amount: ach.savvy,
         streakDays: streak,
         idempotencyKey: key,
-        note: `Hidden achievement: ${ach.label} +${ach.savvy} Savvy`,
-        meta: { achievementId: ach.id },
+        note: adminRunId
+          ? `[Admin test] Hidden achievement: ${ach.label} +${ach.savvy} Savvy`
+          : `Hidden achievement: ${ach.label} +${ach.savvy} Savvy`,
+        meta: { achievementId: ach.id, adminTest: Boolean(adminRunId) },
       });
       if (grant.granted) totalSavvy += grant.amount;
     }
 
     if (ach.badgeId) grantBadge(user, ach.badgeId);
     if (ach.callingCardId && isKnownCosmeticId(ach.callingCardId)) {
-      await grantSystemCosmeticUnlock(user._id, ach.callingCardId, 'streak_hidden');
+      await grantSystemCosmeticUnlock(user._id, ach.callingCardId, adminRunId ? 'streak_admin' : 'streak_hidden');
       grants.callingCards = [...(grants.callingCards || []), ach.callingCardId];
     }
 
@@ -454,10 +459,67 @@ function getStreakStatus(user) {
   return serializeStreakStatus(user);
 }
 
+function clearTodayClaimLock(user) {
+  const today = utcDayKey();
+  if (user.lastDailyClaim === today) {
+    user.lastDailyClaim = null;
+  }
+  if (user.dailyTasks?.completed && user.dailyTasks.completed.dailyLogin) {
+    user.dailyTasks.completed.dailyLogin = false;
+  }
+}
+
+/**
+ * Admin-only: grant Savvy + inventory for a milestone day (unique idempotency per run).
+ */
+async function adminGrantMilestoneRewards(user, milestoneDay, adminRunId) {
+  const milestone = findMilestoneForDay(milestoneDay);
+  if (!milestone) {
+    const err = new Error('Invalid milestone day');
+    err.status = 400;
+    throw err;
+  }
+
+  let grants = {
+    savvy: 0,
+    scoutEggs: null,
+    scoutShields: 0,
+    callingCards: [],
+    badges: [],
+  };
+
+  if (milestone.savvy > 0) {
+    const grant = await grantSavvyReward(user, {
+      rewardType: 'daily_streak_admin',
+      amount: milestone.savvy,
+      streakDays: milestoneDay,
+      idempotencyKey: `streak_admin_milestone:${user._id}:${milestoneDay}:${adminRunId}`,
+      note: `[Admin test] Streak day ${milestoneDay} +${milestone.savvy} Savvy`,
+      meta: { milestoneDay, adminTest: true, adminRunId },
+    });
+    if (grant.granted) grants.savvy += grant.amount;
+  }
+
+  grants = await grantMilestoneInventory(user, milestone, grants);
+
+  if (milestoneDay >= 100) {
+    const hiddenResult = await applyHiddenAchievements(user, milestoneDay, grants, utcDayKey(), {
+      adminRunId,
+    });
+    grants = hiddenResult.grants;
+    grants.savvy += hiddenResult.savvyGranted || 0;
+  }
+
+  return grants;
+}
+
 module.exports = {
   claimDailyStreak,
   getStreakStatus,
   updateStreakWithShield,
   serializeStreakStatus,
   ensureDailyStreakDoc,
+  syncStreakFields,
+  clearTodayClaimLock,
+  adminGrantMilestoneRewards,
 };

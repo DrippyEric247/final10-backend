@@ -190,6 +190,22 @@ export async function claimDailyStreak() {
   return data;
 }
 
+/** Admin-only streak testing */
+export async function adminForceStreakClaim() {
+  const { data } = await api.post("/streak/admin/force-claim");
+  return data;
+}
+
+export async function adminAdvanceStreakDay() {
+  const { data } = await api.post("/streak/admin/advance");
+  return data;
+}
+
+export async function adminSetStreakMilestone(day) {
+  const { data } = await api.post("/streak/admin/set-milestone", { day });
+  return data;
+}
+
 /** POST /api/scout-missions/claim — persist Savvy Scout mission reward to wallet. */
 export async function claimScoutMissionReward({ missionId, periodKey }) {
   const { data } = await api.post("/scout-missions/claim", { missionId, periodKey });

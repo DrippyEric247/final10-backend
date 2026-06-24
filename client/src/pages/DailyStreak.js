@@ -8,6 +8,8 @@ import { triggerDailyLoginReward } from '../lib/rewardEngine';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { formatMilestoneRewards } from '../config/dailyStreakRewards';
 import LoadingState from '../components/ui/states/LoadingState';
+import DailyStreakAdminPanel from '../components/streak/DailyStreakAdminPanel';
+import { isAdminUser } from '../lib/adminAccess';
 import '../styles/DailyStreak.css';
 
 function StreakFlame({ active }) {
@@ -110,6 +112,7 @@ function ScoutClaimModal({ open, onClose, scoutMessage, grants, shieldUsed, hidd
 export default function DailyStreak() {
   const { user, refreshProfile } = useAuth();
   const location = useLocation();
+  const showAdminPanel = isAdminUser(user);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
@@ -122,13 +125,19 @@ export default function DailyStreak() {
     }
   }, [location.state]);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (nextStatus) => {
+    if (nextStatus) {
+      setStatus(nextStatus);
+      return nextStatus;
+    }
     setError('');
     try {
       const data = await getDailyStreakStatus();
       setStatus(data);
+      return data;
     } catch (e) {
       setError(e?.response?.data?.message || 'Could not load streak status.');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -155,6 +164,41 @@ export default function DailyStreak() {
       badgeId: nr.rewards.badgeId,
     });
   }, [status]);
+
+  async function handleAdminTestResult(result) {
+    const added = Number(result?.totalSavvy ?? result?.grants?.savvy ?? 0);
+    if (added > 0) {
+      notifyWalletFromLegacyReward({ amount: added, source: 'daily_streak_admin' });
+    }
+    await refreshProfile();
+    try {
+      window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+    } catch {
+      /* ignore */
+    }
+    if (result?.granted && result?.grants) {
+      setClaimModal({
+        scoutMessage: result.scoutMessage || {
+          greeting: 'Admin test complete, Operator.',
+          streakLine: `Day ${result.currentStreak ?? result.milestoneDay} Streak Achieved.`,
+        },
+        grants: result.grants,
+        shieldUsed: false,
+        hiddenAchievements: result.hiddenAchievements || result.grants?.hiddenAchievements,
+        comeback: result.comeback,
+      });
+    } else if (result?.grants && result.milestoneDay) {
+      setClaimModal({
+        scoutMessage: {
+          greeting: 'Admin milestone test complete, Operator.',
+          streakLine: `Day ${result.milestoneDay} rewards granted.`,
+        },
+        grants: result.grants,
+        shieldUsed: false,
+        hiddenAchievements: result.grants?.hiddenAchievements,
+      });
+    }
+  }
 
   async function handleClaim() {
     if (!canClaim || claiming) return;
@@ -306,6 +350,13 @@ export default function DailyStreak() {
         hiddenAchievements={claimModal?.hiddenAchievements}
         comeback={claimModal?.comeback}
       />
+
+      {showAdminPanel ? (
+        <DailyStreakAdminPanel
+          onStatusRefresh={loadStatus}
+          onTestResult={handleAdminTestResult}
+        />
+      ) : null}
     </div>
   );
 }

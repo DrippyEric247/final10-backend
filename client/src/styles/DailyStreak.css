@@ -316,3 +316,188 @@
   font-size: 0.85rem;
   color: #ddd6fe;
 }
+
+/* Admin testing panel */
+.streak-admin-panel {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 2px dashed rgba(239, 68, 68, 0.45);
+}
+
+.streak-admin-label {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.35rem;
+  background: rgba(220, 38, 38, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.65rem;
+}
+
+.streak-admin-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  color: #fca5a5;
+}
+
+.streak-admin-desc {
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.6);
+  margin: 0 0 1rem;
+}
+
+.streak-admin-error {
+  margin-bottom: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+  font-size: 0.85rem;
+}
+
+.streak-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.streak-admin-btn {
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(69, 10, 10, 0.45);
+  color: #fecaca;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.streak-admin-btn:hover:not(:disabled) {
+  background: rgba(127, 29, 29, 0.55);
+}
+
+.streak-admin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.streak-admin-btn-primary {
+  border-color: rgba(251, 146, 60, 0.5);
+  background: rgba(124, 45, 12, 0.45);
+  color: #fed7aa;
+}
+
+.streak-admin-milestones {
+  margin-bottom: 1rem;
+}
+
+.streak-admin-milestones-label {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(226, 232, 240, 0.55);
+  margin-bottom: 0.5rem;
+}
+
+.streak-admin-milestone-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.streak-admin-milestone-btn {
+  min-width: 4.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(30, 10, 10, 0.6);
+  color: #fca5a5;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.streak-admin-milestone-btn:hover:not(:disabled) {
+  background: rgba(127, 29, 29, 0.5);
+}
+
+.streak-admin-milestone-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.streak-admin-log {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(15, 10, 10, 0.55);
+}
+
+.streak-admin-log-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(252, 165, 165, 0.7);
+  margin: 0 0 0.65rem;
+}
+
+.streak-admin-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.streak-admin-log-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.12);
+}
+
+.streak-admin-log-item:last-child {
+  border-bottom: none;
+}
+
+.streak-admin-log-time {
+  color: rgba(226, 232, 240, 0.45);
+  white-space: nowrap;
+}
+
+.streak-admin-log-action {
+  color: #f87171;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+}
+
+.streak-admin-log-detail {
+  color: rgba(226, 232, 240, 0.75);
+  grid-column: 1 / -1;
+  padding-left: 0;
+}
+
+@media (min-width: 520px) {
+  .streak-admin-log-item {
+    grid-template-columns: 9rem 7rem 1fr;
+  }
+
+  .streak-admin-log-detail {
+    grid-column: auto;
+  }
+}

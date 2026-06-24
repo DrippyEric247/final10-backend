@@ -132,9 +132,50 @@ function requireOwnerAccessFast() {
   };
 }
 
+/**
+ * Admin routes — admin, superadmin, or founder account.
+ */
+function requireAdminAccess() {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
+      }
+      let user = await User.findById(req.user._id || req.user.id);
+      if (!user) {
+        return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
+      }
+      try {
+        await ensureFounderAdminRole(user);
+      } catch (founderErr) {
+        console.error('[requireAdminAccess] ensureFounderAdminRole failed:', founderErr);
+      }
+      user = await User.findById(user._id || user.id);
+      if (!user) {
+        return next(new HttpError(401, 'UNAUTHORIZED', 'Authentication required'));
+      }
+
+      const isSuper = user.role === 'superadmin';
+      const isFounder = isFounderAdminEmail(user.email);
+      const isAdminRole = user.role === 'admin';
+
+      if (!isSuper && !isFounder && !isAdminRole) {
+        return next(new HttpError(403, 'FORBIDDEN', 'Admin access required'));
+      }
+
+      req.adminUser = user;
+      next();
+    } catch (err) {
+      console.error('[requireAdminAccess] unexpected error:', err);
+      next(err);
+    }
+  };
+}
+
 module.exports = {
   requireRole,
   requireSuperAdmin,
   requireOwnerAccess,
   requireOwnerAccessFast,
+  requireAdminAccess,
 };

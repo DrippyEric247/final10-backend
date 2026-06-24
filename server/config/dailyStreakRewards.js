@@ -74,6 +74,9 @@ const HIDDEN_ACHIEVEMENTS = Object.freeze([
 /** Calendar display — all milestone days shown in UI */
 const CALENDAR_DAYS = Object.freeze([1, 3, 7, 14, 30, 60, 100]);
 
+/** Admin testing — valid milestone set targets */
+const ADMIN_MILESTONE_DAYS = CALENDAR_DAYS;
+
 /** Future reward hooks (Battle Pass, Perk Machine, creator bonuses) */
 const FUTURE_REWARD_SLOTS = Object.freeze({
   battlePassXpOnClaim: 25,
@@ -112,6 +115,7 @@ module.exports = {
   COMEBACK_REWARDS,
   HIDDEN_ACHIEVEMENTS,
   CALENDAR_DAYS,
+  ADMIN_MILESTONE_DAYS,
   FUTURE_REWARD_SLOTS,
   findMilestoneForDay,
   findNextMilestone,
