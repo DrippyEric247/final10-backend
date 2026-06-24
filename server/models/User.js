@@ -174,6 +174,29 @@ const userSchema = new mongoose.Schema({
   isPremium: { type: Boolean, default: false },
   hasClaimedCommunityReward: { type: Boolean, default: false },
   
+  /** Savvy Scout monthly goals — completion bonus claim tracking (one per month). */
+  scoutMonthlyGoals: {
+    completionBonusClaimedMonths: [{ type: String }],
+    lastCompletionBonusMonthKey: { type: String, default: null },
+    lastCompletionBonusAt: { type: Date, default: null },
+    lastCompletionBonusAmount: { type: Number, default: 0 },
+    lastActivitySnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+  },
+
+  /** Rolling monthly activity counters for Scout Goals (UTC month key). */
+  monthlyActivity: {
+    monthKey: { type: String, default: null },
+    alertsCreated: { type: Number, default: 0 },
+    bestMovesUsed: { type: Number, default: 0 },
+    bestMoveActiveDays: { type: Number, default: 0 },
+    savvyEarned: { type: Number, default: 0 },
+    battlePassTier: { type: Number, default: 0 },
+    streakDaysClaimed: { type: Number, default: 0 },
+    eggsActivated: { type: Number, default: 0 },
+    loginDays: { type: Number, default: 0 },
+    reportOpened: { type: Boolean, default: false },
+  },
+
   // ---- community stats ----
   totalTransactions: { type: Number, default: 0 },  // For time saved calculation
   

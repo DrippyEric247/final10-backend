@@ -152,9 +152,19 @@ function final10LogoImageUrl() {
   return `${getEmailAssetsBaseUrl()}/assets/final10-logo.png`;
 }
 
-/** Official slogan footer for all Final10 HTML emails. */
-function emailBrandingFooterHtml({ mutedColor = '#6b7280', marginTop = 12 } = {}) {
+function emailBrandingFooterHtml({ mutedColor = '#6b7280', marginTop = 12, prominent = false } = {}) {
+  if (prominent) {
+    return `<div style="margin-top:${marginTop}px;padding:14px 12px;border-top:1px solid #1f3d2e;border-bottom:1px solid #1f3d2e;text-align:center;">
+      <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;color:#4ade80;line-height:1.6;">${escapeHtml(FINAL10_OFFICIAL_SLOGAN)}</div>
+    </div>`;
+  }
   return `<div style="margin-top:${marginTop}px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${mutedColor};font-style:italic;line-height:1.55;text-align:center;">${escapeHtml(FINAL10_OFFICIAL_SLOGAN)}</div>`;
+}
+
+function monthlyReportHeroImageUrl() {
+  const override = String(process.env.EMAIL_MONTHLY_REPORT_HERO_URL || '').trim();
+  if (override) return override;
+  return savvyScoutHeroImageUrl();
 }
 
 function emailBrandingFooterText() {
@@ -180,4 +190,5 @@ module.exports = {
   final10LogoImageUrl,
   emailBrandingFooterHtml,
   emailBrandingFooterText,
+  monthlyReportHeroImageUrl,
 };

@@ -2,7 +2,16 @@ const crypto = require('crypto');
 const router = require('express').Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
-const { sendTestEmail, getEmailConfigStatus, buildSavvyScoutDealFoundEmail } = require('../services/emailService');
+const {
+  sendTestEmail,
+  getEmailConfigStatus,
+  buildSavvyScoutDealFoundEmail,
+  buildSavvyScoutMonthlyReportEmail,
+  sendEarlyMonthlyReportTest,
+} = require('../services/emailService');
+const { sampleMonthlyReportData } = require('../templates/email/savvyScoutMonthlyReportTemplate');
+const { requireAdminAccess } = require('../middleware/requireRole');
+const { FOUNDER_ADMIN_EMAIL } = require('../lib/founderAdminAccess');
 const { HttpError } = require('../middleware/apiErrors');
 
 function readGrantSecretHeader(req) {
@@ -98,19 +107,53 @@ router.get('/preview/deal-found', (req, res, next) => {
 });
 
 /**
+ * GET /api/email/preview/monthly-report
+ * Returns HTML for the Savvy Scout monthly report (JWT or owner secret).
+ */
+router.get('/preview/monthly-report', (req, res, next) => {
+  const render = () => {
+    const { html } = buildSavvyScoutMonthlyReportEmail(sampleMonthlyReportData());
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  };
+
+  if (grantSecretValid(req)) return render();
+  return auth(req, res, () => render());
+});
+
+/**
+ * POST /api/email/test/monthly-report-early
+ * Admin-only — sends early Monthly Scout Report with Savvy Scout Goals to founder.
+ */
+router.post('/test/monthly-report-early', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const to = String(req.body?.to || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
+    const result = await sendEarlyMonthlyReportTest({ to, data: req.body?.data || {} });
+    return jsonEmailTestResult(res, result, {
+      recipient: to,
+      via: 'admin-early-monthly-report',
+      template: 'monthly_report_early',
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+/**
  * POST /api/email/test
- * Send a test email. Body: { "to": "you@example.com" } (optional with JWT — defaults to your account email).
+ * Send a test email. Body: { "to": "you@example.com", "template": "deal" | "monthly_report" }
  * Auth: Bearer JWT (own email only) OR X-Owner-Grant-Secret (any recipient).
  */
 router.post('/test', async (req, res, next) => {
   try {
     const bodyTo = String(req.body?.to || '').trim().toLowerCase();
+    const template = String(req.body?.template || req.query?.template || 'deal').trim().toLowerCase();
 
     if (grantSecretValid(req)) {
       if (!bodyTo) {
         return next(new HttpError(400, 'BAD_REQUEST', 'Body field "to" is required'));
       }
-      const result = await sendTestEmail({ to: bodyTo });
+      const result = await sendTestEmail({ to: bodyTo, template });
       return jsonEmailTestResult(res, result, {
         recipient: bodyTo,
         via: 'owner-grant-secret',
@@ -131,7 +174,7 @@ router.post('/test', async (req, res, next) => {
           return next(new HttpError(403, 'FORBIDDEN', 'JWT test emails may only be sent to your own account email'));
         }
 
-        const result = await sendTestEmail({ to: recipient });
+        const result = await sendTestEmail({ to: recipient, template });
         return jsonEmailTestResult(res, result, {
           recipient,
           via: 'jwt',

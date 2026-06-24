@@ -2,6 +2,14 @@ const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const { auditEmailDelivery } = require('./auditLogger');
 const { buildSavvyScoutDealFoundEmail } = require('../templates/email/savvyScoutDealFoundTemplate');
+const {
+  buildSavvyScoutMonthlyReportEmail,
+  sampleMonthlyReportData,
+} = require('../templates/email/savvyScoutMonthlyReportTemplate');
+const { buildEarlyMonthlyReportTestPayload } = require('./monthlyReportService');
+const { FOUNDER_ADMIN_EMAIL } = require('../lib/founderAdminAccess');
+
+const EARLY_MONTHLY_REPORT_SUBJECT = '🛩️ Your Early Savvy Scout Monthly Report Test';
 const { emailBrandingFooterHtml, emailBrandingFooterText } = require('../templates/email/emailTemplateUtils');
 const {
   resolveEmailFrom,
@@ -643,7 +651,92 @@ async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl, de
   });
 }
 
-async function sendTestEmail({ to, useDealTemplate = true }) {
+async function sendSavvyScoutMonthlyReportEmail({
+  to,
+  data = {},
+  subject: subjectOverride,
+  forceSend = false,
+  trace = null,
+}) {
+  trace?.step('monthly_report_email_enter', { hasRecipient: Boolean(to), forceSend });
+
+  const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
+  let subject;
+  let html;
+  let text;
+  try {
+    const built = buildSavvyScoutMonthlyReportEmail(payload);
+    subject = built.subject;
+    html = built.html;
+    text = built.text;
+    trace?.step('monthly_report_render_done', {
+      ok: true,
+      subjectLen: String(subject || '').length,
+      htmlLen: String(html || '').length,
+    });
+  } catch (err) {
+    trace?.step('monthly_report_render_failed', {
+      ok: false,
+      message: String(err?.message || err).slice(0, 200),
+    });
+    throw err;
+  }
+
+  if (!forceSend && !alertEmailEnabled()) {
+    console.log(`[email] Savvy Scout monthly report (log-only) → ${to || 'no-email'} | ${subject}`);
+    return { sent: false, logOnly: true, reason: 'alert_email_disabled', subject, html, text };
+  }
+
+  const result = await sendMailMessage({ to, subject, text, html, trace });
+  auditEmailDelivery({
+    kind: 'savvy_scout_monthly_report',
+    to: to ? `${String(to).slice(0, 3)}***` : null,
+    sent: Boolean(result?.sent),
+    reason: result?.reason || null,
+    provider: result?.provider || getEmailProvider(),
+    logOnly: Boolean(result?.logOnly),
+    messageId: result?.messageId || null,
+  });
+  return { ...result, subject };
+}
+
+/**
+ * Admin/test — early Monthly Scout Report with dynamic goals to founder email.
+ */
+async function sendEarlyMonthlyReportTest({ to = FOUNDER_ADMIN_EMAIL, data = {}, trace = null } = {}) {
+  const recipient = String(to || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
+  const payload = buildEarlyMonthlyReportTestPayload(data);
+  return sendSavvyScoutMonthlyReportEmail({
+    to: recipient,
+    data: payload,
+    subject: EARLY_MONTHLY_REPORT_SUBJECT,
+    forceSend: true,
+    trace,
+  });
+}
+
+async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) {
+  if (template === 'monthly_report_early' || template === 'early_monthly_report') {
+    const result = await sendEarlyMonthlyReportTest({ to });
+    if (result.sent) {
+      console.log(`[email] Early monthly report test sent via ${result.provider || getEmailProvider()} to ${to}`);
+    }
+    return { ...result, config: getEmailConfigStatus() };
+  }
+
+  if (template === 'monthly_report' || template === 'monthly') {
+    const result = await sendSavvyScoutMonthlyReportEmail({
+      to,
+      data: sampleMonthlyReportData(),
+      subject: '🛩️ Savvy Scout Monthly Report — April 2025 (test)',
+      forceSend: true,
+    });
+    if (result.sent) {
+      console.log(`[email] Monthly report test sent via ${result.provider || getEmailProvider()} to ${to}`);
+    }
+    return { ...result, config: getEmailConfigStatus() };
+  }
+
   if (useDealTemplate) {
     const result = await sendSavvyScoutDealFoundEmail({
       to,
@@ -713,8 +806,11 @@ async function sendTestEmail({ to, useDealTemplate = true }) {
 module.exports = {
   sendAlertMatchEmail,
   sendSavvyScoutDealFoundEmail,
+  sendSavvyScoutMonthlyReportEmail,
+  sendEarlyMonthlyReportTest,
   sendTestEmail,
   buildSavvyScoutDealFoundEmail,
+  buildSavvyScoutMonthlyReportEmail,
   auditEmailFrom,
   alertEmailEnabled,
   getEmailConfigStatus,
