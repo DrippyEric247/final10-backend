@@ -211,6 +211,12 @@ export async function adminSetStreakMilestone(day) {
   return data;
 }
 
+/** POST /api/email/test/monthly-report-early — admin-only early Monthly Scout Report. */
+export async function sendEarlyMonthlyReportTest() {
+  const { data } = await api.post("/email/test/monthly-report-early");
+  return data;
+}
+
 /** POST /api/scout-missions/claim — persist Savvy Scout mission reward to wallet. */
 export async function claimScoutMissionReward({ missionId, periodKey }) {
   const { data } = await api.post("/scout-missions/claim", { missionId, periodKey });

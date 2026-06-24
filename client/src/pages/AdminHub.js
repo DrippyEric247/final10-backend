@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { hasAdminRole } from "../lib/adminAccess";
+import { hasAdminRole, FOUNDER_ADMIN_EMAIL } from "../lib/adminAccess";
 import { ADMIN_TEST_ALERT, fireAdminTestAlert } from "../lib/adminTestAlert";
+import { sendEarlyMonthlyReportTest } from "../lib/api";
 import SavvyMark from "../components/SavvyMark";
 
 const ADMIN_LINKS = [
@@ -20,6 +21,9 @@ export default function AdminHub() {
   const [testBusy, setTestBusy] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportResult, setReportResult] = useState(null);
+  const [reportError, setReportError] = useState("");
 
   const runTestAlert = useCallback(async () => {
     setTestBusy(true);
@@ -31,6 +35,41 @@ export default function AdminHub() {
       setTestError(err?.message || "Test alert failed.");
     } finally {
       setTestBusy(false);
+    }
+  }, []);
+
+  const runMonthlyReportTest = useCallback(async () => {
+    setReportBusy(true);
+    setReportError("");
+    setReportResult(null);
+    try {
+      const result = await sendEarlyMonthlyReportTest();
+      if (result?.ok && result?.sent) {
+        setReportResult(result);
+      } else {
+        const reason = result?.reason || "Email was not sent.";
+        setReportError(
+          reason === "email_not_configured"
+            ? "Email delivery is not configured on the server (RESEND_API_KEY or SMTP)."
+            : reason === "alert_email_disabled"
+              ? "Alert email is disabled on the server."
+              : reason
+        );
+        setReportResult(result || null);
+      }
+    } catch (err) {
+      const data = err?.response?.data;
+      const reason = data?.reason || data?.message;
+      setReportError(
+        reason === "email_not_configured"
+          ? "Email delivery is not configured on the server (RESEND_API_KEY or SMTP)."
+          : reason === "alert_email_disabled"
+            ? "Alert email is disabled on the server."
+            : reason || err?.message || "Failed to send test monthly report."
+      );
+      setReportResult(data || null);
+    } finally {
+      setReportBusy(false);
     }
   }, []);
 
@@ -100,6 +139,54 @@ export default function AdminHub() {
             >
               View Deal
             </Link>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="card border border-cyan-400/35 bg-cyan-500/5 space-y-3">
+        <div>
+          <p className="text-xs font-black tracking-[0.16em] uppercase text-cyan-200">
+            Admin Email Test
+          </p>
+          <h2 className="text-lg font-bold text-white mt-1">Send Test Monthly Report</h2>
+          <p className="text-sm text-gray-300 mt-1">
+            Sends the early Savvy Scout Monthly Report (with Savvy Scout Goals) to{" "}
+            <span className="text-cyan-100 font-semibold">{FOUNDER_ADMIN_EMAIL}</span>.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:brightness-105 disabled:opacity-60"
+          onClick={() => void runMonthlyReportTest()}
+          disabled={reportBusy}
+        >
+          {reportBusy ? "Sending report…" : "Send Test Monthly Report"}
+        </button>
+        {reportError ? (
+          <div className="rounded-xl border border-red-400/35 bg-red-500/10 p-4" role="alert">
+            <p className="text-xs font-black tracking-[0.14em] uppercase text-red-200">Failed</p>
+            <p className="text-sm text-red-100 mt-1">{reportError}</p>
+            {reportResult?.logOnly ? (
+              <p className="text-xs text-gray-400 mt-2">Server ran in log-only mode — no provider configured.</p>
+            ) : null}
+          </div>
+        ) : null}
+        {reportResult?.ok && reportResult?.sent ? (
+          <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 space-y-2">
+            <p className="text-xs font-black tracking-[0.14em] uppercase text-emerald-200">
+              Report sent
+            </p>
+            <p className="text-sm text-gray-200">
+              <span className="font-bold text-white">{reportResult.subject || "Savvy Scout Monthly Report"}</span>
+              {" "}delivered to{" "}
+              <span className="text-emerald-100">{reportResult.recipient || FOUNDER_ADMIN_EMAIL}</span>.
+            </p>
+            {reportResult.messageId ? (
+              <p className="text-xs text-gray-400">Message ID: {reportResult.messageId}</p>
+            ) : null}
+            {reportResult.provider ? (
+              <p className="text-xs text-gray-400">Provider: {reportResult.provider}</p>
+            ) : null}
           </div>
         ) : null}
       </section>
