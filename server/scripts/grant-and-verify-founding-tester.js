@@ -5,7 +5,7 @@
  *   MONGODB_URI="mongodb+srv://..." node server/scripts/grant-and-verify-founding-tester.js ericvasquez012@gmail.com
  *
  * Optional live API check (after grant):
- *   API_BASE_URL=https://final10-backend-production.up.railway.app JWT_SECRET=... node ...
+ *   API_BASE_URL=https://api.final10.app JWT_SECRET=... node ...
  */
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
@@ -13,7 +13,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { getEntitlementByUserId, toMeResponse } = require('../services/premiumEntitlementService');
 
-const API_BASE = String(process.env.API_BASE_URL || 'https://final10-backend-production.up.railway.app')
+const API_BASE = String(process.env.API_BASE_URL || 'https://api.final10.app')
   .trim()
   .replace(/\/+$/, '');
 

@@ -399,6 +399,10 @@ export default function App() {
             }
           />
           <Route
+            path="/monthly-report"
+            element={<Navigate to="/profile?tab=rewards" replace />}
+          />
+          <Route
             path="/leaderboard"
             element={
               <ProtectedRoute>

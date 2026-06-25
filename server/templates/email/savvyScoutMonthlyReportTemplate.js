@@ -167,7 +167,7 @@ function normalizeMonthlyReportData(input = {}) {
     })),
     monthlyBonusSavvy: formatSavvy(pickNumber(input.monthlyBonusSavvy, 100)),
     bonusExpiresLabel: pick(input.bonusExpiresLabel, 'Reward available until May 15, 2025'),
-    claimRewardUrl: pick(input.claimRewardUrl, `${clientUrl}/profile?tab=rewards`),
+    claimRewardUrl: pick(input.claimRewardUrl, `${clientUrl}/monthly-report`),
     achievements: normalizeAchievements(input.achievements),
     recommendationLead: pick(
       input.recommendationLead,

@@ -1,4 +1,5 @@
 const LOCAL_API_ORIGIN = "http://localhost:5000";
+const PRODUCTION_API_ORIGIN = "https://api.final10.app";
 
 function clean(value) {
   return String(value || "")
@@ -34,7 +35,7 @@ export const API_BASE_URL = clean(
   process.env.REACT_APP_API_URL ||
     process.env.VITE_API_URL ||
     process.env.REACT_APP_API_BASE ||
-    LOCAL_API_ORIGIN
+    (process.env.NODE_ENV === "production" ? PRODUCTION_API_ORIGIN : LOCAL_API_ORIGIN)
 );
 
 function warnMissingApiOnce() {
@@ -48,12 +49,12 @@ function warnMissingApiOnce() {
   }
 }
 
-/** API server origin without `/api`. Empty when unconfigured on static hosts (Vercel). */
+/** API server origin without `/api`. Defaults to the official API domain in production. */
 export function getApiOrigin() {
   const configured = readConfiguredApiUrl();
   if (configured) return configured;
   if (isLocalDevHost()) return LOCAL_API_ORIGIN;
-  return "";
+  return PRODUCTION_API_ORIGIN;
 }
 
 export function isBackendApiConfigured() {

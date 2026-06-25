@@ -4,8 +4,8 @@
  */
 import { chromium } from 'playwright';
 
-const FRONTEND = process.env.F10_FRONTEND || 'https://final10-backend-jo1t.vercel.app';
-const API = process.env.F10_API || 'https://final10-backend-production.up.railway.app';
+const FRONTEND = process.env.F10_FRONTEND || 'https://final10.app';
+const API = process.env.F10_API || 'https://api.final10.app';
 
 const ROUTES = [
   { name: 'Dashboard', path: '/' },

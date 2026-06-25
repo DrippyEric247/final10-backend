@@ -6,7 +6,7 @@
  *   node scripts/verify-alert-e2e.js --email eric@example.com --secret <ALERT_TEST_PUBLIC_SECRET>
  *
  * Env:
- *   API_BASE=https://final10-backend-production.up.railway.app
+ *   API_BASE=https://api.final10.app
  */
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });

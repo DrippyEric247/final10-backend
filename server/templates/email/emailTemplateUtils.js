@@ -1,4 +1,8 @@
-const { FINAL10_OFFICIAL_SLOGAN } = require('../../config/final10Branding');
+const {
+  FINAL10_OFFICIAL_SLOGAN,
+  FINAL10_APP_URL,
+  isNonPublicLinkUrl,
+} = require('../../config/final10Branding');
 
 function escapeHtml(raw) {
   return String(raw ?? '')
@@ -38,19 +42,31 @@ function formatSavvy(raw, fallback = '0') {
   return Math.round(n).toLocaleString('en-US');
 }
 
+/**
+ * Public app origin for all user-facing email links (CTA buttons, etc).
+ * Guaranteed to be the official domain — preview/deploy infra URLs
+ * (vercel.app, onrender.com, railway.app) and localhost are rejected so
+ * emails can never send users to a backend/preview URL.
+ */
 function getClientBaseUrl() {
-  return String(process.env.CLIENT_URL || process.env.PUBLIC_APP_URL || 'https://final10.app').replace(/\/$/, '');
+  const configured = String(process.env.CLIENT_URL || process.env.PUBLIC_APP_URL || '').trim();
+  if (configured && !isNonPublicLinkUrl(configured)) {
+    return configured.replace(/\/$/, '');
+  }
+  return FINAL10_APP_URL;
 }
 
+/**
+ * Origin for email image assets. All email assets are published on the public
+ * site (`/assets/...`), so we reuse the official app URL. An explicit override
+ * is honored only when it is a real public host.
+ */
 function getEmailAssetsBaseUrl() {
   const explicit = String(process.env.EMAIL_ASSETS_BASE_URL || '').trim();
-  if (explicit) return explicit.replace(/\/$/, '');
-  const client = getClientBaseUrl();
-  // Prefer known deployed frontend when custom domain is not serving static assets yet.
-  if (!client || client.includes('localhost') || client === 'https://final10.app') {
-    return 'https://final10-backend-jo1t.vercel.app';
+  if (explicit && !isNonPublicLinkUrl(explicit)) {
+    return explicit.replace(/\/$/, '');
   }
-  return client.replace(/\/$/, '');
+  return getClientBaseUrl();
 }
 
 function emailProductFallbackImageUrl() {
