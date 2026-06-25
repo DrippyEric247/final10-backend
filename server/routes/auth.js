@@ -7,12 +7,16 @@ const ReferralLog = require('../models/ReferralLog');
 const CreatorEvent = require('../models/CreatorEvent');
 const auth = require('../middleware/auth');
 const { validateRequest } = require('../middleware/validateRequest');
-const { authLoginLimiter, authMeLimiter, authSignupLimiter } = require('../middleware/rateLimits');
+const { authLoginLimiter, authMeLimiter, authSignupLimiter, authPasswordResetLimiter, authPasswordResetSubmitLimiter } = require('../middleware/rateLimits');
 const schemas = require('../validation/schemas');
 const { HttpError } = require('../middleware/apiErrors');
 const { auditFireAndForget } = require('../services/securityAuditService');
+const { requestPasswordReset, resetPasswordWithToken } = require('../services/passwordResetService');
 
 const { referralFraudCheck, logReferral } = require('../services/referralGuard');
+
+const { googleEnabled, appleEnabled } = require('../config/socialAuthConfig');
+const socialAuth = require('../services/socialAuthService');
 
 const router = express.Router();
 
@@ -349,6 +353,178 @@ router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), 
     return next(err);
   }
 });
+
+/* ============================ Social OAuth ============================== */
+
+/**
+ * GET /api/auth/providers
+ * Lets the client show only the social buttons that are configured.
+ */
+router.get('/providers', (req, res) => {
+  res.json({ google: googleEnabled(), apple: appleEnabled() });
+});
+
+/** Finalize any verified social profile → JWT + redirect back to the client. */
+async function completeSocialLogin(profile, provider, res) {
+  const { user, isNew } = await socialAuth.findOrCreateSocialUser(profile);
+  await ensureFounderAdminRole(user);
+  const token = signUserToken(user);
+  auditFireAndForget(isNew ? 'AUTH_SIGNUP' : 'AUTH_LOGIN_SOCIAL', {
+    userId: user._id,
+    meta: { provider, isNew },
+  });
+  return res.redirect(socialAuth.buildClientSuccessRedirect(token, provider));
+}
+
+/** GET /api/auth/google → redirect to Google consent screen. */
+router.get('/google', (req, res) => {
+  if (!googleEnabled()) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('google_not_configured', 'google'));
+  }
+  try {
+    return res.redirect(socialAuth.getGoogleAuthUrl());
+  } catch (err) {
+    console.error('[auth/google] start failed', err);
+    return res.redirect(socialAuth.buildClientErrorRedirect('google_start_failed', 'google'));
+  }
+});
+
+/** GET /api/auth/google/callback → exchange code, verify, sign JWT, redirect. */
+router.get('/google/callback', async (req, res) => {
+  const { code, state, error } = req.query || {};
+  if (error) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'google'));
+  }
+  if (!code || !state) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'google'));
+  }
+  try {
+    const verifiedState = socialAuth.verifyState(String(state), 'google');
+    const profile = await socialAuth.exchangeGoogleCode(String(code), verifiedState.nonce);
+    return await completeSocialLogin(profile, 'google', res);
+  } catch (err) {
+    console.error('[auth/google/callback] failed', err.message);
+    return res.redirect(socialAuth.buildClientErrorRedirect('google_auth_failed', 'google'));
+  }
+});
+
+/** GET /api/auth/apple → redirect to Apple sign-in. */
+router.get('/apple', (req, res) => {
+  if (!appleEnabled()) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('apple_not_configured', 'apple'));
+  }
+  try {
+    return res.redirect(socialAuth.getAppleAuthUrl());
+  } catch (err) {
+    console.error('[auth/apple] start failed', err);
+    return res.redirect(socialAuth.buildClientErrorRedirect('apple_start_failed', 'apple'));
+  }
+});
+
+/**
+ * POST /api/auth/apple/callback
+ * Apple posts back as application/x-www-form-urlencoded (response_mode=form_post)
+ * because we request name/email scope. We parse the body locally so the global
+ * JSON parser doesn't need to change.
+ */
+router.post('/apple/callback', express.urlencoded({ extended: false }), async (req, res) => {
+  const { code, state, error, user: appleUser } = req.body || {};
+  if (error) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
+  }
+  if (!code || !state) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
+  }
+  try {
+    const verifiedState = socialAuth.verifyState(String(state), 'apple');
+    const profile = await socialAuth.exchangeAppleCode(String(code), verifiedState.nonce, appleUser);
+    return await completeSocialLogin(profile, 'apple', res);
+  } catch (err) {
+    console.error('[auth/apple/callback] failed', err.message);
+    return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
+  }
+});
+
+/* Some Apple configurations return to the callback via GET (no name/email scope). */
+router.get('/apple/callback', async (req, res) => {
+  const { code, state, error } = req.query || {};
+  if (error) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
+  }
+  if (!code || !state) {
+    return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
+  }
+  try {
+    const verifiedState = socialAuth.verifyState(String(state), 'apple');
+    const profile = await socialAuth.exchangeAppleCode(String(code), verifiedState.nonce, null);
+    return await completeSocialLogin(profile, 'apple', res);
+  } catch (err) {
+    console.error('[auth/apple/callback GET] failed', err.message);
+    return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Always returns the same message — never reveals whether the email exists.
+ */
+router.post(
+  '/forgot-password',
+  authPasswordResetLimiter,
+  validateRequest(schemas.authForgotPasswordBody),
+  async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      const result = await requestPasswordReset(email);
+      auditFireAndForget('AUTH_PASSWORD_RESET_REQUEST', {
+        req,
+        severity: 'info',
+        meta: { requested: true },
+      });
+      return res.json({ message: result.message });
+    } catch (err) {
+      console.error('[auth/forgot-password]', err.message);
+      return next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/reset-password
+ * Validates token server-side, hashes new password, invalidates token (single-use).
+ */
+router.post(
+  '/reset-password',
+  authPasswordResetSubmitLimiter,
+  validateRequest(schemas.authResetPasswordBody),
+  async (req, res, next) => {
+    try {
+      const { token, password } = req.body;
+      const result = await resetPasswordWithToken(token, password);
+      auditFireAndForget('AUTH_PASSWORD_RESET_COMPLETE', {
+        userId: result.userId,
+        req,
+        severity: 'info',
+        meta: { success: true },
+      });
+      return res.json({ message: result.message });
+    } catch (err) {
+      if (err.status) {
+        auditFireAndForget('AUTH_PASSWORD_RESET_FAILED', {
+          req,
+          severity: 'warn',
+          meta: { code: err.code || 'INVALID_RESET_TOKEN' },
+        });
+        return res.status(err.status).json({
+          message: err.message,
+          code: err.code,
+        });
+      }
+      console.error('[auth/reset-password]', err.message);
+      return next(err);
+    }
+  }
+);
 
 /**
  * GET /api/auth/me

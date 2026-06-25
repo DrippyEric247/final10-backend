@@ -6,7 +6,36 @@ const userSchema = new mongoose.Schema({
   lastName: String,
   username: { type: String, unique: true },
   email:    { type: String, unique: true },
+  // Optional for social-only accounts (Google/Apple). Email/password users still set it.
   password: String,
+  /** SHA-256 hash of the one-time password reset token (never store raw token). */
+  passwordResetTokenHash: { type: String, default: null, select: false },
+  /** When the reset token expires (30 minutes from issue). */
+  passwordResetExpiresAt: { type: Date, default: null, select: false },
+
+  // ---- social / OAuth identity ----
+  /** Primary/last sign-in method: 'email' | 'google' | 'apple'. */
+  provider: { type: String, default: 'email' },
+  /** Google subject id (stable per Google account). */
+  googleId: { type: String, default: null, index: true, sparse: true },
+  /** Apple subject id (stable per Apple account). */
+  appleId: { type: String, default: null, index: true, sparse: true },
+  /** True once a provider (or our own verification flow) confirms the email. */
+  emailVerified: { type: Boolean, default: false },
+  /** Avatar URL from the social provider, when available. */
+  profileImage: { type: String, default: null },
+  /** All linked sign-in providers so one account can use several login methods. */
+  authProviders: {
+    type: [
+      {
+        provider: { type: String },
+        providerId: { type: String },
+        email: { type: String, default: null },
+        linkedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  },
 
   // your existing fields
   points: { type: Number, default: 0 },

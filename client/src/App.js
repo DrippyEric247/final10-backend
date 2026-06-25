@@ -37,6 +37,9 @@ import { captureAttributionFromLocation, recordCreatorClick } from "./lib/attrib
 import Dashboard from "./pages/Dashboard";        // public (for now)
 import Login from "./pages/Login";                // public
 import Register from "./pages/Register";          // public
+import ForgotPassword from "./pages/ForgotPassword"; // public
+import ResetPassword from "./pages/ResetPassword";   // public
+import SocialAuthCallback from "./pages/SocialAuthCallback"; // public (OAuth landing)
 import Auctions from "./pages/Auctions";          // public
 import AlertsCommandCenter from "./pages/AlertsCommandCenter";              // protected
 import BuildWarsPage from "./pages/BuildWarsPage";
@@ -305,6 +308,9 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/social" element={<SocialAuthCallback />} />
           <Route path="/auctions" element={<Auctions />} />
           <Route path="/auction/:id" element={<AuctionDetail />} />
           <Route path="/feed" element={<ProductFeed />} />

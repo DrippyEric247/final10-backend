@@ -4,6 +4,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
+import SocialAuthButtons from '../components/auth/SocialAuthButtons';
 import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
@@ -117,6 +118,8 @@ export default function Register() {
           )}
         </div>
       ) : null}
+      <SocialAuthButtons mode="signup" />
+
       {err ? (
         <div className="mb-3 rounded-lg border border-red-500/35 bg-red-950/40 px-3 py-2 text-sm text-red-200" role="alert">
           {err}

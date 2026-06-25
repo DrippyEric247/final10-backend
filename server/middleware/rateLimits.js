@@ -87,7 +87,7 @@ const marketValueLimiter = rateLimit({
   message: { code: 'RATE_LIMIT', message: 'Too many market value lookups.' },
 });
 
-/** Reserved for POST /api/auth/password-reset when implemented */
+/** POST /api/auth/forgot-password — limit reset email requests per IP */
 const authPasswordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
@@ -96,12 +96,22 @@ const authPasswordResetLimiter = rateLimit({
   message: { code: 'RATE_LIMIT', message: 'Too many password reset attempts.' },
 });
 
+/** POST /api/auth/reset-password — limit token submission guesses */
+const authPasswordResetSubmitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { code: 'RATE_LIMIT', message: 'Too many reset attempts. Try again later.' },
+});
+
 module.exports = {
   isAuthMeRequest,
   authMeLimiter,
   authLoginLimiter,
   authSignupLimiter,
   authPasswordResetLimiter,
+  authPasswordResetSubmitLimiter,
   progressionEventsLimiter,
   ebaySearchLimiter,
   ebayBidLimiter,

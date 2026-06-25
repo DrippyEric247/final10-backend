@@ -26,6 +26,9 @@ const defaultAuthValue = {
   register: async () => {
     throw new Error("useAuth: AuthProvider is missing");
   },
+  completeSocialLogin: async () => {
+    throw new Error("useAuth: AuthProvider is missing");
+  },
   logout: () => {},
   refreshProfile: async () => null,
   patchUser: () => {},
@@ -154,6 +157,30 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /**
+   * Finish a social (Google/Apple) login: the backend has already issued our
+   * JWT and redirected here with it. Store it, then hydrate the session exactly
+   * like email login so all downstream data (Savvy, Battle Pass, etc.) loads.
+   */
+  const completeSocialLogin = async (socialToken) => {
+    setError("");
+    if (!socialToken) throw new Error("Missing social login token");
+    try {
+      setAuthToken(socialToken);
+      setToken(socialToken);
+      const fresh = await getMe({ force: true });
+      const hydrated = await hydrateSessionUser(fresh);
+      setUser(hydrated);
+      return hydrated;
+    } catch (err) {
+      setAuthToken(null);
+      setToken(null);
+      setUser(null);
+      setError(userSafeErrorMessage(err, "Social login failed. Please try again."));
+      throw err;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -199,7 +226,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, error, login, register, logout, refreshProfile, patchUser }}
+      value={{ user, token, loading, error, login, register, completeSocialLogin, logout, refreshProfile, patchUser }}
     >
       {children}
     </AuthContext.Provider>

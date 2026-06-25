@@ -141,6 +141,35 @@ export async function registerUser(payload) {
   return data.user;
 }
 
+/** Which social sign-in providers are configured on the backend. */
+export async function getAuthProviders() {
+  try {
+    const { data } = await api.get("/auth/providers");
+    return {
+      google: Boolean(data?.google),
+      apple: Boolean(data?.apple),
+    };
+  } catch {
+    return { google: false, apple: false };
+  }
+}
+
+/** POST /auth/forgot-password — always returns generic success copy. */
+export async function requestPasswordReset(email) {
+  const { data } = await api.post("/auth/forgot-password", { email: String(email || "").trim() });
+  return data;
+}
+
+/** POST /auth/reset-password — sets new password via one-time token. */
+export async function submitPasswordReset({ token, password, confirmPassword }) {
+  const { data } = await api.post("/auth/reset-password", {
+    token,
+    password,
+    confirmPassword,
+  });
+  return data;
+}
+
 
 /** GET /auth/me — once on app load; further calls need `{ force: true }` (manual refresh). */
 export async function getMe(options = {}) {

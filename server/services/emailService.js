@@ -8,6 +8,7 @@ const {
 } = require('../templates/email/savvyScoutMonthlyReportTemplate');
 const { buildEarlyMonthlyReportTestPayload } = require('./monthlyReportService');
 const { FOUNDER_ADMIN_EMAIL } = require('../lib/founderAdminAccess');
+const { buildPasswordResetEmail } = require('../templates/email/passwordResetTemplate');
 
 const EARLY_MONTHLY_REPORT_SUBJECT = '🛩️ Your Early Savvy Scout Monthly Report Test';
 const { emailBrandingFooterHtml, emailBrandingFooterText } = require('../templates/email/emailTemplateUtils');
@@ -700,6 +701,22 @@ async function sendSavvyScoutMonthlyReportEmail({
   return { ...result, subject };
 }
 
+/** Password reset — always sends when email is configured (not gated by alert flag). */
+async function sendPasswordResetEmail({ to, resetToken, firstName } = {}) {
+  const { subject, html, text } = buildPasswordResetEmail({ resetToken, firstName });
+  const result = await sendMailMessage({ to, subject, text, html });
+  auditEmailDelivery({
+    kind: 'password_reset',
+    to: to ? `${String(to).slice(0, 3)}***` : null,
+    sent: Boolean(result?.sent),
+    reason: result?.reason || null,
+    provider: result?.provider || getEmailProvider(),
+    logOnly: Boolean(result?.logOnly),
+    messageId: result?.messageId || null,
+  });
+  return { ...result, subject };
+}
+
 /**
  * Admin/test — early Monthly Scout Report with dynamic goals to founder email.
  */
@@ -807,6 +824,7 @@ module.exports = {
   sendAlertMatchEmail,
   sendSavvyScoutDealFoundEmail,
   sendSavvyScoutMonthlyReportEmail,
+  sendPasswordResetEmail,
   sendEarlyMonthlyReportTest,
   sendTestEmail,
   buildSavvyScoutDealFoundEmail,

@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
+import SocialAuthButtons from '../components/auth/SocialAuthButtons';
 import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
@@ -91,6 +92,9 @@ export default function Login() {
       </div>
       
       <h1 className="text-3xl font-bold mb-4 text-center">Welcome Back</h1>
+
+      <SocialAuthButtons mode="login" />
+
       {err ? (
         <div className="mb-3 rounded-lg border border-red-500/35 bg-red-950/40 px-3 py-2 text-sm text-red-200" role="alert">
           {err}
@@ -122,6 +126,11 @@ export default function Login() {
           value={form.password}
           onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
         />
+        <p className="text-right text-sm">
+          <Link className="text-purple-300 underline hover:text-purple-200" to="/forgot-password">
+            Forgot Password?
+          </Link>
+        </p>
         <button
           type="submit"
           disabled={busy}

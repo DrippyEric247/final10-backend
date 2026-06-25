@@ -86,6 +86,18 @@ exports.authLoginBody = Joi.object({
   password: Joi.string().min(1).max(128).required(),
 });
 
+exports.authForgotPasswordBody = Joi.object({
+  email: Joi.string().trim().email().max(254).required(),
+});
+
+exports.authResetPasswordBody = Joi.object({
+  token: Joi.string().trim().min(32).max(256).required(),
+  password: Joi.string().min(10).max(128).required(),
+  confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+    'any.only': 'Passwords do not match',
+  }),
+});
+
 exports.ebaySearchQuery = Joi.object({
   q: Joi.string().allow('').max(200).optional(),
   keywords: Joi.string().allow('').max(200).optional(),
