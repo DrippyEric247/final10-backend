@@ -152,6 +152,18 @@ function final10LogoImageUrl() {
   return `${getEmailAssetsBaseUrl()}/assets/final10-logo.png`;
 }
 
+function savvyScoutLogoImageUrl() {
+  const override = String(process.env.EMAIL_SAVVY_SCOUT_LOGO_URL || '').trim();
+  if (override) return override;
+  return `${getEmailAssetsBaseUrl()}/assets/savvy-scout-mascot.png`;
+}
+
+function savvyUniverseLogoImageUrl() {
+  const override = String(process.env.EMAIL_SAVVY_UNIVERSE_LOGO_URL || '').trim();
+  if (override) return override;
+  return `${getEmailAssetsBaseUrl()}/assets/savvy-universe.png`;
+}
+
 function emailBrandingFooterHtml({ mutedColor = '#6b7280', marginTop = 12, prominent = false } = {}) {
   if (prominent) {
     return `<div style="margin-top:${marginTop}px;padding:14px 12px;border-top:1px solid #1f3d2e;border-bottom:1px solid #1f3d2e;text-align:center;">
@@ -164,7 +176,7 @@ function emailBrandingFooterHtml({ mutedColor = '#6b7280', marginTop = 12, promi
 function monthlyReportHeroImageUrl() {
   const override = String(process.env.EMAIL_MONTHLY_REPORT_HERO_URL || '').trim();
   if (override) return override;
-  return savvyScoutHeroImageUrl();
+  return `${getEmailAssetsBaseUrl()}/assets/email/savvy-scout-monthly-report-hero.png`;
 }
 
 function emailBrandingFooterText() {
@@ -188,6 +200,8 @@ module.exports = {
   emailProductFallbackImageUrl,
   savvyScoutHeroImageUrl,
   final10LogoImageUrl,
+  savvyScoutLogoImageUrl,
+  savvyUniverseLogoImageUrl,
   emailBrandingFooterHtml,
   emailBrandingFooterText,
   monthlyReportHeroImageUrl,

@@ -78,6 +78,15 @@ app.use(securityHeaders);
 app.use(cacheControl);
 app.use(cookieSecurity);
 
+// Email template images (hero banners, logos) — served at /assets/*
+app.use(
+  '/assets',
+  express.static(path.join(__dirname, 'static/assets'), {
+    maxAge: process.env.NODE_ENV === 'production' ? '365d' : 0,
+    fallthrough: true,
+  })
+);
+
 // --- Rate Limiting (skip OPTIONS + telemetry ingest) ---
 const { isAuthMeRequest } = require('./middleware/rateLimits');
 

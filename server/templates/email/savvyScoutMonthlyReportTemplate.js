@@ -12,10 +12,13 @@ const {
   getClientBaseUrl,
   savvyScoutHeroImageUrl,
   final10LogoImageUrl,
+  savvyScoutLogoImageUrl,
+  savvyUniverseLogoImageUrl,
   emailBrandingFooterHtml,
   emailBrandingFooterText,
   monthlyReportHeroImageUrl,
 } = require('./emailTemplateUtils');
+const { FINAL10_TAGLINE, FINAL10_EMAIL_SOCIALS } = require('../../config/final10Branding');
 const { generateMonthlyScoutGoals } = require('../../services/monthlyScoutGoalsService');
 
 const COLORS = {
@@ -26,6 +29,8 @@ const COLORS = {
   green: '#4ade80',
   greenDeep: '#16a34a',
   gold: '#f5b942',
+  purple: '#c084fc',
+  purpleDeep: '#9333ea',
   text: '#f8fafc',
   muted: '#94a3b8',
   dim: '#64748b',
@@ -142,6 +147,11 @@ function normalizeMonthlyReportData(input = {}) {
   };
 
   const scoutGoals = input.scoutGoals || generateMonthlyScoutGoals(mockUser, activity);
+  const estimatedSavingsRaw = pickNumber(input.estimatedSavings ?? stats.estimatedSavings, 327);
+  const savvyEarnedRaw = pickNumber(input.savvyEarned ?? stats.savvyEarned, 2485);
+  const eggsCollectedRaw = pickNumber(input.eggsCollected ?? stats.eggsCollected, 3);
+  const completedGoals = pickNumber(scoutGoals?.completedCount, 0) || 0;
+  const totalGoals = pickNumber(scoutGoals?.totalGoals, scoutGoals?.goals?.length || 0) || 0;
 
   return {
     userName: pick(input.userName, 'Operator'),
@@ -204,6 +214,16 @@ function normalizeMonthlyReportData(input = {}) {
     unsubscribeUrl: pick(input.unsubscribeUrl, `${clientUrl}/profile?tab=notifications`),
     heroImageUrl: monthlyReportHeroImageUrl() || savvyScoutHeroImageUrl(),
     logoImageUrl: final10LogoImageUrl(),
+    savvyScoutLogoUrl: savvyScoutLogoImageUrl(),
+    savvyUniverseLogoUrl: savvyUniverseLogoImageUrl(),
+    endReportEstimatedSavings: formatStatValue({ format: 'money' }, estimatedSavingsRaw),
+    endReportSavvyEarned: formatSavvy(savvyEarnedRaw),
+    endReportCompletedGoals: completedGoals,
+    endReportTotalGoals: totalGoals || scoutGoals?.goals?.length || 0,
+    endReportEggsCollected: eggsCollectedRaw ?? 0,
+    endReportStreak: streakCurrent,
+    socialLinks: FINAL10_EMAIL_SOCIALS,
+    final10Tagline: FINAL10_TAGLINE,
     clientUrl,
   };
 }
@@ -355,6 +375,120 @@ function scoutGoalsSectionHtml(d) {
           </tr>`;
 }
 
+function endReportStatRow(icon, labelHtml) {
+  return `
+    <tr>
+      <td style="padding:10px 14px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:${COLORS.text};border-bottom:1px solid rgba(31,61,46,0.65);">
+        <span style="font-size:18px;line-height:1;vertical-align:middle;margin-right:8px;">${icon}</span>
+        ${labelHtml}
+      </td>
+    </tr>`;
+}
+
+function endOfReportSectionHtml(d) {
+  const socialCells = (d.socialLinks || FINAL10_EMAIL_SOCIALS)
+    .map(
+      (s) => `
+      <td align="center" valign="middle" style="padding:6px 4px;">
+        <a href="${escapeHtml(s.url)}" title="${escapeHtml(s.label)}" style="display:inline-block;padding:10px 12px;background:linear-gradient(180deg,#141c18 0%,#0a100d 100%);border:1px solid ${COLORS.border};border-radius:999px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.text};text-decoration:none;letter-spacing:0.04em;box-shadow:0 0 12px rgba(74,222,128,0.12);">
+          <span style="font-size:14px;margin-right:4px;">${s.icon}</span>${escapeHtml(s.label)}
+        </a>
+      </td>`
+    )
+    .join('');
+
+  return `
+          <!-- End of Report -->
+          <tr>
+            <td style="padding:4px 20px 0;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:0;height:2px;background:linear-gradient(90deg, transparent 0%, ${COLORS.purpleDeep} 20%, ${COLORS.green} 50%, ${COLORS.gold} 80%, transparent 100%);font-size:0;line-height:0;box-shadow:0 0 18px rgba(192,132,252,0.35);">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:14px 0 6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.purple};letter-spacing:0.28em;text-transform:uppercase;">
+                    🏁 End of Report
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 20px 20px;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(180deg,#120a1f 0%,#0c1210 35%,#050806 100%);border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;box-shadow:0 0 32px rgba(147,51,234,0.18), inset 0 1px 0 rgba(245,185,66,0.08);">
+                <tr>
+                  <td style="padding:22px 18px 8px;text-align:center;">
+                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:18px;font-weight:900;color:${COLORS.gold};letter-spacing:0.06em;text-transform:uppercase;text-shadow:0 0 20px rgba(245,185,66,0.35);">
+                      🏆 THIS MONTH YOU...
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 12px 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(5,8,6,0.55);border:1px solid rgba(31,61,46,0.8);border-radius:14px;">
+                      ${endReportStatRow('💰', `Saved <strong style="color:${COLORS.gold};">${escapeHtml(d.endReportEstimatedSavings)}</strong>`)}
+                      ${endReportStatRow('🪙', `Earned <strong style="color:${COLORS.gold};">${escapeHtml(d.endReportSavvyEarned)} Savvy</strong>`)}
+                      ${endReportStatRow('🎯', `Completed <strong style="color:${COLORS.green};">${d.endReportCompletedGoals}/${d.endReportTotalGoals}</strong> Scout Goals`)}
+                      ${endReportStatRow('🥚', `Collected <strong style="color:${COLORS.gold};">${d.endReportEggsCollected}</strong> Eggs`)}
+                      ${endReportStatRow('🔥', `Finished with a <strong style="color:${COLORS.green};">${d.endReportStreak}-Day Streak</strong>`)}
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:20px 16px 10px;">
+                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:26px;line-height:1.15;font-weight:900;color:${COLORS.gold};letter-spacing:0.04em;text-transform:uppercase;text-shadow:0 0 24px rgba(245,185,66,0.28);">
+                      STAY SAVVY.
+                    </div>
+                    <div style="margin-top:6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:26px;line-height:1.15;font-weight:900;color:${COLORS.purple};letter-spacing:0.04em;text-transform:uppercase;text-shadow:0 0 24px rgba(192,132,252,0.35);">
+                      STAY SMART.
+                    </div>
+                    <div style="margin-top:6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:20px;line-height:1.2;font-weight:900;color:${COLORS.text};letter-spacing:0.03em;text-transform:uppercase;">
+                      THE BEST DEALS FROM THE START.
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:6px 16px 4px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${COLORS.muted};letter-spacing:0.08em;text-transform:uppercase;">
+                    Powered by <span style="color:${COLORS.gold};">Final10</span> × <span style="color:${COLORS.purple};">Savvy Universe</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:8px 16px 16px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:15px;font-weight:900;color:${COLORS.green};letter-spacing:0.14em;text-transform:uppercase;text-shadow:0 0 16px rgba(74,222,128,0.25);">
+                    ${escapeHtml(d.final10Tagline)}
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:0 12px 18px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                      <tr>
+                        <td align="center" valign="middle" style="padding:8px 10px;">
+                          <img src="${escapeHtml(d.logoImageUrl)}" alt="Final10" width="88" style="display:block;width:88px;max-width:88px;height:auto;border:0;" />
+                        </td>
+                        <td align="center" valign="middle" style="padding:8px 10px;">
+                          <img src="${escapeHtml(d.savvyScoutLogoUrl)}" alt="Savvy Scout" width="72" style="display:block;width:72px;max-width:72px;height:auto;border:0;border-radius:12px;" />
+                        </td>
+                        <td align="center" valign="middle" style="padding:8px 10px;">
+                          <img src="${escapeHtml(d.savvyUniverseLogoUrl)}" alt="Savvy Universe" width="88" style="display:block;width:88px;max-width:88px;height:auto;border:0;" />
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 8px 20px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>${socialCells}</tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0;height:2px;background:linear-gradient(90deg, transparent 0%, ${COLORS.gold} 30%, ${COLORS.purple} 70%, transparent 100%);font-size:0;line-height:0;opacity:0.75;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+}
+
 function buildSavvyScoutMonthlyReportHtml(raw = {}) {
   const d = normalizeMonthlyReportData(raw);
 
@@ -371,7 +505,8 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
       .stack{display:block!important;width:100%!important;max-width:100%!important;}
       .stat-cell{display:block!important;width:100%!important;}
       .pad-sm{padding-left:14px!important;padding-right:14px!important;}
-      .hero-img{width:100%!important;max-width:280px!important;height:auto!important;}
+      .hero-img{width:100%!important;max-width:600px!important;height:auto!important;border-radius:14px 14px 0 0!important;}
+      .hero-wrap{width:100%!important;max-width:600px!important;}
     }
   </style>
 </head>
@@ -412,8 +547,17 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Hero -->
           <tr>
-            <td align="center" style="padding:16px 20px 8px;" class="pad-sm">
-              <img src="${escapeHtml(d.heroImageUrl)}" alt="Savvy Scout operator" width="300" class="hero-img" style="display:block;width:300px;max-width:100%;height:auto;border:0;border-radius:12px;" />
+            <td align="center" style="padding:16px 20px 0;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="hero-wrap" style="max-width:600px;border:1px solid ${COLORS.border};border-radius:14px;overflow:hidden;background:${COLORS.card};">
+                <tr>
+                  <td style="padding:0;margin:0;line-height:0;font-size:0;">
+                    <img src="${escapeHtml(d.heroImageUrl)}" alt="Savvy Scout — mission complete. Your monthly intelligence report is ready." width="600" class="hero-img" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:14px 14px 0 0;" />
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0;margin:0;height:32px;background:linear-gradient(180deg, rgba(12,18,16,0) 0%, ${COLORS.card} 55%, ${COLORS.card} 100%);font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -580,6 +724,8 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
             </td>
           </tr>
 
+          ${endOfReportSectionHtml(d)}
+
           <!-- Footer -->
           <tr>
             <td style="padding:8px 20px 24px;border-top:1px solid ${COLORS.border};background:#030504;" class="pad-sm">
@@ -657,6 +803,23 @@ function buildSavvyScoutMonthlyReportText(raw = {}) {
     '— MESSAGE FROM SAVVY SCOUT —',
     d.scoutMessage,
     '— Savvy Scout',
+    '',
+    '🏁 END OF REPORT',
+    '🏆 THIS MONTH YOU...',
+    `💰 Saved ${d.endReportEstimatedSavings}`,
+    `🪙 Earned ${d.endReportSavvyEarned} Savvy`,
+    `🎯 Completed ${d.endReportCompletedGoals}/${d.endReportTotalGoals} Scout Goals`,
+    `🥚 Collected ${d.endReportEggsCollected} Eggs`,
+    `🔥 Finished with a ${d.endReportStreak}-Day Streak`,
+    '',
+    'STAY SAVVY.',
+    'STAY SMART.',
+    'THE BEST DEALS FROM THE START.',
+    '',
+    'Powered by Final10 × Savvy Universe',
+    d.final10Tagline,
+    '',
+    ...(d.socialLinks || FINAL10_EMAIL_SOCIALS).map((s) => `${s.label}: ${s.url}`),
     '',
     emailBrandingFooterText(),
     '',
