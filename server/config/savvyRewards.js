@@ -10,6 +10,7 @@ const SAVVY_REWARD_TYPES = Object.freeze({
   ONBOARDING_FIRST_MOVE: 'onboarding_first_move',
   DAILY_TASK_LEGACY: 'daily_task_legacy',
   SCOUT_MISSION: 'scout_mission',
+  PERK_MACHINE: 'perk_machine',
 });
 
 const REWARDS = Object.freeze({

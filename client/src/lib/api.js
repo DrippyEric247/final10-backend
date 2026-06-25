@@ -211,6 +211,52 @@ export async function adminSetStreakMilestone(day) {
   return data;
 }
 
+/** Savvy Perk Machine */
+export async function getPerkMachineStatus() {
+  const { data } = await api.get("/perk-machine/status");
+  return data;
+}
+
+export async function getPerkMachineHistory() {
+  const { data } = await api.get("/perk-machine/history");
+  return data;
+}
+
+export async function spinPerkMachine(mode) {
+  const { data } = await api.post("/perk-machine/spin", { mode });
+  return data;
+}
+
+export async function checkPerkMachineAdminAccess() {
+  const { data } = await api.get("/perk-machine/admin/ping");
+  return data;
+}
+
+export async function adminPerkMachineResetFreeSpin() {
+  const { data } = await api.post("/perk-machine/admin/reset-free-spin");
+  return data;
+}
+
+export async function adminPerkMachineGrantSavvy(amount = 500) {
+  const { data } = await api.post("/perk-machine/admin/grant-savvy", { amount });
+  return data;
+}
+
+export async function adminPerkMachineForceSpin(slots = 1) {
+  const { data } = await api.post("/perk-machine/admin/force-spin", { slots });
+  return data;
+}
+
+export async function adminPerkMachineForceLegendary() {
+  const { data } = await api.post("/perk-machine/admin/force-legendary");
+  return data;
+}
+
+export async function adminPerkMachineClearHistory() {
+  const { data } = await api.post("/perk-machine/admin/clear-history");
+  return data;
+}
+
 /** POST /api/email/test/monthly-report-early — admin-only early Monthly Scout Report. */
 export async function sendEarlyMonthlyReportTest() {
   const { data } = await api.post("/email/test/monthly-report-early");

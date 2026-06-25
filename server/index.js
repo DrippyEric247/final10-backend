@@ -182,6 +182,7 @@ auditStartup({
 
 console.log('[startup] boot phase=audit_startup');
 app.use('/api/streak',      require('./routes/streakRoutes'));
+app.use('/api/perk-machine', require('./routes/perkMachineRoutes'));
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);

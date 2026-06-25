@@ -36,6 +36,37 @@ const userSchema = new mongoose.Schema({
     legacyLoyalistUnlocked: { type: Boolean, default: false },
     shieldsConsumed: { type: Number, default: 0 },
   },
+  /** Savvy Perk Machine — spins, egg inventory, tokens */
+  perkMachine: {
+    lastFreeSpinDay: { type: String, default: null },
+    lastSpinAt: { type: Date, default: null },
+    extraFreeSpins: { type: Number, default: 0 },
+    eggInventory: {
+      common: { type: Number, default: 0 },
+      rare: { type: Number, default: 0 },
+      epic: { type: Number, default: 0 },
+      legendary: { type: Number, default: 0 },
+      extraFreeSpin: { type: Number, default: 0 },
+    },
+    tokens: {
+      battlePassXp15: { type: Number, default: 0 },
+      savvyMultiplier15: { type: Number, default: 0 },
+    },
+    callingCardDrops: { type: Number, default: 0 },
+    spinHistory: {
+      type: [
+        {
+          spinId: String,
+          mode: String,
+          slots: Number,
+          savvyCost: Number,
+          rewards: mongoose.Schema.Types.Mixed,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+  },
   lastActive: Date,
 
   // ---- referrals ----

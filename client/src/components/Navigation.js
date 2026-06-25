@@ -71,6 +71,7 @@ const Navigation = () => {
     { name: 'Build Wars', path: '/build-wars', icon: '⚔️' },
     { name: 'Battle Pass', path: '/battle-pass', icon: '🎯' },
     { name: 'Daily Streak', path: '/daily-streak', icon: '🔥' },
+    { name: 'Perk Machine', path: '/perk-machine', icon: '🎰' },
     { name: 'Customize', path: '/customization', icon: '🎖️' },
     ...(showAdminNav
       ? [

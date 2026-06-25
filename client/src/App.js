@@ -93,6 +93,7 @@ import FoundingTesterBadge from "./components/beta/FoundingTesterBadge";
 import { SavvyScoutMissionsProvider } from './context/SavvyScoutMissionsContext';
 import MissionLog from './pages/MissionLog';
 import DailyStreak from './pages/DailyStreak';
+import PerkMachine from './pages/PerkMachine';
 import Final10Slogan from './components/branding/Final10Slogan';
 import './styles/SavvyScoutMissions.css';
 import './styles/final10Branding.css';
@@ -418,6 +419,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <DailyStreak />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/perk-machine"
+            element={
+              <ProtectedRoute>
+                <PerkMachine />
               </ProtectedRoute>
             }
           />
