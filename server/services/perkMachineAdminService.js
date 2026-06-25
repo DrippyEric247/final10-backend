@@ -3,7 +3,7 @@
  */
 
 const { auditFireAndForget } = require('./securityAuditService');
-const { emptyEggInventory } = require('../config/perkMachineRewards');
+const { emptyEggInventory, HATCHABLE_EGG_TIERS } = require('../config/perkMachineRewards');
 const { ensurePerkMachineDoc, getPerkMachineStatus } = require('./perkMachineService');
 
 function buildAdminLogEntry(action, adminUser, targetUser, details = {}) {
@@ -52,6 +52,17 @@ async function adminGrantSavvy(user, amount = 500, adminUser) {
   return { savvyBalance: user.savvyPoints, adminLog: log };
 }
 
+async function adminGrantEgg(user, tier = 'rare', count = 1, adminUser) {
+  const pm = ensurePerkMachineDoc(user);
+  const eggTier = HATCHABLE_EGG_TIERS.includes(String(tier)) ? String(tier) : 'rare';
+  const n = Math.max(1, Math.min(99, Math.round(Number(count) || 1)));
+  pm.eggInventory[eggTier] = Number(pm.eggInventory[eggTier] || 0) + n;
+  user.markModified('perkMachine');
+  await user.save();
+  const log = logAdminPerkAction('grant_egg', adminUser, user, { eggTier, count: n });
+  return { status: getPerkMachineStatus(user), adminLog: log };
+}
+
 async function adminClearHistory(user, adminUser) {
   const pm = ensurePerkMachineDoc(user);
   pm.spinHistory = [];
@@ -65,5 +76,6 @@ async function adminClearHistory(user, adminUser) {
 module.exports = {
   adminResetFreeSpin,
   adminGrantSavvy,
+  adminGrantEgg,
   adminClearHistory,
 };

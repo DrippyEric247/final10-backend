@@ -73,6 +73,95 @@ const REWARD_POOL = Object.freeze([
   },
 ]);
 
+/**
+ * Extra reward definitions only reachable by hatching eggs.
+ * Kept separate from the spin pool so spins and hatches stay independent.
+ */
+const EXTRA_HATCH_REWARDS = Object.freeze([
+  { id: 'savvy_500', type: 'savvy', amount: 500, label: '+500 Savvy', icon: '💎', rarity: 'legendary', weight: 1 },
+  { id: 'free_spin', type: 'egg', eggTier: 'extraFreeSpin', label: 'Free Spin', icon: '🎰', rarity: 'uncommon', weight: 1 },
+  { id: 'scout_upgrade', type: 'scout_upgrade', label: 'Savvy Scout Upgrade', icon: '🤖', rarity: 'legendary', weight: 1 },
+]);
+
+/** Fast lookup of every reward definition (spin pool + hatch-only rewards). */
+const REWARD_BY_ID = Object.freeze(
+  [...REWARD_POOL, ...EXTRA_HATCH_REWARDS].reduce((acc, r) => {
+    acc[r.id] = r;
+    return acc;
+  }, {})
+);
+
+/** Egg tiers that can be hatched (extraFreeSpin is a spin token, not hatchable). */
+const HATCHABLE_EGG_TIERS = Object.freeze(['common', 'rare', 'epic', 'legendary', 'mythic']);
+
+/**
+ * Per-egg-tier hatch reward tables. Higher tiers skew toward premium rewards.
+ * Each entry references a reward id + a relative weight.
+ */
+const HATCH_POOLS = Object.freeze({
+  common: [
+    { id: 'savvy_25', weight: 20 },
+    { id: 'savvy_50', weight: 12 },
+    { id: 'token_savvy_mult', weight: 6 },
+    { id: 'streak_shield', weight: 6 },
+    { id: 'egg_common', weight: 5 },
+    { id: 'free_spin', weight: 4 },
+  ],
+  rare: [
+    { id: 'savvy_50', weight: 16 },
+    { id: 'savvy_100', weight: 12 },
+    { id: 'token_bp_xp', weight: 8 },
+    { id: 'token_savvy_mult', weight: 8 },
+    { id: 'streak_shield', weight: 6 },
+    { id: 'calling_card', weight: 4 },
+    { id: 'egg_rare', weight: 4 },
+    { id: 'free_spin', weight: 4 },
+  ],
+  epic: [
+    { id: 'savvy_100', weight: 16 },
+    { id: 'savvy_250', weight: 8 },
+    { id: 'token_bp_xp', weight: 10 },
+    { id: 'token_savvy_mult', weight: 10 },
+    { id: 'calling_card', weight: 6 },
+    { id: 'egg_epic', weight: 4 },
+    { id: 'scout_upgrade', weight: 3 },
+    { id: 'free_spin', weight: 4 },
+  ],
+  legendary: [
+    { id: 'savvy_250', weight: 16 },
+    { id: 'savvy_500', weight: 6 },
+    { id: 'token_bp_xp', weight: 10 },
+    { id: 'token_savvy_mult', weight: 10 },
+    { id: 'calling_card', weight: 10 },
+    { id: 'scout_upgrade', weight: 8 },
+    { id: 'egg_legendary', weight: 3 },
+  ],
+  mythic: [
+    { id: 'savvy_500', weight: 14 },
+    { id: 'scout_upgrade', weight: 14 },
+    { id: 'calling_card', weight: 10 },
+    { id: 'token_bp_xp', weight: 10 },
+    { id: 'token_savvy_mult', weight: 10 },
+    { id: 'egg_legendary', weight: 6 },
+  ],
+});
+
+/**
+ * Build a weighted reward pool for hatching a given egg tier.
+ * Subscription tier nudges rare/legendary weights using the same boosts as spins.
+ */
+function buildHatchPool(eggTier, subscriptionTier) {
+  const table = HATCH_POOLS[eggTier] || HATCH_POOLS.common;
+  return table
+    .map((entry) => {
+      const def = REWARD_BY_ID[entry.id];
+      if (!def) return null;
+      const boosted = adjustedWeight({ ...def, weight: entry.weight }, subscriptionTier);
+      return { ...def, weight: boosted };
+    })
+    .filter((r) => r && r.weight > 0);
+}
+
 const TIER_WEIGHT_BOOSTS = Object.freeze({
   free: { rare: 1, epic: 1, legendary: 1, uncommon: 1 },
   core: { rare: 1.12, epic: 1.15, legendary: 1.05, uncommon: 1.08 },
@@ -143,15 +232,24 @@ function emptyEggInventory() {
     rare: 0,
     epic: 0,
     legendary: 0,
+    mythic: 0,
     extraFreeSpin: 0,
   };
 }
+
+const HATCH_COOLDOWN_MS = 800;
 
 module.exports = {
   SPIN_MODES,
   SPIN_COSTS,
   REWARD_POOL,
+  REWARD_BY_ID,
+  EXTRA_HATCH_REWARDS,
+  HATCH_POOLS,
+  HATCHABLE_EGG_TIERS,
+  buildHatchPool,
   SPIN_COOLDOWN_MS,
+  HATCH_COOLDOWN_MS,
   MAX_HISTORY,
   getSpinConfig,
   buildWeightedPool,

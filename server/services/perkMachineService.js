@@ -9,9 +9,12 @@ const { grantSavvyReward } = require('./savvyRewardService');
 const {
   SPIN_MODES,
   SPIN_COOLDOWN_MS,
+  HATCH_COOLDOWN_MS,
   MAX_HISTORY,
   getSpinConfig,
   buildWeightedPool,
+  buildHatchPool,
+  HATCHABLE_EGG_TIERS,
   pickWeightedReward,
   pickResultMessage,
   emptyEggInventory,
@@ -29,6 +32,8 @@ function ensurePerkMachineDoc(user) {
     pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0 };
   }
   if (typeof pm.callingCardDrops !== 'number') pm.callingCardDrops = 0;
+  if (typeof pm.scoutUpgrades !== 'number') pm.scoutUpgrades = 0;
+  if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
   return pm;
 }
 
@@ -70,6 +75,7 @@ function serializeEggInventory(pm) {
     rare: Number(inv.rare) || 0,
     epic: Number(inv.epic) || 0,
     legendary: Number(inv.legendary) || 0,
+    mythic: Number(inv.mythic) || 0,
     extraFreeSpin: Number(inv.extraFreeSpin) || 0,
   };
 }
@@ -109,6 +115,7 @@ function getPerkMachineStatus(user) {
     },
     streakShields: Number(user.dailyStreak?.scoutShields) || 0,
     callingCardDrops: Number(pm.callingCardDrops) || 0,
+    scoutUpgrades: Number(pm.scoutUpgrades) || 0,
     recentSpins: serializeHistory(pm).slice(0, 10),
     spinCosts: {
       free: getSpinConfig(SPIN_MODES.FREE),
@@ -166,6 +173,12 @@ async function applyReward(user, rewardDef, spinId) {
     if (!Array.isArray(user.badges)) user.badges = [];
     if (!user.badges.includes('perk_calling_card')) {
       user.badges.push('perk_calling_card');
+    }
+  } else if (rewardDef.type === 'scout_upgrade') {
+    pm.scoutUpgrades = Number(pm.scoutUpgrades || 0) + 1;
+    if (!Array.isArray(user.badges)) user.badges = [];
+    if (!user.badges.includes('savvy_scout_upgrade')) {
+      user.badges.push('savvy_scout_upgrade');
     }
   }
 
@@ -298,10 +311,80 @@ async function spinPerkMachine(user, options = {}) {
   };
 }
 
+async function hatchEgg(user, options = {}) {
+  const eggTier = String(options.eggTier || '').trim();
+  if (!HATCHABLE_EGG_TIERS.includes(eggTier)) {
+    const err = new Error('That egg cannot be hatched.');
+    err.status = 400;
+    err.code = 'INVALID_EGG_TIER';
+    throw err;
+  }
+
+  const pm = ensurePerkMachineDoc(user);
+  const now = Date.now();
+  const lastHatch = pm.lastHatchAt ? new Date(pm.lastHatchAt).getTime() : 0;
+  if (lastHatch && now - lastHatch < HATCH_COOLDOWN_MS) {
+    const err = new Error('Hatch already in progress. Please wait.');
+    err.status = 429;
+    err.code = 'HATCH_IN_PROGRESS';
+    throw err;
+  }
+
+  const owned = Number(pm.eggInventory?.[eggTier]) || 0;
+  if (owned < 1) {
+    const err = new Error('You do not own that egg.');
+    err.status = 400;
+    err.code = 'NO_EGG';
+    throw err;
+  }
+
+  pm.eggInventory[eggTier] = owned - 1;
+  pm.lastHatchAt = new Date();
+
+  const tier = readTier(user);
+  const hatchId = crypto.randomUUID();
+  const pool = buildHatchPool(eggTier, tier);
+  const picked = pickWeightedReward(pool);
+  const reward = await applyReward(user, picked, `hatch:${hatchId}`);
+
+  const historyEntry = {
+    spinId: hatchId,
+    mode: `hatch_${eggTier}`,
+    slots: 0,
+    savvyCost: 0,
+    rewards: [
+      {
+        id: reward.id,
+        label: reward.label,
+        rarity: reward.rarity,
+        type: reward.type,
+      },
+    ],
+    createdAt: new Date(),
+  };
+  pm.spinHistory.push(historyEntry);
+  if (pm.spinHistory.length > MAX_HISTORY) {
+    pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
+  }
+
+  user.markModified('perkMachine');
+  await user.save();
+
+  return {
+    hatchId,
+    eggTier,
+    reward,
+    resultMessage: pickResultMessage(reward.rarity),
+    savvyBalance: Number(user.savvyPoints) || 0,
+    status: getPerkMachineStatus(user),
+  };
+}
+
 module.exports = {
   ensurePerkMachineDoc,
   getPerkMachineStatus,
   spinPerkMachine,
+  hatchEgg,
   canUseFreeSpin,
   serializeEggInventory,
   serializeHistory,

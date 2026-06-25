@@ -4,8 +4,11 @@ import {
   adminPerkMachineForceLegendary,
   adminPerkMachineForceSpin,
   adminPerkMachineGrantSavvy,
+  adminPerkMachineGrantEgg,
   adminPerkMachineResetFreeSpin,
 } from '../../lib/api';
+
+const EGG_GRANT_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
 export default function PerkMachineAdminPanel({ onStatusRefresh }) {
   const [busy, setBusy] = useState(null);
@@ -61,6 +64,20 @@ export default function PerkMachineAdminPanel({ onStatusRefresh }) {
         <button type="button" disabled={busy} onClick={() => void runAction('clear', adminPerkMachineClearHistory)}>
           Clear spin history
         </button>
+      </div>
+
+      <div className="perk-admin-label" style={{ marginTop: '0.75rem' }}>Grant eggs (Hatchery QA)</div>
+      <div className="perk-admin-actions">
+        {EGG_GRANT_TIERS.map((tier) => (
+          <button
+            key={tier}
+            type="button"
+            disabled={busy}
+            onClick={() => void runAction(`egg-${tier}`, () => adminPerkMachineGrantEgg(tier, 3))}
+          >
+            +3 {tier} eggs
+          </button>
+        ))}
       </div>
       {logs.length ? (
         <ul className="perk-admin-logs">

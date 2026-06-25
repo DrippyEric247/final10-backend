@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getPerkMachineStatus,
   spinPerkMachine,
+  hatchPerkEgg,
   checkPerkMachineAdminAccess,
 } from '../lib/api';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
@@ -13,7 +14,9 @@ import LoadingState from '../components/ui/states/LoadingState';
 import PerkMachineAdminPanel from '../components/perk/PerkMachineAdminPanel';
 import PerkMachineScoutFloater from '../components/perk/PerkMachineScoutFloater';
 import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
+import EggHatchery from '../components/perk/EggHatchery';
 import '../styles/PerkMachine.css';
+import '../styles/EggHatchery.css';
 
 const REEL_SYMBOLS = ['🪙', '💰', '🥚', '⚡', '✨', '🛡️', '🎖️', '🎰', '💎', '🔥'];
 
@@ -228,6 +231,30 @@ export default function PerkMachine() {
     [refreshProfile, runRevealSequence, spinning, status]
   );
 
+  const handleHatch = useCallback(
+    async (eggTier) => {
+      const result = await hatchPerkEgg(eggTier);
+      if (result?.status) setStatus(result.status);
+      const savvyGranted = Number(result?.reward?.savvyGranted) || 0;
+      if (savvyGranted > 0) {
+        setBalanceBump(true);
+        window.setTimeout(() => setBalanceBump(false), 1800);
+      }
+      window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+      if (typeof refreshProfile === 'function') await refreshProfile();
+      return result;
+    },
+    [refreshProfile]
+  );
+
+  const handleHatchStatusUpdate = useCallback((nextStatus) => {
+    if (nextStatus) setStatus(nextStatus);
+  }, []);
+
+  const scrollToMachine = useCallback(() => {
+    machinePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
   if (loading) {
     return (
       <div className="perk-page">
@@ -422,6 +449,13 @@ export default function PerkMachine() {
           ) : null}
         </aside>
       </div>
+
+      <EggHatchery
+        eggInventory={status?.eggInventory}
+        onHatch={handleHatch}
+        onStatusUpdate={handleHatchStatusUpdate}
+        onSpinClick={scrollToMachine}
+      />
 
       {showAdmin ? (
         <PerkMachineAdminPanel onStatusRefresh={loadStatus} />

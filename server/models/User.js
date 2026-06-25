@@ -40,12 +40,15 @@ const userSchema = new mongoose.Schema({
   perkMachine: {
     lastFreeSpinDay: { type: String, default: null },
     lastSpinAt: { type: Date, default: null },
+    lastHatchAt: { type: Date, default: null },
     extraFreeSpins: { type: Number, default: 0 },
+    scoutUpgrades: { type: Number, default: 0 },
     eggInventory: {
       common: { type: Number, default: 0 },
       rare: { type: Number, default: 0 },
       epic: { type: Number, default: 0 },
       legendary: { type: Number, default: 0 },
+      mythic: { type: Number, default: 0 },
       extraFreeSpin: { type: Number, default: 0 },
     },
     tokens: {

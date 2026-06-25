@@ -227,6 +227,11 @@ export async function spinPerkMachine(mode) {
   return data;
 }
 
+export async function hatchPerkEgg(eggTier) {
+  const { data } = await api.post("/perk-machine/hatch", { eggTier });
+  return data;
+}
+
 export async function checkPerkMachineAdminAccess() {
   const { data } = await api.get("/perk-machine/admin/ping");
   return data;
@@ -244,6 +249,11 @@ export async function adminPerkMachineGrantSavvy(amount = 500) {
 
 export async function adminPerkMachineForceSpin(slots = 1) {
   const { data } = await api.post("/perk-machine/admin/force-spin", { slots });
+  return data;
+}
+
+export async function adminPerkMachineGrantEgg(tier = "rare", count = 1) {
+  const { data } = await api.post("/perk-machine/admin/grant-egg", { tier, count });
   return data;
 }
 

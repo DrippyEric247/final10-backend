@@ -3,10 +3,11 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { HttpError } = require('../middleware/apiErrors');
-const { getPerkMachineStatus, spinPerkMachine } = require('../services/perkMachineService');
+const { getPerkMachineStatus, spinPerkMachine, hatchEgg } = require('../services/perkMachineService');
 const {
   adminResetFreeSpin,
   adminGrantSavvy,
+  adminGrantEgg,
   adminClearHistory,
 } = require('../services/perkMachineAdminService');
 const { SPIN_MODES } = require('../config/perkMachineRewards');
@@ -61,6 +62,29 @@ router.post('/spin', auth, async (req, res, next) => {
   }
 });
 
+router.post('/hatch', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+
+    const eggTier = String(req.body?.eggTier || '').trim();
+    const result = await hatchEgg(user, { eggTier });
+    res.json({
+      message: result.resultMessage,
+      ...result,
+    });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({
+        message: err.message,
+        code: err.code,
+      });
+    }
+    console.error('[perk-machine/hatch]', err);
+    next(err);
+  }
+});
+
 /** Admin-only QA controls */
 router.get('/admin/ping', auth, requireAdminAccess(), (req, res) => {
   res.json({ ok: true, admin: true });
@@ -87,6 +111,20 @@ router.post('/admin/grant-savvy', auth, requireAdminAccess(), async (req, res, n
     res.json({ message: `Granted ${amount} Savvy.`, ...result });
   } catch (err) {
     console.error('[perk-machine/admin/grant-savvy]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/grant-egg', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const tier = String(req.body?.tier || 'rare');
+    const count = Number(req.body?.count) || 1;
+    const result = await adminGrantEgg(user, tier, count, req.adminUser || user);
+    res.json({ message: `Granted ${count} ${tier} egg(s).`, ...result });
+  } catch (err) {
+    console.error('[perk-machine/admin/grant-egg]', err);
     next(err);
   }
 });
