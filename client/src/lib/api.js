@@ -267,6 +267,44 @@ export async function adminPerkMachineClearHistory() {
   return data;
 }
 
+/** ---- Battle Pass (beta 25-tier) ---- **/
+
+/** POST /api/progression/claim-tier — claim a tier reward (free|premium). */
+export async function claimBattlePassTier(level, track) {
+  const { data } = await api.post("/progression/claim-tier", { level, track });
+  return data;
+}
+
+/** GET /api/progression/admin/ping — returns 200 only for admins. */
+export async function checkBattlePassAdminAccess() {
+  try {
+    const { data } = await api.get("/progression/admin/ping");
+    return Boolean(data?.admin);
+  } catch {
+    return false;
+  }
+}
+
+export async function adminBattlePassSetTier(level) {
+  const { data } = await api.post("/progression/admin/set-tier", { level });
+  return data;
+}
+
+export async function adminBattlePassGrantXp(amount = 1000) {
+  const { data } = await api.post("/progression/admin/grant-xp", { amount });
+  return data;
+}
+
+export async function adminBattlePassResetClaims() {
+  const { data } = await api.post("/progression/admin/reset-claims");
+  return data;
+}
+
+export async function adminBattlePassForceClaim(level) {
+  const { data } = await api.post("/progression/admin/force-claim", { level });
+  return data;
+}
+
 /** POST /api/email/test/monthly-report-early — admin-only early Monthly Scout Report. */
 export async function sendEarlyMonthlyReportTest() {
   const { data } = await api.post("/email/test/monthly-report-early");

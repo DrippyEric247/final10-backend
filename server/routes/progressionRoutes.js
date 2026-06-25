@@ -1,6 +1,8 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const { requireAdminAccess } = require('../middleware/requireRole');
 const progressionService = require('../services/progressionService');
+const battlePassClaimService = require('../services/battlePassClaimService');
 const { BATTLE_PASS_SEASON_ID } = require('../lib/battlePassConfig');
 const { validateRequest } = require('../middleware/validateRequest');
 const { progressionEventsLimiter } = require('../middleware/rateLimits');
@@ -63,6 +65,63 @@ router.post('/premium', auth, validateRequest(schemas.progressionPremiumBody), a
   try {
     const state = await progressionService.syncBattlePassPremiumFromEntitlement(req.user._id, { req });
     return res.json(state);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+/** Manually claim a battle pass tier reward (free or premium track). */
+router.post('/claim-tier', auth, async (req, res, next) => {
+  try {
+    const { level, track } = req.body || {};
+    const out = await battlePassClaimService.claimTierReward(req.user._id, { level, track });
+    return res.json(out);
+  } catch (err) {
+    if (err && err.status && err.code) {
+      return res.status(err.status).json({ code: err.code, message: err.message });
+    }
+    return next(err);
+  }
+});
+
+/* ----------------------------- Admin testing ----------------------------- */
+
+router.get('/admin/ping', auth, requireAdminAccess(), (req, res) => {
+  res.json({ ok: true, admin: true });
+});
+
+router.post('/admin/set-tier', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const state = await battlePassClaimService.adminSetTier(req.user._id, req.body?.level);
+    return res.json({ ok: true, state });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/admin/grant-xp', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const amount = req.body?.amount != null ? req.body.amount : 1000;
+    const state = await battlePassClaimService.adminGrantXp(req.user._id, amount);
+    return res.json({ ok: true, state });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/admin/reset-claims', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const state = await battlePassClaimService.adminResetClaims(req.user._id);
+    return res.json({ ok: true, state });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/admin/force-claim', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const out = await battlePassClaimService.adminForceClaimTier(req.user._id, req.body?.level);
+    return res.json(out);
   } catch (err) {
     return next(err);
   }

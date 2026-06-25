@@ -10,6 +10,9 @@ const EMBLEM_IDS = new Set([
   'sigil_bp_neon',
   'sigil_bp_hunter',
   'sigil_bp_apex',
+  // Battle Pass beta · season 1 (25-tier)
+  'sigil_bp_animated_t10',
+  'sigil_bp_animated_t18',
   // Savvy / business progression
   'sigil_coupon_scissor',
   'sigil_gift_box',
@@ -40,6 +43,11 @@ const CALLING_CARD_IDS = new Set([
   'card_bp_neon_lane',
   'card_bp_strike',
   'card_bp_finale',
+  // Battle Pass beta · season 1 (25-tier)
+  'card_bp_s1_t3',
+  'card_bp_s1_t13',
+  'card_bp_epic',
+  'card_bp_legendary',
   // Savvy / business progression
   'card_coupon_sniper',
   'card_stack_master',
@@ -68,6 +76,24 @@ const CALLING_CARD_IDS = new Set([
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);
 
+/**
+ * Battle Pass beta · season 1 misc cosmetics (borders, banners, frames,
+ * themes, skins, dialogue packs, badges, season boosts). Stored in the
+ * cosmetic inventory as free-form unlock IDs.
+ */
+const BATTLE_PASS_S1_COSMETIC_IDS = new Set([
+  'border_bp_s1',
+  'banner_bp_s1',
+  'frame_premium_s1',
+  'theme_perk_neon',
+  'skin_perk_s1',
+  'skin_scout_premium',
+  'dialogue_scout_s1',
+  'badge_perk_animated',
+  'badge_founder_animated',
+  'boost_egg_slot_s1',
+]);
+
 /** Role-based auto-unlocks (mirrors client adminCosmetics ROLE_AUTO_GRANTS). */
 const ROLE_AUTO_GRANTS = {
   influencer: ['card_savvy_creator', 'sigil_savvy_creator'],
@@ -88,7 +114,12 @@ const ROLE_AUTO_GRANTS = {
 };
 
 function isKnownCosmeticId(id) {
-  return EMBLEM_IDS.has(id) || CALLING_CARD_IDS.has(id) || TITLE_IDS.has(id);
+  return (
+    EMBLEM_IDS.has(id) ||
+    CALLING_CARD_IDS.has(id) ||
+    TITLE_IDS.has(id) ||
+    BATTLE_PASS_S1_COSMETIC_IDS.has(id)
+  );
 }
 
 function roleAutoUnlockIds(role) {
@@ -100,6 +131,7 @@ module.exports = {
   EMBLEM_IDS,
   CALLING_CARD_IDS,
   TITLE_IDS,
+  BATTLE_PASS_S1_COSMETIC_IDS,
   ROLE_AUTO_GRANTS,
   isKnownCosmeticId,
   roleAutoUnlockIds,

@@ -103,54 +103,18 @@ function applyTrackTierReward(reward, user, inventory, bp, claimedSet, claimKey)
 }
 
 /**
- * Applies tier rewards for current xp, respecting claimedRewardIds and premium flag.
- * Mutates bp.xp, bp.claimedRewardIds (via claimed Set), user, inventory.
+ * Beta: tier rewards are now MANUALLY claimed via `battlePassClaimService`
+ * (the new 25-tier ecosystem rewards route to Savvy/eggs/spins/cosmetics and
+ * surface a claim popup). This function is intentionally a no-op for tier
+ * granting — it only preserves the call sites that recompute premium/tier.
+ *
+ * Legacy `applyTrackTierReward` (points/emblem/card/boost/bp_xp) is retained for
+ * reference but no longer invoked, and historical `tier:` claim keys remain in
+ * `claimedRewardIds` (preserving prior progress) without blocking new `tier2:`
+ * manual claims.
  */
-function applyPendingTierRewards(bp, user, inventory) {
-  const claimed = new Set(bp.claimedRewardIds || []);
-  const premium = Boolean(bp.premiumUnlocked);
-  const tierGrants = [];
-  let guard = 0;
-  while (guard < 48) {
-    guard += 1;
-    let progressed = false;
-    const xp = bp.xp;
-
-    for (let i = 0; i < BATTLE_PASS_TIERS.length; i += 1) {
-      const need = BATTLE_PASS_CUMULATIVE_XP[i];
-      if (xp < need) continue;
-      const tier = BATTLE_PASS_TIERS[i];
-      const lv = tier.level;
-      const keyFree = tierRewardClaimKey('free', lv);
-      if (!claimed.has(keyFree)) {
-        applyTrackTierReward(tier.free, user, inventory, bp, claimed, keyFree);
-        tierGrants.push({ track: 'free', level: lv, reward: tier.free });
-        progressed = true;
-        break;
-      }
-    }
-    if (progressed) continue;
-
-    if (premium) {
-      for (let i = 0; i < BATTLE_PASS_TIERS.length; i += 1) {
-        const need = BATTLE_PASS_CUMULATIVE_XP[i];
-        if (bp.xp < need) continue;
-        const tier = BATTLE_PASS_TIERS[i];
-        const lv = tier.level;
-        const keyPrem = tierRewardClaimKey('premium', lv);
-        if (!claimed.has(keyPrem)) {
-          applyTrackTierReward(tier.premium, user, inventory, bp, claimed, keyPrem);
-          tierGrants.push({ track: 'premium', level: lv, reward: tier.premium });
-          progressed = true;
-          break;
-        }
-      }
-    }
-
-    if (!progressed) break;
-  }
-  bp.claimedRewardIds = [...claimed];
-  return tierGrants;
+function applyPendingTierRewards() {
+  return [];
 }
 
 /**

@@ -353,7 +353,7 @@ export function hydrateBattlePassFromServer(bpSlice) {
   const appliedFree = [];
   const appliedPremium = [];
   for (const id of bpSlice?.claimedRewardIds || []) {
-    const m = typeof id === "string" && id.match(/^tier:(free|premium):(\d+)$/);
+    const m = typeof id === "string" && id.match(/^tier2?:(free|premium):(\d+)$/);
     if (m) {
       const lv = Number(m[2]);
       if (m[1] === "free") appliedFree.push(lv);

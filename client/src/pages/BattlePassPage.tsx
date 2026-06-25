@@ -10,10 +10,11 @@ import {
 } from "../lib/battlePassConfig";
 import {
   getBattlePassProgress,
-  getTierStatus,
   isBattlePassPremiumUnlocked,
   unlockBattlePassPremium,
 } from "../lib/battlePassEngine";
+import BattlePassRewardTracks from "../components/battlePass/BattlePassRewardTracks";
+import BattlePassAdminPanel from "../components/battlePass/BattlePassAdminPanel";
 import { notifyUniversalProgressRefresh } from "../lib/universalBoostProgress";
 import { useAuth } from "../context/AuthContext";
 import { getSeasonTaskDefinition } from "../data/battlePassTaskSeasons";
@@ -269,7 +270,7 @@ export default function BattlePassPage() {
       if (d?.level != null) {
         const premUnlockedNow = isBattlePassPremiumUnlocked();
         const tier = BATTLE_PASS_TIERS.find((t) => t.level === d.level);
-        const earnedReward = (d.reward ?? tier?.free) as BattlePassReward | undefined;
+        const earnedReward = (d.reward ?? tier?.free) as unknown as BattlePassReward | undefined;
         if (!earnedReward || !tier?.free) return;
         const missedPremium = !hasFoundingTesterAccess && d.track === "free" && !premUnlockedNow && Boolean(tier?.premium);
         const latestProgress = getBattlePassProgress();
@@ -277,11 +278,11 @@ export default function BattlePassPage() {
           level: d.level,
           track: d.track || "",
           pointsGainedLabel: earnedReward.label || "Reward unlocked",
-          freeReward: toTierRewardSummary(tier.free as BattlePassReward),
+          freeReward: toTierRewardSummary(tier.free as unknown as BattlePassReward),
           premiumMissedReward:
             missedPremium && tier.premium
               ? {
-                  reward: toTierRewardSummary(tier.premium as BattlePassReward),
+                  reward: toTierRewardSummary(tier.premium as unknown as BattlePassReward),
                   badgeLabel: "Premium",
                   locked: true,
                 }
@@ -423,6 +424,20 @@ export default function BattlePassPage() {
     progression.state?.battlePass?.premiumUnlocked,
     progress.premium,
   ]);
+
+  /** Server-authoritative unlocked tier + claimed reward keys drive the claim UI. */
+  const unlockedTier = useMemo(
+    () => Number(progression.state?.battlePass?.tier ?? progress.completedCount ?? 0),
+    [progression.state?.battlePass?.tier, progress.completedCount]
+  );
+  const claimedIds = useMemo(
+    () => (progression.state?.battlePass?.claimedRewardIds ?? []) as string[],
+    [progression.state?.battlePass?.claimedRewardIds]
+  );
+  const refreshAfterClaim = useCallback(() => {
+    void progression.reload();
+    bump();
+  }, [bump, progression]);
 
   return (
     <div className="f10-bp-page" style={themeStyle}>
@@ -589,72 +604,22 @@ export default function BattlePassPage() {
         </div>
       </header>
 
-      <section className="f10-bp-track-wrap">
-        <div className="f10-bp-track-label">Free track</div>
-        <div className="f10-bp-track-scroll">
-          {BATTLE_PASS_TIERS.map((tier, idx) => {
-            const need = BATTLE_PASS_CUMULATIVE_XP[idx];
-            const st = getTierStatus(tier.level);
-            return (
-              <div
-                key={`f-${tier.level}`}
-                className={`f10-bp-tier f10-bp-tier--free ${st === "active" ? "f10-bp-tier--active" : ""} ${
-                  st === "completed" ? "f10-bp-tier--completed" : ""
-                } ${st === "locked" ? "f10-bp-tier--locked" : ""}`}
-              >
-                <div className="f10-bp-tier-hd">
-                  <span className="f10-bp-tier-lv">T{tier.level}</span>
-                  <span className="f10-bp-tier-badge">Free</span>
-                </div>
-                <div className="f10-bp-tier-xp">{need} XP</div>
-                <div className="f10-bp-reward">{tier.free.label}</div>
-                <div className="f10-bp-tier-foot">
-                  {st === "completed" ? "Claimed" : st === "active" ? "In progress" : "Locked"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <section className="f10-bp-rewards-intro">
+        <p className="f10-bp-rewards-copy">
+          Earn XP by checking deals, claiming streaks, spinning the Perk Machine, completing Scout Goals, and staying
+          active.
+        </p>
       </section>
 
-      <section className="f10-bp-track-wrap" style={{ marginTop: 8 }}>
-        <div className="f10-bp-track-label">Premium track</div>
-        <div className="f10-bp-track-scroll">
-          {BATTLE_PASS_TIERS.map((tier, idx) => {
-            const need = BATTLE_PASS_CUMULATIVE_XP[idx];
-            const st = getTierStatus(tier.level);
-            const locked = !premiumUnlocked;
-            return (
-              <div
-                key={`p-${tier.level}`}
-                className={`f10-bp-tier f10-bp-tier--premium ${st === "active" ? "f10-bp-tier--active" : ""} ${
-                  st === "completed" ? "f10-bp-tier--completed" : ""
-                } ${locked ? "f10-bp-tier--premium-locked" : ""} ${
-                  premiumJustUnlocked ? "f10-bp-tier--premium-unlock-anim" : ""
-                }`}
-              >
-                <div className="f10-bp-tier-hd">
-                  <span className="f10-bp-tier-lv">T{tier.level}</span>
-                  <span className="f10-bp-tier-badge">Premium {locked ? "🔒" : "★"}</span>
-                </div>
-                <div className="f10-bp-tier-xp">{need} XP</div>
-                <div className={`f10-bp-reward ${locked ? "f10-bp-reward--locked-premium" : ""}`}>
-                  <div className="f10-bp-reward-main">{tier.premium.label}</div>
-                  {locked ? (
-                    <>
-                      <div className="f10-bp-reward-lock">🔒 Premium Reward</div>
-                      <div className="f10-bp-reward-cta">Upgrade to unlock</div>
-                    </>
-                  ) : null}
-                </div>
-                <div className="f10-bp-tier-foot">
-                  {locked ? "Locked" : st === "completed" ? "Claimed" : st === "active" ? "In progress" : "Locked"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <BattlePassRewardTracks
+        unlockedTier={unlockedTier}
+        premiumUnlocked={premiumUnlocked || hasFoundingTesterAccess}
+        claimedIds={claimedIds}
+        canClaim={Boolean(authToken)}
+        onClaimed={refreshAfterClaim}
+      />
+
+      <BattlePassAdminPanel onAfterAction={refreshAfterClaim} />
 
       {taskSeason && bp.isActive ? (
         <div className="f10-bp-missions-cluster" style={missionThemeStyle}>
@@ -736,6 +701,10 @@ export default function BattlePassPage() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      <footer className="f10-bp-footer">
+        <Final10Slogan variant="footer" as="p" />
+      </footer>
     </div>
   );
 }
