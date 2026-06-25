@@ -156,6 +156,12 @@ export default function BattlePassRewardTracks({
       try {
         const res = await claimBattlePassTier(level, track);
         setPopup({ kind: "success", reward, grant: res?.grant as BPClaimGrant, level, track });
+        // Refresh the canonical Savvy balance so the HUD updates immediately.
+        try {
+          window.dispatchEvent(new CustomEvent("f10:savvy-auth-refresh-request"));
+        } catch {
+          /* ignore */
+        }
         if (onClaimed) onClaimed(res?.state);
       } catch (e: unknown) {
         const ax = e as { response?: { status?: number; data?: { code?: string; message?: string } } };

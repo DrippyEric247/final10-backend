@@ -7,7 +7,7 @@ import {
   hatchPerkEgg,
   checkPerkMachineAdminAccess,
 } from '../lib/api';
-import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
+import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import LoadingState from '../components/ui/states/LoadingState';
@@ -90,7 +90,8 @@ function EggInventoryPanel({ inventory, pulseTier }) {
 }
 
 export default function PerkMachine() {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, patchUser } = useAuth();
+  const savvy = useSavvyPoints();
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -143,7 +144,19 @@ export default function PerkMachine() {
       .catch(() => setShowAdmin(false));
   }, [user]);
 
-  const savvyBalance = status?.savvyBalance ?? Number(user?.savvyPoints) ?? 0;
+  /**
+   * Single source of truth for the displayed balance: the Savvy store (same as
+   * the floating HUD), falling back to the latest server status / auth user.
+   * Always rounded so the pill and the HUD can never disagree (e.g. 7895.5 vs 7896).
+   */
+  const savvyBalance = Math.round(
+    Number(
+      (savvy && Number.isFinite(savvy.savvyPoints) ? savvy.savvyPoints : null) ??
+        status?.savvyBalance ??
+        user?.savvyPoints ??
+        0
+    )
+  );
   const slotCount = displayRewards.length || 1;
 
   const reelSymbols = useMemo(() => {
@@ -199,6 +212,7 @@ export default function PerkMachine() {
       setDisplayRewards([]);
       setRevealedCount(0);
 
+      const balanceBefore = savvyBalance;
       try {
         const result = await spinPerkMachine(mode);
         const rewards = Array.isArray(result.rewards) ? result.rewards : [];
@@ -216,8 +230,30 @@ export default function PerkMachine() {
           window.setTimeout(() => setBalanceBump(false), 1800);
         }
 
+        // Backend is the single source of truth. Patch the canonical balance
+        // base immediately (withLoadout derives savvyPoints from this field) so
+        // the HUD + balance pill update together, then reconcile via refresh.
+        const nextBalance = Math.round(
+          Number(result?.savvyBalance ?? result?.status?.savvyBalance ?? user?.savvyPoints ?? 0)
+        );
+        if (typeof patchUser === 'function') {
+          patchUser({ savvyPointsServerBase: nextBalance, savvyPoints: nextBalance });
+        }
         window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
         if (typeof refreshProfile === 'function') await refreshProfile();
+
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('[perk-machine/spin]', {
+            mode,
+            balanceBefore,
+            savvyWin,
+            savvyCost: result?.savvyCost ?? null,
+            balanceAfter: nextBalance,
+            dbUpdate: 'success',
+            uiRefresh: 'complete',
+          });
+        }
 
         runRevealSequence(rewards, result.message || result.resultMessage || 'Nice pull, Operator.');
       } catch (e) {
@@ -228,11 +264,12 @@ export default function PerkMachine() {
         spinLock.current = false;
       }
     },
-    [refreshProfile, runRevealSequence, spinning, status]
+    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance]
   );
 
   const handleHatch = useCallback(
     async (eggTier) => {
+      const balanceBefore = savvyBalance;
       const result = await hatchPerkEgg(eggTier);
       if (result?.status) setStatus(result.status);
       const savvyGranted = Number(result?.reward?.savvyGranted) || 0;
@@ -240,11 +277,30 @@ export default function PerkMachine() {
         setBalanceBump(true);
         window.setTimeout(() => setBalanceBump(false), 1800);
       }
+
+      const nextBalance = Math.round(
+        Number(result?.savvyBalance ?? result?.status?.savvyBalance ?? user?.savvyPoints ?? 0)
+      );
+      if (typeof patchUser === 'function') {
+        patchUser({ savvyPointsServerBase: nextBalance, savvyPoints: nextBalance });
+      }
       window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
       if (typeof refreshProfile === 'function') await refreshProfile();
+
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('[perk-machine/hatch]', {
+          eggTier,
+          balanceBefore,
+          savvyWin: savvyGranted,
+          balanceAfter: nextBalance,
+          dbUpdate: 'success',
+          uiRefresh: 'complete',
+        });
+      }
       return result;
     },
-    [refreshProfile]
+    [refreshProfile, patchUser, user, savvyBalance]
   );
 
   const handleHatchStatusUpdate = useCallback((nextStatus) => {

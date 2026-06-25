@@ -101,7 +101,7 @@ function getPerkMachineStatus(user) {
   const freeAvailable = canUseFreeSpin(user);
 
   return {
-    savvyBalance: Number(user.savvyPoints) || 0,
+    savvyBalance: Math.round(Number(user.savvyPoints) || 0),
     subscriptionTier: tier,
     subscriptionLabel: formatTierLabel(tier),
     freeSpinAvailable: freeAvailable,
@@ -241,7 +241,8 @@ async function spinPerkMachine(user, options = {}) {
       pm.lastFreeSpinDay = today;
     }
   } else {
-    const balance = Number(user.savvyPoints) || 0;
+    // Round before spending so balances stay integer (heals any legacy fraction).
+    const balance = Math.round(Number(user.savvyPoints) || 0);
     if (!options.adminBypassCost) {
       if (balance < savvyCost) {
         const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
@@ -252,7 +253,7 @@ async function spinPerkMachine(user, options = {}) {
         throw err;
       }
       user.savvyPoints = balance - savvyCost;
-      user.pointsBalance = Math.max(0, Number(user.pointsBalance || 0) - savvyCost);
+      user.pointsBalance = Math.max(0, Math.round(Number(user.pointsBalance || 0)) - savvyCost);
     } else {
       savvyCost = 0;
     }
@@ -302,7 +303,7 @@ async function spinPerkMachine(user, options = {}) {
     mode,
     slots,
     savvyCost: historyEntry.savvyCost,
-    savvyBalance: Number(user.savvyPoints) || 0,
+    savvyBalance: Math.round(Number(user.savvyPoints) || 0),
     rewards,
     resultMessage,
     topRarity,
@@ -375,7 +376,7 @@ async function hatchEgg(user, options = {}) {
     eggTier,
     reward,
     resultMessage: pickResultMessage(reward.rarity),
-    savvyBalance: Number(user.savvyPoints) || 0,
+    savvyBalance: Math.round(Number(user.savvyPoints) || 0),
     status: getPerkMachineStatus(user),
   };
 }

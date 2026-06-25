@@ -83,9 +83,19 @@ async function grantSavvyReward(user, {
     throw e;
   }
 
-  user.savvyPoints = Number(user.savvyPoints || 0) + savvyAmount;
-  user.pointsBalance = Number(user.pointsBalance || 0) + savvyAmount;
-  user.lifetimePointsEarned = Number(user.lifetimePointsEarned || 0) + savvyAmount;
+  // Round the existing balance before adding so any historical fractional
+  // value self-heals to an integer on the next grant (single source of truth).
+  const balanceBefore = Math.round(Number(user.savvyPoints || 0));
+  user.savvyPoints = balanceBefore + savvyAmount;
+  user.pointsBalance = Math.round(Number(user.pointsBalance || 0)) + savvyAmount;
+  user.lifetimePointsEarned = Math.round(Number(user.lifetimePointsEarned || 0)) + savvyAmount;
+
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[savvyReward] ${rewardType} | before=${balanceBefore} +${savvyAmount} after=${user.savvyPoints} (key=${idempotencyKey})`
+    );
+  }
 
   try {
     const pointType =
