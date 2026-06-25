@@ -55,6 +55,8 @@ const userSchema = new mongoose.Schema({
       battlePassXp15: { type: Number, default: 0 },
       savvyMultiplier15: { type: Number, default: 0 },
     },
+    /** Timed boosts activated from inventory tokens: { [key]: { activatedAt, expiresAt } } */
+    activeBoosts: { type: mongoose.Schema.Types.Mixed, default: {} },
     callingCardDrops: { type: Number, default: 0 },
     spinHistory: {
       type: [

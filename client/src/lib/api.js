@@ -232,6 +232,11 @@ export async function hatchPerkEgg(eggTier) {
   return data;
 }
 
+export async function activatePerkItem(itemKey) {
+  const { data } = await api.post("/perk-machine/activate", { itemKey });
+  return data;
+}
+
 export async function checkPerkMachineAdminAccess() {
   const { data } = await api.get("/perk-machine/admin/ping");
   return data;

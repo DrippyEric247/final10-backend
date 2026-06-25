@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { HttpError } = require('../middleware/apiErrors');
 const { getPerkMachineStatus, spinPerkMachine, hatchEgg } = require('../services/perkMachineService');
+const { activatePerkItem } = require('../services/perkBoostService');
 const {
   adminResetFreeSpin,
   adminGrantSavvy,
@@ -81,6 +82,32 @@ router.post('/hatch', auth, async (req, res, next) => {
       });
     }
     console.error('[perk-machine/hatch]', err);
+    next(err);
+  }
+});
+
+router.post('/activate', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+
+    const itemKey = String(req.body?.itemKey || '').trim();
+    const result = activatePerkItem(user, itemKey);
+    await user.save();
+
+    const { user: _omit, ...rest } = result;
+    res.json({
+      ...rest,
+      message: result.boost
+        ? `${result.item.label} activated.`
+        : `${result.item.label} activated.`,
+      status: getPerkMachineStatus(user),
+    });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message, code: err.code });
+    }
+    console.error('[perk-machine/activate]', err);
     next(err);
   }
 });

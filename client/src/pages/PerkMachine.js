@@ -5,6 +5,7 @@ import {
   getPerkMachineStatus,
   spinPerkMachine,
   hatchPerkEgg,
+  activatePerkItem,
   checkPerkMachineAdminAccess,
 } from '../lib/api';
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
@@ -38,6 +39,37 @@ function rarityClass(rarity) {
   if (rarity === 'uncommon') return 'perk-reward--uncommon';
   return 'perk-reward--common';
 }
+
+function prettyMode(mode) {
+  if (!mode) return 'SPIN';
+  if (mode.startsWith('hatch_')) return `HATCH · ${mode.slice(6).toUpperCase()}`;
+  return mode.toUpperCase();
+}
+
+/** Inventory items the player can activate, with copy for the activation modal. */
+const ACTIVATABLE_DEFS = [
+  {
+    key: 'battlePassXp15',
+    icon: '⚡',
+    label: '1.5× Battle Pass XP Token',
+    effect: 'Activates a 1.5× Battle Pass XP boost for the next 24 hours.',
+    countFrom: (s) => Number(s?.tokens?.battlePassXp15) || 0,
+  },
+  {
+    key: 'savvyMultiplier15',
+    icon: '✨',
+    label: '1.5× Savvy Token',
+    effect: 'Activates a 1.5× Savvy boost on Perk Machine rewards for 24 hours.',
+    countFrom: (s) => Number(s?.tokens?.savvyMultiplier15) || 0,
+  },
+  {
+    key: 'extraFreeSpin',
+    icon: '🎰',
+    label: 'Extra Free Spin Egg',
+    effect: 'Adds one free Perk Machine spin right now.',
+    countFrom: (s) => Number(s?.eggInventory?.extraFreeSpin) || 0,
+  },
+];
 
 function ReelColumn({ spinning, symbol, revealed, highlight }) {
   return (
@@ -105,8 +137,27 @@ export default function PerkMachine() {
   const [countdown, setCountdown] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
   const [machineHover, setMachineHover] = useState(false);
+  const [lastSummary, setLastSummary] = useState(null);
+  const [confirmToast, setConfirmToast] = useState(null);
+  const [coinBurst, setCoinBurst] = useState(0);
+  const [activationItem, setActivationItem] = useState(null);
+  const [activating, setActivating] = useState(false);
+  const [boostNow, setBoostNow] = useState(Date.now());
   const spinLock = useRef(false);
   const machinePanelRef = useRef(null);
+  const toastTimer = useRef(null);
+
+  const showConfirm = useCallback((message, tone = 'success') => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    setConfirmToast({ message, tone, id: Date.now() });
+    toastTimer.current = window.setTimeout(() => setConfirmToast(null), 2800);
+  }, []);
+
+  const fireCoinBurst = useCallback(() => {
+    setCoinBurst((n) => n + 1);
+    setBalanceBump(true);
+    window.setTimeout(() => setBalanceBump(false), 1400);
+  }, []);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -144,6 +195,17 @@ export default function PerkMachine() {
       .catch(() => setShowAdmin(false));
   }, [user]);
 
+  // Tick every second so Active Boosts timers count down live.
+  useEffect(() => {
+    if (!status?.activeBoosts?.length) return undefined;
+    const id = window.setInterval(() => setBoostNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [status?.activeBoosts?.length]);
+
+  useEffect(() => () => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+  }, []);
+
   /**
    * Single source of truth for the displayed balance: the Savvy store (same as
    * the floating HUD), falling back to the latest server status / auth user.
@@ -174,7 +236,7 @@ export default function PerkMachine() {
     );
   }, [status?.eggInventory]);
 
-  const runRevealSequence = useCallback((rewards, message) => {
+  const runRevealSequence = useCallback((rewards, message, onComplete) => {
     setDisplayRewards(rewards);
     setRevealedCount(0);
     setReelPhase('spinning');
@@ -194,6 +256,7 @@ export default function PerkMachine() {
             setResultMessage(message);
             setSpinning(false);
             spinLock.current = false;
+            if (typeof onComplete === 'function') onComplete();
           }, 600);
         }
       };
@@ -225,10 +288,12 @@ export default function PerkMachine() {
         }
 
         const savvyWin = rewards.reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
-        if (savvyWin > 0) {
-          setBalanceBump(true);
-          window.setTimeout(() => setBalanceBump(false), 1800);
-        }
+        const spinCost = Number(result?.summary?.cost ?? result?.savvyCost ?? 0);
+        const netSavvy = Number(result?.summary?.net ?? savvyWin - spinCost);
+        const eggsAdded = Array.isArray(result?.summary?.eggs)
+          ? result.summary.eggs
+          : rewards.filter((r) => r.type === 'egg').map((r) => r.label);
+        setLastSummary({ cost: spinCost, savvyWon: savvyWin, net: netSavvy, eggs: eggsAdded });
 
         // Backend is the single source of truth. Patch the canonical balance
         // base immediately (withLoadout derives savvyPoints from this field) so
@@ -255,7 +320,18 @@ export default function PerkMachine() {
           });
         }
 
-        runRevealSequence(rewards, result.message || result.resultMessage || 'Nice pull, Operator.');
+        runRevealSequence(
+          rewards,
+          result.message || result.resultMessage || 'Nice pull, Operator.',
+          () => {
+            if (savvyWin > 0) {
+              fireCoinBurst();
+              showConfirm(`+${savvyWin.toLocaleString()} Savvy added to wallet`);
+            } else {
+              showConfirm('Balance updated');
+            }
+          }
+        );
       } catch (e) {
         const msg = e?.response?.data?.message || e?.message || 'Spin failed.';
         setError(msg);
@@ -264,7 +340,7 @@ export default function PerkMachine() {
         spinLock.current = false;
       }
     },
-    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance]
+    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm]
   );
 
   const handleHatch = useCallback(
@@ -274,8 +350,8 @@ export default function PerkMachine() {
       if (result?.status) setStatus(result.status);
       const savvyGranted = Number(result?.reward?.savvyGranted) || 0;
       if (savvyGranted > 0) {
-        setBalanceBump(true);
-        window.setTimeout(() => setBalanceBump(false), 1800);
+        fireCoinBurst();
+        showConfirm(`+${savvyGranted.toLocaleString()} Savvy added to wallet`);
       }
 
       const nextBalance = Math.round(
@@ -300,7 +376,33 @@ export default function PerkMachine() {
       }
       return result;
     },
-    [refreshProfile, patchUser, user, savvyBalance]
+    [refreshProfile, patchUser, user, savvyBalance, fireCoinBurst, showConfirm]
+  );
+
+  const handleActivate = useCallback(
+    async (itemKey) => {
+      if (activating) return;
+      setActivating(true);
+      try {
+        const result = await activatePerkItem(itemKey);
+        if (result?.status) setStatus(result.status);
+        if (typeof refreshProfile === 'function') await refreshProfile();
+        window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+        const label = result?.item?.label || 'Boost';
+        showConfirm(
+          result?.freeSpins
+            ? `${label} activated — free spin ready`
+            : `${label} activated`
+        );
+        setActivationItem(null);
+      } catch (e) {
+        const msg = e?.response?.data?.message || e?.message || 'Activation failed.';
+        showConfirm(msg, 'error');
+      } finally {
+        setActivating(false);
+      }
+    },
+    [activating, refreshProfile, showConfirm]
   );
 
   const handleHatchStatusUpdate = useCallback((nextStatus) => {
@@ -327,6 +429,28 @@ export default function PerkMachine() {
   return (
     <div className="perk-page">
       <div className="perk-page__glow" aria-hidden />
+
+      {coinBurst > 0 ? (
+        <div className="perk-coin-fx" key={coinBurst} aria-hidden>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <span key={i} className="perk-coin-fx__coin" style={{ '--i': i }}>
+              🪙
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {confirmToast ? (
+        <div
+          className={`perk-confirm-toast perk-confirm-toast--${confirmToast.tone}`}
+          role="status"
+          key={confirmToast.id}
+        >
+          <span aria-hidden>{confirmToast.tone === 'error' ? '⚠️' : '✅'}</span>
+          {confirmToast.message}
+        </div>
+      ) : null}
+
       <PerkMachineEnvironment
         phase={reelPhase}
         hovering={machineHover}
@@ -468,9 +592,40 @@ export default function PerkMachine() {
                   <div key={`${reward.id}-${reward.label}`} className={`perk-reward-card ${rarityClass(reward.rarity)}`}>
                     <span className="perk-reward-card__icon">{reward.icon}</span>
                     <span className="perk-reward-card__label">{reward.label}</span>
+                    {reward.savvyBoosted ? <span className="perk-reward-card__boost">1.5× boost</span> : null}
                   </div>
                 ))}
               </div>
+
+              {lastSummary ? (
+                <div className="perk-net-summary" aria-label="Spin reward summary">
+                  <div className="perk-net-summary__row">
+                    <span>Cost</span>
+                    <span className="perk-net-summary__cost">
+                      {lastSummary.cost > 0 ? `-${lastSummary.cost.toLocaleString()}` : '0'} Savvy
+                    </span>
+                  </div>
+                  <div className="perk-net-summary__row">
+                    <span>Rewards</span>
+                    <span className="perk-net-summary__rewards">
+                      {lastSummary.savvyWon > 0 ? `+${lastSummary.savvyWon.toLocaleString()} Savvy` : '—'}
+                    </span>
+                  </div>
+                  <div className="perk-net-summary__row perk-net-summary__row--net">
+                    <span>Net</span>
+                    <span className={lastSummary.net >= 0 ? 'perk-net-summary__pos' : 'perk-net-summary__neg'}>
+                      {lastSummary.net >= 0 ? '+' : ''}
+                      {lastSummary.net.toLocaleString()} Savvy
+                    </span>
+                  </div>
+                  {lastSummary.eggs?.length ? (
+                    <div className="perk-net-summary__row">
+                      <span>Eggs</span>
+                      <span className="perk-net-summary__eggs">{lastSummary.eggs.join(', ')} added</span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -478,13 +633,77 @@ export default function PerkMachine() {
         <aside className="perk-sidebar">
           <EggInventoryPanel inventory={status?.eggInventory} pulseTier={eggPulseTier} />
 
+          {(() => {
+            const boosts = status?.activeBoosts || [];
+            const shields = Number(status?.streakShields) || 0;
+            const scoutBoosts = Number(status?.scoutUpgrades) || 0;
+            if (!boosts.length && !shields && !scoutBoosts) return null;
+            return (
+              <div className="perk-boosts-panel">
+                <div className="perk-boosts-panel__title">⚡ Active Boosts</div>
+                <ul className="perk-boosts-list">
+                  {boosts.map((b) => {
+                    const ended = new Date(b.expiresAt).getTime() - boostNow <= 0;
+                    return (
+                      <li key={b.key} className="perk-boost-row perk-boost-row--timed">
+                        <span className="perk-boost-row__label">
+                          {b.icon} {b.label}
+                        </span>
+                        <span className="perk-boost-row__timer">
+                          {ended ? 'Ending…' : formatCountdown(b.expiresAt)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                  {shields > 0 ? (
+                    <li className="perk-boost-row">
+                      <span className="perk-boost-row__label">🛡️ Streak Shield</span>
+                      <span className="perk-boost-row__count">{shields} available</span>
+                    </li>
+                  ) : null}
+                  {scoutBoosts > 0 ? (
+                    <li className="perk-boost-row">
+                      <span className="perk-boost-row__label">🤖 Scout Boost</span>
+                      <span className="perk-boost-row__count">{scoutBoosts} active</span>
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+            );
+          })()}
+
           <div className="perk-tokens-panel">
             <div className="perk-tokens-panel__title">🎁 Inventory</div>
             <ul className="perk-tokens-list">
-              <li>⚡ 1.5× BP XP Tokens: <strong>{status?.tokens?.battlePassXp15 ?? 0}</strong></li>
-              <li>✨ 1.5× Savvy Tokens: <strong>{status?.tokens?.savvyMultiplier15 ?? 0}</strong></li>
-              <li>🛡️ Streak Shields: <strong>{status?.streakShields ?? 0}</strong></li>
-              <li>🎖️ Calling Cards: <strong>{status?.callingCardDrops ?? 0}</strong></li>
+              {ACTIVATABLE_DEFS.map((def) => {
+                const count = def.countFrom(status);
+                return (
+                  <li key={def.key} className="perk-inv-item">
+                    <span className="perk-inv-item__label">
+                      {def.icon} {def.label}
+                    </span>
+                    <span className="perk-inv-item__right">
+                      <strong>{count}</strong>
+                      <button
+                        type="button"
+                        className="perk-inv-item__use"
+                        disabled={count < 1}
+                        onClick={() => setActivationItem({ ...def, count })}
+                      >
+                        Use
+                      </button>
+                    </span>
+                  </li>
+                );
+              })}
+              <li className="perk-inv-item perk-inv-item--passive">
+                <span className="perk-inv-item__label">🛡️ Streak Shields</span>
+                <span className="perk-inv-item__right"><strong>{status?.streakShields ?? 0}</strong></span>
+              </li>
+              <li className="perk-inv-item perk-inv-item--passive">
+                <span className="perk-inv-item__label">🎖️ Calling Cards</span>
+                <span className="perk-inv-item__right"><strong>{status?.callingCardDrops ?? 0}</strong></span>
+              </li>
             </ul>
           </div>
 
@@ -492,14 +711,24 @@ export default function PerkMachine() {
             <div className="perk-history-panel">
               <div className="perk-history-panel__title">Recent Spins</div>
               <ul className="perk-history-list">
-                {status.recentSpins.slice(0, 6).map((spin) => (
-                  <li key={spin.spinId}>
-                    <span className="perk-history-list__mode">{spin.mode}</span>
-                    <span className="perk-history-list__rewards">
-                      {(spin.rewards || []).map((r) => r.label).join(', ')}
-                    </span>
-                  </li>
-                ))}
+                {status.recentSpins.slice(0, 6).map((spin) => {
+                  const cost = Number(spin.savvyCost) || 0;
+                  const won = Number(spin.savvyWon) || 0;
+                  const net = spin.net != null ? Number(spin.net) : won - cost;
+                  const rewardLabels = (spin.rewards || []).map((r) => r.label).join(', ') || '—';
+                  return (
+                    <li key={spin.spinId} className="perk-history-item">
+                      <span className="perk-history-item__mode">{prettyMode(spin.mode)}</span>
+                      <span className="perk-history-item__line">
+                        Cost: <span className="perk-history-item__cost">{cost > 0 ? `-${cost}` : '0'}</span> ·
+                        {' '}Rewards: <span className="perk-history-item__rewards">{rewardLabels}</span>
+                      </span>
+                      <span className={`perk-history-item__net ${net >= 0 ? 'is-pos' : 'is-neg'}`}>
+                        Net: {net >= 0 ? '+' : ''}{net} Savvy
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : null}
@@ -515,6 +744,42 @@ export default function PerkMachine() {
 
       {showAdmin ? (
         <PerkMachineAdminPanel onStatusRefresh={loadStatus} />
+      ) : null}
+
+      {activationItem ? (
+        <div
+          className="perk-activate-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Activate boost"
+          onClick={() => !activating && setActivationItem(null)}
+        >
+          <div className="perk-activate-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="perk-activate-modal__icon" aria-hidden>{activationItem.icon}</div>
+            <h3 className="perk-activate-modal__title">Activate this boost?</h3>
+            <p className="perk-activate-modal__name">{activationItem.label}</p>
+            <p className="perk-activate-modal__effect">{activationItem.effect}</p>
+            <p className="perk-activate-modal__count">You have {activationItem.count} available.</p>
+            <div className="perk-activate-modal__actions">
+              <button
+                type="button"
+                className="perk-activate-modal__cancel"
+                disabled={activating}
+                onClick={() => setActivationItem(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="perk-activate-modal__confirm"
+                disabled={activating}
+                onClick={() => void handleActivate(activationItem.key)}
+              >
+                {activating ? 'Activating…' : 'Activate'}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <footer className="perk-footer">

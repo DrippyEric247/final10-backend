@@ -899,3 +899,238 @@
   font-size: 0.75rem;
   color: #94a3b8;
 }
+
+/* ===== Reward clarity & inventory activation (Perk Machine v2) ===== */
+
+/* Net summary under spin results */
+.perk-net-summary {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.85), rgba(2, 6, 23, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+.perk-net-summary__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: #cbd5e1;
+}
+.perk-net-summary__row > span:first-child {
+  color: #94a3b8;
+  font-weight: 600;
+}
+.perk-net-summary__cost { color: #fca5a5; font-weight: 700; }
+.perk-net-summary__rewards { color: #86efac; font-weight: 700; }
+.perk-net-summary__eggs { color: #fcd34d; font-weight: 700; }
+.perk-net-summary__row--net {
+  margin-top: 0.2rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(148, 163, 184, 0.28);
+  font-size: 1rem;
+}
+.perk-net-summary__pos { color: #4ade80; font-weight: 800; }
+.perk-net-summary__neg { color: #f87171; font-weight: 800; }
+
+.perk-reward-card__boost {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #0b1220;
+  background: linear-gradient(90deg, #fcd34d, #fbbf24);
+}
+
+/* Coin fly animation toward the wallet pill (top-right) */
+.perk-coin-fx {
+  position: fixed;
+  left: 50%;
+  bottom: 38%;
+  z-index: 1400;
+  pointer-events: none;
+}
+.perk-coin-fx__coin {
+  position: absolute;
+  font-size: 1.5rem;
+  opacity: 0;
+  animation: perk-coin-fly 1.05s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: calc(var(--i) * 60ms);
+  filter: drop-shadow(0 0 8px rgba(252, 211, 77, 0.8));
+}
+@keyframes perk-coin-fly {
+  0% { transform: translate(0, 0) scale(0.7); opacity: 0; }
+  18% { opacity: 1; transform: translate(calc(var(--i) * 6px - 24px), -10px) scale(1.1); }
+  100% {
+    transform: translate(calc(40vw + var(--i) * 4px), -42vh) scale(0.5);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .perk-coin-fx { display: none; }
+}
+
+/* Transaction confirmation toast */
+.perk-confirm-toast {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #ecfdf5;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.35);
+  animation: perk-toast-in 0.25s ease, perk-toast-out 0.4s ease 2.4s forwards;
+}
+.perk-confirm-toast--error {
+  color: #fef2f2;
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95));
+  box-shadow: 0 12px 30px rgba(220, 38, 38, 0.35);
+}
+@keyframes perk-toast-in {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes perk-toast-out {
+  to { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+/* Active Boosts panel */
+.perk-boosts-panel {
+  background: linear-gradient(180deg, rgba(30, 27, 75, 0.55), rgba(15, 23, 42, 0.7));
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 16px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+.perk-boosts-panel__title {
+  font-weight: 800;
+  color: #ddd6fe;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+.perk-boosts-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.perk-boost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+.perk-boost-row__timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: #c4b5fd;
+}
+.perk-boost-row__count { font-weight: 700; color: #94a3b8; }
+
+/* Activatable inventory rows */
+.perk-inv-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+}
+.perk-inv-item__label { font-size: 0.85rem; color: #e2e8f0; }
+.perk-inv-item__right { display: flex; align-items: center; gap: 0.6rem; }
+.perk-inv-item__use {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  background: rgba(37, 99, 235, 0.18);
+  color: #bfdbfe;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.perk-inv-item__use:hover:not(:disabled) { background: rgba(37, 99, 235, 0.4); transform: translateY(-1px); }
+.perk-inv-item__use:disabled { opacity: 0.4; cursor: not-allowed; }
+.perk-inv-item--passive .perk-inv-item__label { color: #94a3b8; }
+
+/* Richer recent spins */
+.perk-history-item {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  font-size: 0.8rem;
+}
+.perk-history-item:last-child { border-bottom: none; }
+.perk-history-item__mode {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #93c5fd;
+  font-size: 0.72rem;
+}
+.perk-history-item__line { color: #cbd5e1; }
+.perk-history-item__cost { color: #fca5a5; font-weight: 700; }
+.perk-history-item__rewards { color: #e2e8f0; }
+.perk-history-item__net { font-weight: 800; }
+.perk-history-item__net.is-pos { color: #4ade80; }
+.perk-history-item__net.is-neg { color: #f87171; }
+
+/* Activation modal */
+.perk-activate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(4px);
+  animation: perk-toast-in 0.2s ease;
+}
+.perk-activate-modal {
+  width: min(380px, 92vw);
+  text-align: center;
+  border-radius: 20px;
+  padding: 1.5rem 1.4rem;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(2, 6, 23, 0.98));
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+}
+.perk-activate-modal__icon { font-size: 2.6rem; }
+.perk-activate-modal__title { margin: 0.4rem 0 0.3rem; color: #f8fafc; font-size: 1.15rem; }
+.perk-activate-modal__name { margin: 0; color: #c4b5fd; font-weight: 800; }
+.perk-activate-modal__effect { margin: 0.5rem 0 0; color: #cbd5e1; font-size: 0.88rem; }
+.perk-activate-modal__count { margin: 0.4rem 0 0; color: #94a3b8; font-size: 0.78rem; }
+.perk-activate-modal__actions {
+  margin-top: 1.1rem;
+  display: flex;
+  gap: 0.6rem;
+}
+.perk-activate-modal__actions button {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.perk-activate-modal__cancel {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #e2e8f0;
+}
+.perk-activate-modal__confirm {
+  background: linear-gradient(90deg, #7c3aed, #6d28d9);
+  color: #fff;
+}
+.perk-activate-modal__actions button:disabled { opacity: 0.6; cursor: not-allowed; }

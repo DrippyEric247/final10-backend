@@ -55,10 +55,20 @@ function addUnlocks(inventory, ids) {
 }
 
 function applyMissionGrantPayload(user, inventory, bpDoc, payload) {
-  const xp = Math.max(0, Number(payload?.xp) || 0);
+  const rawXp = Math.max(0, Number(payload?.xp) || 0);
   const savvy = Math.max(0, Number(payload?.savvyPoints) || 0);
   const lint = Math.max(0, Number(payload?.powerLintDelta) || 0);
   const cosmeticId = payload?.cosmeticId;
+
+  // Apply an active 1.5× Battle Pass XP boost from the Perk Machine, if any.
+  let bpXpMult = 1;
+  try {
+    // eslint-disable-next-line global-require
+    bpXpMult = require('./perkBoostService').getBpXpMultiplier(user) || 1;
+  } catch (_e) {
+    bpXpMult = 1;
+  }
+  const xp = Math.round(rawXp * bpXpMult);
 
   if (xp > 0) {
     bpDoc.xp = (bpDoc.xp || 0) + xp;

@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { utcDayKey } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { grantSavvyReward } = require('./savvyRewardService');
+const { getSavvyMultiplier, serializeActiveBoosts } = require('./perkBoostService');
 const {
   SPIN_MODES,
   SPIN_COOLDOWN_MS,
@@ -84,14 +85,23 @@ function serializeHistory(pm) {
   return (pm.spinHistory || [])
     .slice(-MAX_HISTORY)
     .reverse()
-    .map((entry) => ({
-      spinId: entry.spinId,
-      mode: entry.mode,
-      slots: entry.slots,
-      savvyCost: entry.savvyCost,
-      rewards: entry.rewards,
-      createdAt: entry.createdAt,
-    }));
+    .map((entry) => {
+      const savvyCost = Number(entry.savvyCost) || 0;
+      const savvyWon =
+        entry.savvyWon != null
+          ? Number(entry.savvyWon) || 0
+          : (entry.rewards || []).reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
+      return {
+        spinId: entry.spinId,
+        mode: entry.mode,
+        slots: entry.slots,
+        savvyCost,
+        savvyWon,
+        net: savvyWon - savvyCost,
+        rewards: entry.rewards,
+        createdAt: entry.createdAt,
+      };
+    });
 }
 
 function getPerkMachineStatus(user) {
@@ -116,6 +126,7 @@ function getPerkMachineStatus(user) {
     streakShields: Number(user.dailyStreak?.scoutShields) || 0,
     callingCardDrops: Number(pm.callingCardDrops) || 0,
     scoutUpgrades: Number(pm.scoutUpgrades) || 0,
+    activeBoosts: serializeActiveBoosts(user),
     recentSpins: serializeHistory(pm).slice(0, 10),
     spinCosts: {
       free: getSpinConfig(SPIN_MODES.FREE),
@@ -145,15 +156,21 @@ async function applyReward(user, rewardDef, spinId) {
   let granted = { ...payload, granted: true };
 
   if (rewardDef.type === 'savvy') {
-    const amount = Number(rewardDef.amount) || 0;
+    const baseAmount = Number(rewardDef.amount) || 0;
+    // Apply an active 1.5× Savvy boost (integer result) so the win is real.
+    const savvyMult = getSavvyMultiplier(user);
+    const amount = Math.round(baseAmount * savvyMult);
     const result = await grantSavvyReward(user, {
       rewardType: 'perk_machine',
       amount,
+      baseAmount,
+      multiplier: savvyMult,
       idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${amount}`,
-      note: `Perk Machine — ${rewardDef.label}`,
-      meta: { spinId, source: 'perk_machine' },
+      note: `Perk Machine — ${rewardDef.label}${savvyMult > 1 ? ' (1.5× boost)' : ''}`,
+      meta: { spinId, source: 'perk_machine', multiplier: savvyMult },
     });
     granted.savvyGranted = result.amount;
+    granted.savvyBoosted = savvyMult > 1;
     granted.newBalance = result.newBalance;
   } else if (rewardDef.type === 'egg') {
     const tier = rewardDef.eggTier;
@@ -273,16 +290,22 @@ async function spinPerkMachine(user, options = {}) {
     rewards.push(granted);
   }
 
+  const finalCost = mode === SPIN_MODES.FREE ? 0 : savvyCost;
+  const savvyWon = rewards.reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
+  const netSavvy = savvyWon - finalCost;
+
   const historyEntry = {
     spinId,
     mode,
     slots,
-    savvyCost: mode === SPIN_MODES.FREE ? 0 : savvyCost,
+    savvyCost: finalCost,
+    savvyWon,
     rewards: rewards.map((r) => ({
       id: r.id,
       label: r.label,
       rarity: r.rarity,
       type: r.type,
+      savvyGranted: Number(r.savvyGranted) || 0,
     })),
     createdAt: new Date(),
   };
@@ -298,11 +321,23 @@ async function spinPerkMachine(user, options = {}) {
   const topRarity = highestRarity(rewards);
   const resultMessage = pickResultMessage(topRarity);
 
+  const eggsWon = rewards
+    .filter((r) => r.type === 'egg')
+    .map((r) => r.label);
+
   return {
     spinId,
     mode,
     slots,
-    savvyCost: historyEntry.savvyCost,
+    savvyCost: finalCost,
+    savvyWon,
+    net: netSavvy,
+    summary: {
+      cost: finalCost,
+      savvyWon,
+      net: netSavvy,
+      eggs: eggsWon,
+    },
     savvyBalance: Math.round(Number(user.savvyPoints) || 0),
     rewards,
     resultMessage,
@@ -348,17 +383,20 @@ async function hatchEgg(user, options = {}) {
   const picked = pickWeightedReward(pool);
   const reward = await applyReward(user, picked, `hatch:${hatchId}`);
 
+  const hatchSavvyWon = Number(reward.savvyGranted) || 0;
   const historyEntry = {
     spinId: hatchId,
     mode: `hatch_${eggTier}`,
     slots: 0,
     savvyCost: 0,
+    savvyWon: hatchSavvyWon,
     rewards: [
       {
         id: reward.id,
         label: reward.label,
         rarity: reward.rarity,
         type: reward.type,
+        savvyGranted: hatchSavvyWon,
       },
     ],
     createdAt: new Date(),
@@ -375,6 +413,14 @@ async function hatchEgg(user, options = {}) {
     hatchId,
     eggTier,
     reward,
+    savvyWon: hatchSavvyWon,
+    net: hatchSavvyWon,
+    summary: {
+      cost: 0,
+      savvyWon: hatchSavvyWon,
+      net: hatchSavvyWon,
+      eggs: reward.type === 'egg' ? [reward.label] : [],
+    },
     resultMessage: pickResultMessage(reward.rarity),
     savvyBalance: Math.round(Number(user.savvyPoints) || 0),
     status: getPerkMachineStatus(user),
