@@ -11,9 +11,10 @@ import { shouldShowAdminNav } from '../lib/adminAccess';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import LoadingState from '../components/ui/states/LoadingState';
 import PerkMachineAdminPanel from '../components/perk/PerkMachineAdminPanel';
+import PerkMachineScoutFloater from '../components/perk/PerkMachineScoutFloater';
+import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import '../styles/PerkMachine.css';
 
-const SCOUT_MESSAGE = 'Operator, the machine is loaded. Pick your spin and let’s see what drops.';
 const REEL_SYMBOLS = ['🪙', '💰', '🥚', '⚡', '✨', '🛡️', '🎖️', '🎰', '💎', '🔥'];
 
 function formatCountdown(iso) {
@@ -99,7 +100,9 @@ export default function PerkMachine() {
   const [eggPulseTier, setEggPulseTier] = useState(null);
   const [countdown, setCountdown] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
+  const [machineHover, setMachineHover] = useState(false);
   const spinLock = useRef(false);
+  const machinePanelRef = useRef(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -146,6 +149,14 @@ export default function PerkMachine() {
     while (out.length < 3) out.push('✨');
     return out.slice(0, 3);
   }, [displayRewards]);
+
+  const eggsWaiting = useMemo(() => {
+    const inv = status?.eggInventory || {};
+    return ['common', 'rare', 'epic', 'legendary'].reduce(
+      (sum, key) => sum + (Number(inv[key]) || 0),
+      0
+    );
+  }, [status?.eggInventory]);
 
   const runRevealSequence = useCallback((rewards, message) => {
     setDisplayRewards(rewards);
@@ -227,10 +238,19 @@ export default function PerkMachine() {
 
   const freeReady = Boolean(status?.freeSpinAvailable);
   const tierLabel = status?.subscriptionLabel || 'Free';
+  const operatorLevel = tierLabel === 'Free' ? 'Founding Tester' : `${tierLabel} Operator`;
+  const multiplier = tierLabel === 'Pro' || tierLabel === 'Premium' ? '1.50x' : '1.00x';
 
   return (
     <div className="perk-page">
       <div className="perk-page__glow" aria-hidden />
+      <PerkMachineEnvironment
+        phase={reelPhase}
+        hovering={machineHover}
+        eggsWaiting={eggsWaiting}
+        operatorLevel={operatorLevel}
+        multiplier={multiplier}
+      />
 
       <header className="perk-header">
         <div>
@@ -251,7 +271,14 @@ export default function PerkMachine() {
 
       <div className="perk-layout">
         <section className="perk-machine-stage">
-          <div className={`perk-machine ${reelPhase === 'spinning' ? 'perk-machine--active' : ''}`}>
+          <div
+            ref={machinePanelRef}
+            className={`perk-machine ${reelPhase === 'spinning' ? 'perk-machine--active' : ''} ${
+              machineHover ? 'perk-machine--hover' : ''
+            }`}
+            onMouseEnter={() => setMachineHover(true)}
+            onMouseLeave={() => setMachineHover(false)}
+          >
             <img
               src={
                 reelPhase === 'spinning'
@@ -281,13 +308,15 @@ export default function PerkMachine() {
               </div>
             </div>
 
-            <div className="perk-scout-alive">
-              <img src="/assets/perk-machine/savvy-scout-alive.png" alt="Savvy Scout" className="perk-scout-alive__img" />
-              <div className="perk-scout-alive__bubble">
-                <div className="perk-scout-alive__name">Savvy Scout</div>
-                <p>{SCOUT_MESSAGE}</p>
-              </div>
-            </div>
+            <PerkMachineScoutFloater
+              panelRef={machinePanelRef}
+              reelPhase={reelPhase}
+              displayRewards={displayRewards}
+              subscriptionLabel={tierLabel}
+              error={error}
+              eggPulseTier={eggPulseTier}
+              hovering={machineHover}
+            />
           </div>
 
           <div className="perk-free-timer">
@@ -313,7 +342,7 @@ export default function PerkMachine() {
             </div>
           ) : null}
 
-          <div className="perk-spin-actions">
+          <div className="perk-spin-actions" data-perk-protected="spin-buttons">
             <button
               type="button"
               className="perk-btn perk-btn--free"

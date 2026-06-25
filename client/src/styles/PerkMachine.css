@@ -20,7 +20,7 @@
   z-index: 0;
 }
 
-.perk-page > *:not(.perk-page__glow) {
+.perk-page > *:not(.perk-page__glow):not(.perk-env) {
   position: relative;
   z-index: 1;
 }
@@ -142,11 +142,34 @@
   border: 1px solid rgba(168, 85, 247, 0.35);
   box-shadow: 0 0 60px rgba(147, 51, 234, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   min-height: 420px;
-  background: #050508;
+  background: linear-gradient(180deg, rgba(10, 6, 24, 0.82), rgba(5, 5, 8, 0.95));
+  transition: box-shadow 0.4s ease, transform 0.4s ease;
+  animation: perk-machine-breathe 5s ease-in-out infinite;
+}
+
+@keyframes perk-machine-breathe {
+  0%, 100% { box-shadow: 0 0 60px rgba(147, 51, 234, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+  50% { box-shadow: 0 0 78px rgba(168, 85, 247, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+}
+
+.perk-machine--hover {
+  box-shadow: 0 0 90px rgba(168, 85, 247, 0.5), 0 0 140px rgba(74, 222, 128, 0.18);
+  transform: translateY(-2px);
+  animation-duration: 2.2s;
+}
+
+.perk-machine--hover .perk-machine__art {
+  filter: brightness(1.12) saturate(1.1);
 }
 
 .perk-machine--active {
   box-shadow: 0 0 80px rgba(168, 85, 247, 0.45), 0 0 120px rgba(74, 222, 128, 0.15);
+  animation: perk-machine-power 0.45s ease-in-out infinite;
+}
+
+@keyframes perk-machine-power {
+  0%, 100% { box-shadow: 0 0 80px rgba(168, 85, 247, 0.45), 0 0 120px rgba(74, 222, 128, 0.15); transform: translate(0, 0); }
+  50% { box-shadow: 0 0 110px rgba(192, 132, 252, 0.7), 0 0 160px rgba(74, 222, 128, 0.25); transform: translate(0.5px, -0.5px); }
 }
 
 .perk-machine__art {
@@ -157,6 +180,7 @@
   object-position: center 35%;
   display: block;
   opacity: 0.92;
+  transition: filter 0.4s ease;
 }
 
 .perk-machine__overlay {
@@ -280,53 +304,279 @@
   }
 }
 
-.perk-scout-alive {
+.perk-scout-floater {
   position: absolute;
-  left: 0.75rem;
-  bottom: 0.75rem;
+  z-index: 4;
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
-  max-width: min(320px, 55%);
-  z-index: 2;
+  pointer-events: none;
+  max-width: min(280px, 52%);
 }
 
-.perk-scout-alive__img {
-  width: 72px;
-  height: auto;
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.6));
-  animation: perk-scout-bob 3s ease-in-out infinite;
+.perk-scout-floater--br {
+  right: 0.75rem;
+  bottom: 0.75rem;
+  flex-direction: row-reverse;
 }
 
-@keyframes perk-scout-bob {
+.perk-scout-floater--bl {
+  left: 0.75rem;
+  bottom: 0.75rem;
+  flex-direction: row;
+}
+
+.perk-scout-floater--tr {
+  right: 0.75rem;
+  top: 38%;
+  bottom: auto;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+}
+
+.perk-scout-floater--tl {
+  left: 0.75rem;
+  top: 38%;
+  bottom: auto;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.perk-scout-floater__avatar,
+.perk-scout-floater__minimize {
+  pointer-events: auto;
+}
+
+.perk-scout-floater__bubble-wrap {
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px) scale(0.96);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0.45s ease;
+  max-width: min(220px, 42vw);
+}
+
+.perk-scout-floater__bubble-wrap--visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.perk-scout-floater--br .perk-scout-floater__bubble-wrap,
+.perk-scout-floater--tr .perk-scout-floater__bubble-wrap {
+  transform-origin: bottom right;
+}
+
+.perk-scout-floater--bl .perk-scout-floater__bubble-wrap,
+.perk-scout-floater--tl .perk-scout-floater__bubble-wrap {
+  transform-origin: bottom left;
+}
+
+.perk-scout-floater--open.perk-scout-floater--br .perk-scout-floater__bubble-wrap--visible,
+.perk-scout-floater--open.perk-scout-floater--tr .perk-scout-floater__bubble-wrap--visible {
+  transform: translate(-4px, -6px) scale(1);
+}
+
+.perk-scout-floater--open.perk-scout-floater--bl .perk-scout-floater__bubble-wrap--visible,
+.perk-scout-floater--open.perk-scout-floater--tl .perk-scout-floater__bubble-wrap--visible {
+  transform: translate(4px, -6px) scale(1);
+}
+
+.perk-scout-floater--busy .perk-scout-floater__bubble-wrap {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateY(12px) scale(0.92) !important;
+}
+
+.perk-scout-floater[data-corner-probe] .perk-scout-floater__bubble-wrap {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.perk-scout-floater__bubble {
+  padding: 0.6rem 0.75rem 0.7rem;
+  border-radius: 14px 14px 4px 14px;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  background: rgba(5, 12, 8, 0.92);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: perk-scout-msg-fade 0.5s ease;
+}
+
+.perk-scout-floater--bl .perk-scout-floater__bubble,
+.perk-scout-floater--tl .perk-scout-floater__bubble {
+  border-radius: 14px 14px 14px 4px;
+}
+
+@keyframes perk-scout-msg-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.perk-scout-floater__bubble-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.perk-scout-floater__name {
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #4ade80;
+}
+
+.perk-scout-floater__minimize {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  color: #94a3b8;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.perk-scout-floater__text {
+  margin: 0;
+}
+
+.perk-scout-floater__avatar {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(192, 132, 252, 0.55);
+  background: radial-gradient(circle at 30% 25%, #1a1028, #050508);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(147, 51, 234, 0.35);
+  animation: perk-scout-float 3.2s ease-in-out infinite;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.perk-scout-floater__avatar:hover {
+  box-shadow: 0 0 28px rgba(168, 85, 247, 0.55);
+  transform: scale(1.04);
+}
+
+.perk-scout-floater--busy .perk-scout-floater__avatar {
+  animation: perk-scout-float 2s ease-in-out infinite;
+}
+
+@keyframes perk-scout-float {
   0%,
   100% {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-6px);
+    transform: translateY(-5px);
   }
 }
 
-.perk-scout-alive__bubble {
-  flex: 1;
-  padding: 0.65rem 0.85rem;
-  border-radius: 14px 14px 14px 4px;
-  border: 1px solid rgba(74, 222, 128, 0.35);
-  background: rgba(5, 12, 8, 0.88);
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: #cbd5e1;
-  backdrop-filter: blur(8px);
+.perk-scout-floater__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  display: block;
 }
 
-.perk-scout-alive__name {
-  font-size: 0.62rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #4ade80;
-  margin-bottom: 0.25rem;
+.perk-scout-floater__eyes {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  width: 62%;
+  height: 12%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.perk-scout-floater__eye {
+  width: 28%;
+  height: 100%;
+  background: #4ade80;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+  animation: perk-scout-blink 4.5s ease-in-out infinite;
+}
+
+.perk-scout-floater__eye--r {
+  animation-delay: 0.15s;
+}
+
+@keyframes perk-scout-blink {
+  0%,
+  42%,
+  46%,
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  44% {
+    transform: scaleY(0.12);
+    opacity: 0.65;
+  }
+}
+
+.perk-scout-floater__ping {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4ade80;
+  border: 2px solid #0a0610;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
+  animation: perk-scout-ping 1.8s ease-in-out infinite;
+}
+
+@keyframes perk-scout-ping {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.75;
+  }
+}
+
+@media (max-width: 640px) {
+  .perk-scout-floater {
+    max-width: min(240px, 70%);
+  }
+
+  .perk-scout-floater__avatar {
+    width: 50px;
+    height: 50px;
+  }
+
+  .perk-scout-floater__bubble-wrap {
+    max-width: min(190px, 55vw);
+  }
 }
 
 .perk-free-timer {

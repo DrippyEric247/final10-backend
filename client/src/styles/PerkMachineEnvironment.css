@@ -1,0 +1,715 @@
+/* ============================================================
+   Savvy Scout Headquarters — animated reward laboratory
+   Full-bleed environment layer behind the Perk Machine.
+   GPU-friendly: transforms + opacity only.
+   ============================================================ */
+
+.perk-env {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  perspective: 1200px;
+  transition: filter 0.6s ease, opacity 0.6s ease;
+}
+
+/* ---------- Room base + neon floor ---------- */
+.perk-env__room {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -5%, rgba(147, 51, 234, 0.28), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 15% 30%, rgba(88, 28, 135, 0.25), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 30%, rgba(88, 28, 135, 0.22), transparent 55%),
+    linear-gradient(180deg, #07040f 0%, #0a0518 45%, #05030c 100%);
+}
+
+.perk-env__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38%;
+  background:
+    linear-gradient(180deg, transparent, rgba(147, 51, 234, 0.12) 60%, rgba(74, 222, 128, 0.08)),
+    linear-gradient(180deg, #0a0518, #110826);
+  transform: perspective(600px) rotateX(62deg);
+  transform-origin: bottom center;
+  opacity: 0.85;
+}
+
+.perk-env__floor-grid {
+  position: absolute;
+  left: -25%;
+  right: -25%;
+  bottom: 0;
+  height: 40%;
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.18) 1px, transparent 1px);
+  background-size: 48px 48px;
+  transform: perspective(500px) rotateX(70deg);
+  transform-origin: bottom center;
+  animation: perk-env-grid 7s linear infinite;
+  mask-image: linear-gradient(180deg, transparent, #000 70%);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 70%);
+}
+
+@keyframes perk-env-grid {
+  from { background-position: 0 0; }
+  to { background-position: 0 48px; }
+}
+
+/* ---------- Purple fog ---------- */
+.perk-env__fog {
+  position: absolute;
+  left: -30%;
+  right: -30%;
+  bottom: -5%;
+  height: 45%;
+  background: radial-gradient(ellipse 50% 60% at 50% 100%, rgba(168, 85, 247, 0.18), transparent 70%);
+  filter: blur(18px);
+  opacity: 0.55;
+}
+
+.perk-env__fog--a { animation: perk-env-fog 26s ease-in-out infinite; }
+.perk-env__fog--b { animation: perk-env-fog 34s ease-in-out infinite reverse; opacity: 0.4; }
+
+@keyframes perk-env-fog {
+  0%, 100% { transform: translateX(-6%) scale(1); }
+  50% { transform: translateX(8%) scale(1.08); }
+}
+
+/* ---------- Reactor ---------- */
+.perk-env__reactor {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  width: min(420px, 60vw);
+  height: min(420px, 60vw);
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+}
+
+.perk-env__reactor-glow {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), transparent 62%);
+  filter: blur(30px);
+  animation: perk-env-reactor-pulse 4.5s ease-in-out infinite;
+}
+
+.perk-env__reactor-core {
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #f5d0fe, #a855f7 45%, #6b21a8 80%);
+  box-shadow: 0 0 60px rgba(192, 132, 252, 0.8), inset 0 0 30px rgba(255, 255, 255, 0.4);
+  animation: perk-env-reactor-pulse 3s ease-in-out infinite;
+}
+
+.perk-env__reactor-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(192, 132, 252, 0.35);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+}
+
+.perk-env__reactor-ring--1 { width: 55%; height: 55%; border-style: dashed; animation: perk-env-spin 18s linear infinite; }
+.perk-env__reactor-ring--2 { width: 75%; height: 75%; border-color: rgba(74, 222, 128, 0.25); animation: perk-env-spin 26s linear infinite reverse; }
+.perk-env__reactor-ring--3 { width: 95%; height: 95%; border-style: dotted; animation: perk-env-spin 34s linear infinite; }
+
+@keyframes perk-env-spin { to { transform: rotate(360deg); } }
+
+@keyframes perk-env-reactor-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+/* ---------- Energy pipes ---------- */
+.perk-env__pipes { position: absolute; inset: 0; }
+
+.perk-env__pipe {
+  position: absolute;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.15), rgba(74, 222, 128, 0.15));
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.perk-env__pipe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent, rgba(192, 132, 252, 0.95), transparent);
+  background-size: 100% 40%;
+  background-repeat: no-repeat;
+  animation: perk-env-flow 2.8s linear infinite;
+}
+
+.perk-env__pipe--l1 { left: 8%; top: 10%; width: 10px; height: 45%; }
+.perk-env__pipe--l2 { left: 14%; top: 25%; width: 8px; height: 38%; }
+.perk-env__pipe--r1 { right: 8%; top: 10%; width: 10px; height: 45%; }
+.perk-env__pipe--r2 { right: 14%; top: 25%; width: 8px; height: 38%; }
+
+.perk-env__pipe--l2::after,
+.perk-env__pipe--r2::after { animation-delay: 1.2s; }
+
+@keyframes perk-env-flow {
+  from { background-position: 0 -60%; }
+  to { background-position: 0 120%; }
+}
+
+/* ---------- Server racks ---------- */
+.perk-env__racks {
+  position: absolute;
+  bottom: 18%;
+  display: flex;
+  gap: 6px;
+  opacity: 0.8;
+}
+.perk-env__racks--left { left: 1.5%; }
+.perk-env__racks--right { right: 1.5%; }
+
+.perk-env__rack {
+  width: 22px;
+  height: 120px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #1a0f2e, #0b0618);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.perk-env__rack-led {
+  width: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
+  animation: perk-env-led 1.6s steps(2, end) infinite;
+}
+
+@keyframes perk-env-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* ---------- Vault door ---------- */
+.perk-env__vault {
+  position: absolute;
+  right: 4%;
+  bottom: 8%;
+  width: 150px;
+  height: 150px;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 45%, #1c1230, #0a0518 75%);
+  border: 3px solid rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 30px rgba(147, 51, 234, 0.3), inset 0 0 30px rgba(0, 0, 0, 0.7);
+  display: grid;
+  place-items: center;
+  opacity: 0.85;
+}
+
+.perk-env__vault-wheel {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 6px solid rgba(192, 132, 252, 0.5);
+  border-top-color: rgba(74, 222, 128, 0.6);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.5);
+  animation: perk-env-spin 20s linear infinite;
+}
+
+.perk-env__vault-bolts { position: absolute; inset: 0; }
+.perk-env__vault-bolt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  border-radius: 50%;
+  background: rgba(192, 132, 252, 0.7);
+  transform: rotate(calc(var(--i) * 45deg)) translateY(-62px);
+}
+
+.perk-env__vault-label {
+  position: absolute;
+  bottom: 8px;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #c4b5fd;
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.8);
+  text-align: center;
+}
+
+/* ---------- Branding ---------- */
+.perk-env__brand-logo {
+  position: absolute;
+  top: 6%;
+  left: 4%;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  color: rgba(196, 181, 253, 0.5);
+  text-shadow: 0 0 16px rgba(168, 85, 247, 0.6);
+  opacity: 0.8;
+}
+
+.perk-env__neon-sign {
+  position: absolute;
+  top: 12%;
+  right: 5%;
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: #fef08a;
+  text-shadow: 0 0 8px #fde047, 0 0 18px rgba(245, 158, 11, 0.8), 0 0 30px rgba(245, 158, 11, 0.4);
+  animation: perk-env-neon 5s ease-in-out infinite;
+}
+
+@keyframes perk-env-neon {
+  0%, 92%, 100% { opacity: 1; }
+  94% { opacity: 0.35; }
+  96% { opacity: 1; }
+  98% { opacity: 0.5; }
+}
+
+.perk-env__coin-case {
+  position: absolute;
+  left: 5%;
+  bottom: 10%;
+  width: 64px;
+  height: 80px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(147, 51, 234, 0.1), rgba(10, 5, 24, 0.6));
+  border: 1px solid rgba(192, 132, 252, 0.3);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.perk-env__coin {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff7d6, #fcd34d 50%, #b45309 85%);
+  color: #7c2d12;
+  font-weight: 900;
+  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.7);
+  animation: perk-env-coin 6s ease-in-out infinite;
+}
+
+@keyframes perk-env-coin {
+  0%, 100% { transform: rotateY(0deg) translateY(0); }
+  50% { transform: rotateY(180deg) translateY(-4px); }
+}
+
+.perk-env__coin-glass {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  animation: perk-env-glass 4s ease-in-out infinite;
+}
+
+@keyframes perk-env-glass {
+  0%, 100% { transform: translateX(-60%); }
+  50% { transform: translateX(60%); }
+}
+
+/* ---------- Holographic screens ---------- */
+.perk-env__holo {
+  position: absolute;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: linear-gradient(160deg, rgba(74, 222, 128, 0.08), rgba(34, 211, 238, 0.06));
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.15), inset 0 0 18px rgba(34, 211, 238, 0.08);
+  color: #a5f3fc;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(2px);
+  animation: perk-env-holo-float 6s ease-in-out infinite, perk-env-holo-flicker 7s steps(20) infinite;
+  opacity: 0.92;
+}
+
+.perk-env__holo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.06) 0 2px, transparent 2px 4px);
+  pointer-events: none;
+}
+
+.perk-env__holo--scan { top: 22%; left: 6%; width: 150px; }
+.perk-env__holo--event { top: 40%; right: 6%; width: 160px; text-align: right; }
+.perk-env__holo--stats {
+  top: 56%;
+  left: 4%;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  animation-delay: 1.5s, 0.5s;
+}
+
+.perk-env__holo-tag {
+  display: block;
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(165, 243, 252, 0.6);
+}
+
+.perk-env__holo-value {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #e0f7ff;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+}
+
+.perk-env__holo-value--accent { color: #fde047; text-shadow: 0 0 8px rgba(250, 204, 21, 0.6); }
+
+.perk-env__holo-line { display: block; margin: 0.3rem 0; font-weight: 700; }
+
+.perk-env__holo-bar,
+.perk-env__holo-progress {
+  display: block;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(34, 211, 238, 0.2);
+  overflow: hidden;
+}
+.perk-env__holo-bar { margin-bottom: 0.2rem; }
+
+.perk-env__holo-progress::after {
+  content: '';
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+  animation: perk-env-progress 2.4s ease-in-out infinite;
+}
+
+@keyframes perk-env-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+@keyframes perk-env-holo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes perk-env-holo-flicker {
+  0%, 96%, 100% { opacity: 0.92; }
+  97% { opacity: 0.6; }
+  98% { opacity: 0.95; }
+}
+
+/* ---------- Robotic arms ---------- */
+.perk-env__arm {
+  position: absolute;
+  bottom: 30%;
+  width: 70px;
+  height: 110px;
+  transform-origin: bottom center;
+}
+.perk-env__arm--left { left: 20%; animation: perk-env-arm 7s ease-in-out infinite; }
+.perk-env__arm--right { right: 20%; animation: perk-env-arm 8s ease-in-out infinite reverse; }
+
+.perk-env__arm-base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 26px;
+  height: 14px;
+  margin-left: -13px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #3b2563, #1a0f2e);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.perk-env__arm-segment {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  width: 8px;
+  height: 70px;
+  margin-left: -4px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #6d28d9, #2e1065);
+  transform-origin: bottom center;
+  animation: perk-env-arm-seg 5s ease-in-out infinite;
+}
+
+.perk-env__arm-claw {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 16px;
+  height: 10px;
+  margin-left: -8px;
+  border: 2px solid rgba(192, 132, 252, 0.7);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+}
+
+@keyframes perk-env-arm {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes perk-env-arm-seg {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(8deg); }
+}
+
+/* ---------- Conveyor belt ---------- */
+.perk-env__conveyor {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 13%;
+  height: 26px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #1a0f2e, #0b0618);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  overflow: hidden;
+}
+
+.perk-env__conveyor-belt {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(168, 85, 247, 0.18) 0 12px, transparent 12px 24px);
+  animation: perk-env-belt 1.6s linear infinite;
+}
+
+@keyframes perk-env-belt {
+  from { background-position: 0 0; }
+  to { background-position: -24px 0; }
+}
+
+.perk-env__conveyor-egg {
+  position: absolute;
+  bottom: 4px;
+  left: -8%;
+  font-size: 0.9rem;
+  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.6));
+  animation: perk-env-belt-egg 13s linear infinite;
+}
+
+@keyframes perk-env-belt-egg {
+  from { left: -8%; }
+  to { left: 105%; }
+}
+
+/* ---------- Steam vents ---------- */
+.perk-env__steam {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(226, 232, 240, 0.5), transparent 70%);
+  filter: blur(6px);
+  opacity: 0;
+}
+.perk-env__steam--1 { left: 30%; bottom: 16%; animation: perk-env-steam 6s ease-out infinite; }
+.perk-env__steam--2 { right: 32%; bottom: 18%; animation: perk-env-steam 7s ease-out infinite 2.5s; }
+.perk-env__steam--3 { left: 50%; bottom: 14%; animation: perk-env-steam 8s ease-out infinite 4s; }
+
+@keyframes perk-env-steam {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  15% { opacity: 0.6; }
+  100% { opacity: 0; transform: translateY(-90px) scale(2.4); }
+}
+
+/* ---------- Electrical sparks ---------- */
+.perk-env__sparks { position: absolute; inset: 0; }
+.perk-env__spark {
+  position: absolute;
+  top: calc(20% + (var(--i) * 9%));
+  left: calc(12% + (var(--i) * 13%));
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fde047;
+  box-shadow: 0 0 10px #fde047, 0 0 18px rgba(250, 204, 21, 0.7);
+  opacity: 0;
+  animation: perk-env-spark 5s steps(1, end) infinite;
+}
+
+@keyframes perk-env-spark {
+  0%, 88%, 100% { opacity: 0; transform: scale(0.5); }
+  90% { opacity: 1; transform: scale(1.4); }
+  92% { opacity: 0.2; }
+  94% { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- Drones ---------- */
+.perk-env__drone {
+  position: absolute;
+  width: 26px;
+  height: 12px;
+}
+.perk-env__drone--a { top: 16%; animation: perk-env-drone 22s linear infinite; }
+.perk-env__drone--b { top: 30%; animation: perk-env-drone 28s linear infinite 9s reverse; }
+
+.perk-env__drone-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #4c1d95, #1a0f2e);
+  border: 1px solid rgba(192, 132, 252, 0.5);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+.perk-env__drone-beam {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 18px;
+  height: 26px;
+  margin-left: -9px;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.4), transparent);
+  clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%);
+  animation: perk-env-led 2s ease-in-out infinite;
+}
+
+@keyframes perk-env-drone {
+  0% { left: -6%; transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+  100% { left: 106%; transform: translateY(0); }
+}
+
+/* ---------- Particles ---------- */
+.perk-env__particles { position: absolute; inset: 0; }
+.perk-env__particle {
+  position: absolute;
+  bottom: -6px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(192, 132, 252, 0.8);
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.7);
+  animation: perk-env-particle linear infinite;
+}
+
+@keyframes perk-env-particle {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.9; }
+  90% { opacity: 0.7; }
+  100% { transform: translateY(-105vh) translateX(20px); opacity: 0; }
+}
+
+/* ---------- Warning lights ---------- */
+.perk-env__warning {
+  position: absolute;
+  top: 8%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.8);
+  opacity: 0;
+}
+.perk-env__warning--l { left: 30%; }
+.perk-env__warning--r { right: 30%; }
+
+/* ---------- Spin surge vignette ---------- */
+.perk-env__surge {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 30%, transparent 40%, rgba(88, 28, 135, 0.5) 100%);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* ============================================================
+   Interactive states
+   ============================================================ */
+
+/* Hover: lights brighten, energy pulses faster */
+.perk-env--hover { filter: brightness(1.18) saturate(1.15); }
+.perk-env--hover .perk-env__reactor-core,
+.perk-env--hover .perk-env__reactor-glow { animation-duration: 1.6s; }
+.perk-env--hover .perk-env__pipe::after { animation-duration: 1.4s; }
+.perk-env--hover .perk-env__rack-led { animation-duration: 0.8s; }
+
+/* Spin: room reacts — lights dim, surge powers up, slight shake */
+.perk-env--spinning { filter: brightness(0.78) saturate(1.3); animation: perk-env-shake 0.5s ease-in-out infinite; }
+.perk-env--spinning .perk-env__surge { opacity: 1; }
+.perk-env--spinning .perk-env__reactor-core { animation-duration: 1s; box-shadow: 0 0 90px rgba(192, 132, 252, 1), inset 0 0 40px rgba(255, 255, 255, 0.6); }
+.perk-env--spinning .perk-env__reactor-glow { animation-duration: 1.2s; opacity: 1; }
+.perk-env--spinning .perk-env__pipe::after { animation-duration: 0.8s; }
+.perk-env--spinning .perk-env__warning { animation: perk-env-warn 0.6s steps(2, end) infinite; }
+.perk-env--spinning .perk-env__steam { animation-duration: 2.5s; }
+.perk-env--spinning .perk-env__floor { opacity: 1; }
+
+@keyframes perk-env-warn {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes perk-env-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1px, 1px); }
+  50% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, -1px); }
+}
+
+/* ---------- Ambient discrete events ---------- */
+.perk-env--ambient-warning .perk-env__warning { animation: perk-env-warn 0.7s steps(2, end) 4; }
+.perk-env--ambient-steam .perk-env__steam--2 { animation: perk-env-steam 2.5s ease-out 1; }
+.perk-env--ambient-arm .perk-env__arm--left { animation-duration: 2.2s; }
+.perk-env--ambient-holo .perk-env__holo--scan { animation: perk-env-holo-refresh 0.5s ease 2; }
+
+@keyframes perk-env-holo-refresh {
+  0%, 100% { opacity: 0.92; }
+  50% { opacity: 0.3; transform: translateY(-4px) scaleX(1.02); }
+}
+
+/* ============================================================
+   Responsive — dock complexity down on small screens
+   ============================================================ */
+@media (max-width: 900px) {
+  .perk-env__racks,
+  .perk-env__vault,
+  .perk-env__coin-case,
+  .perk-env__arm { display: none; }
+  .perk-env__holo--stats { display: none; }
+}
+
+@media (max-width: 640px) {
+  .perk-env__holo--scan,
+  .perk-env__holo--event,
+  .perk-env__conveyor,
+  .perk-env__drone,
+  .perk-env__neon-sign,
+  .perk-env__brand-logo { display: none; }
+  .perk-env__reactor { width: 80vw; height: 80vw; top: 2%; }
+}
+
+/* ============================================================
+   Accessibility — respect reduced motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .perk-env *,
+  .perk-env {
+    animation: none !important;
+    transition: none !important;
+  }
+}
