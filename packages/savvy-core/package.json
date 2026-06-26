@@ -1,0 +1,16 @@
+{
+  "name": "@savvy/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Savvy Universe shared core — Phase 1 leaf modules (constants, events, tokens). Final10 client unchanged until Phase 2 re-exports.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "verify": "node scripts/verify-parity.js"
+  },
+  "files": [
+    "src",
+    "scripts",
+    "README.md"
+  ]
+}
