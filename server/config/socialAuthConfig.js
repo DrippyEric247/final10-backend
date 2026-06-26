@@ -6,6 +6,8 @@
  * Apple Developer setup is complete). See docs/SOCIAL_AUTH_SETUP.md.
  */
 
+const { FINAL10_APP_URL, isNonPublicLinkUrl } = require('./final10Branding');
+
 function clean(value) {
   return String(value || '').trim();
 }
@@ -60,17 +62,22 @@ function appleEnabled() {
 }
 
 /**
- * Public app origin to redirect the browser back to after auth.
- * Unlike email links, redirecting to localhost in dev is desired, so we use the
- * configured client URL directly (with an official production fallback).
+ * Public app origin for OAuth redirects back to the React client.
+ * Rejects preview/deploy infra URLs (vercel.app, railway.app, etc.) so a stale
+ * Railway CLIENT_URL cannot send users to the wrong host.
  */
 function getClientBaseUrl() {
   const configured =
     clean(process.env.CLIENT_URL) ||
     clean(process.env.FRONTEND_URL) ||
     clean(process.env.PUBLIC_APP_URL);
-  if (configured) return configured.replace(/\/$/, '');
-  return process.env.NODE_ENV === 'production' ? 'https://final10.app' : 'http://localhost:3000';
+  if (configured && !isNonPublicLinkUrl(configured)) {
+    return configured.replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    return configured ? configured.replace(/\/$/, '') : 'http://localhost:3000';
+  }
+  return FINAL10_APP_URL;
 }
 
 module.exports = {

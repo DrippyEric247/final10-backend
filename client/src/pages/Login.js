@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import SocialAuthButtons from '../components/auth/SocialAuthButtons';
+import AuthDebugFooter from '../components/auth/AuthDebugFooter';
 import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
@@ -127,7 +128,10 @@ export default function Login() {
           onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
         />
         <p className="text-right text-sm">
-          <Link className="text-purple-300 underline hover:text-purple-200" to="/forgot-password">
+          <Link
+            className="inline-flex items-center text-purple-300 underline underline-offset-2 hover:text-purple-200 font-medium"
+            to="/forgot-password"
+          >
             Forgot Password?
           </Link>
         </p>
@@ -145,6 +149,7 @@ export default function Login() {
         </div>
       ) : null}
       <p className="mt-3 text-sm text-gray-400">No account? <Link className="underline" to="/register">Sign up</Link></p>
+      <AuthDebugFooter />
     </div>
   );
 }

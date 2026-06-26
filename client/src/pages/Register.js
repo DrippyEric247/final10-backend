@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import SocialAuthButtons from '../components/auth/SocialAuthButtons';
+import AuthDebugFooter from '../components/auth/AuthDebugFooter';
 import { claimDailyLogin } from '../lib/api';
 import { recordDailyLogin } from '../lib/final10PowerEngine';
 import { recordBattlePassXp } from '../lib/battlePassEngine';
@@ -154,6 +155,7 @@ export default function Register() {
         </div>
       ) : null}
       <p className="mt-3 text-sm text-gray-400">Already have an account? <Link className="underline" to="/login">Login</Link></p>
+      <AuthDebugFooter />
     </div>
   );
 }

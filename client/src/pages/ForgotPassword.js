@@ -6,6 +6,7 @@ import Final10Slogan from '../components/branding/Final10Slogan';
 import LoadingState from '../components/ui/states/LoadingState';
 import { requestPasswordReset } from '../lib/api';
 import { parseApiError } from '../lib/apiErrorParsing';
+import AuthDebugFooter from '../components/auth/AuthDebugFooter';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -93,6 +94,7 @@ export default function ForgotPassword() {
           Back to login
         </Link>
       </p>
+      <AuthDebugFooter />
     </div>
   );
 }

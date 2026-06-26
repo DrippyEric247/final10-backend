@@ -7,6 +7,7 @@ import LoadingState from '../components/ui/states/LoadingState';
 import { submitPasswordReset } from '../lib/api';
 import { parseApiError } from '../lib/apiErrorParsing';
 import { isPasswordStrongEnough, scorePasswordStrength } from '../lib/passwordStrength';
+import AuthDebugFooter from '../components/auth/AuthDebugFooter';
 
 const STRENGTH_COLORS = ['', 'bg-red-500', 'bg-yellow-500', 'bg-emerald-500', 'bg-purple-400'];
 
@@ -62,6 +63,7 @@ export default function ResetPassword() {
             Request reset link
           </Link>
         </p>
+        <AuthDebugFooter />
       </div>
     );
   }
@@ -185,6 +187,7 @@ export default function ResetPassword() {
           </Link>
         </p>
       ) : null}
+      <AuthDebugFooter />
     </div>
   );
 }
