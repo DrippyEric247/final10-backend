@@ -36,6 +36,25 @@ function assertFilesEqual(label, packagePath, clientPath) {
   ok(`${label} matches client original`);
 }
 
+const SHIM_RE =
+  /^export\s+\*\s+from\s+['"]@savvy\/core(?:\/[^'"]+)?['"]\s*;?\s*$/;
+
+function assertConfigFileOrShim(label, packagePath, clientPath, expectedShim) {
+  const client = read(clientPath).trim();
+  if (SHIM_RE.test(client)) {
+    if (client !== expectedShim) {
+      fail(`${label} shim must be exactly:\n  ${expectedShim}\n  got:\n  ${client}`);
+    }
+    ok(`${label} client shim → @savvy/core`);
+    if (!fs.existsSync(packagePath)) {
+      fail(`${label} package source missing at ${packagePath}`);
+    }
+    ok(`${label} package source present`);
+    return;
+  }
+  assertFilesEqual(label, packagePath, clientPath);
+}
+
 function verifyEventParity(exportName, relativeClientFile) {
   const clientPath = path.join(CLIENT_SRC, relativeClientFile);
   const clientSource = read(clientPath);
@@ -76,12 +95,13 @@ if (!fs.existsSync(CLIENT_SRC)) {
   fail(`Final10 client/src not found at ${CLIENT_SRC}`);
 }
 
-console.log("Savvy Core Phase 1 — parity verification\n");
+console.log("Savvy Core parity verification\n");
 
-assertFilesEqual(
+assertConfigFileOrShim(
   "savvyRewards.js",
   path.join(PACKAGE_ROOT, "src/config/savvyRewards.js"),
-  path.join(CLIENT_SRC, "config/savvyRewards.js")
+  path.join(CLIENT_SRC, "config/savvyRewards.js"),
+  "export * from '@savvy/core/config/savvyRewards';"
 );
 
 assertFilesEqual(
@@ -176,4 +196,4 @@ if (exportedCount !== expectedCount) {
 }
 ok(`UNIVERSE_EVENTS registry complete (${exportedCount} events)`);
 
-console.log("\n✓ All Phase 1 parity checks passed.\n");
+console.log("\n✓ All parity checks passed.\n");

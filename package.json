@@ -10,6 +10,7 @@
     "client": "cd client && npm run dev",
     "build": "cd client && npm run build",
     "start": "node server/index.js",
+    "verify:savvy-core": "node packages/savvy-core/scripts/verify-parity.js",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
   "keywords": [

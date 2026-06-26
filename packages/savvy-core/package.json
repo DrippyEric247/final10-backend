@@ -5,6 +5,16 @@
   "description": "Savvy Universe shared core — Phase 1 leaf modules (constants, events, tokens). Final10 client unchanged until Phase 2 re-exports.",
   "main": "src/index.js",
   "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./config/savvyRewards": {
+      "types": "./src/config/savvyRewards.d.ts",
+      "default": "./src/config/savvyRewards.js"
+    },
+    "./config/scoutBranding": "./src/config/scoutBranding.js",
+    "./events/universeEvents": "./src/events/universeEvents.js",
+    "./tokens/theme.css": "./src/tokens/theme.css"
+  },
   "scripts": {
     "verify": "node scripts/verify-parity.js"
   },

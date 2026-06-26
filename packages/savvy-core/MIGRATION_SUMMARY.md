@@ -66,3 +66,45 @@
 4. Add `verify:savvy-core` to Final10 root `package.json` for CI
 
 **Do not start Phase 2 until approved.**
+
+---
+
+## Phase 2 Migration Summary
+
+**Date:** 2026-06-26  
+**Scope:** Final10 client re-export shims + `@savvy/core` package exports  
+**SavvyTrip changes:** None  
+
+### What changed
+
+| File | Change |
+|------|--------|
+| `client/package.json` | Added `"@savvy/core": "file:../packages/savvy-core"` |
+| `client/package-lock.json` | Lockfile updated (`npm install --legacy-peer-deps`) |
+| `client/src/config/savvyRewards.js` | One-line shim: `export * from '@savvy/core/config/savvyRewards';` |
+| `client/src/config/savvyRewards.d.ts` | Type shim (TS build only; no runtime change) |
+| `package.json` (root) | Added `"verify:savvy-core"` script |
+| `packages/savvy-core/package.json` | Subpath `exports` + types for `config/savvyRewards` |
+| `packages/savvy-core/src/config/savvyRewards.d.ts` | Type declarations for package subpath |
+| `packages/savvy-core/scripts/verify-parity.js` | Recognizes client re-export shims |
+
+### What did not change
+
+- No UI, routes, or runtime behavior
+- `savvyScoutBranding.js` still local (shim deferred)
+- Event constant files in `client/src/lib/` unchanged (optional Phase 2 item skipped)
+- SavvyTrip untouched
+
+### Verification
+
+1. `npm run verify` in `packages/savvy-core` — pass  
+2. `npm run verify:savvy-core` from repo root — pass  
+3. `npm run build` in `client` — pass (bundle size unchanged)
+
+### Phase 3 preview (awaiting approval)
+
+- Shim `client/src/config/savvyScoutBranding.js` → `@savvy/core/config/scoutBranding`
+- Optional event constant shims in `client/src/lib/`
+- Begin rewards/auth extraction into `@savvy/core`
+
+**Do not start Phase 3 until approved.**
