@@ -8,6 +8,7 @@ const { SCOUT_SUPPORT_MILESTONES, nextMilestoneAfter } = require('../config/scou
 const { getActiveDropForUser } = require('./supplyDropService');
 const { getActiveSavvySale } = require('./savvySaleService');
 const { buildStatus } = require('./scoutSupportService');
+const { getEggExchangeStatus } = require('./eggExchangeService');
 const { applyTierEventMultiplier } = require('../lib/pointsEventMultipliers');
 
 function msUntilEndOfUtcDay(date = new Date()) {
@@ -245,6 +246,26 @@ async function buildEventsHub(user) {
   upcomingEvents.push(...scoutCards.upcoming);
   upcomingEvents.push(...buildUpcomingPlaceholders());
 
+  const eggExchange = getEggExchangeStatus(user);
+  const mythic = eggExchange.mythicFusionProgress;
+  if (mythic) {
+    activeEvents.push(
+      eventCard({
+        id: 'mythic_fusion_progress',
+        type: 'seasonal',
+        status: mythic.canExchange ? 'claimable' : 'active',
+        title: mythic.title,
+        icon: '🥚',
+        description: `${mythic.legendaryOwned}/${mythic.legendaryRequired} Legendary · ${mythic.savvyBalance.toLocaleString()}/${mythic.savvyRequired.toLocaleString()} Savvy`,
+        timerLabel: `${mythic.progressPercent}% ready`,
+        claimable: mythic.canExchange,
+        ctaLabel: 'Open Egg Exchange',
+        ctaPath: '/egg-exchange',
+        meta: mythic,
+      })
+    );
+  }
+
   const claimableCount = claimableRewards.length;
 
   return {
@@ -254,6 +275,7 @@ async function buildEventsHub(user) {
     upcomingEvents,
     completedHistory,
     scoutSupport: scoutStatus,
+    eggExchange: eggExchange.mythicFusionProgress,
     timers: {
       supplyDrop: drop && !drop.expired ? { msRemaining: drop.msRemaining, dropId: drop.dropId } : null,
       savvySale: sale?.active ? { msRemaining: sale.msRemaining, eventId: sale.eventId } : null,

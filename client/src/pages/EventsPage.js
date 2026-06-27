@@ -141,6 +141,33 @@ export default function EventsPage() {
         )}
       </section>
 
+      <section className="events-section" aria-labelledby="events-fusion-heading">
+        <h2 id="events-fusion-heading" className="events-section__title">
+          Long-Term Progression
+        </h2>
+        {hub?.eggExchange ? (
+          <div className="events-grid">
+            <EventHubCard
+              event={{
+                id: 'mythic_fusion_progress',
+                type: 'seasonal',
+                status: hub.eggExchange.canExchange ? 'claimable' : 'active',
+                title: hub.eggExchange.title || 'Mythic Fusion Progress',
+                icon: '🥚',
+                description: `${hub.eggExchange.legendaryOwned}/${hub.eggExchange.legendaryRequired} Legendary eggs · ${hub.eggExchange.savvyBalance.toLocaleString()}/${hub.eggExchange.savvyRequired.toLocaleString()} Savvy`,
+                timerLabel: `${hub.eggExchange.progressPercent}% ready`,
+                claimable: false,
+                ctaLabel: 'Open Egg Exchange',
+                ctaPath: '/egg-exchange',
+              }}
+              compact
+            />
+          </div>
+        ) : (
+          <EmptySection message="Fuse eggs in the Egg Exchange Chamber to track Mythic progress." />
+        )}
+      </section>
+
       <section className="events-section" aria-labelledby="events-scout-heading">
         <h2 id="events-scout-heading" className="events-section__title">
           Scout Support
@@ -178,6 +205,7 @@ export default function EventsPage() {
         <h2 className="events-section__title">Quick Links</h2>
         <div className="events-quick-links">
           <Link to="/perk-machine">🎰 Perk Machine</Link>
+          <Link to="/egg-exchange">🧪 Egg Exchange</Link>
           <Link to="/daily-streak">🔥 Daily Streak</Link>
           <Link to="/battle-pass">🎯 Battle Pass</Link>
           <Link to="/local-deals">🏪 Quick Snipes</Link>

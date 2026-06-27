@@ -103,6 +103,23 @@ const userSchema = new mongoose.Schema({
       ],
       default: [],
     },
+    /** Egg Exchange Chamber — fusion cooldown + transaction log */
+    lastExchangeAt: { type: Date, default: null },
+    eggExchangeHistory: {
+      type: [
+        {
+          exchangeId: String,
+          exchangeType: String,
+          fromTier: String,
+          toTier: String,
+          eggsSpent: Number,
+          savvySpent: Number,
+          outputLabel: String,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   /** Beta live-event placeholder inventory (Scout Flight tickets, beacons, etc.) */
   eventInventory: {

@@ -397,6 +397,67 @@ export async function adminScoutSupportForceClaim(milestone) {
   return data;
 }
 
+/** ---- Egg Exchange Chamber ---- **/
+
+export async function getEggExchangeStatus() {
+  const { data } = await api.get("/eggs/exchange/status");
+  return data;
+}
+
+export async function performEggExchange(exchangeType) {
+  const { data } = await api.post("/eggs/exchange", { exchangeType });
+  return data;
+}
+
+export async function checkEggExchangeAdminAccess() {
+  try {
+    const { data } = await api.get("/eggs/exchange/admin/ping");
+    return Boolean(data?.ok);
+  } catch {
+    return false;
+  }
+}
+
+export async function adminEggExchangeGrantRare() {
+  const { data } = await api.post("/eggs/exchange/admin/grant-rare");
+  return data;
+}
+
+export async function adminEggExchangeGrantEpic() {
+  const { data } = await api.post("/eggs/exchange/admin/grant-epic");
+  return data;
+}
+
+export async function adminEggExchangeGrantLegendary() {
+  const { data } = await api.post("/eggs/exchange/admin/grant-legendary");
+  return data;
+}
+
+export async function adminEggExchangeGrantSavvy(amount = 20000) {
+  const { data } = await api.post("/eggs/exchange/admin/grant-savvy", { amount });
+  return data;
+}
+
+export async function adminEggExchangeReset() {
+  const { data } = await api.post("/eggs/exchange/admin/reset");
+  return data;
+}
+
+export async function adminEggExchangePresetRareEpic() {
+  const { data } = await api.post("/eggs/exchange/admin/preset-rare-epic");
+  return data;
+}
+
+export async function adminEggExchangePresetEpicLegendary() {
+  const { data } = await api.post("/eggs/exchange/admin/preset-epic-legendary");
+  return data;
+}
+
+export async function adminEggExchangePresetLegendaryMythic() {
+  const { data } = await api.post("/eggs/exchange/admin/preset-legendary-mythic");
+  return data;
+}
+
 /** ---- Battle Pass (beta 25-tier) ---- **/
 
 /** POST /api/progression/claim-tier — claim a tier reward (free|premium). */

@@ -185,6 +185,7 @@ app.use('/api/streak',      require('./routes/streakRoutes'));
 app.use('/api/perk-machine', require('./routes/perkMachineRoutes'));
 app.use('/api/events', require('./routes/eventsRoutes'));
 app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));
+app.use('/api/eggs', require('./routes/eggExchangeRoutes'));
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
