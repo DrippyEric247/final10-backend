@@ -61,6 +61,97 @@ function appleEnabled() {
   );
 }
 
+/** Safe startup report — names only, never secret values. */
+function getOAuthStartupReport() {
+  const googleVars = {
+    GOOGLE_CLIENT_ID: Boolean(google.clientId),
+    GOOGLE_CLIENT_SECRET: Boolean(google.clientSecret),
+    GOOGLE_CALLBACK_URL: Boolean(google.callbackUrl),
+  };
+  const appleVars = {
+    APPLE_CLIENT_ID: Boolean(apple.clientId),
+    APPLE_TEAM_ID: Boolean(apple.teamId),
+    APPLE_KEY_ID: Boolean(apple.keyId),
+    APPLE_PRIVATE_KEY: Boolean(apple.privateKey),
+    APPLE_CALLBACK_URL: Boolean(apple.callbackUrl),
+  };
+  const googleMissing = Object.entries(googleVars)
+    .filter(([, ok]) => !ok)
+    .map(([name]) => name);
+  const appleMissing = Object.entries(appleVars)
+    .filter(([, ok]) => !ok)
+    .map(([name]) => name);
+
+  const clientUrlRaw = clean(process.env.CLIENT_URL);
+  const frontendUrlRaw = clean(process.env.FRONTEND_URL);
+
+  return {
+    google: {
+      enabled: googleEnabled(),
+      vars: googleVars,
+      missing: googleMissing,
+      callbackUrl: google.callbackUrl || null,
+    },
+    apple: {
+      enabled: appleEnabled(),
+      vars: appleVars,
+      missing: appleMissing,
+      callbackUrl: apple.callbackUrl || null,
+    },
+    clientRedirectBase: getClientBaseUrl(),
+    redirectEnv: {
+      CLIENT_URL: Boolean(clientUrlRaw),
+      FRONTEND_URL: Boolean(frontendUrlRaw),
+      CLIENT_URL_isPublic: clientUrlRaw ? !isNonPublicLinkUrl(clientUrlRaw) : false,
+      FRONTEND_URL_isPublic: frontendUrlRaw ? !isNonPublicLinkUrl(frontendUrlRaw) : false,
+    },
+  };
+}
+
+/** Log OAuth readiness at server boot (Railway deploy logs). Never logs secrets. */
+function logOAuthStartup() {
+  const report = getOAuthStartupReport();
+  console.log('[startup] OAuth configuration:');
+  if (report.google.enabled) {
+    console.log('  Google: enabled');
+    console.log(`  Google callback URL: ${report.google.callbackUrl}`);
+  } else {
+    console.log(
+      `  Google: disabled — missing env: ${report.google.missing.join(', ') || '(check values)'}`
+    );
+    if (report.google.callbackUrl) {
+      console.log(`  Google callback URL (set): ${report.google.callbackUrl}`);
+    } else {
+      console.log('  Google callback URL (expected): https://api.final10.app/api/auth/google/callback');
+    }
+  }
+  if (report.apple.enabled) {
+    console.log('  Apple: enabled');
+    console.log(`  Apple callback URL: ${report.apple.callbackUrl}`);
+  } else {
+    console.log(
+      `  Apple: disabled — missing env: ${report.apple.missing.join(', ') || '(check values)'}`
+    );
+    if (report.apple.callbackUrl) {
+      console.log(`  Apple callback URL (set): ${report.apple.callbackUrl}`);
+    } else {
+      console.log('  Apple callback URL (expected): https://api.final10.app/api/auth/apple/callback');
+    }
+  }
+  console.log(`  OAuth post-login redirect base: ${report.clientRedirectBase}`);
+  if (report.redirectEnv.CLIENT_URL && !report.redirectEnv.CLIENT_URL_isPublic) {
+    console.warn(
+      '  WARNING: CLIENT_URL is set but points at a non-public host (e.g. vercel.app). ' +
+        'OAuth error/success redirects use https://final10.app instead.'
+    );
+  }
+  if (!report.redirectEnv.CLIENT_URL && !report.redirectEnv.FRONTEND_URL) {
+    console.warn(
+      '  WARNING: CLIENT_URL and FRONTEND_URL are unset — OAuth redirects fall back to https://final10.app'
+    );
+  }
+}
+
 /**
  * Public app origin for OAuth redirects back to the React client.
  * Rejects preview/deploy infra URLs (vercel.app, railway.app, etc.) so a stale
@@ -86,4 +177,6 @@ module.exports = {
   googleEnabled,
   appleEnabled,
   getClientBaseUrl,
+  getOAuthStartupReport,
+  logOAuthStartup,
 };

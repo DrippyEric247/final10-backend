@@ -69,6 +69,18 @@ final10/
 └── README.md
 ```
 
+## Beta QA (pre-launch testing)
+
+All beta verification runs against the **live** app: [https://www.final10.app](https://www.final10.app) (API: [https://api.final10.app](https://api.final10.app)).
+
+| Doc | Purpose |
+|-----|---------|
+| [QA_BETA_TEST_PLAN.md](./QA_BETA_TEST_PLAN.md) | Full AI agent test plan — 6 roles, step-by-step cases, expected/actual/severity |
+| [BUG_REPORT_TEMPLATE.md](./BUG_REPORT_TEMPLATE.md) | Standard bug report for each finding |
+| [docs/BETA_QA_CHECKLIST.md](./docs/BETA_QA_CHECKLIST.md) | One-page nightly checklist |
+
+**Rule:** Do not mark a feature PASS unless it was tested on the live site. Use FAIL or NOT TESTED otherwise.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
