@@ -206,6 +206,7 @@ export default function EventsPage() {
         <div className="events-quick-links">
           <Link to="/perk-machine">🎰 Perk Machine</Link>
           <Link to="/egg-exchange">🧪 Egg Exchange</Link>
+          <Link to="/scout-flight">🚀 Scout Flight</Link>
           <Link to="/daily-streak">🔥 Daily Streak</Link>
           <Link to="/battle-pass">🎯 Battle Pass</Link>
           <Link to="/local-deals">🏪 Quick Snipes</Link>

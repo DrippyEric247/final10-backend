@@ -102,6 +102,7 @@ import MissionLog from './pages/MissionLog';
 import DailyStreak from './pages/DailyStreak';
 import PerkMachine from './pages/PerkMachine';
 import EggExchangeChamber from './pages/EggExchangeChamber';
+import ScoutFlightGame from './pages/ScoutFlightGame';
 import Final10Slogan from './components/branding/Final10Slogan';
 import './styles/SavvyScoutMissions.css';
 import './styles/final10Branding.css';
@@ -453,6 +454,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <EggExchangeChamber />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/scout-flight"
+            element={
+              <ProtectedRoute>
+                <ScoutFlightGame />
               </ProtectedRoute>
             }
           />

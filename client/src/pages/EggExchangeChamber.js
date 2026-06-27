@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getEggExchangeStatus, performEggExchange } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -17,10 +17,11 @@ const TIER_CLASS = {
   mythic: 'egg-exchange-card--mythic',
 };
 
-function ExchangeCard({ option, onExchange, exchanging, successId }) {
+function ExchangeCard({ option, onExchange, exchanging, successId, savvyBalance }) {
   const tierClass = TIER_CLASS[option.toTier] || '';
   const busy = exchanging === option.exchangeType;
   const justSucceeded = successId === option.exchangeType;
+  const savvyDisplay = savvyBalance != null ? savvyBalance : option.savvyBalance;
 
   return (
     <article className={`egg-exchange-card ${tierClass} ${justSucceeded ? 'egg-exchange-card--success' : ''}`}>
@@ -39,7 +40,7 @@ function ExchangeCard({ option, onExchange, exchanging, successId }) {
         <div className="egg-exchange-card__stat">
           <span className="egg-exchange-card__label">Savvy</span>
           <strong>
-            {option.savvyBalance.toLocaleString()} / {option.savvyRequired.toLocaleString()}
+            {Number(savvyDisplay).toLocaleString()} / {option.savvyRequired.toLocaleString()}
           </strong>
         </div>
       </div>
@@ -75,8 +76,8 @@ function ExchangeCard({ option, onExchange, exchanging, successId }) {
 }
 
 export default function EggExchangeChamber() {
-  const { user, refreshProfile } = useAuth();
-  const savvy = useSavvyPoints();
+  const { user, refreshProfile, loading: authLoading } = useAuth();
+  const { savvyPoints: storeSavvyPoints } = useSavvyPoints();
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -133,6 +134,39 @@ export default function EggExchangeChamber() {
     [refreshProfile, status]
   );
 
+  /** Same source as floating Savvy HUD + Perk Machine balance pill. */
+  const savvyBalance = useMemo(() => {
+    if (authLoading || !user) return null;
+    return Math.round(
+      Number(
+        (Number.isFinite(storeSavvyPoints) ? storeSavvyPoints : null) ??
+          user?.savvyPoints ??
+          0
+      )
+    );
+  }, [authLoading, user, storeSavvyPoints]);
+
+  const exchanges = useMemo(() => {
+    const rows = status?.exchanges || [];
+    if (savvyBalance == null) return rows;
+    return rows.map((opt) => {
+      const hasEggs = Number(opt.eggsOwned) >= Number(opt.eggsRequired);
+      const hasSavvy = savvyBalance >= Number(opt.savvyRequired);
+      const progressEggs = Math.min(100, Math.round((Number(opt.eggsOwned) / Number(opt.eggsRequired)) * 100));
+      const progressSavvy = Math.min(
+        100,
+        Math.round((savvyBalance / Number(opt.savvyRequired)) * 100)
+      );
+      return {
+        ...opt,
+        savvyBalance,
+        canExchange: hasEggs && hasSavvy,
+        missingSavvy: Math.max(0, Number(opt.savvyRequired) - savvyBalance),
+        progressPercent: Math.min(progressEggs, progressSavvy),
+      };
+    });
+  }, [status?.exchanges, savvyBalance]);
+
   if (loading) {
     return (
       <div className="egg-exchange-page">
@@ -141,7 +175,8 @@ export default function EggExchangeChamber() {
     );
   }
 
-  const savvyDisplay = savvy ?? status?.savvyBalance ?? 0;
+  const savvyHeaderLabel =
+    savvyBalance == null ? 'Loading...' : savvyBalance.toLocaleString();
 
   return (
     <div className="egg-exchange-page">
@@ -155,7 +190,7 @@ export default function EggExchangeChamber() {
         </div>
         <div className="egg-exchange-header__balance">
           <span>Savvy Balance</span>
-          <strong>{Number(savvyDisplay).toLocaleString()}</strong>
+          <strong>{savvyHeaderLabel}</strong>
         </div>
       </header>
 
@@ -173,10 +208,11 @@ export default function EggExchangeChamber() {
       ) : null}
 
       <div className="egg-exchange-grid">
-        {(status?.exchanges || []).map((option) => (
+        {exchanges.map((option) => (
           <ExchangeCard
             key={option.exchangeType}
             option={option}
+            savvyBalance={savvyBalance}
             onExchange={handleExchange}
             exchanging={exchanging}
             successId={successId}

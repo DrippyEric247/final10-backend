@@ -1,0 +1,226 @@
+.scout-flight-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #06040f;
+  color: #f8fafc;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.scout-flight-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
+  background: rgba(10, 6, 24, 0.92);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.25);
+  z-index: 2;
+}
+
+.scout-flight-page__back {
+  color: #c4b5fd;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.scout-flight-page__title {
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #fcd34d, #e9d5ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.scout-flight-page__beta {
+  font-size: 0.65rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.scout-flight-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0.5rem;
+  margin-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow:
+    0 0 40px rgba(124, 58, 237, 0.2),
+    inset 0 0 60px rgba(88, 28, 135, 0.15);
+}
+
+.scout-flight-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+}
+
+.scout-flight-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+  background: rgba(6, 4, 15, 0.72);
+  backdrop-filter: blur(4px);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.scout-flight-overlay button {
+  pointer-events: auto;
+}
+
+.scout-flight-overlay--start {
+  background: radial-gradient(ellipse at 50% 30%, rgba(88, 28, 135, 0.35) 0%, rgba(6, 4, 15, 0.88) 55%);
+}
+
+.scout-flight-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.scout-flight-logo h1 {
+  margin: 0;
+  font-size: clamp(1.1rem, 4.5vw, 1.45rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(180deg, #fde68a 0%, #fcd34d 40%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.scout-flight-logo__wings {
+  font-size: 1.25rem;
+  filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.6));
+}
+
+.scout-flight-tagline {
+  margin: 0 0 1rem;
+  color: #a78bfa;
+  font-size: 0.9rem;
+}
+
+.scout-flight-scout-preview {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.55));
+  margin-bottom: 1rem;
+  animation: scoutFlightBob 2s ease-in-out infinite;
+}
+
+@keyframes scoutFlightBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.scout-flight-hint {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fcd34d;
+  animation: scoutFlightPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes scoutFlightPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.scout-flight-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.scout-flight-go-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #e9d5ff;
+}
+
+.scout-flight-go-score {
+  margin: 0;
+  font-size: 2.75rem;
+  font-weight: 900;
+  color: #fcd34d;
+  line-height: 1;
+}
+
+.scout-flight-go-label {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.scout-flight-go-best {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: #c4b5fd;
+}
+
+.scout-flight-go-scout {
+  margin: 0 0 1.25rem;
+  font-style: italic;
+  color: #a78bfa;
+  font-size: 0.88rem;
+}
+
+.scout-flight-go-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: min(240px, 100%);
+}
+
+.scout-flight-btn {
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.65rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: none;
+}
+
+.scout-flight-btn--primary {
+  background: linear-gradient(135deg, #7c3aed, #eab308);
+  color: #0f0720;
+}
+
+.scout-flight-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  color: #c4b5fd;
+}
+
+@media (min-width: 768px) {
+  .scout-flight-stage {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    width: calc(100% - 2rem);
+  }
+}
