@@ -3,6 +3,14 @@
  * Side-scroller: obstacles move right to left; tap/click applies upward impulse.
  */
 
+import {
+  applyDifficultyToScout,
+  loadSavedDifficulty,
+  DEFAULT_DIFFICULTY_ID,
+} from './scoutFlightDifficulty';
+
+export { SCOUT_FLIGHT_DIFFICULTY, getSelectableDifficulties, getDifficultyConfig, loadSavedDifficulty, saveDifficulty, applyDifficultyToScout } from './scoutFlightDifficulty';
+
 export const PHASE = Object.freeze({
   IDLE: 'idle',
   PLAYING: 'playing',
@@ -20,8 +28,6 @@ export const COIN_TYPES = Object.freeze([
 const GRAVITY = 0.42;
 const FLAP_VELOCITY = -8.2;
 const MAX_VY = 9;
-const SCOUT_W = 52;
-const SCOUT_H = 52;
 const OBSTACLE_W = 56;
 const GAP_MIN = 118;
 const GAP_MAX = 168;
@@ -57,11 +63,12 @@ function saveBest(n) {
   }
 }
 
-export function createGame(width, height) {
+export function createGame(width, height, difficultyId = loadSavedDifficulty()) {
   const groundH = Math.max(36, Math.round(height * 0.08));
   const scoutX = Math.round(width * 0.22);
+  const resolvedDifficulty = difficultyId || DEFAULT_DIFFICULTY_ID;
 
-  return {
+  const game = {
     width,
     height,
     groundH,
@@ -69,12 +76,13 @@ export function createGame(width, height) {
     phase: PHASE.IDLE,
     score: 0,
     best: loadBest(),
+    difficultyId: resolvedDifficulty,
     scout: {
       x: scoutX,
-      y: height / 2 - SCOUT_H / 2,
+      y: height / 2,
       vy: 0,
-      w: SCOUT_W,
-      h: SCOUT_H,
+      w: 47,
+      h: 47,
       rot: 0,
       flapPulse: 0,
     },
@@ -90,10 +98,13 @@ export function createGame(width, height) {
     events: [],
     isNewBest: false,
   };
+
+  applyDifficultyToScout(game, resolvedDifficulty);
+  return game;
 }
 
 export function resetGame(game) {
-  const fresh = createGame(game.width, game.height);
+  const fresh = createGame(game.width, game.height, game.difficultyId);
   fresh.best = Math.max(game.best, loadBest());
   return fresh;
 }
@@ -101,7 +112,7 @@ export function resetGame(game) {
 export function startGame(game) {
   game.phase = PHASE.PLAYING;
   game.score = 0;
-  game.scout.y = game.height / 2 - SCOUT_H / 2;
+  game.scout.y = game.height / 2 - game.scout.h / 2;
   game.scout.vy = 0;
   game.scout.rot = 0;
   game.scout.flapPulse = 0;
@@ -316,7 +327,8 @@ export function updateGame(game, dtMs) {
 
 export function restartGame(game) {
   const best = game.best;
-  const next = createGame(game.width, game.height);
+  const difficultyId = game.difficultyId;
+  const next = createGame(game.width, game.height, difficultyId);
   next.best = best;
   startGame(next);
   return next;

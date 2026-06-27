@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getEggExchangeStatus, performEggExchange } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
+import { isRateLimitError } from '../lib/apiErrorParsing';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import LoadingState from '../components/ui/states/LoadingState';
 import EggExchangeAdminPanel from '../components/perk/EggExchangeAdminPanel';
@@ -93,7 +94,9 @@ export default function EggExchangeChamber() {
       setError('');
       return data;
     } catch (e) {
-      setError(e?.response?.data?.message || e?.message || 'Failed to load Egg Exchange.');
+      if (!isRateLimitError(e)) {
+        setError(e?.response?.data?.message || e?.message || 'Failed to load Egg Exchange.');
+      }
       return null;
     } finally {
       setLoading(false);
@@ -123,7 +126,9 @@ export default function EggExchangeChamber() {
         if (typeof refreshProfile === 'function') await refreshProfile();
         window.setTimeout(() => setSuccessId(null), 2800);
       } catch (e) {
-        setError(e?.response?.data?.message || e?.message || 'Exchange failed.');
+        if (!isRateLimitError(e)) {
+          setError(e?.response?.data?.message || e?.message || 'Exchange failed.');
+        }
       } finally {
         setExchanging(null);
         window.setTimeout(() => {

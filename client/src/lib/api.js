@@ -5,12 +5,14 @@ import { trackEvent } from "./analytics";
 import { getApiBaseUrl } from "./runtimeApi";
 import {
   gatedRequest,
-  markGlobalCooling,
+  markServerRateLimit,
 } from "./apiRequestGate";
+import { parseRetryAfterSec, sleepMs } from "./parseRetryAfter";
 
 export {
   ApiCoolingDownError,
   getApiCoolingState,
+  getLastRateLimitMeta,
   subscribeApiCooling,
   resetAuthMeBootstrap,
 } from "./apiRequestGate";
@@ -36,7 +38,7 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error) => {
     const url = String(error?.config?.url || "");
     const method = String(error?.config?.method || "get").toUpperCase();
     const parsed = parseApiError(error);
@@ -84,26 +86,40 @@ api.interceptors.response.use(
       devDiagApiFailure("network", { message: error.message, url: error.config?.url });
     }
     if (error.response?.status === 429) {
-      const retryAfter =
-        error.response.headers["retry-after"] ||
-        error.response.headers["Retry-After"] ||
-        60;
+      const headers = error.response.headers;
+      const retryAfter = parseRetryAfterSec(headers, 60);
       const path = String(url).split("?")[0];
-      const isAuthMe = method === "GET" && /\/auth\/me$/i.test(path);
-      const isAuthLogin = method === "POST" && /\/auth\/(login|register)$/i.test(path);
-      if (!isAuthMe && !isAuthLogin) {
-        markGlobalCooling(retryAfter);
+      const methodUpper = method;
+      const isAuthMe = methodUpper === "GET" && /\/auth\/me$/i.test(path);
+      const isAuthLogin = methodUpper === "POST" && /\/auth\/(login|register)$/i.test(path);
+
+      markServerRateLimit(retryAfter, { path, method: methodUpper });
+
+      if (!error.config?.__rateLimitRetried && !isAuthLogin) {
+        error.config.__rateLimitRetried = true;
+        await sleepMs(retryAfter * 1000);
+        try {
+          return await api.request(error.config);
+        } catch (retryErr) {
+          error = retryErr;
+          if (error.response?.status !== 429) {
+            return Promise.reject(error);
+          }
+        }
       }
+
       const rateLimitError = new Error(
         isAuthMe
-          ? "Profile sync rate limit — wait a few seconds and retry."
+          ? "Profile sync rate limit — retrying shortly."
           : isAuthLogin
             ? "Too many login attempts. Wait a moment and try again."
-            : `Too many requests. Cooling down for ${retryAfter} seconds.`
+            : "Too many requests right now. Retrying shortly."
       );
       rateLimitError.status = 429;
       rateLimitError.retryAfter = retryAfter;
       rateLimitError.isCoolingDown = true;
+      rateLimitError.isRateLimited = true;
+      rateLimitError.rateLimitPath = path;
       return Promise.reject(rateLimitError);
     }
     

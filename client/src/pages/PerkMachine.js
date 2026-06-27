@@ -10,6 +10,7 @@ import {
 } from '../lib/api';
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
 import { shouldShowAdminNav } from '../lib/adminAccess';
+import { isRateLimitError } from '../lib/apiErrorParsing';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import LoadingState from '../components/ui/states/LoadingState';
 import PerkMachineAdminPanel from '../components/perk/PerkMachineAdminPanel';
@@ -202,7 +203,9 @@ export default function PerkMachine() {
       setError('');
       return data;
     } catch (e) {
-      setError(e?.response?.data?.message || e?.message || 'Failed to load Perk Machine.');
+      if (!isRateLimitError(e)) {
+        setError(e?.response?.data?.message || e?.message || 'Failed to load Perk Machine.');
+      }
       return null;
     } finally {
       setLoading(false);

@@ -1,9 +1,9 @@
 import React from "react";
 import { useApiCooling } from "../hooks/useApiCooling";
 
-/** Quiet global notice when the client is backing off after HTTP 429. */
+/** Shown only after a real HTTP 429 from the backend. */
 export default function ApiCoolingBanner() {
-  const { isCooling, retryAfterMs } = useApiCooling();
+  const { isCooling, retryAfterMs, meta } = useApiCooling();
   if (!isCooling) return null;
 
   const secs = Math.max(1, Math.ceil(retryAfterMs / 1000));
@@ -26,9 +26,17 @@ export default function ApiCoolingBanner() {
         background: "rgba(30, 27, 46, 0.92)",
         border: "1px solid rgba(251, 191, 36, 0.35)",
         pointerEvents: "none",
+        maxWidth: "min(92vw, 360px)",
+        textAlign: "center",
       }}
     >
-      Cooling down — retry in ~{secs}s
+      Rate limited — retry in ~{secs}s
+      {meta?.path ? (
+        <span style={{ display: "block", fontSize: "0.62rem", opacity: 0.75, marginTop: 2 }}>
+          {meta.method ? `${String(meta.method).toUpperCase()} ` : ""}
+          {meta.path}
+        </span>
+      ) : null}
     </div>
   );
 }

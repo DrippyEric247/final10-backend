@@ -8,6 +8,11 @@ import {
   resetGame,
   PHASE,
   coinsUntilCombo,
+  getSelectableDifficulties,
+  getDifficultyConfig,
+  loadSavedDifficulty,
+  saveDifficulty,
+  applyDifficultyToScout,
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
 import '../styles/ScoutFlight.css';
@@ -197,6 +202,8 @@ export default function ScoutFlightGame() {
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
+  const [difficultyId, setDifficultyId] = useState(() => loadSavedDifficulty());
+  const selectableDifficulties = getSelectableDifficulties();
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
@@ -220,15 +227,18 @@ export default function ScoutFlightGame() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (!gameRef.current) {
-      gameRef.current = createGame(w, h);
+      gameRef.current = createGame(w, h, difficultyId);
     } else {
       gameRef.current.width = w;
       gameRef.current.height = h;
       gameRef.current.groundH = Math.max(36, Math.round(h * 0.08));
       gameRef.current.scoutX = Math.round(w * 0.22);
       gameRef.current.scout.x = gameRef.current.scoutX;
+      if (gameRef.current.phase === PHASE.IDLE) {
+        applyDifficultyToScout(gameRef.current, gameRef.current.difficultyId);
+      }
     }
-  }, []);
+  }, [difficultyId]);
 
   const drawFrame = useCallback((ts) => {
     const canvas = canvasRef.current;
@@ -314,6 +324,14 @@ export default function ScoutFlightGame() {
     };
   }, [resize, drawFrame]);
 
+  const handleDifficultySelect = useCallback((id) => {
+    const saved = saveDifficulty(id);
+    setDifficultyId(saved);
+    if (gameRef.current) {
+      applyDifficultyToScout(gameRef.current, saved);
+    }
+  }, []);
+
   const handleInput = useCallback((e) => {
     e.preventDefault();
     const game = gameRef.current;
@@ -364,6 +382,34 @@ export default function ScoutFlightGame() {
               <span className="scout-flight-logo__wings">🪽</span>
             </div>
             <p className="scout-flight-tagline">Collect Savvy Coins. Dodge the hazards.</p>
+            <section className="scout-flight-difficulty" aria-label="Difficulty">
+              <h2 className="scout-flight-difficulty__title">Difficulty</h2>
+              <div className="scout-flight-difficulty__options" role="radiogroup" aria-label="Select difficulty">
+                {selectableDifficulties.map((d) => {
+                  const selected = difficultyId === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`scout-flight-difficulty__option${selected ? ' scout-flight-difficulty__option--active' : ''}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDifficultySelect(d.id);
+                      }}
+                    >
+                      <span className="scout-flight-difficulty__label">
+                        {d.emoji} {d.label}
+                      </span>
+                      <span className="scout-flight-difficulty__desc">{d.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
             <img src={SCOUT_IMG} alt="" className="scout-flight-scout-preview" />
             <p className="scout-flight-hint">Tap or click to launch</p>
             <p className="scout-flight-note">Score is local only — rewards coming soon.</p>
@@ -373,6 +419,10 @@ export default function ScoutFlightGame() {
         {uiPhase === PHASE.GAMEOVER ? (
           <div className="scout-flight-overlay scout-flight-overlay--gameover">
             <h2 className="scout-flight-go-title">Flight Ended</h2>
+            <p className="scout-flight-go-mode">
+              {getDifficultyConfig(difficultyId).emoji}{' '}
+              {getDifficultyConfig(difficultyId).label}
+            </p>
             {isNewBest ? <p className="scout-flight-go-new-best">New Best!</p> : null}
             <div className="scout-flight-go-stats">
               <div className="scout-flight-go-stat scout-flight-go-stat--run">

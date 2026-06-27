@@ -30,7 +30,18 @@ export function parseApiError(e) {
  * User-facing copy for API failures.
  * Keeps details private while giving clear next steps.
  */
+export function isRateLimitError(e) {
+  return Boolean(e && (e.status === 429 || e.isRateLimited || e.isCoolingDown));
+}
+
 export function userSafeErrorMessage(e, fallback = "Something went wrong. Please try again.") {
+  if (e?.isRateLimited || e?.isCoolingDown) {
+    const sec = Number(e?.retryAfter);
+    if (Number.isFinite(sec) && sec > 0) {
+      return `Too many requests — please wait about ${Math.ceil(sec)} seconds.`;
+    }
+    return "Too many requests right now. Please wait a moment and retry.";
+  }
   const { status, message } = parseApiError(e);
   if (status === 401 || status === 403) {
     return "Your session expired. Please sign in again.";
