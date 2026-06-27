@@ -301,6 +301,97 @@ export async function adminPerkMachineClearHistory() {
   return data;
 }
 
+/** ---- Live beta events (Supply Drops, Scout Support, Savvy Sale) ---- **/
+
+export async function getLiveEventsState() {
+  const { data } = await api.get("/events/live-state");
+  return data;
+}
+
+export async function getActiveSupplyDrop() {
+  const { data } = await api.get("/events/supply-drop/active");
+  return data;
+}
+
+export async function claimSupplyDrop(dropId) {
+  const { data } = await api.post("/events/supply-drop/claim", { dropId });
+  return data;
+}
+
+export async function getActiveSavvySale() {
+  const { data } = await api.get("/events/savvy-sale/active");
+  return data;
+}
+
+export async function getScoutSupportStatus() {
+  const { data } = await api.get("/scout-support/status");
+  return data;
+}
+
+export async function registerScoutSupportAction(actionType, meta = {}) {
+  const { data } = await api.post("/scout-support/register-action", { actionType, meta });
+  return data;
+}
+
+export async function claimScoutSupportMilestone(milestone) {
+  const { data } = await api.post(`/scout-support/claim/${milestone}`);
+  return data;
+}
+
+export async function checkLiveEventsAdminAccess() {
+  try {
+    const { data } = await api.get("/events/admin/ping");
+    return Boolean(data?.ok);
+  } catch {
+    return false;
+  }
+}
+
+export async function adminCreateSupplyDrop(scope = "user") {
+  const { data } = await api.post("/events/supply-drop/create-test", { scope });
+  return data;
+}
+
+export async function adminExpireSupplyDrop() {
+  const { data } = await api.post("/events/supply-drop/expire");
+  return data;
+}
+
+export async function adminGetSupplyDropClaims(limit = 20) {
+  const { data } = await api.get("/events/supply-drop/recent-claims", { params: { limit } });
+  return data;
+}
+
+export async function adminStartSavvySale(minutes = 15) {
+  const { data } = await api.post("/events/savvy-sale/start", { minutes });
+  return data;
+}
+
+export async function adminEndSavvySale() {
+  const { data } = await api.post("/events/savvy-sale/end");
+  return data;
+}
+
+export async function adminScoutSupportAddDeal(actionType = "deal_secured_test") {
+  const { data } = await api.post("/scout-support/admin/add-deal", { actionType });
+  return data;
+}
+
+export async function adminScoutSupportSetStreak(count) {
+  const { data } = await api.post("/scout-support/admin/set-streak", { count });
+  return data;
+}
+
+export async function adminScoutSupportReset() {
+  const { data } = await api.post("/scout-support/admin/reset");
+  return data;
+}
+
+export async function adminScoutSupportForceClaim(milestone) {
+  const { data } = await api.post("/scout-support/admin/force-claim", { milestone });
+  return data;
+}
+
 /** ---- Battle Pass (beta 25-tier) ---- **/
 
 /** POST /api/progression/claim-tier — claim a tier reward (free|premium). */

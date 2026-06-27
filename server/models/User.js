@@ -94,6 +94,9 @@ const userSchema = new mongoose.Schema({
           mode: String,
           slots: Number,
           savvyCost: Number,
+          originalSavvyCost: { type: Number, default: null },
+          savvySaleApplied: { type: Boolean, default: false },
+          savvySaleSavings: { type: Number, default: 0 },
           rewards: mongoose.Schema.Types.Mixed,
           createdAt: { type: Date, default: Date.now },
         },
@@ -101,6 +104,44 @@ const userSchema = new mongoose.Schema({
       default: [],
     },
   },
+  /** Beta live-event placeholder inventory (Scout Flight tickets, beacons, etc.) */
+  eventInventory: {
+    scoutFlightTicket: { type: Number, default: 0 },
+    callingCardPlaceholder: { type: Number, default: 0 },
+    rareScoutFlightRoute: { type: Number, default: 0 },
+    mythicSupplyBeacon: { type: Number, default: 0 },
+  },
+  /** Scout Support / Deal Streak progression */
+  scoutSupport: {
+    dealStreakCount: { type: Number, default: 0 },
+    scoutSupportProgress: { type: Number, default: 0 },
+    scoutSupportMilestonesClaimed: [{ type: Number }],
+    milestonesReady: [
+      {
+        milestone: Number,
+        label: String,
+        icon: String,
+        rewardType: String,
+        unlockedAt: { type: Date, default: Date.now },
+      },
+    ],
+    dealStreakHistory: [
+      {
+        action: String,
+        meta: mongoose.Schema.Types.Mixed,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+  },
+  /** Recent Max Supply Drop claims for profile/history */
+  supplyDropClaimHistory: [
+    {
+      dropId: String,
+      rewardId: String,
+      rewardLabel: String,
+      claimedAt: { type: Date, default: Date.now },
+    },
+  ],
   lastActive: Date,
 
   // ---- referrals ----

@@ -1,0 +1,386 @@
+.live-events-host {
+  position: relative;
+  z-index: 900;
+}
+
+.live-events-banner {
+  position: fixed;
+  top: calc(var(--nav-height, 64px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 901;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  animation: liveBannerPulse 2.4s ease-in-out infinite;
+}
+
+.live-events-banner--sale {
+  background: linear-gradient(135deg, #7c3aed 0%, #ea580c 100%);
+  color: #fff;
+}
+
+.live-events-banner--drop {
+  background: linear-gradient(135deg, #581c87 0%, #a16207 100%);
+  color: #fff;
+}
+
+@keyframes liveBannerPulse {
+  0%, 100% { box-shadow: 0 8px 32px rgba(124, 58, 237, 0.35); }
+  50% { box-shadow: 0 8px 40px rgba(234, 88, 12, 0.55); }
+}
+
+/* Max Supply Drop modal */
+.supply-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(8, 4, 20, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.supply-drop-modal {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+  padding: 1.75rem 1.5rem;
+  border-radius: 1.25rem;
+  background: linear-gradient(160deg, #1a0a2e 0%, #2d1b4e 45%, #1a0a2e 100%);
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  box-shadow: 0 0 60px rgba(168, 85, 247, 0.35), 0 0 120px rgba(234, 179, 8, 0.15);
+  text-align: center;
+  overflow: hidden;
+}
+
+.supply-drop-modal__smoke {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 50% 80%, rgba(168, 85, 247, 0.25) 0%, transparent 55%);
+  pointer-events: none;
+  animation: supplySmoke 4s ease-in-out infinite;
+}
+
+@keyframes supplySmoke {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.supply-drop-modal__crate {
+  font-size: 3.5rem;
+  filter: drop-shadow(0 0 20px rgba(234, 179, 8, 0.6));
+  animation: crateBob 2s ease-in-out infinite;
+}
+
+@keyframes crateBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.supply-drop-modal__title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin: 0.5rem 0 0.25rem;
+  color: #f5f3ff;
+}
+
+.supply-drop-modal__subtitle {
+  color: #c4b5fd;
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+}
+
+.supply-drop-modal__timer {
+  font-size: 2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fcd34d;
+  margin: 0.5rem 0 1rem;
+  letter-spacing: 0.05em;
+}
+
+.supply-drop-modal__scout {
+  font-size: 0.88rem;
+  color: #a78bfa;
+  font-style: italic;
+  margin-bottom: 1.25rem;
+  padding: 0.65rem 0.85rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 0.65rem;
+  border-left: 3px solid #a855f7;
+}
+
+.supply-drop-modal__claim {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  background: linear-gradient(135deg, #a855f7, #eab308);
+  color: #1a0a2e;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.supply-drop-modal__claim:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.45);
+}
+
+.supply-drop-modal__claim:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.supply-drop-modal__dismiss {
+  margin-top: 0.75rem;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.supply-drop-reward-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 4, 20, 0.75);
+  pointer-events: none;
+}
+
+.supply-drop-reward-burst__card {
+  padding: 1.5rem 2rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #581c87, #a16207);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  animation: rewardPop 0.6s ease-out;
+}
+
+@keyframes rewardPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Scout Support panel */
+.scout-support-panel {
+  margin: 1rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+.scout-support-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+
+.scout-support-panel__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}
+
+.scout-support-panel__count {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.scout-support-panel__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 0.65rem;
+}
+
+.scout-support-panel__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  transition: width 0.4s ease;
+}
+
+.scout-support-panel__next {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.scout-support-panel__next strong {
+  color: #fcd34d;
+}
+
+/* Scout celebration */
+.scout-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(4, 8, 24, 0.88);
+}
+
+.scout-celebration {
+  max-width: 440px;
+  width: 100%;
+  padding: 2rem 1.5rem;
+  border-radius: 1.25rem;
+  text-align: center;
+  background: linear-gradient(160deg, #0f172a, #1e1b4b);
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 80px rgba(99, 102, 241, 0.3);
+}
+
+.scout-celebration__icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.scout-celebration__title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0 0 0.5rem;
+}
+
+.scout-celebration__scout {
+  color: #a5b4fc;
+  font-style: italic;
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+}
+
+.scout-celebration__call {
+  width: 100%;
+  padding: 0.85rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+}
+
+.scout-celebration__call:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+/* Perk Machine Savvy Sale theme */
+.perk-page--savvy-sale .perk-page__glow {
+  background: radial-gradient(ellipse at 50% 0%, rgba(234, 88, 12, 0.25) 0%, rgba(124, 58, 237, 0.15) 40%, transparent 70%);
+}
+
+.perk-savvy-sale-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #7c3aed, #ea580c);
+  color: #fff;
+  margin-bottom: 0.5rem;
+  animation: liveBannerPulse 2.4s ease-in-out infinite;
+}
+
+.perk-savvy-sale-timer {
+  font-size: 0.85rem;
+  color: #fcd34d;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.perk-savvy-sale-scout {
+  font-size: 0.82rem;
+  color: #fdba74;
+  font-style: italic;
+  margin-bottom: 0.75rem;
+}
+
+.perk-spin-price--sale {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.perk-spin-price__original {
+  font-size: 0.72rem;
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.perk-spin-price__sale {
+  color: #fcd34d;
+  font-weight: 800;
+}
+
+/* Live events admin */
+.live-events-admin {
+  margin-top: 2rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px dashed rgba(168, 85, 247, 0.45);
+  background: rgba(15, 10, 30, 0.5);
+}
+
+.live-events-admin__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #c4b5fd;
+  margin-bottom: 0.75rem;
+}
+
+.live-events-admin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.live-events-admin__actions button {
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.live-events-admin__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.live-events-admin__error {
+  color: #fca5a5;
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+}

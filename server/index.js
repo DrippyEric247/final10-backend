@@ -183,6 +183,8 @@ auditStartup({
 console.log('[startup] boot phase=audit_startup');
 app.use('/api/streak',      require('./routes/streakRoutes'));
 app.use('/api/perk-machine', require('./routes/perkMachineRoutes'));
+app.use('/api/events', require('./routes/eventsRoutes'));
+app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
@@ -471,6 +473,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌟 Savvy Universe Empire is LIVE!`);
   const { logEmailStartup } = require('./services/emailService');
   logEmailStartup();
+  const { logOAuthStartup } = require('./config/socialAuthConfig');
+  logOAuthStartup();
   const { logEbayAuthStartupCheck, getEbayAppToken } = require('./services/ebayAuthService');
   logEbayAuthStartupCheck();
   getEbayAppToken()

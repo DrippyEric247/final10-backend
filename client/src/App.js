@@ -5,6 +5,7 @@ import Navigation from './components/Navigation';
 import ApiCoolingBanner from './components/ApiCoolingBanner';
 import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
+import LiveEventsHost from './components/events/LiveEventsHost';
 import Final10SideAssistant from './components/Final10SideAssistant';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
 import AuthDebugger from './components/AuthDebugger';
@@ -235,6 +236,7 @@ export default function App() {
         <ApiCoolingBanner />
         <UniversalBoostProgressBar />
         <Final10RewardHost />
+        <LiveEventsHost />
         <CallingCardUnlockCeremony />
         <SmartCoachHost enabled={Boolean(user)} />
         <Final10SideAssistant />

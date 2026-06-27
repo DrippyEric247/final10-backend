@@ -18,6 +18,8 @@ import AttributionBanner from '../components/onboarding/AttributionBanner';
 import BuildWarsBanner from '../components/BuildWarsBanner';
 import { SCOUT_LABELS, SAVVY_SCOUT } from '../config/savvyScoutBranding';
 import "../styles/LiveSavvyNetwork.css";
+import ScoutSupportPanel from "../components/events/ScoutSupportPanel";
+import { getScoutSupportStatus } from "../lib/api";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -29,6 +31,7 @@ const Dashboard = () => {
   const [marketTick, setMarketTick] = useState(0);
   const [alertIdx, setAlertIdx] = useState(0);
   const [tipIdx, setTipIdx] = useState(0);
+  const [scoutSupport, setScoutSupport] = useState(null);
 
   const heroStatuses = useMemo(() => ([
     "1,248 active scans",
@@ -80,6 +83,13 @@ const Dashboard = () => {
     "Watch low-photo listings for hidden value.",
     "Luxury listings peak during weekends.",
   ]), []);
+
+  useEffect(() => {
+    if (!user) return;
+    getScoutSupportStatus()
+      .then(setScoutSupport)
+      .catch(() => setScoutSupport(null));
+  }, [user]);
 
   useEffect(() => {
     const t = window.setInterval(() => setHeroStatusIdx((n) => (n + 1) % heroStatuses.length), 2800);
@@ -139,6 +149,7 @@ const Dashboard = () => {
         {/* Attribution confirmation: "You joined through @creator" */}
         <AttributionBanner user={user} />
         {user ? <BuildWarsBanner /> : null}
+        {user ? <ScoutSupportPanel status={scoutSupport} /> : null}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

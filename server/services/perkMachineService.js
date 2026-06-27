@@ -7,6 +7,7 @@ const { utcDayKey } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { grantSavvyReward } = require('./savvyRewardService');
 const { getSavvyMultiplier, serializeActiveBoosts } = require('./perkBoostService');
+const { getActiveSavvySale, applySavvySaleToSpinCost, SAVVY_SALE_SPIN_COST } = require('./savvySaleService');
 const {
   SPIN_MODES,
   SPIN_COOLDOWN_MS,
@@ -30,8 +31,9 @@ function ensurePerkMachineDoc(user) {
   if (!Array.isArray(pm.spinHistory)) pm.spinHistory = [];
   if (typeof pm.extraFreeSpins !== 'number') pm.extraFreeSpins = 0;
   if (!pm.tokens || typeof pm.tokens !== 'object') {
-    pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0 };
+    pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0, paid3Spin: 0 };
   }
+  if (typeof pm.tokens.paid3Spin !== 'number') pm.tokens.paid3Spin = 0;
   if (typeof pm.callingCardDrops !== 'number') pm.callingCardDrops = 0;
   if (typeof pm.scoutUpgrades !== 'number') pm.scoutUpgrades = 0;
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
@@ -87,6 +89,8 @@ function serializeHistory(pm) {
     .reverse()
     .map((entry) => {
       const savvyCost = Number(entry.savvyCost) || 0;
+      const originalSavvyCost =
+        entry.originalSavvyCost != null ? Number(entry.originalSavvyCost) || savvyCost : savvyCost;
       const savvyWon =
         entry.savvyWon != null
           ? Number(entry.savvyWon) || 0
@@ -96,6 +100,9 @@ function serializeHistory(pm) {
         mode: entry.mode,
         slots: entry.slots,
         savvyCost,
+        originalSavvyCost,
+        savvySaleApplied: Boolean(entry.savvySaleApplied),
+        savvySaleSavings: Number(entry.savvySaleSavings) || 0,
         savvyWon,
         net: savvyWon - savvyCost,
         rewards: entry.rewards,
@@ -122,6 +129,7 @@ function getPerkMachineStatus(user) {
     tokens: {
       battlePassXp15: Number(pm.tokens?.battlePassXp15) || 0,
       savvyMultiplier15: Number(pm.tokens?.savvyMultiplier15) || 0,
+      paid3Spin: Number(pm.tokens?.paid3Spin) || 0,
     },
     streakShields: Number(user.dailyStreak?.scoutShields) || 0,
     callingCardDrops: Number(pm.callingCardDrops) || 0,
@@ -135,6 +143,27 @@ function getPerkMachineStatus(user) {
       paid_3: getSpinConfig(SPIN_MODES.PAID_3),
     },
   };
+}
+
+async function getPerkMachineStatusWithEvents(user) {
+  const status = getPerkMachineStatus(user);
+  const savvySale = await getActiveSavvySale();
+  const saleActive = savvySale?.active;
+
+  if (saleActive) {
+    for (const key of ['paid_1', 'paid_2', 'paid_3']) {
+      const base = status.spinCosts[key]?.savvy || 0;
+      status.spinCosts[key] = {
+        ...status.spinCosts[key],
+        savvy: SAVVY_SALE_SPIN_COST,
+        originalSavvy: base,
+        saleApplied: true,
+      };
+    }
+  }
+
+  status.savvySale = savvySale;
+  return status;
 }
 
 function rewardToPayload(rewardDef) {
@@ -237,7 +266,14 @@ async function spinPerkMachine(user, options = {}) {
   const tier = readTier(user);
   const today = utcDayKey();
   let savvyCost = config.savvy;
+  let originalSavvyCost = config.savvy;
+  let savvySaleApplied = false;
+  let savvySaleSavings = 0;
+  let usedPaid3Token = false;
   let usedExtraFreeSpin = false;
+
+  const savvySale = await getActiveSavvySale();
+  const saleActive = savvySale?.active;
 
   if (mode === SPIN_MODES.FREE) {
     if (!canUseFreeSpin(user)) {
@@ -258,10 +294,26 @@ async function spinPerkMachine(user, options = {}) {
       pm.lastFreeSpinDay = today;
     }
   } else {
+    const salePricing = applySavvySaleToSpinCost(config.savvy, saleActive);
+    originalSavvyCost = salePricing.originalCost;
+    savvyCost = salePricing.cost;
+    savvySaleApplied = salePricing.saleApplied;
+    savvySaleSavings = salePricing.savings;
+
+    const pmTokens = ensurePerkMachineDoc(user).tokens || {};
+    if (mode === SPIN_MODES.PAID_3 && Number(pmTokens.paid3Spin) > 0 && !options.adminBypassCost) {
+      pm.tokens.paid3Spin = Number(pm.tokens.paid3Spin) - 1;
+      savvyCost = 0;
+      originalSavvyCost = config.savvy;
+      usedPaid3Token = true;
+      savvySaleApplied = false;
+      savvySaleSavings = 0;
+    }
+
     // Round before spending so balances stay integer (heals any legacy fraction).
     const balance = Math.round(Number(user.savvyPoints) || 0);
     if (!options.adminBypassCost) {
-      if (balance < savvyCost) {
+      if (savvyCost > 0 && balance < savvyCost) {
         const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
         err.status = 400;
         err.code = 'INSUFFICIENT_SAVVY';
@@ -269,10 +321,13 @@ async function spinPerkMachine(user, options = {}) {
         err.balance = balance;
         throw err;
       }
-      user.savvyPoints = balance - savvyCost;
-      user.pointsBalance = Math.max(0, Math.round(Number(user.pointsBalance || 0)) - savvyCost);
+      if (savvyCost > 0) {
+        user.savvyPoints = balance - savvyCost;
+        user.pointsBalance = Math.max(0, Math.round(Number(user.pointsBalance || 0)) - savvyCost);
+      }
     } else {
       savvyCost = 0;
+      originalSavvyCost = 0;
     }
   }
 
@@ -299,6 +354,9 @@ async function spinPerkMachine(user, options = {}) {
     mode,
     slots,
     savvyCost: finalCost,
+    originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
+    savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
+    savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
     savvyWon,
     rewards: rewards.map((r) => ({
       id: r.id,
@@ -343,7 +401,11 @@ async function spinPerkMachine(user, options = {}) {
     resultMessage,
     topRarity,
     usedExtraFreeSpin,
-    status: getPerkMachineStatus(user),
+    usedPaid3Token,
+    savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
+    savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
+    originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
+    status: await getPerkMachineStatusWithEvents(user),
   };
 }
 
@@ -430,6 +492,7 @@ async function hatchEgg(user, options = {}) {
 module.exports = {
   ensurePerkMachineDoc,
   getPerkMachineStatus,
+  getPerkMachineStatusWithEvents,
   spinPerkMachine,
   hatchEgg,
   canUseFreeSpin,

@@ -3,7 +3,7 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { HttpError } = require('../middleware/apiErrors');
-const { getPerkMachineStatus, spinPerkMachine, hatchEgg } = require('../services/perkMachineService');
+const { getPerkMachineStatus, getPerkMachineStatusWithEvents, spinPerkMachine, hatchEgg } = require('../services/perkMachineService');
 const { activatePerkItem } = require('../services/perkBoostService');
 const {
   adminResetFreeSpin,
@@ -19,7 +19,7 @@ router.get('/status', auth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
-    res.json(getPerkMachineStatus(user));
+    res.json(await getPerkMachineStatusWithEvents(user));
   } catch (err) {
     console.error('[perk-machine/status]', err);
     next(err);

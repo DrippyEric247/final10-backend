@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { hasAdminRole, FOUNDER_ADMIN_EMAIL } from "../lib/adminAccess";
 import { ADMIN_TEST_ALERT, fireAdminTestAlert } from "../lib/adminTestAlert";
-import { sendEarlyMonthlyReportTest } from "../lib/api";
+import { sendEarlyMonthlyReportTest, getLiveEventsState } from "../lib/api";
+import LiveEventsAdminPanel from "../components/events/LiveEventsAdminPanel";
 import SavvyMark from "../components/SavvyMark";
 
 const ADMIN_LINKS = [
@@ -190,6 +191,12 @@ export default function AdminHub() {
           </div>
         ) : null}
       </section>
+
+      <LiveEventsAdminPanel
+        onRefresh={async () => {
+          await getLiveEventsState().catch(() => null);
+        }}
+      />
 
       <ul className="space-y-3">
         {ADMIN_LINKS.map((item) => (
