@@ -3,8 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { hasAdminRole, FOUNDER_ADMIN_EMAIL } from "../lib/adminAccess";
 import { ADMIN_TEST_ALERT, fireAdminTestAlert } from "../lib/adminTestAlert";
-import { sendEarlyMonthlyReportTest, getLiveEventsState } from "../lib/api";
-import LiveEventsAdminPanel from "../components/events/LiveEventsAdminPanel";
+import { sendEarlyMonthlyReportTest } from "../lib/api";
 import SavvyMark from "../components/SavvyMark";
 
 const ADMIN_LINKS = [
@@ -14,6 +13,7 @@ const ADMIN_LINKS = [
   { label: "Launch KPIs", path: "/launch-kpis", description: "Growth and funnel metrics" },
   { label: "Growth levers", path: "/growth-levers", description: "Internal growth experiments" },
   { label: "Production readiness", path: "/production-readiness", description: "Launch checklist" },
+  { label: "Events Hub (admin QA)", path: "/events", description: "Live drops, Savvy Sale, Scout Support testing" },
 ];
 
 export default function AdminHub() {
@@ -191,12 +191,6 @@ export default function AdminHub() {
           </div>
         ) : null}
       </section>
-
-      <LiveEventsAdminPanel
-        onRefresh={async () => {
-          await getLiveEventsState().catch(() => null);
-        }}
-      />
 
       <ul className="space-y-3">
         {ADMIN_LINKS.map((item) => (

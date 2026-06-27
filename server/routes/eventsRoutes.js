@@ -18,6 +18,7 @@ const {
 } = require('../services/savvySaleService');
 const { logLiveEventAdmin } = require('../services/liveEventsAdminService');
 const { DEFAULT_CLAIM_WINDOW_MS } = require('../config/supplyDropRewards');
+const { buildEventsHub } = require('../services/eventsHubService');
 
 const router = express.Router();
 
@@ -62,6 +63,18 @@ router.get('/savvy-sale/active', auth, async (req, res, next) => {
     res.json({ sale });
   } catch (err) {
     console.error('[events/savvy-sale/active]', err);
+    next(err);
+  }
+});
+
+router.get('/hub', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const hub = await buildEventsHub(user);
+    res.json(hub);
+  } catch (err) {
+    console.error('[events/hub]', err);
     next(err);
   }
 });

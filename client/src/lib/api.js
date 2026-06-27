@@ -308,6 +308,11 @@ export async function getLiveEventsState() {
   return data;
 }
 
+export async function getEventsHub() {
+  const { data } = await api.get("/events/hub");
+  return data;
+}
+
 export async function getActiveSupplyDrop() {
   const { data } = await api.get("/events/supply-drop/active");
   return data;

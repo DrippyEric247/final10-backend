@@ -30,6 +30,7 @@
 .live-events-banner--drop {
   background: linear-gradient(135deg, #581c87 0%, #a16207 100%);
   color: #fff;
+  top: calc(var(--nav-height, 64px) + 52px);
 }
 
 @keyframes liveBannerPulse {

@@ -6,6 +6,9 @@ import ApiCoolingBanner from './components/ApiCoolingBanner';
 import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
 import LiveEventsHost from './components/events/LiveEventsHost';
+import EventsFloatingTab from './components/events/EventsFloatingTab';
+import { LiveEventsProvider } from './context/LiveEventsContext';
+import EventsPage from './pages/EventsPage';
 import Final10SideAssistant from './components/Final10SideAssistant';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
 import AuthDebugger from './components/AuthDebugger';
@@ -220,6 +223,7 @@ export default function App() {
       <PointsRewardProvider>
       <SearchIntentProvider>
       <PartyProvider>
+      <LiveEventsProvider>
       <div className="bg-app min-h-screen text-white">
         {/* Faded brand layer (logo on every tab, aurora on /profile). */}
         <AppBackground />
@@ -243,6 +247,7 @@ export default function App() {
         <TourHost />
         {user ? <TabJourneyPanel /> : null}
         {user ? <PartyDock /> : null}
+        {user ? <EventsFloatingTab /> : null}
         <SavvyFirstRunExperience user={user} />
         <SavvyInteractiveDemos enabled={Boolean(user)} />
         {showStartupBoot ? (
@@ -443,6 +448,14 @@ export default function App() {
             }
           />
           <Route
+            path="/events"
+            element={
+              <ProtectedRoute>
+                <EventsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/battle-pass"
             element={
               <ProtectedRoute>
@@ -624,6 +637,7 @@ export default function App() {
         </div>
       </footer>
     </div>
+      </LiveEventsProvider>
       </PartyProvider>
       </SearchIntentProvider>
       </PointsRewardProvider>

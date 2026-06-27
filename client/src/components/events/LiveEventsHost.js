@@ -1,11 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import {
-  claimSupplyDrop,
-  getLiveEventsState,
-  getScoutSupportStatus,
-} from '../../lib/api';
+import { useLiveEventsOptional } from '../../context/LiveEventsContext';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../../store/savvyStore';
 import MaxSupplyDropModal from './MaxSupplyDropModal';
 import SupplyDropBanner from './SupplyDropBanner';
@@ -13,15 +9,13 @@ import SavvySaleBanner from './SavvySaleBanner';
 import ScoutSupportCelebration from './ScoutSupportCelebration';
 import '../../styles/LiveEvents.css';
 
-const POLL_MS = 5000;
-
 export default function LiveEventsHost() {
-  const { user, refreshProfile } = useAuth();
+  const { refreshProfile } = useAuth();
+  const ctx = useLiveEventsOptional();
   const navigate = useNavigate();
-  const [supplyDrop, setSupplyDrop] = useState(null);
-  const [savvySale, setSavvySale] = useState(null);
-  const [dropMs, setDropMs] = useState(0);
-  const [saleMs, setSaleMs] = useState(0);
+  const location = useLocation();
+  const onEventsPage = location.pathname === '/events';
+
   const [modalDismissed, setModalDismissed] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -29,30 +23,11 @@ export default function LiveEventsHost() {
   const [celebration, setCelebration] = useState(null);
   const lastDropId = useRef(null);
 
-  const refresh = useCallback(async () => {
-    if (!user) return;
-    try {
-      const [live, scout] = await Promise.all([getLiveEventsState(), getScoutSupportStatus()]);
-      setSupplyDrop(live?.supplyDrop || null);
-      setSavvySale(live?.savvySale || null);
-      setDropMs(live?.supplyDrop?.msRemaining || 0);
-      setSaleMs(live?.savvySale?.msRemaining || 0);
-
-      const ready = scout?.milestonesReady || [];
-      if (ready.length > 0 && !celebration) {
-        setCelebration(ready[0]);
-      }
-    } catch {
-      /* ignore poll errors */
-    }
-  }, [user, celebration]);
-
-  useEffect(() => {
-    if (!user) return undefined;
-    void refresh();
-    const id = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(id);
-  }, [user, refresh]);
+  const supplyDrop = ctx?.supplyDrop ?? null;
+  const savvySale = ctx?.savvySale ?? null;
+  const dropMs = ctx?.dropMs ?? 0;
+  const saleMs = ctx?.saleMs ?? 0;
+  const scoutReady = ctx?.hub?.scoutSupport?.milestonesReady;
 
   useEffect(() => {
     if (!supplyDrop?.dropId || supplyDrop.expired || supplyDrop.alreadyClaimed) return;
@@ -64,68 +39,62 @@ export default function LiveEventsHost() {
   }, [supplyDrop]);
 
   useEffect(() => {
-    if (!supplyDrop || supplyDrop.expired) return undefined;
-    const tick = setInterval(() => {
-      setDropMs((ms) => Math.max(0, ms - 1000));
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [supplyDrop?.dropId, supplyDrop?.expired]);
-
-  useEffect(() => {
-    if (!savvySale?.active) return undefined;
-    const tick = setInterval(() => {
-      setSaleMs((ms) => Math.max(0, ms - 1000));
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [savvySale?.eventId, savvySale?.active]);
+    const ready = scoutReady || [];
+    if (ready.length > 0 && !celebration && !onEventsPage) {
+      setCelebration(ready[0]);
+    }
+  }, [scoutReady, celebration, onEventsPage]);
 
   const handleClaim = useCallback(
     async (dropId) => {
+      if (!ctx?.claimSupplyDropById) return;
       setClaiming(true);
       try {
-        const result = await claimSupplyDrop(dropId);
+        const result = await ctx.claimSupplyDropById(dropId);
         setRewardBurst(result?.reward?.label || 'Reward claimed!');
         setShowModal(false);
-        setSupplyDrop(null);
         window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
         if (typeof refreshProfile === 'function') await refreshProfile();
         setTimeout(() => setRewardBurst(null), 2400);
-        void refresh();
       } catch (e) {
         window.alert(e?.response?.data?.message || e?.message || 'Claim failed.');
       } finally {
         setClaiming(false);
       }
     },
-    [refresh, refreshProfile]
+    [ctx, refreshProfile]
   );
 
   const handleCelebrationClaimed = useCallback(
-    (result) => {
+    async (result) => {
       if (result?.supplyDrop) {
-        setSupplyDrop(result.supplyDrop);
         setShowModal(true);
-      }
-      if (result?.savvySale) {
-        setSavvySale(result.savvySale);
-        setSaleMs(result.savvySale.msRemaining || 0);
+        setModalDismissed(false);
       }
       window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
-      if (typeof refreshProfile === 'function') void refreshProfile();
-      void refresh();
+      if (typeof refreshProfile === 'function') await refreshProfile();
+      await ctx?.refresh?.();
     },
-    [refresh, refreshProfile]
+    [ctx, refreshProfile]
   );
 
-  if (!user) return null;
+  if (!ctx) return null;
 
   const showDropBanner =
-    supplyDrop && !supplyDrop.expired && !supplyDrop.alreadyClaimed && (modalDismissed || !showModal);
+    !onEventsPage &&
+    supplyDrop &&
+    !supplyDrop.expired &&
+    !supplyDrop.alreadyClaimed &&
+    (modalDismissed || !showModal);
 
   return (
     <div className="live-events-host">
-      {savvySale?.active ? (
-        <SavvySaleBanner sale={savvySale} msRemaining={saleMs} onClick={() => navigate('/perk-machine')} />
+      {!onEventsPage && savvySale?.active ? (
+        <SavvySaleBanner
+          sale={savvySale}
+          msRemaining={saleMs}
+          onClick={() => navigate('/events')}
+        />
       ) : null}
 
       {showDropBanner ? (
@@ -139,7 +108,7 @@ export default function LiveEventsHost() {
         />
       ) : null}
 
-      {showModal && supplyDrop && !modalDismissed ? (
+      {showModal && supplyDrop && !modalDismissed && !onEventsPage ? (
         <MaxSupplyDropModal
           drop={supplyDrop}
           msRemaining={dropMs}
@@ -148,11 +117,12 @@ export default function LiveEventsHost() {
           onDismiss={() => {
             setModalDismissed(true);
             setShowModal(false);
+            navigate('/events');
           }}
         />
       ) : null}
 
-      {celebration ? (
+      {celebration && !onEventsPage ? (
         <ScoutSupportCelebration
           milestone={celebration}
           onComplete={() => setCelebration(null)}

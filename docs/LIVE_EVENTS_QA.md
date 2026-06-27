@@ -34,6 +34,23 @@ Test on **https://www.final10.app** after deploy. Admin controls: `/admin` → L
 | 4 | End sale / wait expiry | Prices return to 20/40/60 |
 | 5 | Client tamper (DevTools) | Server still charges 10 during sale |
 
+## Universal Events Tab
+
+- **Route:** `/events` (protected)
+- **Floating HUD:** 🎪 Events button (bottom-right, all pages when logged in)
+- **Nav:** Events item with claimable badge count
+- **API:** `GET /api/events/hub`
+
+| # | Test | Expected |
+|---|------|----------|
+| 1 | Open `/events` | All five sections render |
+| 2 | Active supply drop | Shows in Active + Claimable with timer |
+| 3 | Claim from Events page | Reward applies; badge count decreases |
+| 4 | Floating tab badge | Matches claimable count |
+| 5 | Mobile viewport | Floating tab tappable; page scrolls cleanly |
+| 6 | Non-admin | No admin panel on Events page |
+| 7 | Admin | Live Events admin controls at bottom of `/events` |
+
 ## Security
 
 | # | Test | Expected |
@@ -41,3 +58,4 @@ Test on **https://www.final10.app** after deploy. Admin controls: `/admin` → L
 | 1 | Claim another user's dropId | 403 FORBIDDEN |
 | 2 | Non-admin POST create-test | 403 |
 | 3 | API error responses | No secrets / stack traces |
+
