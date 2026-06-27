@@ -1,6 +1,6 @@
 /**
- * Savvy Scout Flight — local-score mini-game engine (v1).
- * Side-scroller: obstacles move right→left; tap/click applies upward impulse.
+ * Savvy Scout Flight - local-score mini-game engine (v1 polish).
+ * Side-scroller: obstacles move right to left; tap/click applies upward impulse.
  */
 
 export const PHASE = Object.freeze({
@@ -22,12 +22,14 @@ const FLAP_VELOCITY = -8.2;
 const MAX_VY = 9;
 const SCOUT_W = 52;
 const SCOUT_H = 52;
-const OBstacle_W = 56;
+const OBSTACLE_W = 56;
 const GAP_MIN = 118;
 const GAP_MAX = 168;
 const SPAWN_MS = 2200;
 const COIN_R = 14;
 const HIT_PAD = 6;
+const COMBO_EVERY = 3;
+const COMBO_BONUS = 10;
 
 function pickCoinType() {
   const total = COIN_TYPES.reduce((s, c) => s + c.weight, 0);
@@ -67,14 +69,26 @@ export function createGame(width, height) {
     phase: PHASE.IDLE,
     score: 0,
     best: loadBest(),
-    scout: { x: scoutX, y: height / 2 - SCOUT_H / 2, vy: 0, w: SCOUT_W, h: SCOUT_H, rot: 0 },
+    scout: {
+      x: scoutX,
+      y: height / 2 - SCOUT_H / 2,
+      vy: 0,
+      w: SCOUT_W,
+      h: SCOUT_H,
+      rot: 0,
+      flapPulse: 0,
+    },
     obstacles: [],
     coins: [],
-    particles: [],
     lastSpawn: 0,
     elapsed: 0,
     speed: Math.max(2.8, width * 0.0045),
     coinPopups: [],
+    comboPopups: [],
+    comboStreak: 0,
+    comboCount: 0,
+    events: [],
+    isNewBest: false,
   };
 }
 
@@ -89,10 +103,16 @@ export function startGame(game) {
   game.score = 0;
   game.scout.y = game.height / 2 - SCOUT_H / 2;
   game.scout.vy = 0;
+  game.scout.rot = 0;
+  game.scout.flapPulse = 0;
   game.obstacles = [];
   game.coins = [];
-  game.particles = [];
   game.coinPopups = [];
+  game.comboPopups = [];
+  game.comboStreak = 0;
+  game.comboCount = 0;
+  game.isNewBest = false;
+  game.events = [];
   game.lastSpawn = game.elapsed;
 }
 
@@ -100,10 +120,14 @@ export function flap(game) {
   if (game.phase === PHASE.IDLE) {
     startGame(game);
     game.scout.vy = FLAP_VELOCITY;
+    game.scout.flapPulse = 1;
+    game.events.push({ type: 'flap' });
     return;
   }
   if (game.phase === PHASE.PLAYING) {
     game.scout.vy = FLAP_VELOCITY;
+    game.scout.flapPulse = 1;
+    game.events.push({ type: 'flap' });
   }
 }
 
@@ -117,11 +141,10 @@ function spawnObstacle(game) {
     x: game.width + 20,
     topH,
     bottomY,
-    w: OBstacle_W,
-    scored: false,
+    w: OBSTACLE_W,
   });
   const coinY = topH + gap / 2;
-  const coinX = game.width + 20 + OBstacle_W / 2;
+  const coinX = game.width + 20 + OBSTACLE_W / 2;
   const type = pickCoinType();
   game.coins.push({
     x: coinX,
@@ -163,22 +186,73 @@ function scoutHitsObstacle(game) {
   return false;
 }
 
-function endGame(game) {
-  game.phase = PHASE.GAMEOVER;
-  if (game.score > game.best) {
-    game.best = game.score;
-    saveBest(game.best);
+function collectCoin(game, c) {
+  c.collected = true;
+  game.score += c.value;
+  game.comboStreak += 1;
+
+  game.coinPopups.push({
+    x: c.x,
+    y: c.y,
+    value: c.value,
+    life: 1100,
+    maxLife: 1100,
+    scale: 0.6,
+  });
+
+  game.events.push({ type: 'coin', value: c.value, coinKey: c.type.key });
+
+  if (game.comboStreak >= COMBO_EVERY) {
+    game.comboStreak = 0;
+    game.comboCount += 1;
+    game.score += COMBO_BONUS;
+    game.comboPopups.push({
+      x: c.x,
+      y: c.y - 28,
+      label: `COMBO ×${COMBO_EVERY}!`,
+      bonus: COMBO_BONUS,
+      life: 1400,
+      maxLife: 1400,
+    });
+    game.events.push({ type: 'combo', bonus: COMBO_BONUS, comboCount: game.comboCount });
   }
 }
 
+function endGame(game) {
+  game.phase = PHASE.GAMEOVER;
+  const prevBest = game.best;
+  if (game.score > game.best) {
+    game.best = game.score;
+    game.isNewBest = true;
+    saveBest(game.best);
+    game.events.push({ type: 'new_best', score: game.score, prevBest });
+  }
+  game.events.push({ type: 'crash', score: game.score });
+}
+
+function updateScoutRotation(game, dtMs) {
+  const s = game.scout;
+  if (s.flapPulse > 0) {
+    s.flapPulse = Math.max(0, s.flapPulse - dtMs / 180);
+  }
+
+  const flapTilt = s.flapPulse * -0.42;
+  const velocityTilt = Math.max(-0.28, Math.min(0.72, s.vy * 0.055));
+  const targetRot = flapTilt + velocityTilt;
+  const lerp = Math.min(1, dtMs * 0.014);
+  s.rot += (targetRot - s.rot) * lerp;
+}
+
 export function updateGame(game, dtMs) {
+  game.events = [];
+
   if (game.phase !== PHASE.PLAYING) return;
 
   game.elapsed += dtMs;
   const s = game.scout;
   s.vy = Math.min(MAX_VY, s.vy + GRAVITY);
   s.y += s.vy;
-  s.rot = Math.max(-0.35, Math.min(0.55, s.vy * 0.04));
+  updateScoutRotation(game, dtMs);
 
   const floor = game.height - game.groundH - s.h;
   if (s.y >= floor) {
@@ -210,14 +284,29 @@ export function updateGame(game, dtMs) {
     const dx = cx - c.x;
     const dy = cy - c.y;
     if (dx * dx + dy * dy < (c.r + s.w * 0.35) ** 2) {
-      c.collected = true;
-      game.score += c.value;
-      game.coinPopups.push({ x: c.x, y: c.y, value: c.value, life: 900 });
+      collectCoin(game, c);
     }
   }
 
   game.coinPopups = game.coinPopups
-    .map((p) => ({ ...p, life: p.life - dtMs, y: p.y - dtMs * 0.03 }))
+    .map((p) => {
+      const life = p.life - dtMs;
+      const t = 1 - life / p.maxLife;
+      return {
+        ...p,
+        life,
+        y: p.y - dtMs * 0.045,
+        scale: 0.6 + Math.min(0.5, t * 1.1),
+      };
+    })
+    .filter((p) => p.life > 0);
+
+  game.comboPopups = game.comboPopups
+    .map((p) => ({
+      ...p,
+      life: p.life - dtMs,
+      y: p.y - dtMs * 0.035,
+    }))
     .filter((p) => p.life > 0);
 
   if (scoutHitsObstacle(game)) {
@@ -231,4 +320,10 @@ export function restartGame(game) {
   next.best = best;
   startGame(next);
   return next;
+}
+
+/** @returns {number} Coins until next combo bonus */
+export function coinsUntilCombo(game) {
+  if (!game || game.phase !== PHASE.PLAYING) return COMBO_EVERY;
+  return COMBO_EVERY - (game.comboStreak % COMBO_EVERY || COMBO_EVERY);
 }

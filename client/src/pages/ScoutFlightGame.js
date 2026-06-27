@@ -7,10 +7,13 @@ import {
   restartGame,
   resetGame,
   PHASE,
+  coinsUntilCombo,
 } from '../lib/scoutFlightEngine';
+import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
 import '../styles/ScoutFlight.css';
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
+const BOTTOM_UI_RESERVE = 88;
 
 function drawBackground(ctx, w, h, t) {
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -21,8 +24,8 @@ function drawBackground(ctx, w, h, t) {
   ctx.fillRect(0, 0, w, h);
 
   for (let i = 0; i < 40; i++) {
-    const sx = ((i * 137 + t * 0.02) % w);
-    const sy = ((i * 89) % (h * 0.75));
+    const sx = (i * 137 + t * 0.02) % w;
+    const sy = (i * 89) % (h * 0.75);
     ctx.fillStyle = `rgba(168, 85, 247, ${0.08 + (i % 5) * 0.03})`;
     ctx.beginPath();
     ctx.arc(sx, sy, 1 + (i % 3), 0, Math.PI * 2);
@@ -39,49 +42,124 @@ function drawBackground(ctx, w, h, t) {
   }
 }
 
-function drawObstacle(ctx, o, h, groundH) {
-  const grad = ctx.createLinearGradient(o.x, 0, o.x + o.w, 0);
-  grad.addColorStop(0, '#2d1b4e');
-  grad.addColorStop(0.5, '#4c1d95');
-  grad.addColorStop(1, '#2d1b4e');
-  ctx.fillStyle = grad;
-  ctx.fillRect(o.x, 0, o.w, o.topH);
-  ctx.fillRect(o.x, o.bottomY, o.w, h - groundH - o.bottomY);
-
-  ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(o.x + 1, 0, o.w - 2, o.topH);
-  ctx.strokeRect(o.x + 1, o.bottomY, o.w - 2, h - groundH - o.bottomY);
-
-  ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+function drawWarningTriangle(ctx, cx, cy, size, pulse) {
+  const glow = 0.55 + pulse * 0.35;
+  ctx.save();
+  ctx.shadowColor = `rgba(239, 68, 68, ${glow})`;
+  ctx.shadowBlur = 10 + pulse * 6;
+  ctx.fillStyle = `rgba(239, 68, 68, ${0.75 + pulse * 0.2})`;
   ctx.beginPath();
-  const tx = o.x + o.w / 2;
-  ctx.moveTo(tx, o.topH - 18);
-  ctx.lineTo(tx - 10, o.topH - 4);
-  ctx.lineTo(tx + 10, o.topH - 4);
+  ctx.moveTo(cx, cy - size);
+  ctx.lineTo(cx - size * 0.95, cy + size * 0.55);
+  ctx.lineTo(cx + size * 0.95, cy + size * 0.55);
   ctx.closePath();
   ctx.fill();
+  ctx.fillStyle = '#1a0f35';
+  ctx.font = `bold ${Math.max(8, size * 0.85)}px system-ui,sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 0;
+  ctx.fillText('!', cx, cy + size * 0.05);
+  ctx.restore();
 }
 
-function drawCoin(ctx, c) {
+function drawObstacle(ctx, o, h, groundH, t) {
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.004 + o.x * 0.02);
+  const blocks = [
+    { x: o.x, y: 0, w: o.w, hh: o.topH },
+    { x: o.x, y: o.bottomY, w: o.w, hh: h - groundH - o.bottomY },
+  ];
+
+  for (const b of blocks) {
+    ctx.save();
+    ctx.shadowColor = `rgba(168, 85, 247, ${0.35 + pulse * 0.25})`;
+    ctx.shadowBlur = 14;
+
+    const grad = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.hh);
+    grad.addColorStop(0, '#1a0f35');
+    grad.addColorStop(0.35, '#4c1d95');
+    grad.addColorStop(0.65, '#6d28d9');
+    grad.addColorStop(1, '#2d1b4e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(b.x, b.y, b.w, b.hh);
+
+    ctx.strokeStyle = `rgba(196, 181, 253, ${0.45 + pulse * 0.35})`;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.hh - 2);
+
+    ctx.strokeStyle = `rgba(124, 58, 237, ${0.25 + pulse * 0.2})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(b.x + 5, b.y + 5, b.w - 10, Math.max(0, b.hh - 10));
+    ctx.restore();
+  }
+
+  drawWarningTriangle(ctx, o.x + o.w / 2, o.topH - 14, 11, pulse);
+  const bottomTop = o.bottomY + 14;
+  drawWarningTriangle(ctx, o.x + o.w / 2, bottomTop + 11, 11, pulse);
+}
+
+function drawCoin(ctx, c, t) {
   if (c.collected) return;
   const { color, glow } = c.type;
+  const bob = Math.sin(t * 0.006 + c.x * 0.05) * 2;
+  const cy = c.y + bob;
+
+  ctx.save();
   ctx.shadowColor = glow;
-  ctx.shadowBlur = 12;
-  const g = ctx.createRadialGradient(c.x - 3, c.y - 3, 2, c.x, c.y, c.r);
-  g.addColorStop(0, glow);
-  g.addColorStop(0.6, color);
+  ctx.shadowBlur = 16;
+  const g = ctx.createRadialGradient(c.x - 3, cy - 3, 2, c.x, cy, c.r);
+  g.addColorStop(0, '#fffbeb');
+  g.addColorStop(0.35, glow);
+  g.addColorStop(0.75, color);
   g.addColorStop(1, '#422006');
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+  ctx.arc(c.x, cy, c.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillStyle = 'rgba(15, 7, 32, 0.5)';
   ctx.font = 'bold 9px system-ui,sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`+${c.value}`, c.x, c.y);
+  ctx.fillText(`+${c.value}`, c.x, cy);
+  ctx.restore();
+}
+
+function drawCoinPopup(ctx, p) {
+  const alpha = Math.min(1, p.life / 500);
+  const isGoldTier = p.value >= 10;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(p.x, p.y);
+  ctx.scale(p.scale, p.scale);
+  ctx.shadowColor = isGoldTier ? '#fcd34d' : '#fde68a';
+  ctx.shadowBlur = isGoldTier ? 22 : 14;
+  ctx.font = `bold ${p.value >= 25 ? 18 : p.value >= 10 ? 16 : 14}px system-ui,sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const grad = ctx.createLinearGradient(-20, -10, 20, 10);
+  grad.addColorStop(0, '#fff7cc');
+  grad.addColorStop(0.5, '#fcd34d');
+  grad.addColorStop(1, '#f59e0b');
+  ctx.fillStyle = grad;
+  ctx.fillText(`+${p.value}`, 0, 0);
+  ctx.restore();
+}
+
+function drawComboPopup(ctx, p) {
+  const alpha = Math.min(1, p.life / 600);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = '#a855f7';
+  ctx.shadowBlur = 18;
+  ctx.font = 'bold 13px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e9d5ff';
+  ctx.fillText(p.label, p.x, p.y);
+  ctx.font = 'bold 11px system-ui,sans-serif';
+  ctx.fillStyle = '#fcd34d';
+  ctx.fillText(`+${p.bonus} bonus`, p.x, p.y + 16);
+  ctx.restore();
 }
 
 function drawGround(ctx, w, h, groundH) {
@@ -97,7 +175,18 @@ function drawGround(ctx, w, h, groundH) {
   ctx.stroke();
 }
 
+function handleGameEvents(events) {
+  for (const ev of events) {
+    if (ev.type === 'flap') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.FLAP);
+    if (ev.type === 'coin') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.COIN, { value: ev.value });
+    if (ev.type === 'combo') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.COMBO, { bonus: ev.bonus });
+    if (ev.type === 'crash') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.CRASH, { score: ev.score });
+    if (ev.type === 'new_best') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.NEW_BEST, { score: ev.score });
+  }
+}
+
 export default function ScoutFlightGame() {
+  const pageRef = useRef(null);
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const gameRef = useRef(null);
@@ -107,14 +196,21 @@ export default function ScoutFlightGame() {
   const [uiPhase, setUiPhase] = useState(PHASE.IDLE);
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
+  const [isNewBest, setIsNewBest] = useState(false);
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
-    if (!wrap || !canvas) return;
+    const page = pageRef.current;
+    if (!wrap || !canvas || !page) return;
+
+    const top = page.getBoundingClientRect().top;
+    const availH = Math.max(320, Math.floor(window.innerHeight - top - BOTTOM_UI_RESERVE));
+    wrap.style.height = `${availH}px`;
+
     const rect = wrap.getBoundingClientRect();
     const w = Math.max(320, Math.floor(rect.width));
-    const h = Math.max(480, Math.floor(rect.height));
+    const h = Math.max(280, Math.floor(rect.height));
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = w * dpr;
     canvas.height = h * dpr;
@@ -122,6 +218,7 @@ export default function ScoutFlightGame() {
     canvas.style.height = `${h}px`;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     if (!gameRef.current) {
       gameRef.current = createGame(w, h);
     } else {
@@ -145,15 +242,17 @@ export default function ScoutFlightGame() {
     if (lastTsRef.current) {
       const dt = Math.min(32, ts - lastTsRef.current);
       updateGame(game, dt);
+      if (game.events.length) handleGameEvents(game.events);
       setScore(game.score);
       setBest(game.best);
       setUiPhase(game.phase);
+      setIsNewBest(game.isNewBest);
     }
     lastTsRef.current = ts;
 
     drawBackground(ctx, w, h, ts);
-    for (const o of game.obstacles) drawObstacle(ctx, o, h, game.groundH);
-    for (const c of game.coins) drawCoin(ctx, c);
+    for (const o of game.obstacles) drawObstacle(ctx, o, h, game.groundH, ts);
+    for (const c of game.coins) drawCoin(ctx, c, ts);
 
     const s = game.scout;
     ctx.save();
@@ -161,8 +260,8 @@ export default function ScoutFlightGame() {
     ctx.rotate(s.rot || 0);
     const img = scoutImgRef.current;
     if (img?.complete) {
-      ctx.shadowColor = 'rgba(168, 85, 247, 0.6)';
-      ctx.shadowBlur = 16;
+      ctx.shadowColor = 'rgba(168, 85, 247, 0.65)';
+      ctx.shadowBlur = 18;
       ctx.drawImage(img, -s.w / 2, -s.h / 2, s.w, s.h);
     } else {
       ctx.fillStyle = '#7c3aed';
@@ -172,14 +271,8 @@ export default function ScoutFlightGame() {
     }
     ctx.restore();
 
-    for (const p of game.coinPopups) {
-      ctx.globalAlpha = Math.min(1, p.life / 400);
-      ctx.fillStyle = '#fcd34d';
-      ctx.font = 'bold 14px system-ui,sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`+${p.value}`, p.x, p.y);
-      ctx.globalAlpha = 1;
-    }
+    for (const p of game.coinPopups) drawCoinPopup(ctx, p);
+    for (const p of game.comboPopups) drawComboPopup(ctx, p);
 
     drawGround(ctx, w, h, game.groundH);
 
@@ -187,10 +280,17 @@ export default function ScoutFlightGame() {
       ctx.fillStyle = 'rgba(255,255,255,0.95)';
       ctx.font = 'bold 28px system-ui,sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(String(game.score), w / 2, 48);
+      ctx.fillText(String(game.score), w / 2, 42);
       ctx.font = '600 11px system-ui,sans-serif';
       ctx.fillStyle = 'rgba(196, 181, 253, 0.85)';
-      ctx.fillText(`BEST ${game.best}`, w / 2, 66);
+      ctx.fillText(`BEST ${game.best}`, w / 2, 58);
+
+      if (game.comboStreak > 0) {
+        const until = coinsUntilCombo(game);
+        ctx.font = '600 10px system-ui,sans-serif';
+        ctx.fillStyle = '#fcd34d';
+        ctx.fillText(`COMBO ${game.comboStreak}/3 · ${until} to bonus`, w / 2, 74);
+      }
     }
 
     rafRef.current = requestAnimationFrame(drawFrame);
@@ -205,9 +305,11 @@ export default function ScoutFlightGame() {
   useEffect(() => {
     resize();
     window.addEventListener('resize', resize);
+    const id = window.setTimeout(resize, 120);
     rafRef.current = requestAnimationFrame(drawFrame);
     return () => {
       window.removeEventListener('resize', resize);
+      window.clearTimeout(id);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [resize, drawFrame]);
@@ -224,22 +326,24 @@ export default function ScoutFlightGame() {
     gameRef.current = restartGame(gameRef.current);
     setUiPhase(PHASE.PLAYING);
     setScore(0);
+    setIsNewBest(false);
   }, []);
 
   const handleBackToIdle = useCallback(() => {
     gameRef.current = resetGame(gameRef.current);
     setUiPhase(PHASE.IDLE);
     setScore(0);
+    setIsNewBest(false);
   }, []);
 
   return (
-    <div className="scout-flight-page">
+    <div ref={pageRef} className="scout-flight-page">
       <header className="scout-flight-page__header">
         <Link to="/events" className="scout-flight-page__back">
           ← Events
         </Link>
         <span className="scout-flight-page__title">Savvy Scout Flight</span>
-        <span className="scout-flight-page__beta">Beta · Local score</span>
+        <span className="scout-flight-page__beta">Local score</span>
       </header>
 
       <div
@@ -269,9 +373,17 @@ export default function ScoutFlightGame() {
         {uiPhase === PHASE.GAMEOVER ? (
           <div className="scout-flight-overlay scout-flight-overlay--gameover">
             <h2 className="scout-flight-go-title">Flight Ended</h2>
-            <p className="scout-flight-go-score">{score.toLocaleString()}</p>
-            <p className="scout-flight-go-label">Run Score</p>
-            <p className="scout-flight-go-best">Best: {best.toLocaleString()}</p>
+            {isNewBest ? <p className="scout-flight-go-new-best">New Best!</p> : null}
+            <div className="scout-flight-go-stats">
+              <div className="scout-flight-go-stat scout-flight-go-stat--run">
+                <span className="scout-flight-go-stat__label">Run Score</span>
+                <strong className="scout-flight-go-stat__value">{score.toLocaleString()}</strong>
+              </div>
+              <div className="scout-flight-go-stat scout-flight-go-stat--best">
+                <span className="scout-flight-go-stat__label">Best</span>
+                <strong className="scout-flight-go-stat__value">{best.toLocaleString()}</strong>
+              </div>
+            </div>
             <p className="scout-flight-go-scout">&ldquo;Nice flying, Operator.&rdquo;</p>
             <div className="scout-flight-go-actions">
               <button

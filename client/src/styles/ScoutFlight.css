@@ -1,8 +1,16 @@
+/* Savvy Scout Flight — mobile-first, sits below app nav tabs */
+
 .scout-flight-page {
-  min-height: 100vh;
-  min-height: 100dvh;
+  position: relative;
+  z-index: 1;
+  /* Break out of main container horizontal padding */
+  margin-left: -1rem;
+  margin-right: -1rem;
+  width: calc(100% + 2rem);
+  max-width: none;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background: #06040f;
   color: #f8fafc;
   touch-action: none;
@@ -10,16 +18,24 @@
   -webkit-user-select: none;
 }
 
+@media (min-width: 640px) {
+  .scout-flight-page {
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    width: calc(100% + 3rem);
+  }
+}
+
 .scout-flight-page__header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.65rem 1rem;
-  padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
-  background: rgba(10, 6, 24, 0.92);
-  border-bottom: 1px solid rgba(168, 85, 247, 0.25);
-  z-index: 2;
+  padding: 0.55rem 0.85rem;
+  background: rgba(10, 6, 24, 0.95);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
 .scout-flight-page__back {
@@ -32,7 +48,7 @@
 
 .scout-flight-page__title {
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: linear-gradient(90deg, #fcd34d, #e9d5ff);
@@ -42,7 +58,7 @@
 }
 
 .scout-flight-page__beta {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: #64748b;
   white-space: nowrap;
 }
@@ -50,22 +66,20 @@
 .scout-flight-stage {
   position: relative;
   flex: 1;
-  min-height: 0;
-  margin: 0.5rem;
-  margin-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
-  border-radius: 1rem;
+  min-height: 280px;
+  margin: 0.4rem 0.5rem 0.25rem;
+  border-radius: 0.85rem;
   overflow: hidden;
-  border: 1px solid rgba(168, 85, 247, 0.35);
+  border: 1px solid rgba(168, 85, 247, 0.4);
   box-shadow:
-    0 0 40px rgba(124, 58, 237, 0.2),
-    inset 0 0 60px rgba(88, 28, 135, 0.15);
+    0 0 32px rgba(124, 58, 237, 0.22),
+    inset 0 0 48px rgba(88, 28, 135, 0.12);
 }
 
 .scout-flight-canvas {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 420px;
 }
 
 .scout-flight-overlay {
@@ -75,7 +89,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 1rem;
   text-align: center;
   background: rgba(6, 4, 15, 0.72);
   backdrop-filter: blur(4px);
@@ -100,7 +114,7 @@
 
 .scout-flight-logo h1 {
   margin: 0;
-  font-size: clamp(1.1rem, 4.5vw, 1.45rem);
+  font-size: clamp(1rem, 4.2vw, 1.35rem);
   font-weight: 900;
   letter-spacing: 0.08em;
   background: linear-gradient(180deg, #fde68a 0%, #fcd34d 40%, #c4b5fd 100%);
@@ -110,22 +124,22 @@
 }
 
 .scout-flight-logo__wings {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.6));
 }
 
 .scout-flight-tagline {
-  margin: 0 0 1rem;
+  margin: 0 0 0.75rem;
   color: #a78bfa;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .scout-flight-scout-preview {
-  width: 88px;
-  height: 88px;
+  width: 72px;
+  height: 72px;
   object-fit: contain;
   filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.55));
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   animation: scoutFlightBob 2s ease-in-out infinite;
 }
 
@@ -136,7 +150,7 @@
 
 .scout-flight-hint {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #fcd34d;
   animation: scoutFlightPulse 1.6s ease-in-out infinite;
@@ -148,59 +162,99 @@
 }
 
 .scout-flight-note {
-  margin: 0.75rem 0 0;
-  font-size: 0.72rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.68rem;
   color: #64748b;
 }
 
 .scout-flight-go-title {
-  margin: 0 0 0.35rem;
-  font-size: 1.35rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #e9d5ff;
 }
 
-.scout-flight-go-score {
-  margin: 0;
-  font-size: 2.75rem;
-  font-weight: 900;
+.scout-flight-go-new-best {
+  margin: 0 0 0.65rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.45), rgba(234, 179, 8, 0.35));
+  border: 1px solid rgba(252, 211, 77, 0.45);
   color: #fcd34d;
-  line-height: 1;
-}
-
-.scout-flight-go-label {
-  margin: 0.25rem 0 0.75rem;
-  font-size: 0.78rem;
-  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  animation: scoutFlightPulse 1.2s ease-in-out infinite;
 }
 
-.scout-flight-go-best {
-  margin: 0 0 1rem;
-  font-size: 0.95rem;
-  color: #c4b5fd;
+.scout-flight-go-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  width: min(300px, 100%);
+  margin-bottom: 0.85rem;
+}
+
+.scout-flight-go-stat {
+  padding: 0.75rem 0.65rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 8, 32, 0.85);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.scout-flight-go-stat--run {
+  border-color: rgba(252, 211, 77, 0.4);
+  box-shadow: 0 0 20px rgba(252, 211, 77, 0.12);
+}
+
+.scout-flight-go-stat--best {
+  border-color: rgba(196, 181, 253, 0.35);
+}
+
+.scout-flight-go-stat__label {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 0.25rem;
+}
+
+.scout-flight-go-stat__value {
+  display: block;
+  font-size: 1.65rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.scout-flight-go-stat--run .scout-flight-go-stat__value {
+  color: #fcd34d;
+}
+
+.scout-flight-go-stat--best .scout-flight-go-stat__value {
+  color: #e9d5ff;
 }
 
 .scout-flight-go-scout {
-  margin: 0 0 1.25rem;
+  margin: 0 0 1rem;
   font-style: italic;
   color: #a78bfa;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .scout-flight-go-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.5rem;
   width: min(240px, 100%);
 }
 
 .scout-flight-btn {
-  padding: 0.75rem 1.25rem;
+  padding: 0.7rem 1.15rem;
   border-radius: 0.65rem;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   cursor: pointer;
   border: none;
 }
@@ -217,10 +271,15 @@
 }
 
 @media (min-width: 768px) {
-  .scout-flight-stage {
-    max-width: 480px;
+  .scout-flight-page {
     margin-left: auto;
     margin-right: auto;
-    width: calc(100% - 2rem);
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .scout-flight-stage {
+    margin-left: 0;
+    margin-right: 0;
   }
 }
