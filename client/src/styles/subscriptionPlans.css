@@ -339,3 +339,59 @@
   color: #c4b5fd;
   font-weight: 600;
 }
+
+.f10-subscription-guest-gate {
+  max-width: 32rem;
+  margin: 2rem auto 0;
+}
+
+.f10-subscription-guest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+}
+
+.f10-subscription-card--skeleton {
+  pointer-events: none;
+  border-color: rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.f10-subscription-skeleton-line {
+  height: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: linear-gradient(90deg, rgba(51, 65, 85, 0.5), rgba(71, 85, 105, 0.35), rgba(51, 65, 85, 0.5));
+  background-size: 200% 100%;
+  animation: f10-subscription-shimmer 1.4s ease-in-out infinite;
+}
+
+.f10-subscription-skeleton-line--title {
+  width: 55%;
+  height: 18px;
+}
+
+.f10-subscription-skeleton-line--price {
+  width: 40%;
+  height: 28px;
+  margin: 14px 0;
+}
+
+.f10-subscription-skeleton-cta {
+  height: 44px;
+  border-radius: 12px;
+  margin-top: 16px;
+  background: rgba(51, 65, 85, 0.45);
+}
+
+@keyframes f10-subscription-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-subscription-skeleton-line {
+    animation: none;
+  }
+}

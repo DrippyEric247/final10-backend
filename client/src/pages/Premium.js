@@ -18,6 +18,9 @@ import {
   subscribeBestMoveUsage,
 } from '../lib/bestMoveUsage';
 import Final10Slogan from '../components/branding/Final10Slogan';
+import LoadingState from '../components/ui/states/LoadingState';
+import EmptyState from '../components/ui/states/EmptyState';
+import { Link } from 'react-router-dom';
 import '../styles/subscriptionPlans.css';
 
 const PAID_TIER_IDS = new Set(['core', 'pro']);
@@ -41,6 +44,7 @@ const Premium = () => {
   const isFoundingTester = Boolean(user?.foundingTesterAccess || user?.betaTester || user?.foundingAccess);
   const [billing, setBilling] = useState('monthly');
   const [apiPlans, setApiPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
   const [busyTier, setBusyTier] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -55,11 +59,15 @@ const Premium = () => {
   useEffect(() => {
     if (!user) return;
     const fetch = async () => {
+      setPlansLoading(true);
+      setError('');
       try {
         const response = await getSubscriptionPlans();
         setApiPlans(response?.plans || []);
       } catch {
         setError('Failed to load plans');
+      } finally {
+        setPlansLoading(false);
       }
     };
     fetch();
@@ -113,8 +121,18 @@ const Premium = () => {
   if (!user) {
     return (
       <div className="f10-subscription-page">
-        <div className="f10-subscription-inner text-center text-gray-300">
-          Log in to upgrade.
+        <div className="f10-subscription-inner">
+          <EmptyState
+            className="f10-subscription-guest-gate"
+            title="Sign in to upgrade"
+            description="Choose a plan that matches your hunt — more Best Moves, faster alerts, and bigger event bonuses."
+            action={
+              <div className="f10-subscription-guest-actions">
+                <Link to="/login" className="btn btn-primary">Log in</Link>
+                <Link to="/pricing" className="btn btn-ghost">Compare plans</Link>
+              </div>
+            }
+          />
         </div>
       </div>
     );
@@ -153,7 +171,18 @@ const Premium = () => {
         </div>
 
         <div className="f10-subscription-grid">
-          {displayTiers.map((tier) => {
+          {plansLoading
+            ? [0, 1, 2].map((i) => (
+                <article key={`skeleton-${i}`} className="f10-subscription-card f10-subscription-card--skeleton" aria-hidden>
+                  <div className="f10-subscription-skeleton-line f10-subscription-skeleton-line--title" />
+                  <div className="f10-subscription-skeleton-line" />
+                  <div className="f10-subscription-skeleton-line f10-subscription-skeleton-line--price" />
+                  <div className="f10-subscription-skeleton-line" />
+                  <div className="f10-subscription-skeleton-line" />
+                  <div className="f10-subscription-skeleton-cta" />
+                </article>
+              ))
+            : displayTiers.map((tier) => {
             const isFree = tier.id === 'free';
             const isPremium = tier.id === 'core';
             const isPro = tier.id === 'pro';
