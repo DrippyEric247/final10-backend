@@ -1,5 +1,5 @@
 import CopyField from "../components/CopyField";
-import { makeReferralLink } from "../lib/referrals";
+import { getReferralUserId, makeReferralLink } from "../lib/referrals";
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -21,7 +21,8 @@ import "../styles/LiveSavvyNetwork.css";
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const referralLink = user?._id ? makeReferralLink(user._id) : "";
+  const referralUserId = getReferralUserId(user);
+  const referralLink = referralUserId ? makeReferralLink(referralUserId) : "";
   const [heroStatusIdx, setHeroStatusIdx] = useState(0);
   const [goalMetricIdx, setGoalMetricIdx] = useState(0);
   const [goalProgress, setGoalProgress] = useState(54);
