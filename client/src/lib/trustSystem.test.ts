@@ -200,3 +200,86 @@ describe('trustScoreEngine integration', () => {
     expect(t.trustLevel).not.toBe('unverified');
   });
 });
+
+/** Mirrors each buyer surface's trust enrichment wrapper (score must match canonical API). */
+function searchSurfaceTrust(item: Record<string, unknown>) {
+  const base = trustScoreInputFromListing(item || {});
+  return evaluateTrustScore({
+    ...base,
+    imageUrl: (item?.imageUrl as string) || base.imageUrl || null,
+    seller: (item?.seller as string) || (item?.sellerUsername as string) || base.seller || null,
+  });
+}
+
+function productFeedSurfaceTrust(item: Record<string, unknown>) {
+  const feedPrice =
+    Number(item.currentPrice ?? item.price ?? item.buyNowPrice ?? item.currentBidPrice) || null;
+  const baseIn = trustScoreInputFromListing(item);
+  return evaluateTrustScore({
+    ...baseIn,
+    imageUrl: (typeof item.image === 'string' ? item.image : null) || baseIn.imageUrl,
+    price: feedPrice ?? baseIn.price,
+    seller: (item.seller as string) || (item.sellerUsername as string) || baseIn.seller,
+  });
+}
+
+function bestMoveSurfaceTrust(item: Record<string, unknown>) {
+  const baseTrustInput = trustScoreInputFromListing(item);
+  return evaluateTrustScore({
+    ...baseTrustInput,
+    imageUrl: (item.imageUrl as string) || baseTrustInput.imageUrl,
+    seller: (item.seller as string) || baseTrustInput.seller,
+    savvyVerifiedSeller:
+      (item.savvyVerifiedSeller as boolean | undefined) ?? baseTrustInput.savvyVerifiedSeller,
+  });
+}
+
+describe('cross-surface parity (Search, Feed, Best Move, Quick Snipes, Watchlist)', () => {
+  const FIXTURES: Record<string, Record<string, unknown>> = {
+    mega: MEGA_EBAY_SELLER,
+    established: {
+      seller: 'steady_shop',
+      sellerFeedbackCount: 450,
+      sellerFeedbackPercent: 98.2,
+      sellerAccountAgeDays: 800,
+      title: 'MacBook Pro 14',
+      price: 1200,
+      marketValue: 1400,
+    },
+    partial: { title: 'Untitled listing', price: 49 },
+    empty: {},
+  };
+
+  test.each([
+    ['mega', 'mega'],
+    ['established', 'established'],
+    ['partial', 'partial'],
+    ['empty', 'empty'],
+  ])('%s listing — identical sellerTrustScore across all surfaces', (_label, key) => {
+    const item = FIXTURES[key];
+    const canonical = evaluateListingTrust(item);
+    const surfaces = [
+      searchSurfaceTrust(item),
+      productFeedSurfaceTrust(item),
+      bestMoveSurfaceTrust(item),
+      evaluateListingTrust(item),
+    ];
+    for (const s of surfaces) {
+      expect(s.sellerTrustScore).toBe(canonical.sellerTrustScore);
+      expect(s.sellerDisplay).toEqual(canonical.sellerDisplay);
+      expect(s.sellerTrustBand).toBe(canonical.sellerTrustBand);
+    }
+  });
+
+  test.each([
+    ['mega', 'mega'],
+    ['partial', 'partial'],
+    ['empty', 'empty'],
+  ])('%s listing — no surface throws on partial/missing seller data', (_label, key) => {
+    const item = FIXTURES[key];
+    expect(() => searchSurfaceTrust(item)).not.toThrow();
+    expect(() => productFeedSurfaceTrust(item)).not.toThrow();
+    expect(() => bestMoveSurfaceTrust(item)).not.toThrow();
+    expect(searchSurfaceTrust(item).sellerTrustScore).toBeGreaterThanOrEqual(8);
+  });
+});
