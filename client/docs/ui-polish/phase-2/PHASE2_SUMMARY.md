@@ -11,13 +11,15 @@
 | Commit | Screen | Files |
 |--------|--------|-------|
 | `2ca1385b` | WinFeed | `WinFeed.js`, `WinFeed.css` |
-| `3304605e` | Leaderboard + Seller Dashboard* | `LeaderboardPage.js`, `LeaderboardPage.css`, `SellerDashboard.tsx`, `SellerDashboard.css` |
-| `1cc13aad` | SavvyShop | `SavvyShopPage.js`, `SavvyShop.css` |
-| `bbb479dc` | Premium | `Premium.js`, `subscriptionPlans.css` |
-| `0978be45` | Pricing | `Pricing.js` |
-| `384a2599` | Navigation | `Navigation.js` |
+| `27310990` | Leaderboard | `LeaderboardPage.js`, `LeaderboardPage.css` |
+| `fb1f7e74` | Seller Dashboard | `SellerDashboard.tsx`, `SellerDashboard.css` |
+| `4acab7c8` | SavvyShop | `SavvyShopPage.js`, `SavvyShop.css` |
+| `175ed959` | Premium | `Premium.js`, `subscriptionPlans.css` |
+| `810a0b99` | Pricing | `Pricing.js` |
+| `a913f6f3` | Navigation | `Navigation.js` |
+| `1655be1c` | Docs | `PHASE2_SUMMARY.md`, initial screenshots |
 
-\*Seller Dashboard landed in the same commit as Leaderboard after a git index lock during parallel staging. Changes are isolated to those four files.
+Seller Dashboard was split into its own commit (`fb1f7e74`) after originally landing with Leaderboard.
 
 ---
 
@@ -62,10 +64,10 @@
 
 | Check | Result |
 |-------|--------|
-| **Build** (`npm run build`) | ❌ Pre-existing failure: `trustSystem.test.ts` — `describe`/`test` not in TS compile scope (unrelated to Phase 2). |
-| **Dev server** (`localhost:3000`) | ✅ Routes load when compile overlay clear; Lucide nav visible on `/win-feed`. |
-| **Desktop layout** | ✅ Verified at 1440×900 via browser CDP. |
-| **Mobile layout** | ✅ Nav scroll + card stack verified at 390px width (inherent horizontal nav scroll on narrow viewports — unchanged behavior). |
+| **Build** (`npm run build`) | ✅ Passes after `c4c8df4e` (exclude tests) + `79dba64a` (state JSDoc / TSX fixes). |
+| **Dev server** (`localhost:3000`) | ✅ Restarted; Lucide nav visible on all verified routes. |
+| **Desktop layout** | ✅ Verified at 1280×900 via browser. |
+| **Mobile layout** | ✅ Verified at 390px width. |
 | **Dark mode** | ✅ All touched surfaces use existing dark `f10-state`, `f10-subscription-page`, and shop/dashboard CSS tokens. |
 | **Loading / empty / error** | ✅ Added on Seller Dashboard, Leaderboard, SavvyShop, Premium; WinFeed empty; Premium skeleton load. |
 
@@ -77,15 +79,13 @@ Captured **after** shots (Phase 2 complete). Before reference = Phase 1 audit no
 
 | Screen | Desktop | Mobile |
 |--------|---------|--------|
-| WinFeed | `win-feed-after-desktop.png` | *(capture when compile overlay clear)* |
-| Seller Dashboard | — | — |
-| Leaderboard | — | — |
-| SavvyShop | — | — |
-| Premium | — | — |
-| Pricing | — | — |
+| WinFeed | `win-feed-after-desktop.png` | — |
+| Seller Dashboard | `seller-dashboard-after-desktop.png` | `seller-dashboard-after-mobile.png` |
+| Leaderboard | — | `leaderboard-after-mobile.png` |
+| SavvyShop | `savvy-shop-after-desktop.png` | `savvy-shop-after-mobile.png` |
+| Premium | `premium-after-desktop.png` | `premium-after-mobile.png` |
+| Pricing | `pricing-after-desktop.png` | `pricing-after-mobile.png` |
 | Navigation | visible in all route shots | visible in all route shots |
-
-> **Note:** A concurrent `trustSystem.test.ts` compile error can overlay the dev UI during hot reload. Screenshots should be retaken after that file is excluded from the production TS compile graph or `@types/jest` is added.
 
 ---
 
