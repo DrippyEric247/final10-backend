@@ -245,7 +245,7 @@ export default function App() {
         {/* Use the new Navigation component */}
         <Navigation />
         <ApiCoolingBanner />
-        <UniversalBoostProgressBar />
+        {!isOnboardingRoute ? <UniversalBoostProgressBar /> : null}
         <Final10RewardHost />
         <LiveEventsHost />
         <CallingCardUnlockCeremony />
