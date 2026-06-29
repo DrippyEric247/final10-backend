@@ -9,6 +9,8 @@
     ".": "./src/index.js",
     "./config/savvyRewards": {
       "types": "./src/config/savvyRewards.d.ts",
+      "import": "./src/config/savvyRewards.js",
+      "require": "./src/config/savvyRewards.js",
       "default": "./src/config/savvyRewards.js"
     },
     "./config/scoutBranding": "./src/config/scoutBranding.js",

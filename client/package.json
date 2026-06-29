@@ -41,6 +41,12 @@
       "react-app/jest"
     ]
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^@savvy/core/config/savvyRewards$": "<rootDir>/../packages/savvy-core/src/config/savvyRewards.js",
+      "^@savvy/core/(.*)$": "<rootDir>/../packages/savvy-core/src/$1"
+    }
+  },
   "browserslist": {
     "production": [
       ">0.2%",

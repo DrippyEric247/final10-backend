@@ -108,3 +108,35 @@
 - Begin rewards/auth extraction into `@savvy/core`
 
 **Do not start Phase 3 until approved.**
+
+---
+
+## Phase 3 Milestone 3.1 — CRA subpath resolution
+
+**Date:** 2026-06-29  
+**Scope:** Fix `@savvy/core/config/savvyRewards` resolution in CRA (webpack + Jest); re-apply client shim  
+
+### What changed
+
+| File | Change |
+|------|--------|
+| `client/src/config/savvyRewards.js` | Restored one-line shim: `export * from '@savvy/core/config/savvyRewards';` |
+| `client/package.json` | Added `jest.moduleNameMapper` for `@savvy/core/*` subpaths |
+| `packages/savvy-core/package.json` | Added explicit `import` + `require` conditions on `./config/savvyRewards` export |
+
+### What did not change
+
+- No economy constants, server config, or reward engine logic
+- No UI, routes, or runtime behavior
+- `savvyScoutBranding.js` still local (Milestone 3.2)
+
+### Verification
+
+1. `npm run verify` / `npm run verify:savvy-core` — pass  
+2. `npm test -- --testPathPattern=savvyRewards` — pass  
+3. `npm run build` in `client` — pass  
+4. `npm start` — compiles; no module resolution overlay errors  
+5. Auth, search, alerts, SPA routes — pass  
+
+**Next:** Milestone 3.2 — `scoutBranding` shim (awaiting review)
+
