@@ -27,7 +27,17 @@ import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
 import Final10SocialLinks from "../components/Final10SocialLinks";
 import CallingCard from "../components/CallingCard";
 import EmptyState from "../components/ui/states/EmptyState";
-import { Search, Trophy } from "lucide-react";
+import {
+  BadgeCheck,
+  Camera,
+  Circle,
+  Crown,
+  Flame,
+  Gem,
+  Search,
+  Trophy,
+  Zap,
+} from "lucide-react";
 import "../styles/WinFeed.css";
 
 const FILTERS = [
@@ -62,11 +72,11 @@ function formatRelative(ts) {
 function verificationMeta(v) {
   switch (v) {
     case WIN_VERIFICATION.VERIFIED:
-      return { label: "Verified", icon: "✅", cls: "wf-verify--verified" };
+      return { label: "Verified", Icon: BadgeCheck, cls: "wf-verify--verified" };
     case WIN_VERIFICATION.SCREENSHOT:
-      return { label: "Screenshot", icon: "📸", cls: "wf-verify--screenshot" };
+      return { label: "Screenshot", Icon: Camera, cls: "wf-verify--screenshot" };
     default:
-      return { label: "Unverified", icon: "•", cls: "wf-verify--unverified" };
+      return { label: "Unverified", Icon: Circle, cls: "wf-verify--unverified" };
   }
 }
 
@@ -425,7 +435,7 @@ function PostYourWinModal({ open, onClose, onSubmit, defaultUsername, todayCount
 // ---------------------------------------------------------------------------
 
 function WinCard({ win }) {
-  const v = verificationMeta(win.verification);
+  const { label: verifyLabel, Icon: VerifyIcon, cls: verifyCls } = verificationMeta(win.verification);
   const { emblem, callingCard } = resolveWinCosmetics(win);
   const savings = Math.round(Number(win.savings) || 0);
   const savingsPct =
@@ -454,12 +464,20 @@ function WinCard({ win }) {
         )}
 
         <div className="wf-card-badges">
-          {win.isElite ? <span className="wf-badge wf-badge--elite">💎 Elite Win</span> : null}
+          {win.isElite ? (
+            <span className="wf-badge wf-badge--elite">
+              <Gem className="wf-badge-icon" size={14} aria-hidden /> Elite Win
+            </span>
+          ) : null}
           {win.isHot && !win.isElite ? (
-            <span className="wf-badge wf-badge--hot">🔥 Hot Deal</span>
+            <span className="wf-badge wf-badge--hot">
+              <Flame className="wf-badge-icon" size={14} aria-hidden /> Hot Deal
+            </span>
           ) : null}
           {win.isFastSnipe ? (
-            <span className="wf-badge wf-badge--snipe">⚡ {win.secondsToWin}s Snipe</span>
+            <span className="wf-badge wf-badge--snipe">
+              <Zap className="wf-badge-icon" size={14} aria-hidden /> {win.secondsToWin}s Snipe
+            </span>
           ) : null}
         </div>
 
@@ -473,8 +491,8 @@ function WinCard({ win }) {
       <div className="wf-card-body">
         <h3 className="wf-card-title">{win.title}</h3>
         <div className="wf-card-meta">
-          <span className={`wf-verify ${v.cls}`} title={v.label}>
-            <span aria-hidden>{v.icon}</span> {v.label}
+          <span className={`wf-verify ${verifyCls}`} title={verifyLabel}>
+            <VerifyIcon className="wf-verify-icon" size={14} aria-hidden /> {verifyLabel}
           </span>
           <span className="wf-card-trust" title="Trust score at time of purchase">
             Trust {Math.round(Number(win.trustScore) || 0)}
@@ -658,7 +676,7 @@ export default function WinFeed() {
       <section className="wf-highlights" aria-label="Weekly highlights">
         <HighlightCard
           label="Weekly Top Winner"
-          icon="👑"
+          icon={<Crown className="wf-highlight-lucide" size={18} aria-hidden />}
           tone="gold"
           primary={highlights.weeklyTop?.username ? `@${highlights.weeklyTop.username}` : "—"}
           secondary={
@@ -669,7 +687,7 @@ export default function WinFeed() {
         />
         <HighlightCard
           label="Biggest Save"
-          icon="💎"
+          icon={<Gem className="wf-highlight-lucide" size={18} aria-hidden />}
           tone="violet"
           primary={
             highlights.biggestSave
@@ -684,7 +702,7 @@ export default function WinFeed() {
         />
         <HighlightCard
           label="Fastest Snipe"
-          icon="⚡"
+          icon={<Zap className="wf-highlight-lucide" size={18} aria-hidden />}
           tone="cyan"
           primary={
             highlights.fastestSnipe?.secondsToWin
@@ -778,7 +796,7 @@ function HighlightCard({ label, icon, tone, primary, secondary }) {
   return (
     <div className={`wf-highlight wf-highlight--${tone}`}>
       <div className="wf-highlight-top">
-        <span className="wf-highlight-icon" aria-hidden>{icon}</span>
+        <span className="wf-highlight-icon">{icon}</span>
         <span className="wf-highlight-label">{label}</span>
       </div>
       <div className="wf-highlight-primary">{primary}</div>
