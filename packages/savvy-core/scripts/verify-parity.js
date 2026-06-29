@@ -58,6 +58,28 @@ function assertConfigFileOrShim(label, packagePath, clientPath, expectedShim) {
 function verifyEventParity(exportName, relativeClientFile) {
   const clientPath = path.join(CLIENT_SRC, relativeClientFile);
   const clientSource = read(clientPath);
+
+  const fromCore = "@savvy/core/events/universeEvents";
+  const namedReExport = clientSource.match(
+    new RegExp(
+      `export\\s+\\{[^}]*\\b${exportName}\\b[^}]*\\}\\s+from\\s+['"]${fromCore.replace(/\//g, "\\/")}['"]`
+    )
+  );
+  const importFromCore = clientSource.match(
+    new RegExp(
+      `import\\s+\\{[^}]*\\b${exportName}\\b[^}]*\\}\\s+from\\s+['"]${fromCore.replace(/\//g, "\\/")}['"]`
+    )
+  );
+  const reExportBinding = clientSource.match(
+    new RegExp(`export\\s+\\{[^}]*\\b${exportName}\\b[^}]*\\}`)
+  );
+
+  if (namedReExport || (importFromCore && reExportBinding)) {
+    const actual = universeEvents[exportName];
+    ok(`${exportName} client shim → @savvy/core/events/universeEvents (${actual})`);
+    return;
+  }
+
   let expected;
 
   const direct = clientSource.match(
@@ -104,10 +126,11 @@ assertConfigFileOrShim(
   "export * from '@savvy/core/config/savvyRewards';"
 );
 
-assertFilesEqual(
+assertConfigFileOrShim(
   "scoutBranding.js",
   path.join(PACKAGE_ROOT, "src/config/scoutBranding.js"),
-  path.join(CLIENT_SRC, "config/savvyScoutBranding.js")
+  path.join(CLIENT_SRC, "config/savvyScoutBranding.js"),
+  "export * from '@savvy/core/config/scoutBranding';"
 );
 
 const themePackage = read(path.join(PACKAGE_ROOT, "src/tokens/theme.css"));

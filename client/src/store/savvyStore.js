@@ -20,9 +20,12 @@ import {
   getWalletSnapshot,
 } from "../lib/pointsEngine";
 import { registerSavvyBalanceGetter } from "../lib/customizationCatalog";
+import {
+  SAVVY_AUTH_REFRESH_REQUEST,
+  SAVVY_STORE_UPDATED,
+} from "@savvy/core/events/universeEvents";
 
-export const SAVVY_AUTH_REFRESH_REQUEST = "f10:savvy-auth-refresh-request";
-export const SAVVY_STORE_UPDATED = "f10:savvy-store-updated";
+export { SAVVY_AUTH_REFRESH_REQUEST, SAVVY_STORE_UPDATED };
 
 const MAX_TX = 40;
 const POINTS_SYNC_DEBOUNCE_MS = 800;

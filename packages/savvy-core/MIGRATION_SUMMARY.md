@@ -140,3 +140,41 @@
 
 **Next:** Milestone 3.2 — `scoutBranding` shim (awaiting review)
 
+---
+
+## Phase 3 Milestone 3.2 — scoutBranding + event constant shims
+
+**Date:** 2026-06-29  
+**Scope:** Shim `savvyScoutBranding.js` and re-export universe event constants from `@savvy/core/events/universeEvents`  
+
+### What changed
+
+| File | Change |
+|------|--------|
+| `client/src/config/savvyScoutBranding.js` | One-line shim → `@savvy/core/config/scoutBranding` |
+| `client/src/lib/pointsEngine.js` | `WALLET_AWARD_EVENT` from `@savvy/core/events/universeEvents` |
+| `client/src/lib/rewardEngine.js` | `REWARD_EVENT` shim |
+| `client/src/store/savvyStore.js` | `SAVVY_AUTH_REFRESH_REQUEST`, `SAVVY_STORE_UPDATED` shims |
+| `client/src/lib/callingCardUnlockBus.js` | `CALLING_CARD_UNLOCK_EVENT` shim |
+| `client/src/lib/savvyAlerts.js` | `SAVVY_ALERT_EVENT` shim |
+| `client/src/lib/savvyScoutMissions.js` | Scout mission event shims (3) |
+| `client/src/lib/battlePassConfig.js` | BP update/tier event shims |
+| `client/src/lib/battlePassActionBus.js` | `BATTLE_PASS_ACTION_EVENT` shim |
+| `packages/savvy-core/package.json` | Explicit import/require on scoutBranding + universeEvents exports |
+| `packages/savvy-core/scripts/verify-parity.js` | Recognizes scoutBranding shim + event re-export shims |
+
+### What did not change
+
+- No auth, wallet store logic, reward engine amounts, or economy code
+- No SavvyTrip changes
+- Auth extraction (Milestone 3.3) not started
+
+### Verification
+
+1. `npm run verify` / `npm run verify:savvy-core` — pass  
+2. `npm run build` in `client` — pass  
+3. Auth, search, alerts, SPA routes — pass  
+
+**Next:** Milestone 3.3 — auth API slice copy (awaiting review)
+
+

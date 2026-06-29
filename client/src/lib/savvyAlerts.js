@@ -5,8 +5,9 @@ import { triggerActionReward } from "./rewardEngine";
 import { applyTierMultiplier, formatTierMultiplierLabel } from "./tierMultiplier";
 import { recordScoutMissionAction } from "./savvyScoutMissions";
 import { auditAlertAction } from "./auditLog";
+import { SAVVY_ALERT_EVENT } from "@savvy/core/events/universeEvents";
 
-export const SAVVY_ALERT_EVENT = "f10-savvy-alert-created";
+export { SAVVY_ALERT_EVENT };
 
 export async function createSavvyAlert(payload) {
   const alertPayload = {

@@ -5,8 +5,9 @@
  */
 
 import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
+import { WALLET_AWARD_EVENT } from "@savvy/core/events/universeEvents";
 
-export const WALLET_AWARD_EVENT = "f10:savvy-wallet-award";
+export { WALLET_AWARD_EVENT };
 
 const STORAGE_KEY = "f10_savvy_wallet_v1";
 

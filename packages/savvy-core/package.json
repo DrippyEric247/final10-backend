@@ -13,8 +13,16 @@
       "require": "./src/config/savvyRewards.js",
       "default": "./src/config/savvyRewards.js"
     },
-    "./config/scoutBranding": "./src/config/scoutBranding.js",
-    "./events/universeEvents": "./src/events/universeEvents.js",
+    "./config/scoutBranding": {
+      "import": "./src/config/scoutBranding.js",
+      "require": "./src/config/scoutBranding.js",
+      "default": "./src/config/scoutBranding.js"
+    },
+    "./events/universeEvents": {
+      "import": "./src/events/universeEvents.js",
+      "require": "./src/events/universeEvents.js",
+      "default": "./src/events/universeEvents.js"
+    },
     "./tokens/theme.css": "./src/tokens/theme.css"
   },
   "scripts": {

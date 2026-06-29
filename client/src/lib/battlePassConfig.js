@@ -106,5 +106,7 @@ export const BP_COSMETIC_KEY = "f10_bp_unlocked_cosmetics";
 export const BP_POWER_LINT_KEY = "f10_bp_power_lint";
 export const BP_PREMIUM_KEY_PREFIX = "f10_bp_premium_";
 
-export const BP_UPDATE_EVENT = "f10-battlepass-update";
-export const BP_TIER_COMPLETE_EVENT = "f10-battlepass-tier-complete";
+export {
+  BP_UPDATE_EVENT,
+  BP_TIER_COMPLETE_EVENT,
+} from "@savvy/core/events/universeEvents";

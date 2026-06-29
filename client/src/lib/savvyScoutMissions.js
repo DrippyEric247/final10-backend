@@ -5,10 +5,17 @@
 
 import { claimScoutMissionReward as apiClaimScoutMissionReward } from "./api";
 import { awardPoints } from "./pointsEngine";
+import {
+  SCOUT_MISSION_ACTION_EVENT,
+  SCOUT_MISSION_POPUP_EVENT,
+  SCOUT_MISSION_SYNC_EVENT,
+} from "@savvy/core/events/universeEvents";
 
-export const SCOUT_MISSION_SYNC_EVENT = "f10:scout-mission-sync";
-export const SCOUT_MISSION_POPUP_EVENT = "f10:scout-mission-popup";
-export const SCOUT_MISSION_ACTION_EVENT = "f10:scout-mission-action";
+export {
+  SCOUT_MISSION_SYNC_EVENT,
+  SCOUT_MISSION_POPUP_EVENT,
+  SCOUT_MISSION_ACTION_EVENT,
+};
 
 const STORAGE_KEY = "f10_scout_missions_v1";
 const POPUP_COOLDOWN_MS = 45_000;

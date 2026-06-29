@@ -1,8 +1,9 @@
 import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
 import { getUniversalBoostState } from "./universalBoostProgress";
 import { buildDailyLoginReward } from "./tierMultiplier";
+import { REWARD_EVENT } from "@savvy/core/events/universeEvents";
 
-export const REWARD_EVENT = "f10-reward-event";
+export { REWARD_EVENT };
 export const REWARD_FIRST_ACTION_KEY = "final10_first_action_reward_seen";
 
 /**

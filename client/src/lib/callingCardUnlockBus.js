@@ -9,7 +9,9 @@
  *   });
  */
 
-export const CALLING_CARD_UNLOCK_EVENT = "f10:calling-card-unlock";
+import { CALLING_CARD_UNLOCK_EVENT } from "@savvy/core/events/universeEvents";
+
+export { CALLING_CARD_UNLOCK_EVENT };
 
 /**
  * @typedef {Object} CallingCardUnlockPayload

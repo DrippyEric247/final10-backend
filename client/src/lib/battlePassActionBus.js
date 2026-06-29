@@ -1,4 +1,5 @@
-const EVENT_NAME = 'f10:battle-pass-action';
+import { BATTLE_PASS_ACTION_EVENT } from '@savvy/core/events/universeEvents';
+
 const STORAGE_KEY = 'f10_battle_pass_action_log';
 
 export function emitBattlePassAction(type, payload = {}) {
@@ -17,9 +18,8 @@ export function emitBattlePassAction(type, payload = {}) {
     // no-op
   }
 
-  window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: action }));
+  window.dispatchEvent(new CustomEvent(BATTLE_PASS_ACTION_EVENT, { detail: action }));
   return action;
 }
 
-export const BATTLE_PASS_ACTION_EVENT = EVENT_NAME;
-
+export { BATTLE_PASS_ACTION_EVENT };
