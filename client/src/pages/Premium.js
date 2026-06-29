@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ import {
 } from '../lib/bestMoveUsage';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import EmptyState from '../components/ui/states/EmptyState';
+import ErrorState from '../components/ui/states/ErrorState';
 import { Link } from 'react-router-dom';
 import '../styles/subscriptionPlans.css';
 
@@ -55,22 +56,23 @@ const Premium = () => {
     setUsageLine(formatBestMoveUsageLine());
   }), []);
 
+  const fetchPlans = useCallback(async () => {
+    setPlansLoading(true);
+    setError('');
+    try {
+      const response = await getSubscriptionPlans();
+      setApiPlans(response?.plans || []);
+    } catch {
+      setError('Failed to load plans');
+    } finally {
+      setPlansLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      setPlansLoading(true);
-      setError('');
-      try {
-        const response = await getSubscriptionPlans();
-        setApiPlans(response?.plans || []);
-      } catch {
-        setError('Failed to load plans');
-      } finally {
-        setPlansLoading(false);
-      }
-    };
-    fetch();
-  }, [user]);
+    void fetchPlans();
+  }, [user, fetchPlans]);
 
   const displayTiers = useMemo(() => {
     const freeTier = FINAL10_TIERS[0];
@@ -169,9 +171,12 @@ const Premium = () => {
           {usageLine}
         </div>
 
-        <div className="f10-subscription-grid">
-          {plansLoading
-            ? [0, 1, 2].map((i) => (
+        <div
+          className="f10-subscription-grid"
+          aria-busy={plansLoading ? 'true' : 'false'}
+        >
+          {plansLoading ? (
+            [0, 1, 2].map((i) => (
                 <article key={`skeleton-${i}`} className="f10-subscription-card f10-subscription-card--skeleton" aria-hidden>
                   <div className="f10-subscription-skeleton-line f10-subscription-skeleton-line--title" />
                   <div className="f10-subscription-skeleton-line" />
@@ -181,7 +186,16 @@ const Premium = () => {
                   <div className="f10-subscription-skeleton-cta" />
                 </article>
               ))
-            : displayTiers.map((tier) => {
+          ) : error && !apiPlans.length ? (
+            <ErrorState
+              className="f10-subscription-load-error"
+              title="Couldn't load plans"
+              description="Membership options didn't load. Check your connection and try again."
+              error={error}
+              onRetry={() => void fetchPlans()}
+            />
+          ) : (
+            displayTiers.map((tier) => {
             const isFree = tier.id === 'free';
             const isPremium = tier.id === 'core';
             const isPro = tier.id === 'pro';
@@ -259,7 +273,8 @@ const Premium = () => {
                 </button>
               </article>
             );
-          })}
+          })
+          )}
         </div>
 
         <div className="f10-subscription-footnote">
@@ -270,7 +285,9 @@ const Premium = () => {
         </div>
 
         {message ? <div className="f10-subscription-msg f10-subscription-msg--ok">{message}</div> : null}
-        {error ? <div className="f10-subscription-msg f10-subscription-msg--err">{error}</div> : null}
+        {error && apiPlans.length ? (
+          <div className="f10-subscription-msg f10-subscription-msg--err">{error}</div>
+        ) : null}
       </div>
     </div>
   );
