@@ -512,8 +512,27 @@
 }
 
 @media (max-width: 640px) {
+  .f10-lb-page {
+    padding: 0 12px 40px;
+  }
+
   .f10-season-grid {
     grid-template-columns: 1fr;
+  }
+
+  .f10-season-strip-main {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .f10-lb-guest-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .f10-lb-guest-actions .btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .f10-lb-row {
