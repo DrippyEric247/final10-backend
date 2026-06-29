@@ -3,7 +3,6 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const ReferralLog = require('../models/ReferralLog');
 const CreatorEvent = require('../models/CreatorEvent');
 const auth = require('../middleware/auth');
 const { validateRequest } = require('../middleware/validateRequest');
@@ -13,15 +12,13 @@ const { HttpError } = require('../middleware/apiErrors');
 const { auditFireAndForget } = require('../services/securityAuditService');
 const { requestPasswordReset, resetPasswordWithToken } = require('../services/passwordResetService');
 
-const { referralFraudCheck, logReferral } = require('../services/referralGuard');
+const { getClientIp, getClientUa } = require('../services/referralGuard');
+const { processReferralOnSignup, resolveReferrer } = require('../services/referralService');
 
 const { googleEnabled, appleEnabled } = require('../config/socialAuthConfig');
 const socialAuth = require('../services/socialAuthService');
 
 const router = express.Router();
-
-const REFERRAL_POINTS = Number(process.env.REFERRAL_POINTS || 5000);
-const REFERRAL_DAILY_CAP = Number(process.env.REFERRAL_DAILY_CAP || 10);
 
 const BCRYPT_ROUNDS = 12;
 
@@ -136,17 +133,6 @@ function serializeAuthMePayload(user) {
   };
 }
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function endOfToday() {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
 /**
  * POST /api/auth/signup
  * POST /api/auth/register (alias)
@@ -192,18 +178,8 @@ async function handleSignup(req, res, next) {
 
     let referrer = null;
     if (referralCode) {
-      referrer =
-        (await User.findOne({ referralCode })) ||
-        (await User.findById(referralCode).catch(() => null));
+      referrer = await resolveReferrer(referralCode);
       if (referrer && String(referrer._id) === String(user._id)) {
-        await logReferral({
-          referrerId: referrer._id,
-          refereedId: user._id,
-          ip: '',
-          ua: '',
-          status: 'blocked',
-          reason: 'self_by_id',
-        });
         referrer = null;
       }
     }
@@ -211,54 +187,14 @@ async function handleSignup(req, res, next) {
     await user.save();
 
     if (referrer) {
-      const check = await referralFraudCheck(req, referrer._id, email, user._id);
-
-      if (!check.ok) {
-        await logReferral({
-          referrerId: referrer._id,
-          refereedId: user._id,
-          ip: check.ip || '',
-          ua: check.ua || '',
-          status: 'blocked',
-          reason: check.reason || 'failed_check',
-        });
-      } else {
-        const todayAcceptedCount = await ReferralLog.countDocuments({
-          referrerId: referrer._id,
-          status: 'accepted',
-          createdAt: { $gte: startOfToday(), $lte: endOfToday() },
-        });
-
-        if (todayAcceptedCount < REFERRAL_DAILY_CAP) {
-          await User.updateOne({ _id: referrer._id }, { $inc: { points: REFERRAL_POINTS } });
-
-          await logReferral({
-            referrerId: referrer._id,
-            refereedId: user._id,
-            ip: check.ip || '',
-            ua: check.ua || '',
-            status: 'accepted',
-            reason: 'ok',
-          });
-        } else {
-          await logReferral({
-            referrerId: referrer._id,
-            refereedId: user._id,
-            ip: check.ip || '',
-            ua: check.ua || '',
-            status: 'capped',
-            reason: 'daily_cap_reached',
-          });
-        }
-
-        user.referredBy = referrer._id;
-
-        if (referralCode !== 'welcome') {
-          user.points += 200;
-        }
-
-        await user.save();
-      }
+      await processReferralOnSignup({
+        referrer,
+        referee: user,
+        referralCode,
+        ip: getClientIp(req),
+        ua: getClientUa(req),
+        req,
+      });
     }
 
     // Phase B: persist attribution and log a creator signup event.

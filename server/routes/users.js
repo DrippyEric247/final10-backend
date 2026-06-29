@@ -374,26 +374,69 @@ router.get('/referral-leaderboard', async (req, res) => {
   }
 });
 
-// Process referral signup (called during user registration)
-router.post('/process-referral', async (req, res) => {
+// Process referral signup (authenticated catch-up — idempotent)
+router.post('/process-referral', auth, async (req, res) => {
   try {
-    const { userId, referralCode } = req.body;
-    
-    if (!userId || !referralCode) {
-      return res.status(400).json({ message: 'User ID and referral code are required' });
+    const { referralCode } = req.body;
+
+    if (!referralCode) {
+      return res.status(400).json({ message: 'Referral code is required' });
     }
 
-    const result = await User.processReferralSignup(userId, referralCode);
-    
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { getClientIp, getClientUa } = require('../services/referralGuard');
+    const { processReferralByCode } = require('../services/referralService');
+
+    const result = await processReferralByCode({
+      referee: user,
+      referralCode,
+      ip: getClientIp(req),
+      ua: getClientUa(req),
+      req,
+    });
+
+    if (result.reason === 'invalid_referral_code') {
+      return res.status(400).json({ message: 'Invalid referral code' });
+    }
+
+    if (result.duplicate || result.alreadyProcessed) {
+      return res.status(409).json({
+        message: 'Referral already processed for this account',
+        ...result,
+      });
+    }
+
+    if (result.blocked) {
+      return res.status(403).json({
+        message: result.reason || 'Referral blocked',
+        code: result.code,
+      });
+    }
+
+    if (result.capped) {
+      return res.status(429).json({
+        message: 'Referrer daily referral cap reached',
+        dailyCap: result.dailyCap,
+      });
+    }
+
+    if (!result.granted) {
+      return res.status(400).json({ message: 'Referral could not be processed', ...result });
+    }
+
     res.json({
       message: 'Referral processed successfully',
-      ...result
+      referrerSavvy: result.referrerSavvy,
+      refereeSavvy: result.refereeSavvy,
+      referrerNewBalance: result.referrerNewBalance,
+      refereeNewBalance: result.refereeNewBalance,
     });
   } catch (error) {
     console.error('Process referral error:', error);
-    if (error.message === 'Invalid referral code') {
-      return res.status(400).json({ message: 'Invalid referral code' });
-    }
     res.status(500).json({ message: 'Server error' });
   }
 });
