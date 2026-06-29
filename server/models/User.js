@@ -1007,62 +1007,34 @@ userSchema.statics.findUsersWithExpiredEbayTokens = function() {
   });
 };
 
-// Static method to process referral signup
-userSchema.statics.processReferralSignup = async function(userId, referralCode) {
-  try {
-    // Find the referrer
-    const referrer = await this.findOne({ referralCode });
-    if (!referrer) {
-      throw new Error('Invalid referral code');
-    }
-    
-    // Find the new user
-    const newUser = await this.findById(userId);
-    if (!newUser) {
-      throw new Error('User not found');
-    }
-    
-    // Set referral relationship
-    newUser.referredBy = referrer._id;
-    await newUser.save();
-    
-    // Track referral for referrer
-    await referrer.trackReferral();
-    
-    // Award points to both users
-    const SavvyPoint = require('./SavvyPoint');
-    
-    // Award points to referrer
-    await SavvyPoint.awardPoints(
-      referrer._id,
-      100,
-      'referral',
-      `Referred ${newUser.username}`,
-      newUser._id,
-      'User',
-      1
-    );
-    
-    // Award points to new user
-    await SavvyPoint.awardPoints(
-      newUser._id,
-      50,
-      'signup_referral',
-      `Signed up with referral from ${referrer.username}`,
-      referrer._id,
-      'User',
-      1
-    );
-    
-    return {
-      referrer: referrer.username,
-      newUser: newUser.username,
-      referrerPoints: 100,
-      newUserPoints: 50
-    };
-  } catch (error) {
-    throw error;
+// Static method to process referral signup (delegates to referralService)
+userSchema.statics.processReferralSignup = async function processReferralSignup(userId, referralCode, opts = {}) {
+  const { processReferralByCode } = require('../services/referralService');
+  const newUser = await this.findById(userId);
+  if (!newUser) {
+    throw new Error('User not found');
   }
+  const result = await processReferralByCode({
+    referee: newUser,
+    referralCode,
+    ip: opts.ip || '',
+    ua: opts.ua || '',
+  });
+  if (result.reason === 'invalid_referral_code') {
+    throw new Error('Invalid referral code');
+  }
+  return {
+    referrer: result.referrerUsername || null,
+    newUser: newUser.username,
+    referrerPoints: result.referrerSavvy || 0,
+    newUserPoints: result.refereeSavvy || 0,
+    referrerSavvy: result.referrerSavvy || 0,
+    refereeSavvy: result.refereeSavvy || 0,
+    duplicate: Boolean(result.duplicate),
+    granted: Boolean(result.granted),
+    blocked: Boolean(result.blocked),
+    capped: Boolean(result.capped),
+  };
 };
 
 // Admin helper methods
