@@ -22,9 +22,7 @@ import { buildThemStatsFromRanked, resolveRivalUserId } from '../data/rivalryMoc
 import { BP_UPDATE_EVENT } from '../lib/battlePassConfig';
 import {
   BATTLE_PASS_TIERS,
-  MOCK_PROFILE_ACTIVITIES,
   pickNextBestGoal,
-  sortActivitiesByRecency,
 } from '../lib/profilePageEngagement.js';
 import {
   getUniversalBoostState,
@@ -974,7 +972,7 @@ const Profile = () => {
         ? themStats.leaderboardScore - leaderboardScore
         : null;
 
-    const activityItems = sortActivitiesByRecency(MOCK_PROFILE_ACTIVITIES).slice(0, 6);
+    const activityItems = [];
     const nextGoal = pickNextBestGoal({
       rivalDisplayName: themStats?.displayName ?? null,
       pointsBehindRival,

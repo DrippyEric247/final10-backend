@@ -1,5 +1,5 @@
 import CopyField from "../components/CopyField";
-import { makeReferralLink } from "../lib/referrals";
+import { getReferralUserId, makeReferralLink } from "../lib/referrals";
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -21,7 +21,8 @@ import "../styles/LiveSavvyNetwork.css";
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const referralLink = user?._id ? makeReferralLink(user._id) : "";
+  const referralUserId = getReferralUserId(user);
+  const referralLink = referralUserId ? makeReferralLink(referralUserId) : "";
   const [heroStatusIdx, setHeroStatusIdx] = useState(0);
   const [goalMetricIdx, setGoalMetricIdx] = useState(0);
   const [goalProgress, setGoalProgress] = useState(54);
@@ -31,20 +32,20 @@ const Dashboard = () => {
   const [tipIdx, setTipIdx] = useState(0);
 
   const heroStatuses = useMemo(() => ([
-    "1,248 active scans",
-    "483 deals under market",
-    "91 low competition auctions",
-    `${SAVVY_SCOUT.shortTitle} confidence rising`,
+    "Beta — live scan stats coming soon",
+    "Hunt ending auctions",
+    "Lock alerts on your targets",
+    `${SAVVY_SCOUT.shortTitle} is learning your picks`,
   ]), []);
 
   const goalMetrics = useMemo(() => ([
-    { label: "Auctions Won", value: "14,922", reward: "10,000 Savvy Points for all active users" },
-    { label: "Deals Saved", value: "$2.4M", reward: "Community Drop Unlocked" },
-    { label: "Savvy Points Earned", value: "8.7M", reward: "Free Elite Weekend" },
-    { label: "Alerts Triggered", value: "42,311", reward: "Bonus Radar Boost Activated" },
-    { label: "Time Saved", value: "128,000h", reward: "AI Acceleration Cycle Complete" },
-    { label: "Community Profit", value: "$6.9M", reward: "Savvy Victory Crate Unlocked" },
-    { label: "Listings Scanned", value: "1.8M", reward: "Network Scan Milestone Cleared" },
+    { label: "Beta testers", value: "Early access", reward: "Help shape launch rewards together" },
+    { label: "Community goals", value: "Coming soon", reward: "Live totals at public launch" },
+    { label: "Savvy rewards", value: "Earn now", reward: "Complete missions and daily tasks" },
+    { label: "Alerts", value: "Your picks", reward: "Create your first alert to start" },
+    { label: "Best Moves", value: "Personalized", reward: "Finish onboarding for your first pick" },
+    { label: "Win feed", value: "Real wins", reward: "Post your first Savvy Win" },
+    { label: "Leaderboard", value: "Preview", reward: "Rankings update as players compete" },
   ]), []);
 
   const quickActions = useMemo(() => ([
@@ -139,6 +140,14 @@ const Dashboard = () => {
         {/* Attribution confirmation: "You joined through @creator" */}
         <AttributionBanner user={user} />
         {user ? <BuildWarsBanner /> : null}
+        {user ? (
+          <p className="events-hint" style={{ marginBottom: '1rem' }}>
+            🎪 Live events, drops, and Scout Support —{' '}
+            <Link to="/events" style={{ color: '#c4b5fd', fontWeight: 600 }}>
+              open Events Hub
+            </Link>
+          </p>
+        ) : null}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -159,7 +168,7 @@ const Dashboard = () => {
         <motion.div className={`lsn-goals ${goalPulse ? "is-pulse" : ""}`} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}>
           <div className="lsn-goals-head">
             <div>
-              <div className="lsn-goals-kicker">COMMUNITY GOALS</div>
+              <div className="lsn-goals-kicker">COMMUNITY GOALS · BETA PREVIEW</div>
               <h3>When the community wins, everyone earns.</h3>
             </div>
             <div className="lsn-goals-metric">
@@ -193,7 +202,10 @@ const Dashboard = () => {
           <div className="lsn-feed col-span-3">
             <div className="lsn-feed-head">
               <h3><TrendingUp className="w-5 h-5" /> TRENDING AUCTIONS — LIVE MARKET FEED</h3>
-              <Link to="/auctions">View all</Link>
+              <div className="flex items-center gap-2">
+                <span className="chip">Preview</span>
+                <Link to="/auctions">View all</Link>
+              </div>
             </div>
             <div className="lsn-feed-lane">
               {marketItems.map((item, i) => {
@@ -216,7 +228,10 @@ const Dashboard = () => {
           <div className="lsn-alerts col-span-2">
             <div className="lsn-feed-head">
               <h3><Bell className="w-5 h-5" /> LIVE ALERT STREAM</h3>
-              <Link to="/alerts">Manage</Link>
+              <div className="flex items-center gap-2">
+                <span className="chip">Preview</span>
+                <Link to="/alerts">Manage</Link>
+              </div>
             </div>
             <motion.div key={alertIdx} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className={`lsn-alert-item rarity-${activeAlert.rarity}`}>
               <div className="lsn-alert-dot" />
@@ -234,28 +249,31 @@ const Dashboard = () => {
         </motion.div>
 
 {/* Invite & Earn */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.6, delay: 0.25 }}
-  className="card mb-8"
->
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="text-2xl font-semibold text-white">Invite &amp; Earn</h3>
-    <span className="text-purple-400 text-sm font-semibold">#StaySavvy #StayEarning</span>
-  </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.25 }}
+          className="lsn-goals mb-8"
+        >
+          <div className="lsn-goals-head">
+            <div>
+              <div className="lsn-goals-kicker">REFERRAL · EARN TOGETHER</div>
+              <h3>Invite &amp; Earn</h3>
+            </div>
+            <span className="chip">#StaySavvy</span>
+          </div>
 
-  <p className="text-gray-300 mb-4">
-    Share your link. When a friend signs up, you earn <span className="text-yellow-300 font-semibold">5,000 Savvy
-    Points</span> and a <span className="text-yellow-300 font-semibold">$50 bonus</span> (up to 10 new users per day for cash bonus).
-    No cap on points after that—keep it rolling.
-  </p>
+          <p className="text-[var(--f10-text-dim)] mb-4 leading-relaxed">
+            Share your link. When a friend signs up, you earn <span className="text-[var(--f10-accent)] font-semibold">5,000 Savvy
+            Points</span> and a <span className="text-[var(--f10-accent)] font-semibold">$50 bonus</span> (up to 10 new users per day for cash bonus).
+            No cap on points after that—keep it rolling.
+          </p>
 
-  <CopyField value={referralLink} />
-  <p className="text-gray-400 text-xs mt-2">
-    Pro tip: post your auction wins with <span className="text-purple-300">#Final10</span> for extra Savvy Points.
-  </p>
-</motion.div>
+          <CopyField value={referralLink} />
+          <p className="text-[var(--f10-text-dim)] text-xs mt-2 mb-0">
+            Pro tip: post your auction wins with <span className="text-purple-300">#Final10</span> for extra Savvy Points.
+          </p>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

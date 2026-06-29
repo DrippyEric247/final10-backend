@@ -3,7 +3,6 @@ import React, { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
-import LoadingState from '../components/ui/states/LoadingState';
 import { submitPasswordReset } from '../lib/api';
 import { parseApiError } from '../lib/apiErrorParsing';
 import { isPasswordStrongEnough, scorePasswordStrength } from '../lib/passwordStrength';
@@ -89,7 +88,7 @@ export default function ResetPassword() {
           <p className="mt-6 text-center">
             <Link
               to="/login"
-              className="inline-block w-full p-3 rounded bg-purple-500 font-semibold text-center"
+              className="btn btn-primary w-full text-center"
             >
               Go to login
             </Link>
@@ -107,7 +106,7 @@ export default function ResetPassword() {
           ) : null}
           <form onSubmit={onSubmit} className="space-y-3">
             <div>
-              <label htmlFor="new-password" className="block text-sm text-gray-300 mb-1">
+              <label htmlFor="new-password" className="block text-sm text-[var(--f10-text-dim)] mb-1">
                 New password
               </label>
               <input
@@ -117,7 +116,7 @@ export default function ResetPassword() {
                 autoComplete="new-password"
                 required
                 minLength={10}
-                className="w-full p-3 rounded bg-gray-900"
+                className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -145,7 +144,7 @@ export default function ResetPassword() {
             </div>
 
             <div>
-              <label htmlFor="confirm-password" className="block text-sm text-gray-300 mb-1">
+              <label htmlFor="confirm-password" className="block text-sm text-[var(--f10-text-dim)] mb-1">
                 Confirm password
               </label>
               <input
@@ -155,7 +154,7 @@ export default function ResetPassword() {
                 autoComplete="new-password"
                 required
                 minLength={10}
-                className="w-full p-3 rounded bg-gray-900"
+                className="input"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
@@ -167,16 +166,12 @@ export default function ResetPassword() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full p-3 rounded bg-yellow-400 text-black font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+              className="btn btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-busy={busy}
             >
               {busy ? 'Updating…' : 'Reset password'}
             </button>
           </form>
-          {busy ? (
-            <div className="mt-4 flex justify-center">
-              <LoadingState variant="inline" label="Updating password…" />
-            </div>
-          ) : null}
         </>
       )}
 
