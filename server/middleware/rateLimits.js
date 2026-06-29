@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { rateLimitSkipDev } = require('../lib/rateLimitDevBypass');
 
 /** True for GET /api/auth/me (profile hydrate — not a credential guess). */
 function isAuthMeRequest(req) {
@@ -12,6 +13,7 @@ const authMeLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: {
     code: 'RATE_LIMIT',
     message: 'Profile sync is busy — wait a few seconds and retry.',
@@ -23,6 +25,7 @@ const authLoginLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: { code: 'RATE_LIMIT', message: 'Too many login attempts. Try again later.' },
   skipSuccessfulRequests: true,
 });
@@ -32,6 +35,7 @@ const authSignupLimiter = rateLimit({
   max: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: { code: 'RATE_LIMIT', message: 'Too many signup attempts from this IP.' },
 });
 
@@ -40,6 +44,7 @@ const progressionEventsLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: { code: 'RATE_LIMIT', message: 'Too many progression events. Slow down.' },
 });
 
@@ -48,6 +53,7 @@ const ebaySearchLimiter = rateLimit({
   max: 90,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: {
     code: 'RATE_LIMIT',
     message:
@@ -60,6 +66,7 @@ const ebayBidLimiter = rateLimit({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: {
     code: 'RATE_LIMIT',
     message: 'Too many bid attempts from your session. Pause briefly and retry.',
@@ -72,6 +79,7 @@ const ebaySellerTrendsLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: {
     code: 'RATE_LIMIT',
     message: 'Seller trend refresh limit reached. Try again in a minute.',
@@ -84,6 +92,7 @@ const marketValueLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: { code: 'RATE_LIMIT', message: 'Too many market value lookups.' },
 });
 
@@ -93,6 +102,7 @@ const authPasswordResetLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: { code: 'RATE_LIMIT', message: 'Too many password reset attempts.' },
 });
 
@@ -102,6 +112,7 @@ const authPasswordResetSubmitLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: rateLimitSkipDev,
   message: { code: 'RATE_LIMIT', message: 'Too many reset attempts. Try again later.' },
 });
 

@@ -89,13 +89,15 @@ app.use(
 
 // --- Rate Limiting (skip OPTIONS + telemetry ingest) ---
 const { isAuthMeRequest } = require('./middleware/rateLimits');
+const { rateLimitSkipDev } = require('./lib/rateLimitDevBypass');
 
 const limiter = rateLimit({
   ...rateLimitConfig,
   skip: (req) =>
     req.method === 'OPTIONS' ||
     req.path.startsWith('/analytics') ||
-    isAuthMeRequest(req),
+    isAuthMeRequest(req) ||
+    rateLimitSkipDev(req),
 });
 app.use('/api/', limiter);
 
