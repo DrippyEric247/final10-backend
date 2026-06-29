@@ -9,6 +9,9 @@ import {
 import FollowButton from "../components/social/FollowButton";
 import { useAuth } from "../context/AuthContext";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
+import LoadingState from "../components/ui/states/LoadingState";
+import EmptyState from "../components/ui/states/EmptyState";
+import ErrorState from "../components/ui/states/ErrorState";
 import "../styles/SavvyShop.css";
 
 function getShopEngageFp() {
@@ -63,6 +66,7 @@ export default function SavvyShopPage() {
   const [feedPosts, setFeedPosts] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedErr, setFeedErr] = useState(null);
+  const [feedRetry, setFeedRetry] = useState(0);
   const viewedProductIdsRef = useRef(new Set());
   const viewedPostIdsRef = useRef(new Set());
 
@@ -126,7 +130,7 @@ export default function SavvyShopPage() {
     return () => {
       cancel = true;
     };
-  }, [slug, tab, feedSort]);
+  }, [slug, tab, feedSort, feedRetry]);
 
   useEffect(() => {
     if (!slug || tab !== "feed" || !feedPosts?.length) return;
@@ -144,7 +148,7 @@ export default function SavvyShopPage() {
   if (loading) {
     return (
       <div className="savvy-shop-page">
-        <p className="savvy-shop-empty">Loading storefront…</p>
+        <LoadingState label="Loading storefront…" className="savvy-shop-state" />
       </div>
     );
   }
@@ -152,10 +156,16 @@ export default function SavvyShopPage() {
   if (err || !data?.shop) {
     return (
       <div className="savvy-shop-page">
-        <p className="savvy-shop-empty">{err || "This shop is not available."}</p>
-        <Link to="/" className="savvy-shop-btn savvy-shop-btn--ghost">
-          Back home
-        </Link>
+        <ErrorState
+          className="savvy-shop-state"
+          title="Shop unavailable"
+          description={err || "This shop is not available."}
+          action={
+            <Link to="/" className="btn btn-primary">
+              Back home
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -329,10 +339,23 @@ export default function SavvyShopPage() {
               </select>
             </label>
           </div>
-          {feedLoading ? <p className="savvy-shop-empty">Loading picks…</p> : null}
-          {feedErr ? <p className="savvy-shop-msg savvy-shop-msg--err">{feedErr}</p> : null}
+          {feedLoading ? (
+            <LoadingState variant="inline" label="Loading picks…" className="savvy-shop-state savvy-shop-state--inline" />
+          ) : null}
+          {feedErr ? (
+            <ErrorState
+              className="savvy-shop-state savvy-shop-state--inline"
+              title="Couldn't load posts"
+              description={feedErr}
+              onRetry={() => setFeedRetry((n) => n + 1)}
+            />
+          ) : null}
           {!feedLoading && !feedErr && !feedPosts?.length ? (
-            <p className="savvy-shop-empty">No posts yet — this creator is building the money lane.</p>
+            <EmptyState
+              className="savvy-shop-state savvy-shop-state--inline"
+              title="No posts yet"
+              description="This creator is building the money lane — check back soon."
+            />
           ) : null}
           <div className="savvy-shop-feed-list">
             {feedPosts.map((post) => {
@@ -423,7 +446,11 @@ export default function SavvyShopPage() {
           </div>
         </div>
       ) : !products?.length ? (
-        <p className="savvy-shop-empty">Fresh picks are on the way — check back soon.</p>
+        <EmptyState
+          className="savvy-shop-state"
+          title="Fresh picks on the way"
+          description="This storefront is still stocking up — check back soon."
+        />
       ) : (
         <div className="savvy-shop-grid">
           {products.map((p) => (

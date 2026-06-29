@@ -7,6 +7,16 @@
   color: #e2e8f0;
 }
 
+.savvy-shop-state {
+  margin: 24px auto;
+  max-width: 520px;
+}
+
+.savvy-shop-state--inline {
+  margin: 16px 0;
+  max-width: none;
+}
+
 .savvy-shop-hero {
   display: flex;
   flex-wrap: wrap;
