@@ -451,6 +451,7 @@ export default function BattlePassPage() {
           className="mb-3 f10-state--inline"
           title="Couldn't sync battle pass"
           description={progression.error}
+          error={progression.error}
           onRetry={() => void progression.reload()}
         />
       ) : null}

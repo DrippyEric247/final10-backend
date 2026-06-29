@@ -7,7 +7,6 @@ import {
 import RecommendedByCreatorTag from "../components/listings/RecommendedByCreatorTag";
 import ListingCardImage from "../components/listings/ListingCardImage";
 import LoadingState from "../components/ui/states/LoadingState";
-import ErrorState from "../components/ui/states/ErrorState";
 import EmptyState from "../components/ui/states/EmptyState";
 import SavvyMark from "../components/SavvyMark";
 import "../styles/CreatorLanding.css";
@@ -75,7 +74,7 @@ export default function CreatorLanding() {
   if (error || !profile) {
     return (
       <div className="creator-landing">
-        <ErrorState
+        <EmptyState
           title="Couldn't load this creator"
           description={error || "This profile may not exist or is temporarily unavailable."}
           action={

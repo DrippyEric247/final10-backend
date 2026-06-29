@@ -9,6 +9,14 @@ import { Sparkles } from "lucide-react";
  * Always include a primary action when one makes sense. App Store
  * reviewers flag "dead end" screens that give the user nowhere to go.
  */
+/**
+ * @param {Object} props
+ * @param {string} [props.title]
+ * @param {string} [props.description]
+ * @param {import('react').ReactNode} [props.icon]
+ * @param {import('react').ReactNode} [props.action]
+ * @param {string} [props.className]
+ */
 export default function EmptyState({
   title = "Nothing here yet",
   description,

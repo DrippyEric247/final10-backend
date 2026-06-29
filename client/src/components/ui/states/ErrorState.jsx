@@ -7,6 +7,15 @@ import { AlertTriangle } from "lucide-react";
  * action. In development the original error object is logged to the
  * console for debugging.
  */
+/**
+ * @param {Object} props
+ * @param {string} [props.title]
+ * @param {string} [props.description]
+ * @param {unknown} [props.error]
+ * @param {() => void} [props.onRetry]
+ * @param {string} [props.retryLabel]
+ * @param {string} [props.className]
+ */
 export default function ErrorState({
   title = "Something went wrong",
   description = "We couldn't load this right now. Try again in a moment.",

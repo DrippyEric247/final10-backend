@@ -430,6 +430,7 @@ export default function SellerDashboard(): JSX.Element {
               className="f10-state--inline listings-empty"
               title="Couldn't load listings"
               description="Your promotion data didn't load. Try again in a moment."
+              error={promotionsError}
               onRetry={() => void refetchPromotions()}
             />
           ) : promotions.length === 0 ? (
