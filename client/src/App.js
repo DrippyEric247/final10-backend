@@ -104,6 +104,7 @@ import PerkMachine from './pages/PerkMachine';
 import EggExchangeChamber from './pages/EggExchangeChamber';
 import ScoutFlightGame from './pages/ScoutFlightGame';
 import Final10Slogan from './components/branding/Final10Slogan';
+import NotFound from './pages/NotFound';
 import './styles/SavvyScoutMissions.css';
 import './styles/final10Branding.css';
 
@@ -175,6 +176,10 @@ function OnboardingRedirect() {
 
 export default function App() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const isOnboardingRoute = /^\/onboarding\b/.test(location.pathname);
+  const onboardingComplete = user ? hasCompletedOnboarding(onboardingUserId(user)) : true;
+  const showPostOnboardingFtue = Boolean(user) && onboardingComplete && !isOnboardingRoute;
   const entitlement = useEntitlement(Boolean(user));
   const entIsBeta = Boolean(entitlement?.isBetaTester);
   const entFoundingAccess = Boolean(entitlement?.foundingTesterAccess);
@@ -246,13 +251,13 @@ export default function App() {
         <CallingCardUnlockCeremony />
         <SmartCoachHost enabled={Boolean(user)} />
         <Final10SideAssistant />
-        <TourHost />
+        <TourHost enabled={showPostOnboardingFtue} />
         {user ? <TabJourneyPanel /> : null}
         {user ? <PartyDock /> : null}
         {user ? <EventsFloatingTab /> : null}
-        <SavvyFirstRunExperience user={user} />
-        <SavvyInteractiveDemos enabled={Boolean(user)} />
-        {showStartupBoot ? (
+        <SavvyFirstRunExperience user={showPostOnboardingFtue ? user : null} />
+        <SavvyInteractiveDemos enabled={showPostOnboardingFtue} />
+        {showStartupBoot && !isOnboardingRoute ? (
           <StartupBootSequence
             appName="Final10"
             durationMs={1450}
@@ -415,7 +420,7 @@ export default function App() {
           />
           <Route
             path="/monthly-report"
-            element={<Navigate to="/profile?tab=rewards" replace />}
+            element={<Navigate to="/profile#savvy-balance" replace />}
           />
           <Route
             path="/leaderboard"
@@ -545,6 +550,14 @@ export default function App() {
                      </ProtectedRoute>
                    }
                  />
+                <Route
+                  path="/promotion/:id/success"
+                  element={
+                    <ProtectedRoute>
+                      <Navigate to="/promotion-dashboard?payment=success" replace />
+                    </ProtectedRoute>
+                  }
+                />
         <Route
           path="/promotion-dashboard"
           element={
@@ -640,7 +653,7 @@ export default function App() {
           />
 
           {/* 404 */}
-          <Route path="*" element={<div className="card">Not found</div>} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </AppErrorBoundary>
       </main>
