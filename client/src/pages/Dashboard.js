@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import FirstSixtyLanding from '../components/onboarding/FirstSixtyLanding';
+import HomeLandingSections from '../components/home/HomeLandingSections';
 import AttributionBanner from '../components/onboarding/AttributionBanner';
 import BuildWarsBanner from '../components/BuildWarsBanner';
 import { SCOUT_LABELS, SAVVY_SCOUT } from '../config/savvyScoutBranding';
@@ -23,20 +24,12 @@ const Dashboard = () => {
   const { user } = useAuth();
   const referralUserId = getReferralUserId(user);
   const referralLink = referralUserId ? makeReferralLink(referralUserId) : "";
-  const [heroStatusIdx, setHeroStatusIdx] = useState(0);
   const [goalMetricIdx, setGoalMetricIdx] = useState(0);
   const [goalProgress, setGoalProgress] = useState(54);
   const [goalPulse, setGoalPulse] = useState(false);
   const [marketTick, setMarketTick] = useState(0);
   const [alertIdx, setAlertIdx] = useState(0);
   const [tipIdx, setTipIdx] = useState(0);
-
-  const heroStatuses = useMemo(() => ([
-    "Beta — live scan stats coming soon",
-    "Hunt ending auctions",
-    "Lock alerts on your targets",
-    `${SAVVY_SCOUT.shortTitle} is learning your picks`,
-  ]), []);
 
   const goalMetrics = useMemo(() => ([
     { label: "Beta testers", value: "Early access", reward: "Help shape launch rewards together" },
@@ -81,11 +74,6 @@ const Dashboard = () => {
     "Watch low-photo listings for hidden value.",
     "Luxury listings peak during weekends.",
   ]), []);
-
-  useEffect(() => {
-    const t = window.setInterval(() => setHeroStatusIdx((n) => (n + 1) % heroStatuses.length), 2800);
-    return () => window.clearInterval(t);
-  }, [heroStatuses.length]);
 
   useEffect(() => {
     const t = window.setInterval(() => setGoalMetricIdx((n) => (n + 1) % goalMetrics.length), 3600);
@@ -149,21 +137,7 @@ const Dashboard = () => {
           </p>
         ) : null}
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="lsn-hero mb-8"
-        >
-          <div className="lsn-hero-kicker">LIVE SAVVY NETWORK</div>
-          <h1>
-            {user ? <>Welcome back, <span>{user?.firstName}</span>.</> : <>Welcome back, Operator.</>}
-          </h1>
-          <p>The market moved while you were away.</p>
-          <motion.div key={heroStatusIdx} className="lsn-status-bar" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            {heroStatuses[heroStatusIdx]}
-          </motion.div>
-        </motion.div>
+        <HomeLandingSections user={user} />
 
         <motion.div className={`lsn-goals ${goalPulse ? "is-pulse" : ""}`} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}>
           <div className="lsn-goals-head">

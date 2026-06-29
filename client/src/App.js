@@ -86,6 +86,7 @@ import TabJourneyPanel from "./components/onboarding/TabJourneyPanel";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Support from "./pages/Support";
+import DonationSuccessPreview from "./pages/DonationSuccessPreview";
 import DeleteAccount from "./pages/DeleteAccount";
 import Settings from "./pages/Settings";
 import SavvyShopPage from "./pages/SavvyShopPage";
@@ -343,6 +344,7 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/donation/success" element={<DonationSuccessPreview />} />
           <Route
             path="/founding-tester"
             element={
