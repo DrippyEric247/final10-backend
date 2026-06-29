@@ -555,6 +555,16 @@
 }
 .listings-empty p { margin: 0 0 12px; }
 
+.seller-dash-card .f10-state--inline {
+  margin: 4px 0;
+}
+
+.seller-dash-card .f10-state--inline.panel-empty {
+  background: transparent;
+  border: none;
+  padding: 12px 8px;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1080px) {
@@ -570,9 +580,11 @@
 
 @media (max-width: 720px) {
   .seller-dash-wrap { padding: 18px 12px 80px; }
+  .seller-dash-header { gap: 8px; }
   .seller-dash-topbar { grid-template-columns: 1fr; }
   .seller-dash-grid   { grid-template-columns: 1fr; }
-  .seller-dash-card   { min-height: 0; }
+  .seller-dash-card   { min-height: 0; padding: 14px 12px; }
+  .panel-head { flex-wrap: wrap; gap: 8px; }
   .reco-stats         { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .reco-stats dd      { font-size: 14px; }
 
