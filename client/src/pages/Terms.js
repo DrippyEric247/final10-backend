@@ -1,54 +1,43 @@
 import React from "react";
 
-const sectionClass = "space-y-3 text-[var(--f10-text)] leading-relaxed";
-const headingClass = "text-xl font-semibold text-[var(--f10-text)] m-0";
-
 export default function Terms() {
   return (
-    <article className="mx-auto max-w-3xl py-4">
-      <div className="card p-6 sm:p-8 space-y-8">
-        <header>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--f10-text-dim)] mb-2">
-            Legal
-          </p>
-          <h1 className="text-3xl font-bold m-0 text-[var(--f10-text)]">Terms of Service</h1>
-          <p className="text-sm text-[var(--f10-text-dim)] mt-2">Last updated: April 27, 2026</p>
-        </header>
+    <div className="min-h-screen bg-gray-900 pt-20">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-200">
+        <h1 className="text-3xl font-bold text-white mb-4">Terms of Service</h1>
+        <p className="text-sm text-gray-400 mb-6">Last updated: April 27, 2026</p>
 
-        <section className={sectionClass}>
-          <h2 className={headingClass}>User responsibility</h2>
-          <p className="m-0 text-[var(--f10-text-dim)]">
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-white">User responsibility</h2>
+          <p>
             You are responsible for your account activity, keeping your login credentials secure, and
             making independent purchase decisions when using Final10.
           </p>
         </section>
 
-        <section className={sectionClass}>
-          <h2 className={headingClass}>No guarantee of deal accuracy</h2>
-          <p className="m-0 text-[var(--f10-text-dim)]">
+        <section className="space-y-4 mt-8">
+          <h2 className="text-xl font-semibold text-white">No guarantee of deal accuracy</h2>
+          <p>
             Final10 provides scoring, trust signals, and recommendations for convenience, but does not
             guarantee listing accuracy, price outcomes, seller behavior, or availability.
           </p>
         </section>
 
-        <section className={sectionClass}>
-          <h2 className={headingClass}>Platform usage rules</h2>
-          <p className="m-0 text-[var(--f10-text-dim)]">
+        <section className="space-y-4 mt-8">
+          <h2 className="text-xl font-semibold text-white">Platform usage rules</h2>
+          <p>
             You agree not to abuse the platform, attempt unauthorized access, automate harmful traffic, or
             use Final10 for unlawful activity. We may suspend accounts that violate these rules.
           </p>
         </section>
 
-        <section className={sectionClass}>
-          <h2 className={headingClass}>Contact</h2>
-          <p className="m-0 text-[var(--f10-text-dim)]">
-            Terms questions:{" "}
-            <a className="text-purple-300 underline hover:text-purple-200" href="mailto:support@final10.com">
-              support@final10.com
-            </a>
+        <section className="space-y-4 mt-8">
+          <h2 className="text-xl font-semibold text-white">Contact</h2>
+          <p>
+            Terms questions: <a className="text-purple-300 underline" href="mailto:support@final10.com">support@final10.com</a>
           </p>
         </section>
       </div>
-    </article>
+    </div>
   );
 }

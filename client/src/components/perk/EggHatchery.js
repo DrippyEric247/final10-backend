@@ -1,9 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import EggCard from './EggCard';
 import EggHatchModal from './EggHatchModal';
 import { buildOwnedEggs } from '../../lib/eggHatchery';
-import '../../styles/EggExchange.css';
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 
@@ -65,10 +63,6 @@ export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onS
           onStatusUpdate={onStatusUpdate}
         />
       ) : null}
-
-      <div className="egg-hatchery__exchange-link">
-        <Link to="/egg-exchange">🧪 Egg Exchange Chamber — fuse into higher tiers</Link>
-      </div>
     </section>
   );
 }

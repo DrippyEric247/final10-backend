@@ -14,6 +14,7 @@ import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { hasCompletedOnboarding, onboardingUserId } from '../lib/onboardingPreferences';
 import { parseApiError } from '../lib/apiErrorParsing';
+import LoadingState from '../components/ui/states/LoadingState';
 
 export default function Login() {
   const { login, refreshProfile } = useAuth();
@@ -85,11 +86,12 @@ export default function Login() {
 
   return (
     <div className="max-w-md mx-auto p-6">
-      <div className="text-center mb-8 mt-4">
+      {/* FINAL10 APP Logo */}
+      <div className="text-center mb-12 mt-4">
         <Final10Logo size="large" showTaglines={true} />
         <Final10Slogan variant="auth" />
       </div>
-
+      
       <h1 className="text-3xl font-bold mb-4 text-center">Welcome Back</h1>
 
       <SocialAuthButtons mode="login" />
@@ -100,38 +102,31 @@ export default function Login() {
         </div>
       ) : null}
       <form onSubmit={onSubmit} className="space-y-3" autoComplete="on">
-        <div>
-          <label htmlFor="email" className="block text-sm text-[var(--f10-text-dim)] mb-1">
-            Email
-          </label>
-          <input
-            className="input"
-            placeholder="you@example.com"
-            type="email"
-            name="email"
-            id="email"
-            autoComplete="email"
-            autoCapitalize="none"
-            spellCheck={false}
-            value={form.email}
-            onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="block text-sm text-[var(--f10-text-dim)] mb-1">
-            Password
-          </label>
-          <input
-            className="input"
-            placeholder="Your password"
-            type="password"
-            name="password"
-            id="password"
-            autoComplete="current-password"
-            value={form.password}
-            onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-          />
-        </div>
+        <label htmlFor="email" className="block text-sm text-gray-300">
+          Email
+        </label>
+        <input
+          className="w-full p-3 rounded bg-gray-900"
+          placeholder="Email"
+          type="email"
+          name="email"
+          id="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={form.email}
+          onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+        />
+        <input
+          className="w-full p-3 rounded bg-gray-900"
+          placeholder="Password"
+          type="password"
+          name="password"
+          id="password"
+          autoComplete="current-password"
+          value={form.password}
+          onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+        />
         <p className="text-right text-sm">
           <Link
             className="inline-flex items-center text-purple-300 underline underline-offset-2 hover:text-purple-200 font-medium"
@@ -143,16 +138,20 @@ export default function Login() {
         <button
           type="submit"
           disabled={busy}
-          className="btn btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
-          aria-busy={busy}
+          className="w-full p-3 rounded bg-purple-500 font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <p className="mt-3 text-sm text-[var(--f10-text-dim)]">
-        No account? <Link className="underline text-purple-300" to="/register">Sign up</Link>
-      </p>
+      {busy ? (
+        <div className="mt-4 flex justify-center">
+          <LoadingState variant="inline" label="Signing you in…" />
+        </div>
+      ) : null}
+      <p className="mt-3 text-sm text-gray-400">No account? <Link className="underline" to="/register">Sign up</Link></p>
       <AuthDebugFooter />
     </div>
   );
 }
+
+

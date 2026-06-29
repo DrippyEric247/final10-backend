@@ -41,18 +41,10 @@ export function getBestMoveUsedToday() {
 /** Returns true when a capped credit was consumed. */
 export function tryConsumeBestMoveCredit(tier = getEffectiveSubscriptionTier()) {
   const cap = getBestMoveBoostedCap(tier);
-  if (!Number.isFinite(cap)) {
-    import('./scoutSupportTracking').then(({ trackBestMoveClicked }) => {
-      trackBestMoveClicked({ source: 'best_move' });
-    }).catch(() => {});
-    return true;
-  }
+  if (!Number.isFinite(cap)) return true;
   const usage = readBestMoveUsage();
   if (usage.used >= cap) return false;
   writeBestMoveUsage(usage.used + 1);
-  import('./scoutSupportTracking').then(({ trackBestMoveClicked }) => {
-    trackBestMoveClicked({ source: 'best_move' });
-  }).catch(() => {});
   return true;
 }
 

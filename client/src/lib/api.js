@@ -5,14 +5,12 @@ import { trackEvent } from "./analytics";
 import { getApiBaseUrl } from "./runtimeApi";
 import {
   gatedRequest,
-  markServerRateLimit,
+  markGlobalCooling,
 } from "./apiRequestGate";
-import { parseRetryAfterSec, sleepMs } from "./parseRetryAfter";
 
 export {
   ApiCoolingDownError,
   getApiCoolingState,
-  getLastRateLimitMeta,
   subscribeApiCooling,
   resetAuthMeBootstrap,
 } from "./apiRequestGate";
@@ -38,7 +36,7 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  async (error) => {
+  (error) => {
     const url = String(error?.config?.url || "");
     const method = String(error?.config?.method || "get").toUpperCase();
     const parsed = parseApiError(error);
@@ -86,40 +84,26 @@ api.interceptors.response.use(
       devDiagApiFailure("network", { message: error.message, url: error.config?.url });
     }
     if (error.response?.status === 429) {
-      const headers = error.response.headers;
-      const retryAfter = parseRetryAfterSec(headers, 60);
+      const retryAfter =
+        error.response.headers["retry-after"] ||
+        error.response.headers["Retry-After"] ||
+        60;
       const path = String(url).split("?")[0];
-      const methodUpper = method;
-      const isAuthMe = methodUpper === "GET" && /\/auth\/me$/i.test(path);
-      const isAuthLogin = methodUpper === "POST" && /\/auth\/(login|register)$/i.test(path);
-
-      markServerRateLimit(retryAfter, { path, method: methodUpper });
-
-      if (!error.config?.__rateLimitRetried && !isAuthLogin) {
-        error.config.__rateLimitRetried = true;
-        await sleepMs(retryAfter * 1000);
-        try {
-          return await api.request(error.config);
-        } catch (retryErr) {
-          error = retryErr;
-          if (error.response?.status !== 429) {
-            return Promise.reject(error);
-          }
-        }
+      const isAuthMe = method === "GET" && /\/auth\/me$/i.test(path);
+      const isAuthLogin = method === "POST" && /\/auth\/(login|register)$/i.test(path);
+      if (!isAuthMe && !isAuthLogin) {
+        markGlobalCooling(retryAfter);
       }
-
       const rateLimitError = new Error(
         isAuthMe
-          ? "Profile sync rate limit — retrying shortly."
+          ? "Profile sync rate limit — wait a few seconds and retry."
           : isAuthLogin
             ? "Too many login attempts. Wait a moment and try again."
-            : "Too many requests right now. Retrying shortly."
+            : `Too many requests. Cooling down for ${retryAfter} seconds.`
       );
       rateLimitError.status = 429;
       rateLimitError.retryAfter = retryAfter;
       rateLimitError.isCoolingDown = true;
-      rateLimitError.isRateLimited = true;
-      rateLimitError.rateLimitPath = path;
       return Promise.reject(rateLimitError);
     }
     
@@ -314,163 +298,6 @@ export async function adminPerkMachineForceLegendary() {
 
 export async function adminPerkMachineClearHistory() {
   const { data } = await api.post("/perk-machine/admin/clear-history");
-  return data;
-}
-
-/** ---- Live beta events (Supply Drops, Scout Support, Savvy Sale) ---- **/
-
-export async function getLiveEventsState() {
-  const { data } = await api.get("/events/live-state");
-  return data;
-}
-
-export async function getEventsHub() {
-  const { data } = await api.get("/events/hub");
-  return data;
-}
-
-export async function getActiveSupplyDrop() {
-  const { data } = await api.get("/events/supply-drop/active");
-  return data;
-}
-
-export async function claimSupplyDrop(dropId) {
-  const { data } = await api.post("/events/supply-drop/claim", { dropId });
-  return data;
-}
-
-export async function getActiveSavvySale() {
-  const { data } = await api.get("/events/savvy-sale/active");
-  return data;
-}
-
-export async function getScoutSupportStatus() {
-  const { data } = await api.get("/scout-support/status");
-  return data;
-}
-
-export async function registerScoutSupportAction(actionType, meta = {}) {
-  const { data } = await api.post("/scout-support/register-action", { actionType, meta });
-  return data;
-}
-
-export async function claimScoutSupportMilestone(milestone) {
-  const { data } = await api.post(`/scout-support/claim/${milestone}`);
-  return data;
-}
-
-export async function checkLiveEventsAdminAccess() {
-  try {
-    const { data } = await api.get("/events/admin/ping");
-    return Boolean(data?.ok);
-  } catch {
-    return false;
-  }
-}
-
-export async function adminCreateSupplyDrop(scope = "user") {
-  const { data } = await api.post("/events/supply-drop/create-test", { scope });
-  return data;
-}
-
-export async function adminExpireSupplyDrop() {
-  const { data } = await api.post("/events/supply-drop/expire");
-  return data;
-}
-
-export async function adminGetSupplyDropClaims(limit = 20) {
-  const { data } = await api.get("/events/supply-drop/recent-claims", { params: { limit } });
-  return data;
-}
-
-export async function adminStartSavvySale(minutes = 15) {
-  const { data } = await api.post("/events/savvy-sale/start", { minutes });
-  return data;
-}
-
-export async function adminEndSavvySale() {
-  const { data } = await api.post("/events/savvy-sale/end");
-  return data;
-}
-
-export async function adminScoutSupportAddDeal(actionType = "deal_secured_test") {
-  const { data } = await api.post("/scout-support/admin/add-deal", { actionType });
-  return data;
-}
-
-export async function adminScoutSupportSetStreak(count) {
-  const { data } = await api.post("/scout-support/admin/set-streak", { count });
-  return data;
-}
-
-export async function adminScoutSupportReset() {
-  const { data } = await api.post("/scout-support/admin/reset");
-  return data;
-}
-
-export async function adminScoutSupportForceClaim(milestone) {
-  const { data } = await api.post("/scout-support/admin/force-claim", { milestone });
-  return data;
-}
-
-/** ---- Egg Exchange Chamber ---- **/
-
-export async function getEggExchangeStatus() {
-  const { data } = await api.get("/eggs/exchange/status");
-  return data;
-}
-
-export async function performEggExchange(exchangeType) {
-  const { data } = await api.post("/eggs/exchange", { exchangeType });
-  return data;
-}
-
-export async function checkEggExchangeAdminAccess() {
-  try {
-    const { data } = await api.get("/eggs/exchange/admin/ping");
-    return Boolean(data?.ok);
-  } catch {
-    return false;
-  }
-}
-
-export async function adminEggExchangeGrantRare() {
-  const { data } = await api.post("/eggs/exchange/admin/grant-rare");
-  return data;
-}
-
-export async function adminEggExchangeGrantEpic() {
-  const { data } = await api.post("/eggs/exchange/admin/grant-epic");
-  return data;
-}
-
-export async function adminEggExchangeGrantLegendary() {
-  const { data } = await api.post("/eggs/exchange/admin/grant-legendary");
-  return data;
-}
-
-export async function adminEggExchangeGrantSavvy(amount = 20000) {
-  const { data } = await api.post("/eggs/exchange/admin/grant-savvy", { amount });
-  return data;
-}
-
-export async function adminEggExchangeReset() {
-  const { data } = await api.post("/eggs/exchange/admin/reset");
-  return data;
-}
-
-export async function adminEggExchangePresetRareEpic() {
-  const { data } = await api.post("/eggs/exchange/admin/preset-rare-epic");
-  return data;
-}
-
-export async function adminEggExchangePresetEpicLegendary() {
-  const { data } = await api.post("/eggs/exchange/admin/preset-epic-legendary");
-  return data;
-}
-
-export async function adminEggExchangePresetLegendaryMythic() {
-  const { data } = await api.post("/eggs/exchange/admin/preset-legendary-mythic");
   return data;
 }
 

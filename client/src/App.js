@@ -5,10 +5,6 @@ import Navigation from './components/Navigation';
 import ApiCoolingBanner from './components/ApiCoolingBanner';
 import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
-import LiveEventsHost from './components/events/LiveEventsHost';
-import EventsFloatingTab from './components/events/EventsFloatingTab';
-import { LiveEventsProvider } from './context/LiveEventsContext';
-import EventsPage from './pages/EventsPage';
 import Final10SideAssistant from './components/Final10SideAssistant';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
 import AuthDebugger from './components/AuthDebugger';
@@ -101,10 +97,7 @@ import { SavvyScoutMissionsProvider } from './context/SavvyScoutMissionsContext'
 import MissionLog from './pages/MissionLog';
 import DailyStreak from './pages/DailyStreak';
 import PerkMachine from './pages/PerkMachine';
-import EggExchangeChamber from './pages/EggExchangeChamber';
-import ScoutFlightGame from './pages/ScoutFlightGame';
 import Final10Slogan from './components/branding/Final10Slogan';
-import NotFound from './pages/NotFound';
 import './styles/SavvyScoutMissions.css';
 import './styles/final10Branding.css';
 
@@ -176,10 +169,6 @@ function OnboardingRedirect() {
 
 export default function App() {
   const { user, logout } = useAuth();
-  const location = useLocation();
-  const isOnboardingRoute = /^\/onboarding\b/.test(location.pathname);
-  const onboardingComplete = user ? hasCompletedOnboarding(onboardingUserId(user)) : true;
-  const showPostOnboardingFtue = Boolean(user) && onboardingComplete && !isOnboardingRoute;
   const entitlement = useEntitlement(Boolean(user));
   const entIsBeta = Boolean(entitlement?.isBetaTester);
   const entFoundingAccess = Boolean(entitlement?.foundingTesterAccess);
@@ -230,7 +219,6 @@ export default function App() {
       <PointsRewardProvider>
       <SearchIntentProvider>
       <PartyProvider>
-      <LiveEventsProvider>
       <div className="bg-app min-h-screen text-white">
         {/* Faded brand layer (logo on every tab, aurora on /profile). */}
         <AppBackground />
@@ -245,19 +233,17 @@ export default function App() {
         {/* Use the new Navigation component */}
         <Navigation />
         <ApiCoolingBanner />
-        {!isOnboardingRoute ? <UniversalBoostProgressBar /> : null}
+        <UniversalBoostProgressBar />
         <Final10RewardHost />
-        <LiveEventsHost />
         <CallingCardUnlockCeremony />
         <SmartCoachHost enabled={Boolean(user)} />
         <Final10SideAssistant />
-        <TourHost enabled={showPostOnboardingFtue} />
+        <TourHost />
         {user ? <TabJourneyPanel /> : null}
         {user ? <PartyDock /> : null}
-        {user ? <EventsFloatingTab /> : null}
-        <SavvyFirstRunExperience user={showPostOnboardingFtue ? user : null} />
-        <SavvyInteractiveDemos enabled={showPostOnboardingFtue} />
-        {showStartupBoot && !isOnboardingRoute ? (
+        <SavvyFirstRunExperience user={user} />
+        <SavvyInteractiveDemos enabled={Boolean(user)} />
+        {showStartupBoot ? (
           <StartupBootSequence
             appName="Final10"
             durationMs={1450}
@@ -420,7 +406,7 @@ export default function App() {
           />
           <Route
             path="/monthly-report"
-            element={<Navigate to="/profile#savvy-balance" replace />}
+            element={<Navigate to="/profile?tab=rewards" replace />}
           />
           <Route
             path="/leaderboard"
@@ -451,30 +437,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PerkMachine />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/egg-exchange"
-            element={
-              <ProtectedRoute>
-                <EggExchangeChamber />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/scout-flight"
-            element={
-              <ProtectedRoute>
-                <ScoutFlightGame />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events"
-            element={
-              <ProtectedRoute>
-                <EventsPage />
               </ProtectedRoute>
             }
           />
@@ -550,14 +512,6 @@ export default function App() {
                      </ProtectedRoute>
                    }
                  />
-                <Route
-                  path="/promotion/:id/success"
-                  element={
-                    <ProtectedRoute>
-                      <Navigate to="/promotion-dashboard?payment=success" replace />
-                    </ProtectedRoute>
-                  }
-                />
         <Route
           path="/promotion-dashboard"
           element={
@@ -653,7 +607,7 @@ export default function App() {
           />
 
           {/* 404 */}
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<div className="card">Not found</div>} />
         </Routes>
         </AppErrorBoundary>
       </main>
@@ -668,7 +622,6 @@ export default function App() {
         </div>
       </footer>
     </div>
-      </LiveEventsProvider>
       </PartyProvider>
       </SearchIntentProvider>
       </PointsRewardProvider>

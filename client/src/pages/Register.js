@@ -16,8 +16,7 @@ import { buildSignupAttributionPayload, getAttribution } from '../lib/attributio
 import { resetOnboardingForNewAccount, onboardingUserId } from '../lib/onboardingPreferences';
 import { ANALYTICS_EVENTS, trackEvent } from '../lib/analytics';
 import { parseApiError } from '../lib/apiErrorParsing';
-
-const fieldLabelClass = 'block text-sm text-[var(--f10-text-dim)] mb-1';
+import LoadingState from '../components/ui/states/LoadingState';
 
 export default function Register() {
   const { register, refreshProfile } = useAuth();
@@ -96,10 +95,11 @@ export default function Register() {
 
   return (
     <div className="max-w-md mx-auto p-6">
+      {/* FINAL10 APP Logo */}
       <div className="text-center mb-8">
         <Final10Logo size="large" showTaglines={true} />
       </div>
-
+      
       <h1 className="text-3xl font-bold mb-2 text-center">Join FINAL10</h1>
       <Final10Slogan variant="auth" className="mb-4" />
       {attribution?.creatorHandle ? (
@@ -127,49 +127,37 @@ export default function Register() {
         </div>
       ) : null}
       <form onSubmit={onSubmit} className="space-y-3">
-        <div>
-          <label htmlFor="username" className={fieldLabelClass}>Username</label>
-          <input className="input" placeholder="Username" name="username" id="username"
-                 value={form.username} onChange={e=>setForm({...form, username:e.target.value})}/>
+        <input className="w-full p-3 rounded bg-gray-900" placeholder="Username" name="username" id="username"
+               value={form.username} onChange={e=>setForm({...form, username:e.target.value})}/>
+        <div className="grid grid-cols-2 gap-3">
+          <input className="p-3 rounded bg-gray-900" placeholder="First name" name="firstName" id="firstName"
+                 value={form.firstName} onChange={e=>setForm({...form, firstName:e.target.value})}/>
+          <input className="p-3 rounded bg-gray-900" placeholder="Last name" name="lastName" id="lastName"
+                 value={form.lastName} onChange={e=>setForm({...form, lastName:e.target.value})}/>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="firstName" className={fieldLabelClass}>First name</label>
-            <input className="input" placeholder="First name" name="firstName" id="firstName"
-                   value={form.firstName} onChange={e=>setForm({...form, firstName:e.target.value})}/>
-          </div>
-          <div>
-            <label htmlFor="lastName" className={fieldLabelClass}>Last name</label>
-            <input className="input" placeholder="Last name" name="lastName" id="lastName"
-                   value={form.lastName} onChange={e=>setForm({...form, lastName:e.target.value})}/>
-          </div>
-        </div>
-        <div>
-          <label htmlFor="email" className={fieldLabelClass}>Email</label>
-          <input className="input" placeholder="you@example.com" type="email" name="email" id="email"
-                 value={form.email} onChange={e=>setForm({...form, email:e.target.value})}/>
-        </div>
-        <div>
-          <label htmlFor="password" className={fieldLabelClass}>Password</label>
-          <input className="input" placeholder="Create a password" type="password" name="password" id="password"
-                 value={form.password} onChange={e=>setForm({...form, password:e.target.value})}/>
-        </div>
-        <div>
-          <label htmlFor="referralCode" className={fieldLabelClass}>Referral code (optional)</label>
-          <input className="input" placeholder="Referral code" name="referralCode" id="referralCode"
-                 value={form.referralCode} onChange={e=>setForm({...form, referralCode:e.target.value})}/>
-        </div>
+        <input className="w-full p-3 rounded bg-gray-900" placeholder="Email" name="email" id="email"
+               value={form.email} onChange={e=>setForm({...form, email:e.target.value})}/>
+        <input className="w-full p-3 rounded bg-gray-900" placeholder="Password" type="password" name="password" id="password"
+               value={form.password} onChange={e=>setForm({...form, password:e.target.value})}/>
+        <input className="w-full p-3 rounded bg-gray-900" placeholder="Referral code (optional)" name="referralCode" id="referralCode"
+               value={form.referralCode} onChange={e=>setForm({...form, referralCode:e.target.value})}/>
         <button
           type="submit"
           disabled={busy}
-          className="btn btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
-          aria-busy={busy}
+          className="w-full p-3 rounded bg-yellow-400 text-black font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {busy ? 'Creating account…' : 'Sign up'}
         </button>
       </form>
-      <p className="mt-3 text-sm text-[var(--f10-text-dim)]">Already have an account? <Link className="underline text-purple-300" to="/login">Login</Link></p>
+      {busy ? (
+        <div className="mt-4 flex justify-center">
+          <LoadingState variant="inline" label="Creating your account…" />
+        </div>
+      ) : null}
+      <p className="mt-3 text-sm text-gray-400">Already have an account? <Link className="underline" to="/login">Login</Link></p>
       <AuthDebugFooter />
     </div>
   );
 }
+
+

@@ -29,8 +29,6 @@ import { BATTLE_PASS_ACTION_EVENT } from "../lib/battlePassActionBus";
 import { createBattlePassActionEvent } from "../lib/battlePassActionEventFactory";
 import SavvyMark from "../components/SavvyMark";
 import Final10Slogan from "../components/branding/Final10Slogan";
-import LoadingState from "../components/ui/states/LoadingState";
-import ErrorState from "../components/ui/states/ErrorState";
 import { SavvyPointsIcon } from "../components/rewards/SavvyPointsIcon";
 import { useSavvyPoints } from "../store/savvyStore";
 import "../styles/BattlePassPage.css";
@@ -444,15 +442,48 @@ export default function BattlePassPage() {
   return (
     <div className="f10-bp-page" style={themeStyle}>
       {authToken && progression.loading ? (
-        <LoadingState variant="inline" label="Syncing battle pass from server…" className="mb-2" />
+        <div
+          className="f10-bp-hero"
+          style={{
+            marginBottom: 8,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: "rgba(15,23,42,0.65)",
+            border: "1px solid rgba(148,163,184,0.25)",
+            fontSize: "0.9rem",
+            color: "#cbd5e1",
+          }}
+          role="status"
+        >
+          Syncing battle pass from server…
+        </div>
       ) : null}
       {authToken && progression.error ? (
-        <ErrorState
-          className="mb-3 f10-state--inline"
-          title="Couldn't sync battle pass"
-          description={progression.error}
-          onRetry={() => void progression.reload()}
-        />
+        <div
+          style={{
+            marginBottom: 12,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(127,29,29,0.35)",
+            border: "1px solid rgba(248,113,113,0.45)",
+            color: "#fecaca",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 10,
+          }}
+          role="alert"
+        >
+          <span style={{ flex: "1 1 200px" }}>{progression.error}</span>
+          <button
+            type="button"
+            className="f10-bp-btn f10-bp-btn-ghost"
+            style={{ borderColor: "rgba(254,202,202,0.5)", color: "#fff7ed" }}
+            onClick={() => void progression.reload()}
+          >
+            Retry sync
+          </button>
+        </div>
       ) : null}
       <header className="f10-bp-hero">
         <div className="f10-bp-hero-inner">

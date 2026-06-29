@@ -6,10 +6,6 @@ import {
 } from "../lib/api";
 import RecommendedByCreatorTag from "../components/listings/RecommendedByCreatorTag";
 import ListingCardImage from "../components/listings/ListingCardImage";
-import LoadingState from "../components/ui/states/LoadingState";
-import ErrorState from "../components/ui/states/ErrorState";
-import EmptyState from "../components/ui/states/EmptyState";
-import SavvyMark from "../components/SavvyMark";
 import "../styles/CreatorLanding.css";
 
 type CreatorProfile = {
@@ -66,24 +62,12 @@ export default function CreatorLanding() {
   }, [handle]);
 
   if (loading) {
-    return (
-      <div className="creator-landing">
-        <LoadingState label={`Loading @${handle}…`} className="creator-landing-loading" />
-      </div>
-    );
+    return <div className="creator-landing-loading">Loading @{handle}…</div>;
   }
   if (error || !profile) {
     return (
-      <div className="creator-landing">
-        <ErrorState
-          title="Couldn't load this creator"
-          description={error || "This profile may not exist or is temporarily unavailable."}
-          action={
-            <Link to="/" className="btn btn-primary">
-              Go home
-            </Link>
-          }
-        />
+      <div className="creator-landing-error">
+        Couldn't load this creator. <Link to="/">Go home</Link>
       </div>
     );
   }
@@ -112,15 +96,9 @@ export default function CreatorLanding() {
       <section className="creator-landing-section">
         <div className="creator-landing-section-title">Curated by @{profile.handle}</div>
         {curated.length === 0 ? (
-          <EmptyState
-            title="No curated picks yet"
-            description="Check back soon for hand-picked deals from this creator."
-            action={
-              <Link to="/auctions" className="btn btn-primary">
-                Browse auctions
-              </Link>
-            }
-          />
+          <div className="creator-landing-empty">
+            No curated picks yet — check back soon.
+          </div>
         ) : (
           <div className="creator-landing-grid">
             {curated.map((item) => (
@@ -133,9 +111,7 @@ export default function CreatorLanding() {
                     borderRadius="12px"
                   />
                 ) : (
-                  <div className="creator-landing-card-placeholder" aria-hidden>
-                    <SavvyMark variant="icon" size={28} />
-                  </div>
+                  <div className="creator-landing-card-placeholder">🏷️</div>
                 )}
                 <div className="creator-landing-card-meta">
                   <div className="creator-landing-card-title">{item.title || "Listing"}</div>

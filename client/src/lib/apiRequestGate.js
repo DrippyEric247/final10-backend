@@ -1,12 +1,10 @@
 /**
- * Client-side request deduping, per-route spacing, and server 429 backoff.
- * Client spacing waits silently — only real HTTP 429 triggers user-visible cooling.
+ * Client-side request deduping, per-route cooldowns, and global 429 cooling.
+ * Used by lib/api.js wrappers for hot endpoints that were hammering Railway.
  */
 
-import { parseRetryAfterSec, sleepMs } from './parseRetryAfter';
-
 const COOLDOWN_MS = {
-  /** Minimum spacing between successful /auth/me refreshes (not login brute-force). */
+  /** Dedupe rapid /auth/me — not the same as login brute-force protection. */
   authMe: 45_000,
   authLogin: 3_000,
   notifications: 60_000,
@@ -18,37 +16,28 @@ const COOLDOWN_MS = {
 
 const inflight = new Map();
 const lastSuccessAt = new Map();
-const lastResult = new Map();
 const routeCoolingUntil = new Map();
 
-/** Set only from real HTTP 429 responses (see markServerRateLimit). */
-let serverRateLimitUntil = 0;
-let lastRateLimitMeta = null;
+let globalCoolingUntil = 0;
 let authMeBootstrapPending = true;
 
 const listeners = new Set();
 
 export class ApiCoolingDownError extends Error {
-  constructor(message = 'Rate limited — retrying shortly.') {
+  constructor(message = "Cooling down — try again in a minute.") {
     super(message);
-    this.name = 'ApiCoolingDownError';
+    this.name = "ApiCoolingDownError";
     this.status = 429;
     this.isCoolingDown = true;
-    this.isRateLimited = true;
   }
-}
-
-export function getLastRateLimitMeta() {
-  return lastRateLimitMeta;
 }
 
 export function getApiCoolingState() {
   const now = Date.now();
-  const until = serverRateLimitUntil;
+  const until = Math.max(globalCoolingUntil, ...routeCoolingUntil.values());
   return {
     isCooling: until > now,
     retryAfterMs: until > now ? until - now : 0,
-    meta: lastRateLimitMeta,
   };
 }
 
@@ -68,61 +57,26 @@ function notifyCooling() {
   });
 }
 
-/** Record a server HTTP 429 — drives ApiCoolingBanner only. */
-export function markServerRateLimit(retryAfterSec, meta = {}) {
-  const ms = Math.max(1000, parseRetryAfterSec(null, retryAfterSec) * 1000);
-  serverRateLimitUntil = Date.now() + ms;
-  lastRateLimitMeta = {
-    ...meta,
-    retryAfterSec: Math.ceil(ms / 1000),
-    at: Date.now(),
-  };
+export function markGlobalCooling(retryAfterSec = 60) {
+  const ms = Math.max(1000, Number(retryAfterSec) || 60) * 1000;
+  globalCoolingUntil = Date.now() + ms;
   notifyCooling();
 }
 
-/** @deprecated use markServerRateLimit */
-export function markGlobalCooling(retryAfterSec = 60) {
-  markServerRateLimit(retryAfterSec, { source: 'legacy_markGlobalCooling' });
-}
-
-function markRouteCooling(key, retryAfterSec = 60) {
-  const ms = Math.max(1000, parseRetryAfterSec(null, retryAfterSec) * 1000);
+function markRouteCooling(key, retryAfterSec = 60, { affectGlobal = true } = {}) {
+  const ms = Math.max(1000, Number(retryAfterSec) || 60) * 1000;
   routeCoolingUntil.set(key, Date.now() + ms);
-}
-
-async function waitUntilServerAllowed() {
-  const wait = serverRateLimitUntil - Date.now();
-  if (wait > 0) {
-    await sleepMs(wait);
+  if (affectGlobal) {
+    markGlobalCooling(retryAfterSec);
   }
 }
 
-async function waitUntilRouteAllowed(key) {
-  const until = routeCoolingUntil.get(key) || 0;
-  const wait = until - Date.now();
-  if (wait > 0) {
-    await sleepMs(wait);
-  }
+function isGloballyCooling() {
+  return Date.now() < globalCoolingUntil;
 }
 
-async function waitForMinInterval(key, coolKey, { allowBootstrap = false } = {}) {
-  if (key === 'authMe' && !allowBootstrap && authMeBootstrapPending === false) {
-    const minMs = minIntervalForKey('authMe');
-    const last = lastSuccessAt.get('authMe') || 0;
-    const elapsed = Date.now() - last;
-    if (Number.isFinite(minMs) && minMs > 0 && elapsed < minMs) {
-      await sleepMs(minMs - elapsed);
-    }
-    return;
-  }
-
-  const minMs = minIntervalForKey(key);
-  if (!Number.isFinite(minMs) || minMs <= 0) return;
-  const last = lastSuccessAt.get(coolKey) || 0;
-  const elapsed = Date.now() - last;
-  if (elapsed < minMs) {
-    await sleepMs(minMs - elapsed);
-  }
+function isRouteCooling(key) {
+  return Date.now() < (routeCoolingUntil.get(key) || 0);
 }
 
 /** Call after logout to allow the next session's first /auth/me. */
@@ -131,30 +85,30 @@ export function resetAuthMeBootstrap() {
 }
 
 /** Normalize axios path or full URL to a stable cooldown key. */
-export function cooldownKeyForRequest(method, url = '') {
-  const m = String(method || 'get').toUpperCase();
+export function cooldownKeyForRequest(method, url = "") {
+  const m = String(method || "get").toUpperCase();
   const path = String(url)
-    .replace(/^https?:\/\/[^/]+/i, '')
-    .replace(/^\/?api/, '')
-    .split('?')[0];
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/?api/, "")
+    .split("?")[0];
 
-  if (m === 'GET' && path === '/auth/me') return 'authMe';
-  if (m === 'POST' && (path === '/auth/login' || path === '/auth/register')) {
-    return 'authLogin';
+  if (m === "GET" && path === "/auth/me") return "authMe";
+  if (m === "POST" && (path === "/auth/login" || path === "/auth/register")) {
+    return "authLogin";
   }
-  if (m === 'GET' && path === '/notifications') return 'notifications';
-  if (m === 'GET' && path === '/levels/me') return 'levelsMe';
-  if (m === 'GET' && (path === '/auctions/daily-tasks' || path === '/actions/daily-tasks')) {
-    return 'dailyTasks';
+  if (m === "GET" && path === "/notifications") return "notifications";
+  if (m === "GET" && path === "/levels/me") return "levelsMe";
+  if (m === "GET" && (path === "/auctions/daily-tasks" || path === "/actions/daily-tasks")) {
+    return "dailyTasks";
   }
-  if (m === 'GET' && /^\/users\/[^/]+\/ebay(?:-status)?$/.test(path)) return 'userEbay';
-  if (m === 'GET' && path === '/parties/me') return 'partiesMe';
+  if (m === "GET" && /^\/users\/[^/]+\/ebay(?:-status)?$/.test(path)) return "userEbay";
+  if (m === "GET" && path === "/parties/me") return "partiesMe";
   return null;
 }
 
 function baseCooldownKey(key) {
   if (!key) return null;
-  if (String(key).startsWith('userEbay:')) return 'userEbay';
+  if (String(key).startsWith("userEbay:")) return "userEbay";
   return key;
 }
 
@@ -178,45 +132,54 @@ export async function gatedRequest(key, run, opts = {}) {
     return run();
   }
 
+  if (isGloballyCooling() && !force && key !== "authLogin") {
+    throw new ApiCoolingDownError();
+  }
+  if (isRouteCooling(coolKey) && !force) {
+    throw new ApiCoolingDownError();
+  }
+
+  if (key === "authMe" && !force) {
+    const minMs = minIntervalForKey("authMe");
+    if (!allowBootstrap && authMeBootstrapPending === false) {
+      const last = lastSuccessAt.get("authMe") || 0;
+      if (Number.isFinite(minMs) && minMs > 0 && Date.now() - last < minMs) {
+        throw new ApiCoolingDownError("Profile refresh is on cooldown. Try again shortly.");
+      }
+    }
+  } else if (!force) {
+    const minMs = minIntervalForKey(key);
+    if (Number.isFinite(minMs) && minMs > 0) {
+      const last = lastSuccessAt.get(coolKey) || 0;
+      if (Date.now() - last < minMs) {
+        throw new ApiCoolingDownError();
+      }
+    }
+  }
+
   if (inflight.has(key)) {
     return inflight.get(key);
   }
 
   const promise = (async () => {
-    if (!force) {
-      await waitUntilServerAllowed();
-      await waitUntilRouteAllowed(coolKey);
-      await waitForMinInterval(key, coolKey, { allowBootstrap });
-    }
-
     try {
       const result = await run();
       lastSuccessAt.set(coolKey, Date.now());
-      lastResult.set(key, result);
-      if (key === 'authMe') {
+      if (key === "authMe") {
         authMeBootstrapPending = false;
       }
       return result;
     } catch (err) {
       const status = err?.response?.status ?? err?.status;
       if (status === 429) {
-        const headers = err?.response?.headers;
-        const retryAfter = parseRetryAfterSec(headers, err?.retryAfter ?? 60);
-        const path = String(err?.config?.url || '').split('?')[0];
-        markServerRateLimit(retryAfter, {
-          path,
-          method: err?.config?.method,
-          key: coolKey,
-        });
-        markRouteCooling(coolKey, coolKey === 'authMe' ? Math.min(15, retryAfter) : retryAfter);
-        await sleepMs(retryAfter * 1000);
-        const retryResult = await run();
-        lastSuccessAt.set(coolKey, Date.now());
-        lastResult.set(key, retryResult);
-        if (key === 'authMe') {
-          authMeBootstrapPending = false;
-        }
-        return retryResult;
+        const retryAfter =
+          err?.response?.headers?.["retry-after"] ??
+          err?.response?.headers?.["Retry-After"] ??
+          err?.retryAfter ??
+          60;
+        const affectGlobal = coolKey !== "authMe" && coolKey !== "authLogin";
+        const routeRetry = coolKey === "authMe" ? Math.min(15, Number(retryAfter) || 15) : retryAfter;
+        markRouteCooling(coolKey, routeRetry, { affectGlobal });
       }
       throw err;
     } finally {
@@ -231,10 +194,8 @@ export async function gatedRequest(key, run, opts = {}) {
 export function resetApiRequestGateForTests() {
   inflight.clear();
   lastSuccessAt.clear();
-  lastResult.clear();
   routeCoolingUntil.clear();
-  serverRateLimitUntil = 0;
-  lastRateLimitMeta = null;
+  globalCoolingUntil = 0;
   authMeBootstrapPending = true;
   listeners.clear();
 }

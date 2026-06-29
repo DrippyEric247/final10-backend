@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
 import { Bug, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useLiveEventsOptional } from '../context/LiveEventsContext';
 import MembershipStatusBadge from './membership/MembershipStatusBadge';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
@@ -15,8 +14,6 @@ const Navigation = () => {
   const [alertUnreadCount, setAlertUnreadCount] = useState(0);
   const { user } = useAuth() || {};
   const showAdminNav = shouldShowAdminNav(user);
-  const liveEvents = useLiveEventsOptional();
-  const eventsBadge = liveEvents?.claimableCount ?? 0;
 
   useEffect(() => {
     if (!user) {
@@ -73,7 +70,6 @@ const Navigation = () => {
     { name: 'Leaderboard', path: '/leaderboard', icon: '🏆' },
     { name: 'Build Wars', path: '/build-wars', icon: '⚔️' },
     { name: 'Battle Pass', path: '/battle-pass', icon: '🎯' },
-    ...(user ? [{ name: 'Events', path: '/events', icon: '🎪', eventsBadge: true }] : []),
     { name: 'Daily Streak', path: '/daily-streak', icon: '🔥' },
     { name: 'Perk Machine', path: '/perk-machine', icon: '🎰' },
     { name: 'Customize', path: '/customization', icon: '🎖️' },
@@ -113,14 +109,7 @@ const Navigation = () => {
                   ) : null}
                 </>
               ) : (
-                <span className="nav-icon-wrap">
-                  {item.icon}
-                  {item.eventsBadge && eventsBadge > 0 ? (
-                    <span className="nav-alert-badge" aria-label={`${eventsBadge} claimable event reward${eventsBadge === 1 ? '' : 's'}`}>
-                      {eventsBadge > 99 ? '99+' : eventsBadge}
-                    </span>
-                  ) : null}
-                </span>
+                item.icon
               )}
             </span>
             <span className="nav-label">{item.name}</span>
