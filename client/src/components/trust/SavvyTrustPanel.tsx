@@ -1,6 +1,7 @@
 import React from 'react';
 import type { TrustScoreResult } from '../../types/trustScore';
 import { SCOUT_LABELS } from '../../config/savvyScoutBranding';
+import SellerTrustStats from './SellerTrustStats';
 import '../../styles/SavvyTrustPanel.css';
 
 const SELLER_BADGE: Record<
@@ -45,6 +46,10 @@ export default function SavvyTrustPanel({ trust, className = '' }: SavvyTrustPan
 
       {trust.savvyVerifiedSeller ? (
         <div className="savvy-trust-panel__verified">Savvy Verified Seller</div>
+      ) : null}
+
+      {trust.sellerDisplay ? (
+        <SellerTrustStats display={trust.sellerDisplay} score={trust.sellerTrustScore} />
       ) : null}
 
       {trust.dealHighlights.length > 0 ? (

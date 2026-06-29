@@ -223,6 +223,10 @@ export function evaluateSellerTrust(input: TrustScoreInput): SellerTrustResult {
     band = bandFromScore(score);
   }
 
+  if (!established && !mega && feedbackCount != null && feedbackCount <= 10) {
+    band = 'low';
+  }
+
   return {
     sellerTrustScore: score,
     band,

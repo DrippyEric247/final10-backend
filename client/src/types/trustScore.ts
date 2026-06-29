@@ -1,5 +1,13 @@
 export type SellerTrustBand = 'elite' | 'high' | 'medium' | 'low' | 'unknown';
 
+export type SellerTrustDisplay = {
+  bandLabel: 'New' | 'Established' | 'Trusted' | 'Elite';
+  feedbackPercent: string;
+  feedbackCount: string;
+  accountAge: string;
+  isTopRated: boolean;
+};
+
 export type DealRiskFlag =
   | 'price_far_below_market'
   | 'high_shipping'
@@ -73,6 +81,7 @@ export type TrustScoreResult = {
   savvyVerifiedSeller: boolean;
   isEstablishedSeller: boolean;
   isMegaReputation: boolean;
+  sellerDisplay: SellerTrustDisplay;
 };
 
 export type MergedDealTrustDecision = {

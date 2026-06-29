@@ -8,6 +8,7 @@ import type {
 } from '../types/trustScore';
 import { evaluateDealRisk } from './dealRiskEngine';
 import { evaluateSellerTrust } from './sellerTrustEngine';
+import { buildSellerTrustDisplay } from './sellerTrustDisplay';
 
 function toNum(value: number | string | null | undefined): number | null {
   const n = Number(value);
@@ -232,6 +233,8 @@ export function evaluateTrustScore(input: TrustScoreInput): TrustScoreResult {
     trustReasons.unshift('Savvy Verified Seller.');
   }
 
+  const sellerDisplay = buildSellerTrustDisplay(input, seller.band);
+
   return {
     trustScore: seller.sellerTrustScore,
     trustLevel,
@@ -252,7 +255,17 @@ export function evaluateTrustScore(input: TrustScoreInput): TrustScoreResult {
     savvyVerifiedSeller: savvyVerified,
     isEstablishedSeller: seller.isEstablishedSeller,
     isMegaReputation: seller.isMegaReputation,
+    sellerDisplay,
   };
+}
+
+/** Canonical listing trust — use across Search, feeds, Best Move, alerts, watchlist. */
+export function evaluateListingTrust(
+  item: Record<string, unknown>,
+  patch: Partial<TrustScoreInput> = {}
+): TrustScoreResult {
+  const base = trustScoreInputFromListing(item);
+  return evaluateTrustScore({ ...base, ...patch });
 }
 
 export function getTrustSummary(_listing: TrustScoreInput, trustResult: TrustScoreResult): string {
