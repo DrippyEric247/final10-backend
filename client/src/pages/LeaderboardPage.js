@@ -9,6 +9,10 @@ import { getBattlePassProgress } from "../lib/battlePassEngine";
 import { BP_UPDATE_EVENT } from "../lib/battlePassConfig";
 import { getUniversalBoostState } from "../lib/universalBoostProgress";
 import { getTopFlippersWeek } from "../lib/api";
+import LoadingState from "../components/ui/states/LoadingState";
+import EmptyState from "../components/ui/states/EmptyState";
+import ErrorState from "../components/ui/states/ErrorState";
+import { Link } from "react-router-dom";
 import "../styles/LeaderboardPage.css";
 
 const BRACKETS = [
@@ -74,6 +78,7 @@ export default function LeaderboardPage() {
   const [selected, setSelected] = useState(null);
   const [topFlippers, setTopFlippers] = useState(null);
   const [topFlippersErr, setTopFlippersErr] = useState(null);
+  const [topFlippersLoading, setTopFlippersLoading] = useState(true);
 
   const bump = useCallback(() => setSync((s) => s + 1), []);
 
@@ -96,6 +101,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     let cancelled = false;
     setTopFlippersErr(null);
+    setTopFlippersLoading(true);
     getTopFlippersWeek(20)
       .then((data) => {
         if (!cancelled) setTopFlippers(data);
@@ -105,6 +111,9 @@ export default function LeaderboardPage() {
           setTopFlippersErr(err?.message || "Could not load flip leaderboard.");
           setTopFlippers(null);
         }
+      })
+      .finally(() => {
+        if (!cancelled) setTopFlippersLoading(false);
       });
     return () => {
       cancelled = true;
@@ -232,12 +241,18 @@ export default function LeaderboardPage() {
           Ranked by Savvy Points earned from verified flip sales (UTC week). Ties favor more completed
           flips.
         </p>
-        {topFlippersErr ? (
-          <p className="f10-season-note" style={{ color: "#fca5a5" }}>
-            {topFlippersErr}
-          </p>
+        {topFlippersLoading ? (
+          <LoadingState variant="inline" label="Loading top flippers…" className="f10-flippers-loading" />
         ) : null}
-        {!topFlippersErr && topFlippers?.rows?.length ? (
+        {topFlippersErr ? (
+          <ErrorState
+            className="f10-state--inline"
+            title="Couldn't load flip leaderboard"
+            description={topFlippersErr}
+            onRetry={() => bump()}
+          />
+        ) : null}
+        {!topFlippersLoading && !topFlippersErr && topFlippers?.rows?.length ? (
           <ol className="f10-flippers-list">
             {topFlippers.rows.map((r) => {
               const isYou =
@@ -261,8 +276,12 @@ export default function LeaderboardPage() {
             })}
           </ol>
         ) : null}
-        {!topFlippersErr && topFlippers && (!topFlippers.rows || topFlippers.rows.length === 0) ? (
-          <p className="f10-season-note">No verified flip payouts this week yet — ship a deal and bank Savvy.</p>
+        {!topFlippersLoading && !topFlippersErr && topFlippers && (!topFlippers.rows || topFlippers.rows.length === 0) ? (
+          <EmptyState
+            className="f10-state--inline"
+            title="No flip payouts this week yet"
+            description="Ship a verified flip sale and bank Savvy to claim a spot."
+          />
         ) : null}
       </article>
 
@@ -292,6 +311,20 @@ export default function LeaderboardPage() {
               ? `${seasonModel.myBracket.label} bracket • Rank ${seasonModel.myBracketRank || "-"} in bracket`
               : "Sign in to track your bracket progress."}
           </p>
+          {!user ? (
+            <EmptyState
+              className="f10-state--inline f10-lb-guest-gate"
+              title="Join the season ladder"
+              description="Sign in to see your bracket, progress bar, and eligibility."
+              action={
+                <div className="f10-lb-guest-actions">
+                  <Link to="/login" className="btn btn-primary">Log in</Link>
+                  <Link to="/register" className="btn btn-ghost">Sign up</Link>
+                </div>
+              }
+            />
+          ) : (
+            <>
           <div className="f10-season-progress">
             <div className="f10-season-progress-bar" style={{ width: `${seasonModel.myBracketProgress}%` }} />
           </div>
@@ -317,6 +350,8 @@ export default function LeaderboardPage() {
             <strong>Projected eligibility</strong>
             <span>{seasonModel.projectedHint}</span>
           </div>
+            </>
+          )}
         </article>
 
         <article className="f10-season-card">
@@ -356,9 +391,11 @@ export default function LeaderboardPage() {
       </section>
 
       {ranked.length === 0 ? (
-        <p style={{ padding: "24px 12px", color: "#9ca3af", textAlign: "center", margin: 0 }}>
-          No leaderboard rows yet. Play a few rounds or check back after the next sync.
-        </p>
+        <EmptyState
+          className="f10-state--page"
+          title="No leaderboard rows yet"
+          description="Play a few rounds or check back after the next sync."
+        />
       ) : null}
       <div className="f10-lb-list" role="list">
         {ranked.map((player, idx) => {

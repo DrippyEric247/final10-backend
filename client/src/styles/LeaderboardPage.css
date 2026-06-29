@@ -781,3 +781,18 @@
   text-transform: uppercase;
   color: rgba(148, 163, 184, 0.75);
 }
+
+.f10-flippers-loading {
+  margin: 12px 0;
+}
+
+.f10-lb-guest-gate {
+  margin-top: 12px;
+}
+
+.f10-lb-guest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}

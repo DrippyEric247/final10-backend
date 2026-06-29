@@ -39,6 +39,9 @@ import {
 import "../styles/SellerDashboard.css";
 import { incrementJourneyStep } from "../lib/tabJourney";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
+import LoadingState from "../components/ui/states/LoadingState";
+import EmptyState from "../components/ui/states/EmptyState";
+import ErrorState from "../components/ui/states/ErrorState";
 
 /* -------------------------------------------------------------- */
 /* Types & helpers                                                */
@@ -139,7 +142,7 @@ export default function SellerDashboard(): JSX.Element {
 
   const feed = useSellerSignalFeed({ limit: 10, windowMinutes: 180 });
 
-  const { data: promotionsData } = useQuery({
+  const { data: promotionsData, isLoading: promotionsLoading, isError: promotionsError, refetch: refetchPromotions } = useQuery({
     queryKey: ["seller-dashboard-promotions"],
     queryFn: () => promotionService.getMyPromotions(),
     enabled: !!user,
@@ -276,11 +279,15 @@ export default function SellerDashboard(): JSX.Element {
                   ))}
                 </ul>
               ) : (
-                <div className="panel-empty">
-                  {coverage.hasEnoughData
-                    ? "Lanes are quiet — check back after the next scroll wave."
-                    : "We’re still learning you — browse, save, hunt, and this map lights up."}
-                </div>
+                <EmptyState
+                  className="f10-state--inline panel-empty"
+                  title={coverage.hasEnoughData ? "Lanes are quiet" : "Still learning you"}
+                  description={
+                    coverage.hasEnoughData
+                      ? "Check back after the next scroll wave."
+                      : "Browse, save, and hunt — this map lights up as you move."
+                  }
+                />
               )}
             </div>
 
@@ -296,7 +303,11 @@ export default function SellerDashboard(): JSX.Element {
                   ))}
                 </ul>
               ) : (
-                <div className="panel-empty">Need a bit more motion before we call peak hours.</div>
+                <EmptyState
+                  className="f10-state--inline panel-empty"
+                  title="Peak hours pending"
+                  description="Need a bit more motion before we call the best posting windows."
+                />
               )}
             </div>
           </article>
@@ -345,7 +356,7 @@ export default function SellerDashboard(): JSX.Element {
                 >
                   List it now
                 </Link>
-                <div style={{ marginTop: 10 }}>
+                <div className="seller-dash-alert-wrap">
                   <SavvyAlertButton
                     tone="seller"
                     label="Watch this for me"
@@ -361,16 +372,20 @@ export default function SellerDashboard(): JSX.Element {
                 </div>
               </div>
             ) : (
-              <div className="panel-empty reco-empty">
-                <p>No loud signal yet — browse or drop a listing to wake the map.</p>
-                <Link
-                  to="/promote-listing"
-                  className="reco-cta-btn reco-cta-btn-ghost"
-                  onClick={() => incrementJourneyStep("/seller-dashboard", "open_listing_cta", 1)}
-                >
-                  Start earning clicks
-                </Link>
-              </div>
+              <EmptyState
+                className="f10-state--inline panel-empty reco-empty"
+                title="No loud signal yet"
+                description="Browse or drop a listing to wake the map."
+                action={
+                  <Link
+                    to="/promote-listing"
+                    className="reco-cta-btn reco-cta-btn-ghost"
+                    onClick={() => incrementJourneyStep("/seller-dashboard", "open_listing_cta", 1)}
+                  >
+                    Start earning clicks
+                  </Link>
+                }
+              />
             )}
           </article>
 
@@ -384,9 +399,11 @@ export default function SellerDashboard(): JSX.Element {
             </header>
 
             {feed.length === 0 ? (
-              <div className="panel-empty">
-                Quiet feed — shoppers haven’t moved enough yet for fresh pings.
-              </div>
+              <EmptyState
+                className="f10-state--inline panel-empty"
+                title="Quiet feed"
+                description="Shoppers haven't moved enough yet for fresh pings."
+              />
             ) : (
               <ul className="signal-list">
                 {feed.map((s) => (
@@ -406,13 +423,26 @@ export default function SellerDashboard(): JSX.Element {
             </Link>
           </header>
 
-          {promotions.length === 0 ? (
-            <div className="panel-empty listings-empty">
-              <p>No asks live yet — first click funds the next play.</p>
-              <Link to="/promote-listing" className="reco-cta-btn reco-cta-btn-ghost">
-                List your first item
-              </Link>
-            </div>
+          {promotionsLoading ? (
+            <LoadingState variant="inline" label="Loading your listings…" className="listings-loading" />
+          ) : promotionsError ? (
+            <ErrorState
+              className="f10-state--inline listings-empty"
+              title="Couldn't load listings"
+              description="Your promotion data didn't load. Try again in a moment."
+              onRetry={() => void refetchPromotions()}
+            />
+          ) : promotions.length === 0 ? (
+            <EmptyState
+              className="f10-state--inline panel-empty listings-empty"
+              title="No asks live yet"
+              description="First click funds the next play."
+              action={
+                <Link to="/promote-listing" className="reco-cta-btn reco-cta-btn-ghost">
+                  List your first item
+                </Link>
+              }
+            />
           ) : (
             <div className="listings-table" role="table">
               <div className="listings-row listings-row-head" role="row">

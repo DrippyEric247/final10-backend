@@ -224,6 +224,12 @@
   border: 1px dashed var(--dash-border-strong);
   border-radius: 12px;
 }
+.seller-dash-alert-wrap {
+  margin-top: 10px;
+}
+.listings-loading {
+  margin: 12px 0;
+}
 
 /* ---------- Market panel ---------- */
 
