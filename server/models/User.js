@@ -37,11 +37,17 @@ const userSchema = new mongoose.Schema({
     default: [],
   },
 
-  // your existing fields
+  // Legacy profile points (non-wallet). Prefer savvyPoints for new economy flows.
   points: { type: Number, default: 0 },
-  savvyPoints: { type: Number, default: 0 },          // community savvy points
-  pointsBalance: { type: Number, default: 0 },        // spendable points balance
-  lifetimePointsEarned: { type: Number, default: 0 }, // total points ever earned
+  /** Canonical Savvy wallet balance — mutate only via savvyBalanceService. */
+  savvyPoints: { type: Number, default: 0 },
+  /**
+   * @deprecated Mirror of savvyPoints for legacy APIs. Kept in sync by savvyBalanceService.
+   * Will be removed in Phase 2 after client migration.
+   */
+  pointsBalance: { type: Number, default: 0 },
+  /** Lifetime Savvy earned (credits only; debits do not reduce). */
+  lifetimePointsEarned: { type: Number, default: 0 },
   badges: [{ type: String }],                         // user badges/achievements
   trial: {                                            // trial information
     isActive: { type: Boolean, default: false },

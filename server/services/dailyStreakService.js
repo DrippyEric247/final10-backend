@@ -1,4 +1,5 @@
 const { utcDayKey, REWARDS } = require('../config/savvyRewards');
+const User = require('../models/User');
 const {
   STREAK_MILESTONES,
   COMEBACK_REWARDS,
@@ -117,6 +118,10 @@ async function grantMilestoneInventory(user, milestone, grants) {
   const ds = ensureDailyStreakDoc(user);
   if (!milestone) return grants;
 
+  if (ds.claimedMilestoneDays.includes(milestone.day)) {
+    return grants;
+  }
+
   if (milestone.scoutEggs) {
     addScoutEggs(ds, milestone.scoutEggs);
     grants.scoutEggs = { ...(grants.scoutEggs || {}), ...milestone.scoutEggs };
@@ -151,13 +156,15 @@ async function applyComebackRewards(user, inactiveDays, grants, today) {
     return { grants, comeback: null, savvyGranted: 0 };
   }
 
-  if (!ds.claimedComebackTiers.includes(tier.tierKey)) {
-    ds.claimedComebackTiers.push(tier.tierKey);
+  if (ds.claimedComebackTiers.includes(tier.tierKey)) {
+    return { grants, comeback: null, savvyGranted: 0 };
   }
+
+  ds.claimedComebackTiers.push(tier.tierKey);
   let savvyGranted = 0;
 
   if (tier.savvy > 0) {
-    const key = `streak_comeback:${user._id}:${tier.tierKey}:${today}`;
+    const key = `streak_comeback:${user._id}:${tier.tierKey}`;
     const grant = await grantSavvyReward(user, {
       rewardType: 'streak_comeback',
       amount: tier.savvy,
@@ -319,36 +326,54 @@ function serializeStreakStatus(user) {
 }
 
 /**
- * Claim today's daily streak reward (authoritative).
+ * Claim today's daily streak reward (authoritative, atomic daily lock).
  */
 async function claimDailyStreak(user) {
   const today = utcDayKey();
-  const ds = ensureDailyStreakDoc(user);
 
   if (typeof user.resetDailyTasks === 'function') {
     user.resetDailyTasks();
   }
 
-  const alreadyClaimed =
-    user.lastDailyClaim === today ||
-    Boolean(user.dailyTasks?.completed?.dailyLogin);
+  const lockedUser = await User.findOneAndUpdate(
+    {
+      _id: user._id,
+      lastDailyClaim: { $ne: today },
+    },
+    {
+      $set: {
+        lastDailyClaim: today,
+        'dailyTasks.completed.dailyLogin': true,
+      },
+      $inc: {
+        'dailyTasks.pointsEarned': REWARDS.daily_login.legacyPoints,
+        points: REWARDS.daily_login.legacyPoints,
+      },
+    },
+    { new: true }
+  );
 
-  if (alreadyClaimed) {
+  if (!lockedUser) {
+    const fresh = await User.findById(user._id);
+    const u = fresh || user;
     return {
       granted: false,
       alreadyClaimed: true,
       totalSavvy: 0,
       added: 0,
       savvyPointsEarned: 0,
-      newBalance: Number(user.savvyPoints) || 0,
-      currentStreak: Number(user.loginStreakDays) || 0,
-      longestStreak: Number(user.longestStreak) || 0,
-      streakDays: Number(user.loginStreakDays) || 0,
-      status: serializeStreakStatus(user),
+      newBalance: Number(u.savvyPoints) || 0,
+      currentStreak: Number(u.loginStreakDays) || 0,
+      longestStreak: Number(u.longestStreak) || 0,
+      streakDays: Number(u.loginStreakDays) || 0,
+      status: serializeStreakStatus(u),
       scoutMessage: null,
       shieldUsed: false,
     };
   }
+
+  Object.assign(user, lockedUser.toObject ? lockedUser.toObject() : lockedUser);
+  ensureDailyStreakDoc(user);
 
   const prevDay = user.lastLoginDay;
   const preGap = prevDay ? daysBetween(prevDay, today) : Number.POSITIVE_INFINITY;
@@ -383,7 +408,7 @@ async function claimDailyStreak(user) {
 
   const milestone = findMilestoneForDay(streak);
   if (milestone?.savvy > 0) {
-    const milestoneKey = `streak_milestone:${user._id}:${streak}:${today}`;
+    const milestoneKey = `streak_milestone:${user._id}:${streak}`;
     const grant = await grantSavvyReward(user, {
       rewardType: STREAK_REWARD_TYPE,
       amount: milestone.savvy,
@@ -400,11 +425,6 @@ async function claimDailyStreak(user) {
   const hiddenResult = await applyHiddenAchievements(user, streak, grants, today);
   grants = hiddenResult.grants;
   grants.savvy += hiddenResult.savvyGranted || 0;
-
-  user.dailyTasks.completed.dailyLogin = true;
-  user.dailyTasks.pointsEarned += REWARDS.daily_login.legacyPoints;
-  user.points += REWARDS.daily_login.legacyPoints;
-  user.lastDailyClaim = today;
 
   if (typeof user.awardXP === 'function') {
     await user.awardXP(FUTURE_REWARD_SLOTS.battlePassXpOnClaim, 'daily_login');

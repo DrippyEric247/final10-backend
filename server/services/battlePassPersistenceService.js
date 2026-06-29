@@ -23,6 +23,7 @@ const {
 } = require('./premiumEntitlementService');
 const { validateStrictEventPayload } = require('../validation/progressionEventsStrict');
 const { assertEventTrustOrDeny } = require('./progressionTrustService');
+const { grantSavvyReward } = require('./savvyRewardService');
 
 /** HTTP-accepted events only (no synthetic `task_completed` from clients). */
 const INCOMING_EVENT_TYPES = new Set([
@@ -54,7 +55,7 @@ function addUnlocks(inventory, ids) {
   inventory.newItemIds = [...newSet];
 }
 
-function applyMissionGrantPayload(user, inventory, bpDoc, payload) {
+async function applyMissionGrantPayload(user, inventory, bpDoc, payload, idempotencyKey) {
   const rawXp = Math.max(0, Number(payload?.xp) || 0);
   const savvy = Math.max(0, Number(payload?.savvyPoints) || 0);
   const lint = Math.max(0, Number(payload?.powerLintDelta) || 0);
@@ -73,9 +74,14 @@ function applyMissionGrantPayload(user, inventory, bpDoc, payload) {
   if (xp > 0) {
     bpDoc.xp = (bpDoc.xp || 0) + xp;
   }
-  if (savvy > 0) {
-    user.savvyPoints = (user.savvyPoints || 0) + savvy;
-    user.pointsBalance = (user.pointsBalance || 0) + savvy;
+  if (savvy > 0 && idempotencyKey) {
+    await grantSavvyReward(user, {
+      rewardType: 'battle_pass_mission',
+      amount: savvy,
+      idempotencyKey,
+      note: 'Battle Pass mission Savvy',
+      meta: { source: 'battle_pass_mission' },
+    });
   }
   if (lint > 0) {
     user.powerMultiplier = clamp((user.powerMultiplier || 1) + lint, 1, 3.5);
@@ -376,7 +382,7 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
 
   for (const g of result.grantedRewards) {
     const key = missionRewardClaimKey(seasonId, g.taskId);
-    applyMissionGrantPayload(user, inv, bp, g.payload);
+    await applyMissionGrantPayload(user, inv, bp, g.payload, `battle_pass_mission:${userId}:${key}`);
     claimed.add(key);
     missionGrants.push({ taskId: g.taskId, payload: g.payload });
   }

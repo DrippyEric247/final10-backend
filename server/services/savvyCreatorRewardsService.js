@@ -9,6 +9,7 @@ const SavvyShop = require('../models/SavvyShop');
 const SavvyShopProduct = require('../models/SavvyShopProduct');
 const SavvyShopEngagementLog = require('../models/SavvyShopEngagementLog');
 const PointsLedger = require('../models/PointsLedger');
+const { creditSavvy } = require('./savvyBalanceService');
 const { getCreatorMonetizationProfile } = require('./creatorEliteAccessService');
 
 /** @deprecated use creatorEliteAccessService caps — kept for exports */
@@ -80,12 +81,6 @@ async function awardCreatorPoints(userId, amount, idempotencyKey, source, shopId
     return { awarded: 0, capped: capped || amount, duplicate: false };
   }
 
-  user.savvyPoints = Number(user.savvyPoints || 0) + award;
-  await user.save();
-  if (typeof user.bumpWeeklyStat === 'function') {
-    await user.bumpWeeklyStat('savvyEarned', award);
-  }
-
   try {
     await PointsLedger.create({
       userId: user._id,
@@ -100,6 +95,23 @@ async function awardCreatorPoints(userId, amount, idempotencyKey, source, shopId
       return { awarded: 0, capped: 0, duplicate: true };
     }
     throw err;
+  }
+
+  const credit = await creditSavvy(user, {
+    amount: award,
+    source,
+    idempotencyKey: `${idempotencyKey}:savvy`,
+    meta: { shopId: shopId ? String(shopId) : '' },
+  });
+
+  if (credit.duplicate) {
+    return { awarded: 0, capped: 0, duplicate: true };
+  }
+
+  await user.save();
+
+  if (typeof user.bumpWeeklyStat === 'function') {
+    await user.bumpWeeklyStat('savvyEarned', award);
   }
 
   if (shopId) {

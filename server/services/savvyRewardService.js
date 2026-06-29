@@ -7,6 +7,7 @@ const {
 } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { auditRewardGrant } = require('./auditLogger');
+const { creditSavvy, debitSavvy } = require('./savvyBalanceService');
 
 function readTier(user) {
   return normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
@@ -30,7 +31,7 @@ function updateLoginStreak(user, today = utcDayKey()) {
 }
 
 /**
- * Grant Savvy to wallet with ledger + audit log. Idempotent per `idempotencyKey`.
+ * Grant Savvy to wallet via canonical balance service. Idempotent per `idempotencyKey`.
  */
 async function grantSavvyReward(user, {
   rewardType,
@@ -45,12 +46,60 @@ async function grantSavvyReward(user, {
 }) {
   const savvyAmount = Math.round(Number(amount) || 0);
   if (!savvyAmount || savvyAmount <= 0) {
-    return { granted: false, amount: 0, duplicate: false, newBalance: Number(user.savvyPoints) || 0 };
+    return {
+      granted: false,
+      amount: 0,
+      duplicate: false,
+      newBalance: Math.round(Number(user.savvyPoints) || 0),
+    };
   }
   if (!idempotencyKey) {
     throw new Error('grantSavvyReward requires idempotencyKey');
   }
 
+  const result = await creditSavvy(user, {
+    amount: savvyAmount,
+    source: rewardType || 'grant',
+    idempotencyKey,
+    rewardType,
+    note,
+    meta: {
+      ...meta,
+      baseAmount,
+      multiplier,
+      streakBonus,
+      streakDays,
+      tier: readTier(user),
+    },
+  });
+
+  if (result.duplicate) {
+    auditRewardGrant({
+      userId: String(user._id),
+      rewardType,
+      granted: false,
+      duplicate: true,
+      idempotencyKey,
+    });
+    return {
+      granted: false,
+      amount: 0,
+      duplicate: true,
+      newBalance: result.newBalance,
+      transactionId: result.transactionId,
+    };
+  }
+
+  if (!result.granted) {
+    return {
+      granted: false,
+      amount: 0,
+      duplicate: false,
+      newBalance: result.newBalance,
+    };
+  }
+
+  // Legacy audit row (non-blocking; SavvyTransaction is authoritative)
   try {
     await SavvyRewardLog.create({
       userId: user._id,
@@ -65,36 +114,9 @@ async function grantSavvyReward(user, {
       meta,
     });
   } catch (e) {
-    if (e?.code === 11000) {
-      auditRewardGrant({
-        userId: String(user._id),
-        rewardType,
-        granted: false,
-        duplicate: true,
-        idempotencyKey,
-      });
-      return {
-        granted: false,
-        amount: 0,
-        duplicate: true,
-        newBalance: Number(user.savvyPoints) || 0,
-      };
+    if (e?.code !== 11000) {
+      console.warn('[savvyReward] SavvyRewardLog write failed:', e?.message);
     }
-    throw e;
-  }
-
-  // Round the existing balance before adding so any historical fractional
-  // value self-heals to an integer on the next grant (single source of truth).
-  const balanceBefore = Math.round(Number(user.savvyPoints || 0));
-  user.savvyPoints = balanceBefore + savvyAmount;
-  user.pointsBalance = Math.round(Number(user.pointsBalance || 0)) + savvyAmount;
-  user.lifetimePointsEarned = Math.round(Number(user.lifetimePointsEarned || 0)) + savvyAmount;
-
-  if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
-    console.log(
-      `[savvyReward] ${rewardType} | before=${balanceBefore} +${savvyAmount} after=${user.savvyPoints} (key=${idempotencyKey})`
-    );
   }
 
   try {
@@ -114,20 +136,68 @@ async function grantSavvyReward(user, {
     console.warn('[savvyReward] SavvyPoint ledger write failed:', err?.message);
   }
 
-  auditRewardGrant({
-    userId: String(user._id),
-    rewardType,
-    granted: true,
-    amount: savvyAmount,
-    idempotencyKey,
-    newBalance: user.savvyPoints,
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[savvyReward] ${rewardType} | before=${result.balanceBefore} +${savvyAmount} after=${result.newBalance} (key=${idempotencyKey})`
+    );
+  }
 
   return {
     granted: true,
     amount: savvyAmount,
     duplicate: false,
-    newBalance: user.savvyPoints,
+    newBalance: result.newBalance,
+    balanceBefore: result.balanceBefore,
+    balanceAfter: result.balanceAfter,
+    transactionId: result.transactionId,
+  };
+}
+
+/**
+ * Spend Savvy via canonical balance service.
+ */
+async function spendSavvyReward(user, {
+  amount,
+  source,
+  idempotencyKey,
+  note,
+  meta = {},
+}) {
+  const spend = Math.round(Number(amount) || 0);
+  if (spend <= 0) {
+    return { spent: false, amount: 0, newBalance: Math.round(Number(user.savvyPoints) || 0) };
+  }
+  if (!idempotencyKey) {
+    throw new Error('spendSavvyReward requires idempotencyKey');
+  }
+
+  const result = await debitSavvy(user, {
+    amount: spend,
+    source,
+    idempotencyKey,
+    note,
+    meta,
+  });
+
+  if (result.duplicate) {
+    return {
+      spent: false,
+      duplicate: true,
+      amount: 0,
+      newBalance: result.newBalance,
+      transactionId: result.transactionId,
+    };
+  }
+
+  return {
+    spent: result.granted,
+    amount: result.granted ? spend : 0,
+    duplicate: false,
+    newBalance: result.newBalance,
+    balanceBefore: result.balanceBefore,
+    balanceAfter: result.balanceAfter,
+    transactionId: result.transactionId,
   };
 }
 
@@ -163,6 +233,7 @@ async function claimDailyLoginReward(user) {
 
 module.exports = {
   grantSavvyReward,
+  spendSavvyReward,
   claimDailyLoginReward,
   updateLoginStreak,
   readTier,

@@ -3,6 +3,8 @@ const auth = require('../middleware/auth');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const progressionService = require('../services/progressionService');
 const battlePassClaimService = require('../services/battlePassClaimService');
+const User = require('../models/User');
+const { claimOnboardingFirstMoveReward } = require('../services/onboardingRewardService');
 const { BATTLE_PASS_SEASON_ID } = require('../lib/battlePassConfig');
 const { validateRequest } = require('../middleware/validateRequest');
 const { progressionEventsLimiter } = require('../middleware/rateLimits');
@@ -56,6 +58,30 @@ router.post('/init', auth, validateRequest(schemas.progressionInitBody), async (
     const reset = Boolean(req.body.reset);
     const state = await progressionService.initUserProgression(req.user._id, { reset });
     return res.json(state);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+/** POST /api/progression/onboarding-first-move — grant first Best Move Savvy (idempotent). */
+router.post('/onboarding-first-move', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));
+    }
+
+    const result = await claimOnboardingFirstMoveReward(user);
+
+    if (result.alreadyClaimed) {
+      return res.status(409).json(result);
+    }
+
+    if (!result.granted) {
+      return res.status(500).json({ ...result, message: result.message || 'Claim failed.' });
+    }
+
+    return res.json(result);
   } catch (err) {
     return next(err);
   }

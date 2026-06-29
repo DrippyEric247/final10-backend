@@ -8,6 +8,7 @@ const ProjectAlert = require('../models/ProjectAlert');
 const BuildWarsEntry = require('../models/BuildWarsEntry');
 const BuildWarsVote = require('../models/BuildWarsVote');
 const PointsLedger = require('../models/PointsLedger');
+const { creditSavvy } = require('../services/savvyBalanceService');
 const BW = require('../config/buildWars');
 const {
   scoreProject,
@@ -31,11 +32,14 @@ async function grantSavvyPoints(userId, amount, source, idempotencyKey) {
     if (e?.code === 11000) return { granted: false, amount: 0, duplicate: true };
     throw e;
   }
-  await User.updateOne(
-    { _id: userId },
-    { $inc: { pointsBalance: amount, lifetimePointsEarned: amount, savvyPoints: amount } }
-  );
-  return { granted: true, amount };
+  const result = await creditSavvy(userId, {
+    amount,
+    source,
+    idempotencyKey: `${idempotencyKey}:savvy`,
+    meta: { refId: BW.EVENT_ID },
+  });
+  if (result.duplicate) return { granted: false, amount: 0, duplicate: true };
+  return { granted: result.granted, amount: result.granted ? amount : 0 };
 }
 
 function luckyRollStable(userId) {

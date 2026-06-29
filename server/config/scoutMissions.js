@@ -44,9 +44,8 @@ function getMissionById(missionId) {
   return { id, ...SCOUT_MISSIONS[id] };
 }
 
-function periodKeyForMission(mission, clientPeriodKey) {
-  const key = String(clientPeriodKey || '').trim();
-  if (key) return key.slice(0, 64);
+/** Server-authoritative period keys — client-supplied keys are ignored (anti-exploit). */
+function periodKeyForMission(mission, _clientPeriodKey) {
   return cadenceKey(mission.cadence);
 }
 

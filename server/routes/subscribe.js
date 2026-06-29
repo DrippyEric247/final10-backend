@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const { creditSavvy } = require('../services/savvyBalanceService');
 const {
   SUBSCRIPTION_TIERS,
   YEARLY_BONUS,
@@ -67,7 +68,12 @@ router.post('/', auth, async (req, res) => {
   const bonusGranted = billing === 'yearly';
   if (bonusGranted) {
     multiplier += YEARLY_BONUS.multiplierBoost;
-    user.savvyPoints = Number(user.savvyPoints || 0) + YEARLY_BONUS.savvyPointsBonus;
+    await creditSavvy(user, {
+      amount: YEARLY_BONUS.savvyPointsBonus,
+      source: 'yearly_subscription_bonus',
+      idempotencyKey: `yearly_bonus:${user._id}:${requestedTier}:${billing}`,
+      meta: { tier: requestedTier, billing },
+    });
     if (!Array.isArray(user.badges)) user.badges = [];
     if (!user.badges.includes(YEARLY_BONUS.badge)) user.badges.push(YEARLY_BONUS.badge);
   }

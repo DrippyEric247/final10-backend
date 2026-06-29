@@ -11,6 +11,7 @@ const {
   getRecipe,
 } = require('../config/eggExchangeConfig');
 const { ensurePerkMachineDoc, serializeEggInventory, getPerkMachineStatus } = require('./perkMachineService');
+const { spendSavvyReward } = require('./savvyRewardService');
 const { auditFireAndForget } = require('./securityAuditService');
 
 class EggExchangeError extends Error {
@@ -145,13 +146,24 @@ async function performEggExchange(user, exchangeType) {
     throw new EggExchangeError(409, 'INSUFFICIENT_SAVVY', 'Savvy balance changed. Please refresh and try again.');
   }
 
+  const exchangeId = crypto.randomUUID();
+
+  if (recipe.savvyRequired > 0) {
+    const spend = await spendSavvyReward(user, {
+      amount: recipe.savvyRequired,
+      source: 'egg_exchange',
+      idempotencyKey: `egg_exchange_spend:${exchangeId}`,
+      note: `Egg exchange ${recipe.exchangeType}`,
+      meta: { exchangeType: recipe.exchangeType, exchangeId },
+    });
+    if (!spend.spent && !spend.duplicate) {
+      throw new EggExchangeError(409, 'INSUFFICIENT_SAVVY', 'Savvy balance changed. Please refresh and try again.');
+    }
+  }
+
   pm.eggInventory[recipe.fromTier] = ownedFrom - recipe.eggsRequired;
   pm.eggInventory[recipe.toTier] = Number(pm.eggInventory[recipe.toTier] || 0) + 1;
 
-  user.savvyPoints = balance - recipe.savvyRequired;
-  user.pointsBalance = Math.max(0, Math.round(Number(user.pointsBalance || 0)) - recipe.savvyRequired);
-
-  const exchangeId = crypto.randomUUID();
   const historyEntry = {
     exchangeId,
     exchangeType: recipe.exchangeType,

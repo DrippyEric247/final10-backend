@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const Points = require('../models/PointsLedger');
 const CFG = require('../config/points');
+const { debitSavvy } = require('../services/savvyBalanceService');
 
 // ---- GET /api/points ----
 // returns just the points balance (for compatibility)
@@ -69,12 +70,22 @@ router.post('/redeem', auth, async (req, res) => {
       throw e;
     }
 
-    // update spendable balance (lifetime DOES NOT change)
-    user.pointsBalance = (user.pointsBalance ?? 0) - pts;
+    // update spendable balance via canonical service
+    const spend = await debitSavvy(user, {
+      amount: pts,
+      source: 'auction_redeem',
+      idempotencyKey: `redeem:${idempotencyKey}`,
+      meta: { auctionId: auctionId || 'n/a' },
+    });
+
+    if (!spend.granted && !spend.duplicate) {
+      return res.status(400).json({ error: 'Insufficient points' });
+    }
+
     await user.save();
 
     const discountUSD = pts * CFG.DISCOUNT_RATIO;
-    return res.json({ ok: true, discountUSD, newBalance: user.pointsBalance });
+    return res.json({ ok: true, discountUSD, newBalance: spend.newBalance });
   } catch (err) {
     console.error('Redeem error', err);
     return res.status(500).json({ error: 'Redeem failed' });

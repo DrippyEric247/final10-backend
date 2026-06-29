@@ -5,7 +5,7 @@
 const crypto = require('crypto');
 const { utcDayKey } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
-const { grantSavvyReward } = require('./savvyRewardService');
+const { grantSavvyReward, spendSavvyReward } = require('./savvyRewardService');
 const { getSavvyMultiplier, serializeActiveBoosts } = require('./perkBoostService');
 const { getActiveSavvySale, applySavvySaleToSpinCost, SAVVY_SALE_SPIN_COST } = require('./savvySaleService');
 const {
@@ -321,10 +321,6 @@ async function spinPerkMachine(user, options = {}) {
         err.balance = balance;
         throw err;
       }
-      if (savvyCost > 0) {
-        user.savvyPoints = balance - savvyCost;
-        user.pointsBalance = Math.max(0, Math.round(Number(user.pointsBalance || 0)) - savvyCost);
-      }
     } else {
       savvyCost = 0;
       originalSavvyCost = 0;
@@ -333,6 +329,23 @@ async function spinPerkMachine(user, options = {}) {
 
   pm.lastSpinAt = new Date();
   const spinId = crypto.randomUUID();
+
+  if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
+    const spend = await spendSavvyReward(user, {
+      amount: savvyCost,
+      source: 'perk_machine_spin',
+      idempotencyKey: `perk_spin_spend:${spinId}`,
+      note: `Perk Machine spin (${mode})`,
+      meta: { mode, spinId },
+    });
+    if (!spend.spent && !spend.duplicate) {
+      const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
+      err.status = 400;
+      err.code = 'INSUFFICIENT_SAVVY';
+      throw err;
+    }
+  }
+
   const pool = buildWeightedPool(tier, options.forceRewardId || null);
   const slots = config.slots;
   const rewards = [];

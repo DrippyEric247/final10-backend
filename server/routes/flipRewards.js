@@ -6,6 +6,7 @@ const FlipTrackedListing = require('../models/FlipTrackedListing');
 const SavvyFlipRewardLog = require('../models/SavvyFlipRewardLog');
 const PointsLedger = require('../models/PointsLedger');
 const { getEntitlementByUserId } = require('../services/premiumEntitlementService');
+const { creditSavvy } = require('../services/savvyBalanceService');
 const {
   computeListingBonusAfterFlipScore,
   computeSaleStack,
@@ -45,7 +46,18 @@ async function creditSavvyWithCap(
   if (award <= 0) {
     return { awarded: 0, capped, ledgerWritten: false };
   }
-  userDoc.savvyPoints = Number(userDoc.savvyPoints || 0) + award;
+
+  const credit = await creditSavvy(userDoc, {
+    amount: award,
+    source,
+    idempotencyKey,
+    meta: { refId, breakdown, capped, flipScoreAtCompletion },
+  });
+
+  if (credit.duplicate) {
+    return { awarded: 0, capped, ledgerWritten: true, duplicate: true };
+  }
+
   await userDoc.save();
   if (typeof userDoc.bumpWeeklyStat === 'function') {
     await userDoc.bumpWeeklyStat('savvyEarned', award);

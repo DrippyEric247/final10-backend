@@ -1,4 +1,5 @@
 const { normalizeTier } = require('../config/subscriptionPlans');
+const { creditSavvy } = require('./savvyBalanceService');
 const {
   MONTHLY_GOALS_COMPLETION_BONUS,
   DEFAULT_GOAL_REWARD_SAVVY,
@@ -262,7 +263,13 @@ async function claimMonthlyGoalsCompletionBonus(user, { monthKey = getMonthKey()
   user.scoutMonthlyGoals.lastCompletionBonusMonthKey = monthKey;
   user.scoutMonthlyGoals.lastCompletionBonusAt = new Date();
   user.scoutMonthlyGoals.lastCompletionBonusAmount = amount;
-  user.savvyPoints = num(user.savvyPoints) + amount;
+
+  await creditSavvy(user, {
+    amount,
+    source: 'monthly_goals_completion',
+    idempotencyKey: `monthly_goals_bonus:${user._id}:${monthKey}`,
+    meta: { monthKey, tier },
+  });
 
   await user.save();
 

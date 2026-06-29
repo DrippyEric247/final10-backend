@@ -49,13 +49,8 @@ savvyPointSchema.index({ type: 1 });
 // Static method to award points
 savvyPointSchema.statics.awardPoints = async function(userId, points, type, note, relatedId = null, relatedType = null, multiplier = 1) {
   try {
-    const User = require('./User');
-    
-    // Savvy balances are integer-only. Round here so a fractional multiplier
-    // (e.g. 1.5x) can never persist a fractional savvyPoints balance.
     const amt = Math.round((Number(points) || 0) * (Number(multiplier) || 1));
 
-    // Create savvy point record
     const savvyPoint = new this({
       user_id: userId,
       type: type,
@@ -64,14 +59,21 @@ savvyPointSchema.statics.awardPoints = async function(userId, points, type, note
     });
     await savvyPoint.save();
 
-    const inc = { points: amt };
     if (type === 'alert_trigger') {
-      inc.savvyPoints = amt;
-      inc.lifetimePointsEarned = amt;
-      inc.pointsBalance = amt;
+      const { creditSavvy } = require('../services/savvyBalanceService');
+      const ref = relatedId ? String(relatedId) : 'alert';
+      await creditSavvy(userId, {
+        amount: amt,
+        source: 'alert_trigger',
+        idempotencyKey: `alert_trigger:${userId}:${ref}:${amt}`,
+        note,
+        meta: { relatedId: ref, relatedType },
+      });
+      return savvyPoint;
     }
 
-    await User.findByIdAndUpdate(userId, { $inc: inc });
+    const User = require('./User');
+    await User.findByIdAndUpdate(userId, { $inc: { points: amt } });
     
     return savvyPoint;
   } catch (error) {

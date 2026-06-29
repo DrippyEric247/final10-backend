@@ -7,6 +7,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "jest",
+    "test:economy": "jest __tests__/economy-integrity.test.js --testTimeout=120000",
     "test:alert-e2e": "jest __tests__/alert-flow.e2e.test.js --testTimeout=60000",
     "build": "echo 'No build step required for Node.js'",
     "railway:deploy": "npm install && npm start"

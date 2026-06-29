@@ -16,6 +16,7 @@
  */
 
 const User = require('../models/User');
+const BattlePassProgress = require('../models/BattlePassProgress');
 const CosmeticInventory = require('../models/CosmeticInventory');
 const {
   BATTLE_PASS_TIERS,
@@ -193,16 +194,24 @@ async function claimTierReward(userId, args, opts = {}) {
   }
 
   const claimKey = tierClaimKeyV2(track, level);
-  const claimed = new Set(bp.claimedRewardIds || []);
-  if (claimed.has(claimKey)) {
+
+  const bpLocked = await BattlePassProgress.findOneAndUpdate(
+    {
+      _id: bp._id,
+      claimedRewardIds: { $ne: claimKey },
+    },
+    { $addToSet: { claimedRewardIds: claimKey } },
+    { new: true }
+  );
+
+  if (!bpLocked) {
     throw new ClaimError(409, 'ALREADY_CLAIMED', 'Reward already claimed');
   }
 
   const grant = await applyClaimReward(user, inv, reward, claimKey);
 
-  claimed.add(claimKey);
-  bp.claimedRewardIds = [...claimed];
-  bp.tier = computeTierFromXp(bp.xp || 0);
+  bpLocked.tier = computeTierFromXp(bpLocked.xp || 0);
+  Object.assign(bp, bpLocked.toObject ? bpLocked.toObject() : bpLocked);
 
   await user.save();
   await inv.save();

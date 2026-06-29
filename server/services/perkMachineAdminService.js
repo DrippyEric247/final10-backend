@@ -5,6 +5,7 @@
 const { auditFireAndForget } = require('./securityAuditService');
 const { emptyEggInventory, HATCHABLE_EGG_TIERS } = require('../config/perkMachineRewards');
 const { ensurePerkMachineDoc, getPerkMachineStatus } = require('./perkMachineService');
+const { creditSavvy } = require('./savvyBalanceService');
 
 function buildAdminLogEntry(action, adminUser, targetUser, details = {}) {
   return {
@@ -42,14 +43,19 @@ async function adminResetFreeSpin(user, adminUser) {
 
 async function adminGrantSavvy(user, amount = 500, adminUser) {
   const n = Math.round(Number(amount) || 0);
-  user.savvyPoints = Number(user.savvyPoints || 0) + n;
-  user.pointsBalance = Number(user.pointsBalance || 0) + n;
+  const runId = `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+  const credit = await creditSavvy(user, {
+    amount: n,
+    source: 'admin_perk_machine_grant',
+    idempotencyKey: `admin_perk_grant:${user._id}:${runId}`,
+    meta: { adminId: String(adminUser._id) },
+  });
   await user.save();
   const log = logAdminPerkAction('grant_savvy', adminUser, user, {
     amount: n,
-    newBalance: user.savvyPoints,
+    newBalance: credit.newBalance,
   });
-  return { savvyBalance: user.savvyPoints, adminLog: log };
+  return { savvyBalance: credit.newBalance, adminLog: log };
 }
 
 async function adminGrantEgg(user, tier = 'rare', count = 1, adminUser) {

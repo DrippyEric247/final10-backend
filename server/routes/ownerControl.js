@@ -8,6 +8,8 @@ const { authOwnerPanel } = authModule;
 const { requireOwnerAccess } = require('../middleware/requireRole');
 const { isFounderAdminEmail } = require('../lib/founderAdminAccess');
 const { buildOwnerUserRegexFilter } = require('../lib/ownerUserSearch');
+const crypto = require('crypto');
+const { creditSavvy } = require('../services/savvyBalanceService');
 const { logOwnerPanel, actorFromReq } = require('../lib/ownerPanelLog');
 const {
   buildOwnerMembershipMongoSet,
@@ -332,11 +334,15 @@ router.post('/grant-points', requireOwnerAccess, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Grant points
+    // Grant Savvy via canonical balance service
     user.points += points;
-    user.savvyPoints += points;
-    user.pointsBalance += points;
-    user.lifetimePointsEarned += points;
+
+    await creditSavvy(user, {
+      amount: points,
+      source: 'owner_grant',
+      idempotencyKey: `owner_grant:${userId}:${crypto.randomUUID()}`,
+      meta: { reason, grantedBy: req.superAdmin.username },
+    });
     
     // Add to audit trail
     user.ownerGrants = user.ownerGrants || [];

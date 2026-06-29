@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const { creditSavvy } = require('../services/savvyBalanceService');
 const Alert = require('../models/Alert');
 const Auction = require('../models/Auction');
 
@@ -149,9 +150,13 @@ router.post('/claim-reward', auth, async (req, res) => {
 
     // Award the reward
     const reward = COMMUNITY_GOALS[completedGoal].reward;
-    
-    // Add points
-    user.savvyPoints += reward.points;
+
+    await creditSavvy(user, {
+      amount: reward.points,
+      source: 'community_goal',
+      idempotencyKey: `community_goal_${user._id}_${completedGoal}`,
+      meta: { completedGoal },
+    });
     
     // Add subscription months
     const currentDate = new Date();

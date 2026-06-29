@@ -6,6 +6,7 @@ const PromotionPackage = require('../models/PromotionPackage');
 const PromotionPayment = require('../models/PromotionPayment');
 const User = require('../models/User');
 const PointsLedger = require('../models/PointsLedger');
+const { creditSavvy } = require('../services/savvyBalanceService');
 const auth = require('../middleware/auth');
 
 // Apply auth middleware to all routes
@@ -351,8 +352,13 @@ router.post('/watch/:listingId', async (req, res) => {
         mutedOffers: false,
         savvyAwardedAt: new Date(),
       });
-      user.savvyPoints = Number(user.savvyPoints || 0) + WATCH_SAVVY_BONUS;
       savvyAwarded = WATCH_SAVVY_BONUS;
+      await creditSavvy(user, {
+        amount: WATCH_SAVVY_BONUS,
+        source: 'watch_listing',
+        idempotencyKey: `watch_listing_${user._id}_${listingId}`,
+        meta: { refId: listingId },
+      });
       await PointsLedger.create({
         userId: user._id,
         type: 'earn',
@@ -596,7 +602,12 @@ router.post('/private-offers/:offerId/claim', async (req, res) => {
 
     inboxItem.claimedAt = new Date();
     inboxItem.status = 'claimed';
-    user.savvyPoints = Number(user.savvyPoints || 0) + BUYER_CLAIM_OFFER_SAVVY;
+    await creditSavvy(user, {
+      amount: BUYER_CLAIM_OFFER_SAVVY,
+      source: 'private_offer_claim',
+      idempotencyKey: `private_offer_claim_${user._id}_${offerId}`,
+      meta: { refId: offerId },
+    });
     await user.save();
     await PointsLedger.create({
       userId: user._id,
@@ -615,7 +626,12 @@ router.post('/private-offers/:offerId/claim', async (req, res) => {
 
     const seller = await User.findById(promotion.user);
     if (seller) {
-      seller.savvyPoints = Number(seller.savvyPoints || 0) + SELLER_CONVERSION_SAVVY;
+      await creditSavvy(seller, {
+        amount: SELLER_CONVERSION_SAVVY,
+        source: 'private_offer_conversion',
+        idempotencyKey: `private_offer_conversion_${seller._id}_${offerId}_${user._id}`,
+        meta: { refId: offerId },
+      });
       await seller.save();
       await PointsLedger.create({
         userId: seller._id,
