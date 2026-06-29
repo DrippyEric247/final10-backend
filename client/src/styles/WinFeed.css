@@ -260,6 +260,13 @@
   width: 100%;
 }
 .wf-search input::placeholder { color: #64748b; }
+.wf-search-icon {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+.wf-btn-icon {
+  flex-shrink: 0;
+}
 
 /* ---------- Feed grid ---------- */
 

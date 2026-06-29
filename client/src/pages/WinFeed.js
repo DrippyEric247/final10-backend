@@ -26,6 +26,8 @@ import {
 import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
 import Final10SocialLinks from "../components/Final10SocialLinks";
 import CallingCard from "../components/CallingCard";
+import EmptyState from "../components/ui/states/EmptyState";
+import { Search, Trophy } from "lucide-react";
 import "../styles/WinFeed.css";
 
 const FILTERS = [
@@ -626,7 +628,8 @@ export default function WinFeed() {
               className="wf-btn wf-btn--primary wf-btn--lg"
               onClick={() => setModalOpen(true)}
             >
-              <span aria-hidden>🏆</span> Post your win
+              <Trophy className="wf-btn-icon" size={18} aria-hidden />
+              Post your win
             </button>
             <div className="wf-hero-chips">
               <span>+100 base pts</span>
@@ -727,7 +730,7 @@ export default function WinFeed() {
           ))}
         </div>
         <label className="wf-search" aria-label="Search wins">
-          <span aria-hidden>🔎</span>
+          <Search className="wf-search-icon" size={16} aria-hidden />
           <input
             type="text"
             placeholder="Search title, tag, or @user"
@@ -738,17 +741,20 @@ export default function WinFeed() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="wf-empty">
-          <h3>No wins match that filter yet.</h3>
-          <p>Try a different tab or be the first to post a win in this category.</p>
-          <button
-            type="button"
-            className="wf-btn wf-btn--primary"
-            onClick={() => setModalOpen(true)}
-          >
-            Post your win
-          </button>
-        </div>
+        <EmptyState
+          className="wf-empty f10-state--page"
+          title="No wins match that filter yet"
+          description="Try a different tab or be the first to post a win in this category."
+          action={
+            <button
+              type="button"
+              className="wf-btn wf-btn--primary"
+              onClick={() => setModalOpen(true)}
+            >
+              Post your win
+            </button>
+          }
+        />
       ) : (
         <div className="wf-grid">
           {filtered.map((w) => (
