@@ -126,6 +126,8 @@ const userSchema = new mongoose.Schema({
       ],
       default: [],
     },
+    /** Spins toward next Scout Flight Tournament Ticket (resets on award). */
+    ticketSpinProgress: { type: Number, default: 0 },
   },
   /** Beta live-event placeholder inventory (Scout Flight tickets, beacons, etc.) */
   eventInventory: {

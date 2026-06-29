@@ -748,11 +748,194 @@
 
 .perk-eggs-panel,
 .perk-tokens-panel,
-.perk-history-panel {
+.perk-history-panel,
+.perk-ticket-progress {
   border-radius: 16px;
   border: 1px solid rgba(31, 61, 46, 0.9);
   background: linear-gradient(160deg, rgba(16, 26, 20, 0.95), rgba(5, 8, 6, 0.98));
   padding: 1rem;
+}
+
+.perk-ticket-progress {
+  margin-top: 0.75rem;
+  border-color: rgba(245, 185, 66, 0.35);
+  background: linear-gradient(160deg, rgba(26, 20, 8, 0.95), rgba(8, 6, 4, 0.98));
+  transition: box-shadow 0.35s ease, transform 0.35s ease;
+}
+
+.perk-ticket-progress--pulse {
+  animation: perk-ticket-pulse 0.85s ease;
+}
+
+@keyframes perk-ticket-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(245, 185, 66, 0);
+  }
+  40% {
+    transform: scale(1.02);
+    box-shadow: 0 0 32px rgba(245, 185, 66, 0.45);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(245, 185, 66, 0);
+  }
+}
+
+.perk-ticket-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.perk-ticket-progress__title {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fcd34d;
+}
+
+.perk-ticket-progress__owned {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #86efac;
+  white-space: nowrap;
+}
+
+.perk-ticket-progress__bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(245, 185, 66, 0.25);
+  overflow: hidden;
+}
+
+.perk-ticket-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ca8a04, #fcd34d, #fde68a);
+  box-shadow: 0 0 12px rgba(252, 211, 77, 0.55);
+  transition: width 0.45s ease;
+}
+
+.perk-ticket-progress__label {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+}
+
+.perk-ticket-progress__label strong {
+  color: #fcd34d;
+}
+
+.perk-ticket-progress__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.perk-ticket-unlock {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  animation: perk-ticket-unlock-bg 0.35s ease;
+}
+
+@keyframes perk-ticket-unlock-bg {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.perk-ticket-unlock__card {
+  max-width: 340px;
+  width: 100%;
+  padding: 1.35rem 1.25rem;
+  border-radius: 18px;
+  border: 2px solid rgba(252, 211, 77, 0.65);
+  background: linear-gradient(165deg, rgba(42, 32, 8, 0.98), rgba(12, 10, 6, 0.98));
+  box-shadow:
+    0 0 48px rgba(252, 211, 77, 0.35),
+    0 16px 40px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: perk-ticket-unlock-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes perk-ticket-unlock-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.75) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.perk-ticket-unlock__icon {
+  display: block;
+  font-size: 2.75rem;
+  margin-bottom: 0.35rem;
+  animation: perk-ticket-unlock-icon 0.9s ease;
+}
+
+@keyframes perk-ticket-unlock-icon {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  35% {
+    transform: scale(1.15) rotate(-8deg);
+  }
+  65% {
+    transform: scale(1.1) rotate(8deg);
+  }
+}
+
+.perk-ticket-unlock__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #fcd34d;
+  letter-spacing: 0.02em;
+}
+
+.perk-ticket-unlock__message {
+  margin: 0.45rem 0 0;
+  font-size: 0.92rem;
+  color: #f8fafc;
+  line-height: 1.4;
+}
+
+.perk-ticket-unlock__count {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: #86efac;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .perk-ticket-progress {
+    margin-top: 0.65rem;
+  }
+
+  .perk-ticket-progress__title {
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
 }
 
 .perk-eggs-panel__title,

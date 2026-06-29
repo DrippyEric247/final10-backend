@@ -13,6 +13,10 @@ import {
   loadSavedDifficulty,
   saveDifficulty,
   applyDifficultyToScout,
+  getScoutCollisionRadius,
+  loadDebugHitboxEnabled,
+  saveDebugHitboxEnabled,
+  isDebugHitboxAllowed,
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
 import '../styles/ScoutFlight.css';
@@ -167,6 +171,31 @@ function drawComboPopup(ctx, p) {
   ctx.restore();
 }
 
+function drawScoutHitboxDebug(ctx, game) {
+  const s = game.scout;
+  const r = getScoutCollisionRadius(game);
+  const cx = s.x + s.w / 2;
+  const cy = s.y + s.h / 2;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(s.x, s.y, s.w, s.h);
+
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.75)';
+  ctx.font = '9px system-ui,sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${s.w}×${s.h}`, s.x + 2, s.y - 4);
+  ctx.restore();
+}
+
 function drawGround(ctx, w, h, groundH) {
   const g = ctx.createLinearGradient(0, h - groundH, 0, h);
   g.addColorStop(0, '#3b0764');
@@ -203,7 +232,11 @@ export default function ScoutFlightGame() {
   const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
   const [difficultyId, setDifficultyId] = useState(() => loadSavedDifficulty());
+  const [debugHitbox, setDebugHitbox] = useState(() => loadDebugHitboxEnabled());
+  const debugAllowed = isDebugHitboxAllowed();
   const selectableDifficulties = getSelectableDifficulties();
+  const isPracticeMode = difficultyId === 'PRACTICE';
+  const isTournamentMode = difficultyId === 'TOURNAMENT';
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
@@ -265,6 +298,8 @@ export default function ScoutFlightGame() {
     for (const c of game.coins) drawCoin(ctx, c, ts);
 
     const s = game.scout;
+    const spriteW = s.spriteW ?? s.w;
+    const spriteH = s.spriteH ?? s.h;
     ctx.save();
     ctx.translate(s.x + s.w / 2, s.y + s.h / 2);
     ctx.rotate(s.rot || 0);
@@ -272,14 +307,18 @@ export default function ScoutFlightGame() {
     if (img?.complete) {
       ctx.shadowColor = 'rgba(168, 85, 247, 0.65)';
       ctx.shadowBlur = 18;
-      ctx.drawImage(img, -s.w / 2, -s.h / 2, s.w, s.h);
+      ctx.drawImage(img, -spriteW / 2, -spriteH / 2, spriteW, spriteH);
     } else {
       ctx.fillStyle = '#7c3aed';
       ctx.beginPath();
-      ctx.arc(0, 0, s.w / 2, 0, Math.PI * 2);
+      ctx.arc(0, 0, spriteW / 2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
+
+    if (debugAllowed && debugHitbox) {
+      drawScoutHitboxDebug(ctx, game);
+    }
 
     for (const p of game.coinPopups) drawCoinPopup(ctx, p);
     for (const p of game.comboPopups) drawComboPopup(ctx, p);
@@ -304,7 +343,7 @@ export default function ScoutFlightGame() {
     }
 
     rafRef.current = requestAnimationFrame(drawFrame);
-  }, []);
+  }, [debugAllowed, debugHitbox]);
 
   useEffect(() => {
     const img = new Image();
@@ -330,6 +369,15 @@ export default function ScoutFlightGame() {
     if (gameRef.current) {
       applyDifficultyToScout(gameRef.current, saved);
     }
+  }, []);
+
+  const handleDebugHitboxToggle = useCallback((e) => {
+    e.stopPropagation();
+    setDebugHitbox((prev) => {
+      const next = !prev;
+      saveDebugHitboxEnabled(next);
+      return next;
+    });
   }, []);
 
   const handleInput = useCallback((e) => {
@@ -366,22 +414,38 @@ export default function ScoutFlightGame() {
 
       <div
         ref={wrapRef}
-        className="scout-flight-stage"
+        className={`scout-flight-stage${isPracticeMode ? ' scout-flight-stage--practice' : ''}`}
         role="application"
         aria-label="Savvy Scout Flight mini-game"
         onPointerDown={handleInput}
         onTouchStart={handleInput}
       >
+        {isPracticeMode ? (
+          <div className="scout-flight-practice-header" aria-label="Practice Mode">
+            <h2 className="scout-flight-practice-header__title">🎮 Practice Mode</h2>
+            <p className="scout-flight-practice-header__subtitle">
+              Train here. Compete for Savvy Points in Tournament.
+            </p>
+          </div>
+        ) : null}
         <canvas ref={canvasRef} className="scout-flight-canvas" />
 
         {uiPhase === PHASE.IDLE ? (
           <div className="scout-flight-overlay scout-flight-overlay--start">
-            <div className="scout-flight-logo">
-              <span className="scout-flight-logo__wings">🪽</span>
-              <h1>SAVVY SCOUT FLIGHT</h1>
-              <span className="scout-flight-logo__wings">🪽</span>
-            </div>
-            <p className="scout-flight-tagline">Collect Savvy Coins. Dodge the hazards.</p>
+            {!isPracticeMode ? (
+              <>
+                <div className="scout-flight-logo">
+                  <span className="scout-flight-logo__wings">🪽</span>
+                  <h1>SAVVY SCOUT FLIGHT</h1>
+                  <span className="scout-flight-logo__wings">🪽</span>
+                </div>
+                <p className="scout-flight-tagline">Collect Savvy Coins. Dodge the hazards.</p>
+              </>
+            ) : (
+              <p className="scout-flight-practice-intro">
+                Most forgiving hitbox — perfect for learning pipes and coin routes.
+              </p>
+            )}
             <section className="scout-flight-difficulty" aria-label="Difficulty">
               <h2 className="scout-flight-difficulty__title">Difficulty</h2>
               <div className="scout-flight-difficulty__options" role="radiogroup" aria-label="Select difficulty">
@@ -410,9 +474,29 @@ export default function ScoutFlightGame() {
                 })}
               </div>
             </section>
+            {debugAllowed ? (
+              <label
+                className="scout-flight-debug-toggle"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={debugHitbox}
+                  onChange={handleDebugHitboxToggle}
+                />
+                Show hitbox overlay (testing)
+              </label>
+            ) : null}
             <img src={SCOUT_IMG} alt="" className="scout-flight-scout-preview" />
             <p className="scout-flight-hint">Tap or click to launch</p>
-            <p className="scout-flight-note">Score is local only — rewards coming soon.</p>
+            <p className="scout-flight-note">
+              {isPracticeMode
+                ? 'Practice runs are local only — earn Tournament Tickets on the Perk Machine to compete for Savvy Points.'
+                : isTournamentMode
+                  ? 'Tournament Mode — compete for Savvy Points. Requires a Tournament Ticket from the Perk Machine.'
+                  : 'Score is local only. Select Tournament when you have a ticket.'}
+            </p>
           </div>
         ) : null}
 

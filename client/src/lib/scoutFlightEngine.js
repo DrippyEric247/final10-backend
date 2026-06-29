@@ -9,7 +9,7 @@ import {
   DEFAULT_DIFFICULTY_ID,
 } from './scoutFlightDifficulty';
 
-export { SCOUT_FLIGHT_DIFFICULTY, getSelectableDifficulties, getDifficultyConfig, loadSavedDifficulty, saveDifficulty, applyDifficultyToScout } from './scoutFlightDifficulty';
+export { SCOUT_FLIGHT_DIFFICULTY, getSelectableDifficulties, getDifficultyConfig, loadSavedDifficulty, saveDifficulty, applyDifficultyToScout, SCOUT_SPRITE_SIZE, loadDebugHitboxEnabled, saveDebugHitboxEnabled, isDebugHitboxAllowed } from './scoutFlightDifficulty';
 
 export const PHASE = Object.freeze({
   IDLE: 'idle',
@@ -63,10 +63,11 @@ function saveBest(n) {
   }
 }
 
-export function createGame(width, height, difficultyId = loadSavedDifficulty()) {
+export function createGame(width, height, difficultyId = loadSavedDifficulty(), opts = {}) {
   const groundH = Math.max(36, Math.round(height * 0.08));
   const scoutX = Math.round(width * 0.22);
   const resolvedDifficulty = difficultyId || DEFAULT_DIFFICULTY_ID;
+  const simMode = Boolean(opts.simMode);
 
   const game = {
     width,
@@ -75,14 +76,18 @@ export function createGame(width, height, difficultyId = loadSavedDifficulty()) 
     scoutX,
     phase: PHASE.IDLE,
     score: 0,
-    best: loadBest(),
+    best: simMode ? 0 : loadBest(),
+    simMode,
     difficultyId: resolvedDifficulty,
+    hitPad: HIT_PAD,
     scout: {
       x: scoutX,
       y: height / 2,
       vy: 0,
-      w: 47,
-      h: 47,
+      w: 42,
+      h: 42,
+      spriteW: 47,
+      spriteH: 47,
       rot: 0,
       flapPulse: 0,
     },
@@ -112,6 +117,7 @@ export function resetGame(game) {
 export function startGame(game) {
   game.phase = PHASE.PLAYING;
   game.score = 0;
+  game.elapsed = 0;
   game.scout.y = game.height / 2 - game.scout.h / 2;
   game.scout.vy = 0;
   game.scout.rot = 0;
@@ -124,7 +130,7 @@ export function startGame(game) {
   game.comboCount = 0;
   game.isNewBest = false;
   game.events = [];
-  game.lastSpawn = game.elapsed;
+  game.lastSpawn = 0;
 }
 
 export function flap(game) {
@@ -177,7 +183,7 @@ function circleRectHit(cx, cy, cr, rx, ry, rw, rh) {
 
 function scoutHitsObstacle(game) {
   const s = game.scout;
-  const pad = HIT_PAD;
+  const pad = game.hitPad ?? HIT_PAD;
   for (const o of game.obstacles) {
     if (
       circleRectHit(s.x + s.w / 2, s.y + s.h / 2, s.w / 2 - pad, o.x, 0, o.w, o.topH) ||
@@ -232,7 +238,7 @@ function collectCoin(game, c) {
 function endGame(game) {
   game.phase = PHASE.GAMEOVER;
   const prevBest = game.best;
-  if (game.score > game.best) {
+  if (!game.simMode && game.score > game.best) {
     game.best = game.score;
     game.isNewBest = true;
     saveBest(game.best);
@@ -332,6 +338,12 @@ export function restartGame(game) {
   next.best = best;
   startGame(next);
   return next;
+}
+
+export function getScoutCollisionRadius(game) {
+  const s = game?.scout;
+  if (!s) return 0;
+  return Math.max(0, s.w / 2 - (game.hitPad ?? HIT_PAD));
 }
 
 /** @returns {number} Coins until next combo bonus */

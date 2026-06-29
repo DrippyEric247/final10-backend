@@ -21,6 +21,10 @@ const {
   pickResultMessage,
   emptyEggInventory,
 } = require('../config/perkMachineRewards');
+const {
+  buildTournamentTicketProgress,
+  recordSpinForTournamentTicket,
+} = require('./scoutFlightTicketService');
 
 function ensurePerkMachineDoc(user) {
   if (!user.perkMachine || typeof user.perkMachine !== 'object') {
@@ -36,6 +40,7 @@ function ensurePerkMachineDoc(user) {
   if (typeof pm.tokens.paid3Spin !== 'number') pm.tokens.paid3Spin = 0;
   if (typeof pm.callingCardDrops !== 'number') pm.callingCardDrops = 0;
   if (typeof pm.scoutUpgrades !== 'number') pm.scoutUpgrades = 0;
+  if (typeof pm.ticketSpinProgress !== 'number') pm.ticketSpinProgress = 0;
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
   return pm;
 }
@@ -136,6 +141,7 @@ function getPerkMachineStatus(user) {
     scoutUpgrades: Number(pm.scoutUpgrades) || 0,
     activeBoosts: serializeActiveBoosts(user),
     recentSpins: serializeHistory(pm).slice(0, 10),
+    tournamentTicketProgress: buildTournamentTicketProgress(user, pm),
     spinCosts: {
       free: getSpinConfig(SPIN_MODES.FREE),
       paid_1: getSpinConfig(SPIN_MODES.PAID_1),
@@ -386,6 +392,8 @@ async function spinPerkMachine(user, options = {}) {
     pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
   }
 
+  const ticketResult = recordSpinForTournamentTicket(user, pm);
+
   user.markModified('perkMachine');
   await user.save();
 
@@ -418,6 +426,7 @@ async function spinPerkMachine(user, options = {}) {
     savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
     savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
     originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
+    tournamentTicket: ticketResult,
     status: await getPerkMachineStatusWithEvents(user),
   };
 }

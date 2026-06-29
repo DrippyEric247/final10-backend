@@ -76,6 +76,51 @@
     inset 0 0 48px rgba(88, 28, 135, 0.12);
 }
 
+.scout-flight-stage--practice {
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow:
+    0 0 28px rgba(59, 130, 246, 0.18),
+    inset 0 0 40px rgba(30, 58, 138, 0.12);
+}
+
+.scout-flight-practice-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  padding: 0.55rem 0.75rem 0.5rem;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(6, 4, 15, 0.92) 0%, rgba(6, 4, 15, 0.55) 75%, transparent 100%);
+  pointer-events: none;
+}
+
+.scout-flight-practice-header__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #93c5fd;
+}
+
+.scout-flight-practice-header__subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #cbd5e1;
+  max-width: 280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.scout-flight-practice-intro {
+  margin: 0 0 0.65rem;
+  max-width: 300px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #bfdbfe;
+}
+
 .scout-flight-canvas {
   display: block;
   width: 100%;
@@ -165,6 +210,21 @@
   font-size: 0.68rem;
   line-height: 1.35;
   color: #94a3b8;
+}
+
+.scout-flight-debug-toggle {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  color: #86efac;
+  cursor: pointer;
+}
+
+.scout-flight-debug-toggle input {
+  accent-color: #22c55e;
 }
 
 .scout-flight-go-mode {

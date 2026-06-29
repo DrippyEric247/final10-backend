@@ -17,6 +17,8 @@ import PerkMachineAdminPanel from '../components/perk/PerkMachineAdminPanel';
 import PerkMachineScoutFloater from '../components/perk/PerkMachineScoutFloater';
 import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import EggHatchery from '../components/perk/EggHatchery';
+import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournamentProgress';
+import { playTournamentTicketUnlockSound } from '../lib/tournamentTicketSound';
 import { SavvySalePerkBadge } from '../components/events/SavvySaleBanner';
 import '../styles/PerkMachine.css';
 import '../styles/EggHatchery.css';
@@ -146,6 +148,8 @@ export default function PerkMachine() {
   const [activating, setActivating] = useState(false);
   const [boostNow, setBoostNow] = useState(Date.now());
   const [saleMs, setSaleMs] = useState(0);
+  const [ticketProgressPulse, setTicketProgressPulse] = useState(false);
+  const [ticketUnlock, setTicketUnlock] = useState(null);
   const spinLock = useRef(false);
   const machinePanelRef = useRef(null);
   const toastTimer = useRef(null);
@@ -160,6 +164,19 @@ export default function PerkMachine() {
     setCoinBurst((n) => n + 1);
     setBalanceBump(true);
     window.setTimeout(() => setBalanceBump(false), 1400);
+  }, []);
+
+  const showTicketUnlock = useCallback((ticketResult) => {
+    if (!ticketResult?.ticketEarned) return;
+    playTournamentTicketUnlockSound();
+    setTicketUnlock({
+      id: Date.now(),
+      ticketsEarned: ticketResult.ticketsEarned || 1,
+      ticketsOwned: ticketResult.tournamentTicketProgress?.ticketsOwned ?? 1,
+    });
+    setTicketProgressPulse(true);
+    window.setTimeout(() => setTicketProgressPulse(false), 1800);
+    window.setTimeout(() => setTicketUnlock(null), 4200);
   }, []);
 
   useEffect(() => {
@@ -363,10 +380,16 @@ export default function PerkMachine() {
           rewards,
           result.message || result.resultMessage || 'Nice pull, Operator.',
           () => {
+            if (result.tournamentTicket?.ticketEarned) {
+              showTicketUnlock(result.tournamentTicket);
+            } else if (result.status?.tournamentTicketProgress) {
+              setTicketProgressPulse(true);
+              window.setTimeout(() => setTicketProgressPulse(false), 700);
+            }
             if (savvyWin > 0) {
               fireCoinBurst();
               showConfirm(`+${savvyWin.toLocaleString()} Savvy added to wallet`);
-            } else {
+            } else if (!result.tournamentTicket?.ticketEarned) {
               showConfirm('Balance updated');
             }
           }
@@ -379,7 +402,7 @@ export default function PerkMachine() {
         spinLock.current = false;
       }
     },
-    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm]
+    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock]
   );
 
   const handleHatch = useCallback(
@@ -576,6 +599,11 @@ export default function PerkMachine() {
             )}
           </div>
 
+          <PerkMachineTournamentProgress
+            progress={status?.tournamentTicketProgress}
+            pulse={ticketProgressPulse}
+          />
+
           {error ? (
             <div className="perk-error" role="alert">
               {error}
@@ -744,6 +772,12 @@ export default function PerkMachine() {
                 <span className="perk-inv-item__label">🎖️ Calling Cards</span>
                 <span className="perk-inv-item__right"><strong>{status?.callingCardDrops ?? 0}</strong></span>
               </li>
+              <li className="perk-inv-item perk-inv-item--passive">
+                <span className="perk-inv-item__label">🎫 Scout Flight Tickets</span>
+                <span className="perk-inv-item__right">
+                  <strong>{status?.tournamentTicketProgress?.ticketsOwned ?? 0}</strong>
+                </span>
+              </li>
             </ul>
           </div>
 
@@ -818,6 +852,19 @@ export default function PerkMachine() {
                 {activating ? 'Activating…' : 'Activate'}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {ticketUnlock ? (
+        <div className="perk-ticket-unlock" role="alert" aria-live="assertive" key={ticketUnlock.id}>
+          <div className="perk-ticket-unlock__card">
+            <span className="perk-ticket-unlock__icon" aria-hidden>🎫</span>
+            <h3 className="perk-ticket-unlock__title">Tournament Ticket Earned!</h3>
+            <p className="perk-ticket-unlock__message">Ready to compete for Savvy Points.</p>
+            <p className="perk-ticket-unlock__count">
+              {ticketUnlock.ticketsOwned} ticket{ticketUnlock.ticketsOwned === 1 ? '' : 's'} in inventory
+            </p>
           </div>
         </div>
       ) : null}
