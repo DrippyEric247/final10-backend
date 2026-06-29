@@ -22,23 +22,16 @@ const {
   getEntitlementByUserId,
 } = require('./premiumEntitlementService');
 const { validateStrictEventPayload } = require('../validation/progressionEventsStrict');
-const { assertEventTrustOrDeny } = require('./progressionTrustService');
+const { assertEventTrustOrDeny, assertClientOriginEventAllowed } = require('./progressionTrustService');
 const { grantSavvyReward } = require('./savvyRewardService');
+const {
+  CLIENT_ALLOWED_EVENT_TYPES,
+  ALL_BATTLE_PASS_EVENT_TYPES,
+  SERVER_ONLY_EVENT_TYPES,
+} = require('../config/battlePassTrust');
 
 /** HTTP-accepted events only (no synthetic `task_completed` from clients). */
-const INCOMING_EVENT_TYPES = new Set([
-  'daily_login_claimed',
-  'power_boost_claimed',
-  'auction_scanned',
-  'bid_placed',
-  'auction_won',
-  'savvy_points_earned',
-  'streak_updated',
-  'rank_changed',
-  'power_multiplier_changed',
-  'buy_now_scanned',
-  'recommended_deal_viewed',
-]);
+const INCOMING_EVENT_TYPES = CLIENT_ALLOWED_EVENT_TYPES;
 
 const DEFAULT_STARTER_UNLOCKS = ['sigil_starter', 'card_default'];
 
@@ -180,11 +173,12 @@ function syncTaskProgressArray(bpDoc, updatedTasks) {
   bpDoc.completedTaskIds = updatedTasks.filter((t) => t.completed).map((t) => t.id);
 }
 
-function normalizeClientEvent(event, serverUserId) {
+function normalizeClientEvent(event, serverUserId, options = {}) {
   if (!event || typeof event !== 'object') return null;
   const { id, type, timestamp, payload } = event;
   if (typeof id !== 'string' || !id.length) return null;
-  if (typeof type !== 'string' || !INCOMING_EVENT_TYPES.has(type)) return null;
+  const allowed = options.trustedServerOrigin ? ALL_BATTLE_PASS_EVENT_TYPES : INCOMING_EVENT_TYPES;
+  if (typeof type !== 'string' || !allowed.has(type)) return null;
   if (!payload || typeof payload !== 'object') return null;
   return {
     id,
@@ -232,7 +226,7 @@ async function progressionStateForResponse(userId) {
 }
 
 async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) {
-  const { req: auditReq } = options;
+  const { req: auditReq, trustedServerOrigin = false } = options;
   const season = getSeasonTaskDefinition(seasonId);
   if (!season) {
     const state = await progressionStateForResponse(userId);
@@ -242,13 +236,58 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
     };
   }
 
-  const event = normalizeClientEvent(rawEvent, userId);
+  if (
+    !trustedServerOrigin &&
+    rawEvent &&
+    typeof rawEvent.type === 'string' &&
+    SERVER_ONLY_EVENT_TYPES.has(rawEvent.type)
+  ) {
+    auditFireAndForget('PROGRESSION_TRUST_REJECTED', {
+      userId,
+      req: auditReq,
+      meta: { code: 'TRUST_SERVER_EVENT_ONLY', eventId: rawEvent.id, type: rawEvent.type, stage: 'client_origin' },
+      severity: 'warn',
+    });
+    const state = await progressionStateForResponse(userId);
+    return {
+      httpError: {
+        status: 403,
+        body: {
+          code: 'TRUST_SERVER_EVENT_ONLY',
+          message: 'This progression event must be recorded by the server from a verified action.',
+        },
+      },
+      state,
+    };
+  }
+
+  const event = normalizeClientEvent(rawEvent, userId, { trustedServerOrigin });
   if (!event) {
     const state = await progressionStateForResponse(userId);
     return {
       httpError: { status: 400, body: { code: 'INVALID_EVENT', message: 'Malformed battle pass event' } },
       state,
     };
+  }
+
+  if (!trustedServerOrigin) {
+    const clientOrigin = assertClientOriginEventAllowed(event.type);
+    if (!clientOrigin.ok) {
+      auditFireAndForget('PROGRESSION_TRUST_REJECTED', {
+        userId,
+        req: auditReq,
+        meta: { code: clientOrigin.code, eventId: event.id, type: event.type, stage: 'client_origin' },
+        severity: 'warn',
+      });
+      const state = await progressionStateForResponse(userId);
+      return {
+        httpError: {
+          status: 403,
+          body: { code: clientOrigin.code, message: clientOrigin.message },
+        },
+        state,
+      };
+    }
   }
 
   const strict = validateStrictEventPayload(event.type, event.payload);
@@ -304,6 +343,8 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
   if (!user) {
     return { httpError: { status: 404, body: { code: 'USER_NOT_FOUND', message: 'User not found' } } };
   }
+
+  const powerMultBefore = user.powerMultiplier ?? 1;
 
   let { bp, inv } = await ensureProgressDocuments(userId);
   await reconcileBattlePassPremiumFromEntitlement(userId);
@@ -396,6 +437,23 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
   await user.save();
   await inv.save();
   await bp.save();
+
+  const powerMultAfter = user.powerMultiplier ?? 1;
+  if (Math.abs(powerMultBefore - powerMultAfter) > 1e-9) {
+    setImmediate(() => {
+      try {
+        const { onPowerMultiplierChangedForBattlePass } = require('./progressionServerEventsService');
+        void onPowerMultiplierChangedForBattlePass(
+          userId,
+          powerMultBefore,
+          powerMultAfter,
+          `bp_event:${event.id}:pm`
+        );
+      } catch (_e) {
+        /* BP power emit must not fail primary event */
+      }
+    });
+  }
 
   await BattlePassEventLog.updateOne(
     { userId, eventId: event.id },

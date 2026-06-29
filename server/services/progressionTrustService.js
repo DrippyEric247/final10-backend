@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const ProgressionScanDeck = require('../models/ProgressionScanDeck');
 const ProgressionActionToken = require('../models/ProgressionActionToken');
 const { isProduction } = require('../config/envValidation');
+const { SERVER_ONLY_EVENT_TYPES } = require('../config/battlePassTrust');
 
 const SCAN_DECK_MS = 12 * 60 * 1000;
 const BID_TOKEN_MS = 15 * 60 * 1000;
@@ -97,6 +98,22 @@ async function consumeActionToken(userId, listingId, purpose, token) {
 }
 
 /**
+ * Reject client-originated events that must only be emitted server-side.
+ * @returns {{ ok: true } | { ok: false, code: string, message: string }}
+ */
+function assertClientOriginEventAllowed(eventType) {
+  if (!trustRequired()) return { ok: true };
+  if (SERVER_ONLY_EVENT_TYPES.has(eventType)) {
+    return {
+      ok: false,
+      code: 'TRUST_SERVER_EVENT_ONLY',
+      message: 'This progression event must be recorded by the server from a verified action.',
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Enforce trusted context for high-risk event types (production only unless bypass).
  * @returns {Promise<{ ok: true } | { ok: false, code: string, message: string }>}
  */
@@ -165,6 +182,7 @@ module.exports = {
   listingInScanDeck,
   issueBidFlowTokens,
   consumeActionToken,
+  assertClientOriginEventAllowed,
   assertEventTrustOrDeny,
   SCAN_DECK_MS,
 };

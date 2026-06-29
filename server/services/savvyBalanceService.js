@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const SavvyTransaction = require('../models/SavvyTransaction');
 const { auditRewardGrant } = require('./auditLogger');
+const { shouldEmitBattlePassProgress } = require('../config/battlePassTrust');
 
 class InsufficientSavvyError extends Error {
   constructor(balance, required) {
@@ -178,6 +179,16 @@ async function adjustSavvyBalance(userOrId, {
       amount: amt,
       idempotencyKey,
       newBalance: balanceAfter,
+    });
+
+    setImmediate(() => {
+      try {
+        if (!shouldEmitBattlePassProgress()) return;
+        const { onSavvyCreditedForBattlePass } = require('./progressionServerEventsService');
+        void onSavvyCreditedForBattlePass(String(userId), amt, source || rewardType, idempotencyKey);
+      } catch (_e) {
+        /* non-blocking */
+      }
     });
   }
 

@@ -12,6 +12,7 @@ const {
   daysBetween,
 } = require('../config/dailyStreakRewards');
 const { grantSavvyReward } = require('./savvyRewardService');
+const { shouldEmitBattlePassProgress } = require('../config/battlePassTrust');
 const { ensureProgressDocuments } = require('./battlePassPersistenceService');
 const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
 const { isKnownCosmeticId } = require('../data/cosmeticIds');
@@ -432,6 +433,14 @@ async function claimDailyStreak(user) {
   }
 
   await user.save();
+
+  try {
+    if (!shouldEmitBattlePassProgress()) return;
+    const { onDailyStreakClaimedForBattlePass } = require('./progressionServerEventsService');
+    await onDailyStreakClaimedForBattlePass(user._id, streak, today);
+  } catch (_e) {
+    /* streak claim must succeed even if BP emit fails */
+  }
 
   const scoutMessage = comeback?.scoutMessage
     ? comeback.scoutMessage

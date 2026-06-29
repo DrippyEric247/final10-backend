@@ -21,6 +21,9 @@ const battlePassProgressSchema = new mongoose.Schema(
     completedTaskIds: [{ type: String }],
     claimedRewardIds: [{ type: String }],
     taskProgress: [taskProgressEntrySchema],
+    /** Savvy-leaderboard rank anchor for season climb missions (server-maintained). */
+    seasonRankAnchor: { type: Number, default: null },
+    lastKnownLeaderboardRank: { type: Number, default: null },
     /** Neon Hunt style premium track unlock (separate from membershipTier). */
     premiumUnlocked: { type: Boolean, default: false },
   },

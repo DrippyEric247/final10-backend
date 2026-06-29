@@ -9,6 +9,7 @@
     "test": "jest",
     "test:economy": "jest __tests__/economy-integrity.test.js --testTimeout=120000",
     "test:referral": "jest __tests__/referral-integrity.test.js --testTimeout=120000",
+    "test:battle-pass-trust": "jest __tests__/battle-pass-trust.test.js --testTimeout=120000",
     "test:alert-e2e": "jest __tests__/alert-flow.e2e.test.js --testTimeout=60000",
     "build": "echo 'No build step required for Node.js'",
     "railway:deploy": "npm install && npm start"

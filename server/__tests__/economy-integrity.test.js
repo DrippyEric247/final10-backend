@@ -35,6 +35,7 @@ describeReal('Economy integrity (Phase 1)', () => {
 
   afterAll(async () => {
     if (!MONGODB_URI) return;
+    await new Promise((r) => setTimeout(r, 500));
     try {
       if (user?._id) {
         await SavvyTransaction.deleteMany({ userId: user._id });

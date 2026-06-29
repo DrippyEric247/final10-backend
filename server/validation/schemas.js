@@ -1,16 +1,10 @@
 const Joi = require('joi');
 
-/** Client-submitted events only — `task_completed` is server-emitted during engine cascade, never accepted from HTTP. */
+/** Client-submitted events only — server-only types are emitted from trusted hooks. */
 const BATTLE_PASS_EVENT_TYPES = [
-  'daily_login_claimed',
-  'power_boost_claimed',
   'auction_scanned',
   'bid_placed',
   'auction_won',
-  'savvy_points_earned',
-  'streak_updated',
-  'rank_changed',
-  'power_multiplier_changed',
   'buy_now_scanned',
   'recommended_deal_viewed',
 ];
