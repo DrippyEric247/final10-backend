@@ -30,6 +30,9 @@ import { emitTourAction } from "../lib/tourGuide";
 import { hasCompletedFirstSixty } from "../lib/firstRunState";
 import { incrementJourneyStep } from "../lib/tabJourney";
 import { getEffectiveSubscriptionTier } from "../lib/tierMultiplier";
+import LoadingState from "../components/ui/states/LoadingState";
+import ErrorState from "../components/ui/states/ErrorState";
+import EmptyState from "../components/ui/states/EmptyState";
 import "../styles/ProductFeed.css";
 
 const FEED_CATEGORIES = [
@@ -239,6 +242,14 @@ export default function ProductFeed() {
   const queryClient = useQueryClient();
   const subscriptionTier = getEffectiveSubscriptionTier();
   const tierLevel = subscriptionTier === "pro" || subscriptionTier === "elite" ? 2 : subscriptionTier === "core" ? 1 : 0;
+  const tierModeLabel =
+    subscriptionTier === "free" ? "Free" : subscriptionTier === "core" ? "Premium" : "Pro";
+  const tierUnlockHint =
+    tierLevel === 0
+      ? "Unlock trust + low competition lanes with Premium"
+      : tierLevel === 1
+        ? "Unlock premium pairings with Pro"
+        : "Full AI optimization active";
   
   const [activeCategory, setActiveCategory] = useState("all");
   const [watchFeedback, setWatchFeedback] = useState({});
@@ -256,6 +267,7 @@ export default function ProductFeed() {
     isFetchingNextPage,
     status,
     error,
+    refetch,
   } = useInfiniteQuery({
     queryKey: ["productFeed", activeCategory],
     queryFn: fetchFeed,
@@ -520,15 +532,41 @@ export default function ProductFeed() {
           <h1>Trending Feed</h1>
           <p className="muted">Discover what is trending across eBay categories in real time.</p>
         </header>
-        <div className="feed-status">
-          <p>Please <Link to="/login">login</Link> to view the product feed</p>
-        </div>
+        <EmptyState
+          title="Sign in to view the feed"
+          description="Discover what is trending across eBay categories in real time."
+          action={<Link to="/login" className="btn btn-primary">Log in</Link>}
+        />
       </div>
     );
   }
 
-  if (status === "loading") return <div className="feed-status">Loading…</div>;
-  if (status === "error") return <div className="feed-status">Error: {String(error)}</div>;
+  if (status === "loading") {
+    return (
+      <div className="feed-wrap">
+        <header className="feed-header">
+          <h1>Trending Across eBay</h1>
+          <p className="muted">Category-diverse discovery feed with momentum, demand, and activity signals.</p>
+        </header>
+        <LoadingState label="Loading trending picks…" />
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="feed-wrap">
+        <header className="feed-header">
+          <h1>Trending Across eBay</h1>
+        </header>
+        <ErrorState
+          title="Couldn't load the feed"
+          description="We couldn't fetch listings right now. Try again in a moment."
+          error={error}
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
 
   feedIntentCoachCtxRef.current = {
     visibleItems: dynamicFeed.sections.flatMap((s) => s.items),
@@ -667,7 +705,7 @@ export default function ProductFeed() {
             <p className="muted">Build-aware recommendations that complete setups, not random upsells.</p>
           </div>
           <div className="smart-cart-tier">
-            <span>{subscriptionTier === "free" ? "FREE" : subscriptionTier === "core" ? "$7" : "$14"} Mode</span>
+            <span>{tierModeLabel} mode</span>
           </div>
         </header>
 
@@ -681,7 +719,7 @@ export default function ProductFeed() {
         <div className="smart-cart-state-row">
           <span>{smartCartItems.length} build items in Smart Cart</span>
           <span>Focus: {smartCartFocusCategory}</span>
-          <span>{tierLevel === 0 ? "Unlock trust + low competition lanes at $7" : tierLevel === 1 ? "Unlock premium pairings at $14" : "Full AI optimization active"}</span>
+          <span>{tierUnlockHint}</span>
         </div>
 
         {smartSections.map((section) => (
@@ -955,7 +993,11 @@ export default function ProductFeed() {
                 }}
               />
             ) : (
-              <p className="feed-status muted">Nothing in this section yet — try another category or load more.</p>
+              <EmptyState
+                className="f10-state--inline"
+                title="Nothing in this section yet"
+                description="Try another category or load more listings."
+              />
             )}
           </section>
         );
@@ -963,8 +1005,12 @@ export default function ProductFeed() {
       {/* sentinel for infinite scroll */}
       <div ref={sentinelRef} />
 
-      {isFetchingNextPage && <div className="feed-status">Loading more…</div>}
-      {!hasNextPage && <div className="feed-status muted">You’re all caught up.</div>}
+      {isFetchingNextPage ? (
+        <LoadingState variant="inline" label="Loading more…" className="mt-4" />
+      ) : null}
+      {!hasNextPage && sortedItems.length > 0 ? (
+        <p className="feed-status muted">You’re all caught up.</p>
+      ) : null}
     </div>
   );
 }
