@@ -17,21 +17,19 @@ const Pricing = () => {
   const mostPopularTier = getMostPopularTierId();
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="f10-subscription-page">
+      <div className="f10-subscription-inner">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           {/* Header */}
-          <div className="text-center mb-16">
-            <h1 className="text-5xl font-bold text-white mb-6">
-              Choose Your Plan
-            </h1>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <div className="f10-subscription-hero mb-16">
+            <h1>Choose Your Plan</h1>
+            <p>
               Free, Premium, and Pro — three clear tiers with more Best Moves, faster alerts, and bigger rewards as you upgrade.
             </p>
-            <Final10Slogan variant="section" as="p" className="mt-4 max-w-2xl mx-auto" />
+            <Final10Slogan variant="section" as="p" className="f10-subscription-slogan" />
           </div>
 
           {/* Pricing Cards */}
@@ -108,7 +106,7 @@ const Pricing = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl p-12 border border-blue-500/30 mb-16"
+            className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl p-6 sm:p-12 border border-blue-500/30 mb-16"
           >
             <div className="text-center">
               <div className="bg-blue-500/20 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
