@@ -455,14 +455,14 @@ export default function PerkMachine() {
   if (loading) {
     return (
       <div className="perk-page">
-        <LoadingState message="Powering up Savvy Perk Machine…" />
+        <LoadingState label="Powering up Savvy Perk Machine…" />
       </div>
     );
   }
 
   const freeReady = Boolean(status?.freeSpinAvailable);
   const tierLabel = status?.subscriptionLabel || 'Free';
-  const operatorLevel = tierLabel === 'Free' ? 'Founding Tester' : `${tierLabel} Operator`;
+  const operatorLevel = tierLabel === 'Free' ? 'Free Operator' : `${tierLabel} Operator`;
   const multiplier = tierLabel === 'Pro' || tierLabel === 'Premium' ? '1.50x' : '1.00x';
 
   return (
