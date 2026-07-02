@@ -18,6 +18,7 @@ import {
 } from '../../config/homeLandingContent';
 import { saveDonationFeedback } from '../../lib/donationFeedbackStorage';
 import DonationSuccessModal from './DonationSuccessModal';
+import SavvyUniverseRoadmap from './SavvyUniverseRoadmap';
 import '../../styles/HomeLanding.css';
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
@@ -112,6 +113,8 @@ export default function HomeLandingSections({ user }) {
           <p className="home-card__body">{HOME_VISION.body}</p>
         </section>
       </div>
+
+      <SavvyUniverseRoadmap />
 
       {/* Marketplace roadmap */}
       <section className="home-card home-roadmap" aria-labelledby="home-roadmap-title">
