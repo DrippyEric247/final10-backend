@@ -74,8 +74,8 @@ export const DONATION_IMPACT = Object.freeze([
 
 export const DONATION_BUTTONS = Object.freeze([
   { id: 'coffee5', emoji: '☕', label: 'Buy Savvy Scout a Coffee', amount: '$5', linkKey: 'coffee5' },
-  { id: 'support10', emoji: '🚀', label: 'Support Development', amount: '$10', linkKey: 'support10' },
-  { id: 'founding25', emoji: '💎', label: 'Founding Supporter', amount: '$25', linkKey: 'founding25' },
+  { id: 'support25', emoji: '🚀', label: 'Support Development', amount: '$25', linkKey: 'support25' },
+  { id: 'legendary100', emoji: '💎', label: 'Legendary Supporter', amount: '$100', linkKey: 'legendary100' },
   { id: 'custom', emoji: '❤️', label: 'Choose Your Amount', amount: null, linkKey: 'custom' },
 ]);
 
