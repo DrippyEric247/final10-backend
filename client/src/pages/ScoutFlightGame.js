@@ -19,10 +19,20 @@ import {
   isDebugHitboxAllowed,
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
+import {
+  exitNativeFullscreen,
+  getFocusViewportHeight,
+  isNativeFullscreenActive,
+  isNativeFullscreenSupported,
+  lockBodyScroll,
+  requestNativeFullscreen,
+  unlockBodyScroll,
+} from '../lib/scoutFlightFocusMode';
 import '../styles/ScoutFlight.css';
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 const BOTTOM_UI_RESERVE = 88;
+const FOCUS_CHROME_H = 44;
 
 function drawBackground(ctx, w, h, t) {
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -237,6 +247,7 @@ export default function ScoutFlightGame() {
   const selectableDifficulties = getSelectableDifficulties();
   const isPracticeMode = difficultyId === 'PRACTICE';
   const isTournamentMode = difficultyId === 'TOURNAMENT';
+  const [focusMode, setFocusMode] = useState(false);
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
@@ -244,9 +255,16 @@ export default function ScoutFlightGame() {
     const page = pageRef.current;
     if (!wrap || !canvas || !page) return;
 
-    const top = page.getBoundingClientRect().top;
-    const availH = Math.max(320, Math.floor(window.innerHeight - top - BOTTOM_UI_RESERVE));
-    wrap.style.height = `${availH}px`;
+    const inFocus = focusMode;
+    let availH;
+    if (inFocus) {
+      availH = Math.max(280, getFocusViewportHeight() - FOCUS_CHROME_H);
+      wrap.style.height = `${availH}px`;
+    } else {
+      const top = page.getBoundingClientRect().top;
+      availH = Math.max(320, Math.floor(window.innerHeight - top - BOTTOM_UI_RESERVE));
+      wrap.style.height = `${availH}px`;
+    }
 
     const rect = wrap.getBoundingClientRect();
     const w = Math.max(320, Math.floor(rect.width));
@@ -271,7 +289,72 @@ export default function ScoutFlightGame() {
         applyDifficultyToScout(gameRef.current, gameRef.current.difficultyId);
       }
     }
-  }, [difficultyId]);
+  }, [difficultyId, focusMode]);
+
+  const exitFocusMode = useCallback(async () => {
+    await exitNativeFullscreen();
+    unlockBodyScroll();
+    setFocusMode(false);
+    window.setTimeout(() => resize(), 50);
+  }, [resize]);
+
+  const enterFocusMode = useCallback(async () => {
+    lockBodyScroll();
+    setFocusMode(true);
+    const page = pageRef.current;
+    if (page && isNativeFullscreenSupported(page)) {
+      await requestNativeFullscreen(page);
+    }
+    window.setTimeout(() => resize(), 80);
+  }, [resize]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!isNativeFullscreenActive() && focusMode) {
+        unlockBodyScroll();
+        setFocusMode(false);
+        window.setTimeout(() => resize(), 50);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    };
+  }, [focusMode, resize]);
+
+  useEffect(() => {
+    if (!focusMode) return undefined;
+    const onViewportChange = () => resize();
+    window.visualViewport?.addEventListener('resize', onViewportChange);
+    window.visualViewport?.addEventListener('scroll', onViewportChange);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', onViewportChange);
+      window.visualViewport?.removeEventListener('scroll', onViewportChange);
+    };
+  }, [focusMode, resize]);
+
+  useEffect(
+    () => () => {
+      void exitNativeFullscreen();
+      unlockBodyScroll();
+    },
+    []
+  );
+
+  const handleFocusToggle = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (focusMode) {
+        void exitFocusMode();
+      } else {
+        void enterFocusMode();
+      }
+    },
+    [focusMode, enterFocusMode, exitFocusMode]
+  );
 
   const drawFrame = useCallback((ts) => {
     const canvas = canvasRef.current;
@@ -403,14 +486,43 @@ export default function ScoutFlightGame() {
   }, []);
 
   return (
-    <div ref={pageRef} className="scout-flight-page">
+    <div
+      ref={pageRef}
+      className={`scout-flight-page${focusMode ? ' scout-flight-page--focus' : ''}`}
+    >
       <header className="scout-flight-page__header">
         <Link to="/events" className="scout-flight-page__back">
           ← Events
         </Link>
         <span className="scout-flight-page__title">Savvy Scout Flight</span>
-        <span className="scout-flight-page__beta">Local score</span>
+        <div className="scout-flight-page__header-actions">
+          {!focusMode ? (
+            <button
+              type="button"
+              className="scout-flight-focus-btn"
+              onClick={handleFocusToggle}
+              aria-label="Enter focus mode"
+            >
+              ⛶ Focus Mode
+            </button>
+          ) : null}
+          <span className="scout-flight-page__beta">Local score</span>
+        </div>
       </header>
+
+      {focusMode ? (
+        <div className="scout-flight-focus-bar">
+          <span className="scout-flight-focus-bar__label">Focus Mode</span>
+          <button
+            type="button"
+            className="scout-flight-focus-btn scout-flight-focus-btn--exit"
+            onClick={handleFocusToggle}
+            aria-label="Exit full screen"
+          >
+            ✕ Exit Full Screen
+          </button>
+        </div>
+      ) : null}
 
       <div
         ref={wrapRef}
@@ -420,6 +532,18 @@ export default function ScoutFlightGame() {
         onPointerDown={handleInput}
         onTouchStart={handleInput}
       >
+        {focusMode && uiPhase === PHASE.PLAYING ? (
+          <button
+            type="button"
+            className="scout-flight-focus-btn scout-flight-focus-btn--in-game"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={handleFocusToggle}
+            aria-label="Exit full screen"
+          >
+            ✕ Exit
+          </button>
+        ) : null}
         {isPracticeMode ? (
           <div className="scout-flight-practice-header" aria-label="Practice Mode">
             <h2 className="scout-flight-practice-header__title">🎮 Practice Mode</h2>
@@ -490,6 +614,17 @@ export default function ScoutFlightGame() {
             ) : null}
             <img src={SCOUT_IMG} alt="" className="scout-flight-scout-preview" />
             <p className="scout-flight-hint">Tap or click to launch</p>
+            {!focusMode ? (
+              <button
+                type="button"
+                className="scout-flight-focus-btn scout-flight-focus-btn--overlay"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={handleFocusToggle}
+              >
+                ⛶ Focus Mode
+              </button>
+            ) : null}
             <p className="scout-flight-note">
               {isPracticeMode
                 ? 'Practice runs are local only — earn Tournament Tickets on the Perk Machine to compete for Savvy Points.'
@@ -502,6 +637,18 @@ export default function ScoutFlightGame() {
 
         {uiPhase === PHASE.GAMEOVER ? (
           <div className="scout-flight-overlay scout-flight-overlay--gameover">
+            {focusMode ? (
+              <button
+                type="button"
+                className="scout-flight-focus-btn scout-flight-focus-btn--overlay-top"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void exitFocusMode();
+                }}
+              >
+                ✕ Exit Full Screen
+              </button>
+            ) : null}
             <h2 className="scout-flight-go-title">Flight Ended</h2>
             <p className="scout-flight-go-mode">
               {getDifficultyConfig(difficultyId).emoji}{' '}
