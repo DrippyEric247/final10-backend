@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import scoutMascot from "../assets/savvy-scout-mascot.png";
 import Final10Slogan from "./branding/Final10Slogan";
 import "../styles/SavvyScoutDealToast.css";
+import "../styles/ScoutMobilePopups.css";
 
 /**
  * Deal-found toast card shown above the Savvy Scout dock button.
@@ -42,7 +43,7 @@ export default function SavvyScoutDealToast({
 
   return (
     <div
-      className={`savvy-scout-deal-toast${flash ? " savvy-scout-deal-toast--flash" : ""}`}
+      className={`savvy-scout-deal-toast f10-scout-surface-popup${flash ? " savvy-scout-deal-toast--flash" : ""}`}
       role="status"
     >
       {!reducedMotion ? (

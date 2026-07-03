@@ -1,6 +1,8 @@
 // Hashtag Tracking Service
 // This service handles automated social media hashtag tracking and points awarding
 
+import { SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE } from '../lib/savvyScoutRateLimitCopy';
+
 class HashtagTrackerService {
   constructor() {
     /** Same-origin API base (works behind proxy and in production). */
@@ -227,7 +229,7 @@ class HashtagTrackerService {
     if (error.message.includes('401')) {
       throw new Error('Authentication failed. Please log in again.');
     } else if (error.message.includes('429')) {
-      throw new Error('Too many requests. Please wait a moment and try again.');
+      throw new Error(SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE);
     } else if (error.message.includes('500')) {
       throw new Error('Server error. Please try again later.');
     } else {

@@ -12,7 +12,12 @@
   gap: 10px;
   align-items: center;
   position: relative;
-  animation: savvy-deal-toast-in 0.32s ease-out;
+}
+
+@media (min-width: 768px) {
+  .savvy-scout-deal-toast {
+    animation: savvy-deal-toast-in 0.32s ease-out;
+  }
 }
 
 .savvy-scout-deal-toast--flash::before {
@@ -150,7 +155,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .savvy-scout-deal-toast,
   .savvy-scout-deal-toast--flash::before,
   .savvy-scout-deal-toast__confetti span {
     animation: none !important;

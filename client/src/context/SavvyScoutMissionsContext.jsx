@@ -8,14 +8,27 @@ import {
   getScoutMissionSnapshot,
   recordScoutMissionAction,
   surfaceContextualMissionPopup,
+  syncScoutMissionProgressFromServer,
 } from "../lib/savvyScoutMissions";
 
 const SavvyScoutMissionsContext = createContext(null);
 
 export function SavvyScoutMissionsProvider({ children }) {
   const location = useLocation();
-  const { patchUser } = useAuth();
+  const { patchUser, user } = useAuth();
   const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id && !user?._id) return undefined;
+    let cancelled = false;
+    (async () => {
+      await syncScoutMissionProgressFromServer();
+      if (!cancelled) setTick((n) => n + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?._id]);
 
   useEffect(() => {
     const bump = () => setTick((n) => n + 1);

@@ -2,7 +2,7 @@ import ProductFeed from './pages/ProductFeed';
 import Trending from './pages/Trending';
 import VideoScanner from './components/VideoScanner';
 import Navigation from './components/Navigation';
-import ApiCoolingBanner from './components/ApiCoolingBanner';
+import SavvyScoutUpdatingCard from './components/SavvyScoutUpdatingCard';
 import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
 import LiveEventsHost from './components/events/LiveEventsHost';
@@ -245,7 +245,7 @@ export default function App() {
         
         {/* Use the new Navigation component */}
         <Navigation />
-        <ApiCoolingBanner />
+        <SavvyScoutUpdatingCard />
         {!isOnboardingRoute ? <UniversalBoostProgressBar /> : null}
         <Final10RewardHost />
         <LiveEventsHost />

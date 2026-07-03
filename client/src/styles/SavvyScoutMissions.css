@@ -178,16 +178,21 @@
 }
 
 .scout-mission-popup {
-  position: fixed;
-  right: 5.5rem;
-  bottom: 6.5rem;
-  z-index: 95;
   width: min(92vw, 320px);
   padding: 0.85rem 1rem 1rem;
   border-radius: 14px;
   border: 1px solid rgba(34, 211, 238, 0.4);
   background: rgba(15, 23, 42, 0.96);
   box-shadow: 0 12px 40px rgba(124, 58, 237, 0.35);
+}
+
+@media (min-width: 768px) {
+  .scout-mission-popup.f10-scout-surface-popup {
+    position: fixed;
+    right: 5.5rem;
+    bottom: 6.5rem;
+    z-index: 2147482085;
+  }
 }
 
 .scout-mission-popup__close {

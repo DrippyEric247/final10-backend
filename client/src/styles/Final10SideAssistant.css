@@ -25,7 +25,6 @@
     0 16px 40px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.06) inset;
   position: relative;
-  animation: f10-coach-in 0.28s ease-out;
 }
 
 @keyframes f10-coach-in {
@@ -36,6 +35,24 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (min-width: 768px) {
+  .f10-assistant-coach-toast {
+    animation: f10-coach-in 0.28s ease-out;
+  }
+}
+
+@media (max-width: 767px) {
+  .f10-scout-surface-popup.f10-assistant-coach-toast {
+    animation: scout-popup-slide-bounce 0.48s cubic-bezier(0.34, 1.35, 0.64, 1) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-scout-surface-popup.f10-assistant-coach-toast {
+    animation: scout-popup-slide-fade 0.22s ease-out both !important;
   }
 }
 

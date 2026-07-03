@@ -11,6 +11,7 @@ import {
   getUserEbayStatus,
 } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
+import { isRateLimitError, userSafeErrorMessage } from '../lib/apiErrorParsing';
 import ProfilePageLayout from './ProfilePageLayout';
 import MembershipStatusBadge from '../components/membership/MembershipStatusBadge';
 import PremiumEntitlementCard from '../components/PremiumEntitlementCard';
@@ -827,10 +828,8 @@ const Profile = () => {
     onError: (error) => {
       console.error('Daily login claim failed:', error);
       setPointsUpdating(false);
-      const errorMessage = error.status === 429 
-        ? 'Too many requests. Please wait a moment and try again.'
-        : (error.message || 'Unknown error');
-      alert('Failed to claim daily login: ' + errorMessage);
+      if (isRateLimitError(error)) return;
+      alert(`Failed to claim daily login: ${userSafeErrorMessage(error, 'Please try again.')}`);
     },
   });
 

@@ -96,6 +96,48 @@ const marketValueLimiter = rateLimit({
   message: { code: 'RATE_LIMIT', message: 'Too many market value lookups.' },
 });
 
+/** Perk Machine spins — per-user cap to blunt double-tap / parallel request abuse. */
+const perkMachineSpinLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Too many spins. Wait a moment before trying again.',
+  },
+});
+
+/** Scout mission claims — per-user cap against spam clicking Complete. */
+const scoutMissionClaimLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Too many claim attempts. Slow down.',
+  },
+});
+
+/** Easter egg redemptions — per-user cap. */
+const easterEggRedeemLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Too many redemption attempts. Try again shortly.',
+  },
+});
+
 /** POST /api/auth/forgot-password — limit reset email requests per IP */
 const authPasswordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -128,4 +170,7 @@ module.exports = {
   ebayBidLimiter,
   ebaySellerTrendsLimiter,
   marketValueLimiter,
+  perkMachineSpinLimiter,
+  scoutMissionClaimLimiter,
+  easterEggRedeemLimiter,
 };

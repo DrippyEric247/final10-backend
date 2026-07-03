@@ -3,6 +3,7 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { claimScoutMissionReward } = require('../services/scoutMissionService');
 const { getMissionProgressSnapshot } = require('../services/scoutMissionProgressService');
+const { scoutMissionClaimLimiter } = require('../middleware/rateLimits');
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ router.get('/progress', auth, async (req, res) => {
 });
 
 /** POST /api/scout-missions/claim — grant Savvy for a completed mission (idempotent). */
-router.post('/claim', auth, async (req, res) => {
+router.post('/claim', auth, scoutMissionClaimLimiter, async (req, res) => {
   try {
     const missionId = String(req.body?.missionId || '').trim();
     const periodKey = String(req.body?.periodKey || '').trim();

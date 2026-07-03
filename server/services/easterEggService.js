@@ -196,11 +196,17 @@ async function getEasterEggStats() {
   };
 }
 
+async function getUserRedeemedCodes(userId) {
+  const rows = await EasterEggRedemption.find({ userId }).select('code').lean();
+  return rows.map((r) => r.code);
+}
+
 module.exports = {
   EASTER_EGG_CODES,
   getEasterEggDefinition,
   listEasterEggHintsForUser,
   getUserRedemptionHistory,
+  getUserRedeemedCodes,
   redeemEasterEggCode,
   getEasterEggStats,
 };

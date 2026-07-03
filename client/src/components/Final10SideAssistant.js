@@ -43,6 +43,7 @@ import {
   isDealFoundFeedRow,
 } from "../lib/savvyScoutState";
 import "../styles/Final10SideAssistant.css";
+import "../styles/ScoutMobilePopups.css";
 import "../styles/SavvyScoutMissions.css";
 import SavvyWalletBubble from "./wallet/SavvyWalletBubble";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
@@ -1743,7 +1744,7 @@ export default function Final10SideAssistant() {
       ) : null}
       {coachToast ? (
         <div
-          className={`f10-assistant-coach-toast f10-assistant-coach-toast--${coachToast.tone || "coach"}`}
+          className={`f10-assistant-coach-toast f10-scout-surface-popup f10-assistant-coach-toast--${coachToast.tone || "coach"}`}
           role="status"
         >
           <button

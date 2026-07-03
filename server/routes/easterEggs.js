@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { easterEggRedeemLimiter } = require('../middleware/rateLimits');
 const {
   redeemEasterEggCode,
   listEasterEggHintsForUser,
@@ -13,7 +14,7 @@ const EasterEggRedemption = require('../models/EasterEggRedemption');
 
 router.use(auth);
 
-router.post('/redeem', async (req, res) => {
+router.post('/redeem', easterEggRedeemLimiter, async (req, res) => {
   try {
     const { code } = req.body;
     const userId = req.user.id;

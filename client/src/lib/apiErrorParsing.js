@@ -1,5 +1,12 @@
 /**
  * Normalize axios / fetch failures into a small, UI-safe shape.
+ */
+import {
+  SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE,
+  SAVVY_SCOUT_RETRY_FAILED_BODY,
+} from "./savvyScoutRateLimitCopy";
+
+/**
  * @param {unknown} e
  * @returns {{ status: number; code: string; message: string }}
  */
@@ -35,19 +42,22 @@ export function isRateLimitError(e) {
 }
 
 export function userSafeErrorMessage(e, fallback = "Something went wrong. Please try again.") {
-  if (e?.isRateLimited || e?.isCoolingDown) {
-    const sec = Number(e?.retryAfter);
-    if (Number.isFinite(sec) && sec > 0) {
-      return `Too many requests — please wait about ${Math.ceil(sec)} seconds.`;
+  if (e?.isRateLimited || e?.isCoolingDown || e?.status === 429) {
+    if (e?.isRateLimitExhausted) {
+      return SAVVY_SCOUT_RETRY_FAILED_BODY;
     }
-    return "Too many requests right now. Please wait a moment and retry.";
+    return SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE;
+  }
+  const directMsg = e && typeof e.message === "string" ? e.message.trim() : "";
+  if (directMsg && /rate limit|429|too many request/i.test(directMsg)) {
+    return SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE;
   }
   const { status, message } = parseApiError(e);
   if (status === 401 || status === 403) {
     return "Your session expired. Please sign in again.";
   }
   if (status === 429) {
-    return "Too many requests right now. Please wait a moment and retry.";
+    return SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE;
   }
   if (status >= 500) {
     return "Service is temporarily unavailable. Please try again shortly.";
@@ -56,7 +66,14 @@ export function userSafeErrorMessage(e, fallback = "Something went wrong. Please
     return "Network error. Check your connection and try again.";
   }
   if (typeof message === "string" && message.trim()) {
-    return message;
+    const raw = message.trim();
+    if (/rate limit|429|too many request/i.test(raw)) {
+      return SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE;
+    }
+    if (/request failed with status code/i.test(raw)) {
+      return fallback;
+    }
+    return raw;
   }
   return fallback;
 }

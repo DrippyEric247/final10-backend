@@ -3,6 +3,8 @@
  */
 import { api } from "./api";
 import { parseApiError } from "./apiErrorParsing";
+import { markServerRateLimit, clearRateLimitRecovery } from "./apiRequestGate";
+import { SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE } from "./savvyScoutRateLimitCopy";
 
 const MAX_ATTEMPTS = 4;
 const BASE_DELAY_MS = 550;
@@ -21,22 +23,17 @@ function nextDelayMs(attempt, retryAfterSec) {
 }
 
 export function ebayFriendlyMessage(error, fallback = "Marketplace request failed. Try again shortly.") {
-  const { status, code, message } = parseApiError(error);
+  const { status, code } = parseApiError(error);
   if (status === 429 || code === "RATE_LIMIT" || code === "RATE_LIMITED") {
-    return (
-      message ||
-      "Too many marketplace requests right now. Please wait a minute and try again."
-    );
+    return SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE;
   }
   if (status === 503 || status === 502 || status === 504) {
-    return (
-      message ||
-      "The marketplace is temporarily busy. Please retry in a few moments."
-    );
+    return "The marketplace is temporarily busy. Please retry in a few moments.";
   }
   if (status === 401) {
-    return message || "Please sign in again to load marketplace results.";
+    return "Please sign in again to load marketplace results.";
   }
+  const { message } = parseApiError(error);
   if (message && typeof message === "string") return message;
   return fallback;
 }
@@ -47,12 +44,20 @@ async function getWithRetry(path, config = {}) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const res = await api.get(path, config);
+      if (attempt > 0) clearRateLimitRecovery();
       return res.data;
     } catch (e) {
       lastErr = e;
       const status = e.response?.status;
       const retryAfter = parseInt(e.response?.headers?.["retry-after"], 10);
       const retryable = status === 429 || status >= 500;
+      if (status === 429) {
+        markServerRateLimit(
+          Number.isFinite(retryAfter) ? retryAfter : 60,
+          { source: "ebayClient" },
+          { attempt: attempt + 1, phase: "updating" }
+        );
+      }
       if (!retryable || attempt >= attempts - 1) throw e;
       await sleep(nextDelayMs(attempt, retryAfter));
     }

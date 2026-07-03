@@ -8,6 +8,8 @@ const scoutMissionProgressSchema = new mongoose.Schema(
     progress: { type: Number, default: 0 },
     target: { type: Number, required: true },
     completedAt: { type: Date, default: null },
+    /** Set atomically when Savvy is granted — survives logout; blocks duplicate claims. */
+    claimedAt: { type: Date, default: null },
     lastTrigger: { type: String, default: null },
   },
   { timestamps: true }

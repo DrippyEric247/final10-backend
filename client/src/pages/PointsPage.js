@@ -13,7 +13,7 @@ import {
   redeemSavvyStoreItem,
 } from '../lib/savvyCredits';
 import { getLifetimeLeaderboard, getMyPoints, redeemPointsDiscount } from '../lib/api';
-import { parseApiError } from '../lib/apiErrorParsing';
+import { parseApiError, isRateLimitError, userSafeErrorMessage } from '../lib/apiErrorParsing';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import EmptyState from '../components/ui/states/EmptyState';
@@ -163,16 +163,18 @@ export default function PointsPage() {
         console.error('Redeem error:', error);
       }
       const parsed = parseApiError(error);
-      const genericAxios =
-        typeof parsed.message === 'string' &&
-        /^Request failed with status code\b/i.test(parsed.message);
-      setToast(
-        parsed.status === 429
-          ? 'Too many requests. Please wait a moment and try again.'
-          : genericAxios
+      if (isRateLimitError(error)) {
+        setToast(userSafeErrorMessage(error));
+      } else {
+        const genericAxios =
+          typeof parsed.message === 'string' &&
+          /^Request failed with status code\b/i.test(parsed.message);
+        setToast(
+          genericAxios
             ? 'Could not redeem points. Please try again.'
-            : parsed.message
-      );
+            : userSafeErrorMessage(error, parsed.message)
+        );
+      }
     }
     setTimeout(() => setToast(''), 2500);
   };

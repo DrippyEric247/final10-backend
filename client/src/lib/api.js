@@ -6,8 +6,12 @@ import { getApiBaseUrl } from "./runtimeApi";
 import {
   gatedRequest,
   markServerRateLimit,
+  clearRateLimitRecovery,
+  registerRateLimitFailedRequest,
 } from "./apiRequestGate";
 import { parseRetryAfterSec, sleepMs } from "./parseRetryAfter";
+import { rateLimitBackoffMs, RATE_LIMIT_MAX_ATTEMPTS } from "./apiRateLimitBackoff";
+import { SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE } from "./savvyScoutRateLimitCopy";
 
 export {
   ApiCoolingDownError,
@@ -15,6 +19,9 @@ export {
   getLastRateLimitMeta,
   subscribeApiCooling,
   resetAuthMeBootstrap,
+  clearRateLimitRecovery,
+  manualRateLimitRetry,
+  registerRateLimitFailedRequest,
 } from "./apiRequestGate";
 
 const DEFAULT_TIMEOUT_MS = Math.min(Math.max(Number(process.env.REACT_APP_API_TIMEOUT_MS) || 28000, 8000), 120000);
@@ -90,36 +97,57 @@ api.interceptors.response.use(
       const retryAfter = parseRetryAfterSec(headers, 60);
       const path = String(url).split("?")[0];
       const methodUpper = method;
-      const isAuthMe = methodUpper === "GET" && /\/auth\/me$/i.test(path);
       const isAuthLogin = methodUpper === "POST" && /\/auth\/(login|register)$/i.test(path);
+      const originalConfig = error.config || {};
 
-      markServerRateLimit(retryAfter, { path, method: methodUpper });
+      if (isAuthLogin) {
+        const rateLimitError = new Error("Please wait a moment before trying again.");
+        rateLimitError.status = 429;
+        rateLimitError.retryAfter = retryAfter;
+        rateLimitError.isCoolingDown = true;
+        rateLimitError.isRateLimited = true;
+        return Promise.reject(rateLimitError);
+      }
 
-      if (!error.config?.__rateLimitRetried && !isAuthLogin) {
-        error.config.__rateLimitRetried = true;
-        await sleepMs(retryAfter * 1000);
+      markServerRateLimit(retryAfter, { path, method: methodUpper }, { attempt: 1, phase: "updating" });
+
+      const startAttempt = Number(originalConfig.__rateLimitAttempt) || 0;
+      for (let attempt = startAttempt; attempt < RATE_LIMIT_MAX_ATTEMPTS; attempt += 1) {
+        const delayMs = rateLimitBackoffMs(attempt, retryAfter);
+        markServerRateLimit(Math.ceil(delayMs / 1000), { path, method: methodUpper }, {
+          attempt: attempt + 1,
+          phase: "updating",
+        });
+        await sleepMs(delayMs);
         try {
-          return await api.request(error.config);
+          const retryConfig = {
+            ...originalConfig,
+            __rateLimitAttempt: attempt + 1,
+          };
+          const response = await api.request(retryConfig);
+          clearRateLimitRecovery();
+          return response;
         } catch (retryErr) {
-          error = retryErr;
-          if (error.response?.status !== 429) {
-            return Promise.reject(error);
+          if (retryErr.response?.status !== 429) {
+            clearRateLimitRecovery();
+            return Promise.reject(retryErr);
           }
+          error = retryErr;
         }
       }
 
-      const rateLimitError = new Error(
-        isAuthMe
-          ? "Profile sync rate limit — retrying shortly."
-          : isAuthLogin
-            ? "Too many login attempts. Wait a moment and try again."
-            : "Too many requests right now. Retrying shortly."
-      );
+      const retryRunner = async () => {
+        const res = await api.request({ ...originalConfig, __rateLimitAttempt: 0 });
+        return res;
+      };
+      registerRateLimitFailedRequest(originalConfig, retryRunner);
+
+      const rateLimitError = new Error(SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE);
       rateLimitError.status = 429;
       rateLimitError.retryAfter = retryAfter;
       rateLimitError.isCoolingDown = true;
       rateLimitError.isRateLimited = true;
-      rateLimitError.rateLimitPath = path;
+      rateLimitError.isRateLimitExhausted = true;
       return Promise.reject(rateLimitError);
     }
     
@@ -521,6 +549,12 @@ export async function sendEarlyMonthlyReportTest() {
 /** POST /api/scout-missions/claim — persist Savvy Scout mission reward to wallet. */
 export async function claimScoutMissionReward({ missionId, periodKey }) {
   const { data } = await api.post("/scout-missions/claim", { missionId, periodKey });
+  return data;
+}
+
+/** GET /api/scout-missions/progress — server-authoritative mission completion + claim state. */
+export async function getScoutMissionProgress() {
+  const { data } = await api.get("/scout-missions/progress");
   return data;
 }
 

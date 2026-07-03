@@ -4,6 +4,8 @@
  */
 
 import { parseRetryAfterSec, sleepMs } from './parseRetryAfter';
+import { RATE_LIMIT_MAX_ATTEMPTS } from './apiRateLimitBackoff';
+import { SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE } from './savvyScoutRateLimitCopy';
 
 const COOLDOWN_MS = {
   /** Minimum spacing between successful /auth/me refreshes (not login brute-force). */
@@ -24,12 +26,17 @@ const routeCoolingUntil = new Map();
 /** Set only from real HTTP 429 responses (see markServerRateLimit). */
 let serverRateLimitUntil = 0;
 let lastRateLimitMeta = null;
+/** @type {'idle' | 'updating' | 'failed'} */
+let rateLimitUiPhase = 'idle';
+let rateLimitAttempt = 0;
+let lastFailedRequestConfig = null;
+let manualRetryRunner = null;
 let authMeBootstrapPending = true;
 
 const listeners = new Set();
 
 export class ApiCoolingDownError extends Error {
-  constructor(message = 'Rate limited — retrying shortly.') {
+  constructor(message = SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE) {
     super(message);
     this.name = 'ApiCoolingDownError';
     this.status = 429;
@@ -45,10 +52,16 @@ export function getLastRateLimitMeta() {
 export function getApiCoolingState() {
   const now = Date.now();
   const until = serverRateLimitUntil;
+  const isCooling = until > now || rateLimitUiPhase === 'updating' || rateLimitUiPhase === 'failed';
   return {
-    isCooling: until > now,
+    isCooling,
+    phase: rateLimitUiPhase,
+    isUpdating: rateLimitUiPhase === 'updating',
+    isFailed: rateLimitUiPhase === 'failed',
     retryAfterMs: until > now ? until - now : 0,
-    meta: lastRateLimitMeta,
+    attempt: rateLimitAttempt,
+    maxAttempts: RATE_LIMIT_MAX_ATTEMPTS,
+    canManualRetry: rateLimitUiPhase === 'failed' && Boolean(manualRetryRunner || lastFailedRequestConfig),
   };
 }
 
@@ -68,8 +81,8 @@ function notifyCooling() {
   });
 }
 
-/** Record a server HTTP 429 — drives ApiCoolingBanner only. */
-export function markServerRateLimit(retryAfterSec, meta = {}) {
+/** Record a server HTTP 429 — drives Savvy Scout updating card. */
+export function markServerRateLimit(retryAfterSec, meta = {}, { attempt = 1, phase = 'updating' } = {}) {
   const ms = Math.max(1000, parseRetryAfterSec(null, retryAfterSec) * 1000);
   serverRateLimitUntil = Date.now() + ms;
   lastRateLimitMeta = {
@@ -77,7 +90,48 @@ export function markServerRateLimit(retryAfterSec, meta = {}) {
     retryAfterSec: Math.ceil(ms / 1000),
     at: Date.now(),
   };
+  rateLimitUiPhase = phase;
+  rateLimitAttempt = attempt;
   notifyCooling();
+}
+
+export function registerRateLimitFailedRequest(config, retryRunner) {
+  lastFailedRequestConfig = config || null;
+  manualRetryRunner = typeof retryRunner === 'function' ? retryRunner : null;
+  rateLimitUiPhase = 'failed';
+  notifyCooling();
+}
+
+export function clearRateLimitRecovery() {
+  serverRateLimitUntil = 0;
+  lastRateLimitMeta = null;
+  rateLimitUiPhase = 'idle';
+  rateLimitAttempt = 0;
+  lastFailedRequestConfig = null;
+  manualRetryRunner = null;
+  notifyCooling();
+}
+
+/**
+ * Manual retry from Savvy Scout card after backoff exhausted.
+ * @returns {Promise<boolean>} true if recovery succeeded
+ */
+export async function manualRateLimitRetry() {
+  if (!manualRetryRunner && !lastFailedRequestConfig) return false;
+  rateLimitUiPhase = 'updating';
+  rateLimitAttempt = 0;
+  notifyCooling();
+  try {
+    if (manualRetryRunner) {
+      await manualRetryRunner();
+    }
+    clearRateLimitRecovery();
+    return true;
+  } catch {
+    rateLimitUiPhase = 'failed';
+    notifyCooling();
+    return false;
+  }
 }
 
 /** @deprecated use markServerRateLimit */
@@ -207,16 +261,25 @@ export async function gatedRequest(key, run, opts = {}) {
           path,
           method: err?.config?.method,
           key: coolKey,
-        });
+        }, { attempt: 1, phase: 'updating' });
         markRouteCooling(coolKey, coolKey === 'authMe' ? Math.min(15, retryAfter) : retryAfter);
         await sleepMs(retryAfter * 1000);
-        const retryResult = await run();
-        lastSuccessAt.set(coolKey, Date.now());
-        lastResult.set(key, retryResult);
-        if (key === 'authMe') {
-          authMeBootstrapPending = false;
+        try {
+          const retryResult = await run();
+          clearRateLimitRecovery();
+          lastSuccessAt.set(coolKey, Date.now());
+          lastResult.set(key, retryResult);
+          if (key === 'authMe') {
+            authMeBootstrapPending = false;
+          }
+          return retryResult;
+        } catch (retryErr) {
+          if (retryErr?.response?.status === 429 || retryErr?.status === 429) {
+            registerRateLimitFailedRequest(err?.config);
+            throw new ApiCoolingDownError();
+          }
+          throw retryErr;
         }
-        return retryResult;
       }
       throw err;
     } finally {
@@ -233,8 +296,7 @@ export function resetApiRequestGateForTests() {
   lastSuccessAt.clear();
   lastResult.clear();
   routeCoolingUntil.clear();
-  serverRateLimitUntil = 0;
-  lastRateLimitMeta = null;
+  clearRateLimitRecovery();
   authMeBootstrapPending = true;
   listeners.clear();
 }

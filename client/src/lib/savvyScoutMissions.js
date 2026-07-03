@@ -3,7 +3,7 @@
  * Tagline: Savvy Scout discovers Savvy Point earning opportunities while you use the Savvy Universe.
  */
 
-import { claimScoutMissionReward as apiClaimScoutMissionReward } from "./api";
+import { claimScoutMissionReward as apiClaimScoutMissionReward, getScoutMissionProgress } from "./api";
 import { awardPoints } from "./pointsEngine";
 import {
   SCOUT_MISSION_ACTION_EVENT,
@@ -19,6 +19,7 @@ export {
 
 const STORAGE_KEY = "f10_scout_missions_v1";
 const POPUP_COOLDOWN_MS = 45_000;
+let claimInFlight = false;
 
 /** @typedef {'daily'|'weekly'|'seasonal'|'one_time'} MissionCadence */
 
@@ -491,16 +492,69 @@ function markMissionClaimedLocally(state, def) {
   dispatchScoutMissionSync();
 }
 
+/**
+ * Merge server-authoritative progress + claim state (survives logout/refresh).
+ */
+export async function syncScoutMissionProgressFromServer() {
+  try {
+    const data = await getScoutMissionProgress();
+    const rows = Array.isArray(data?.progress) ? data.progress : [];
+    if (!rows.length) return;
+
+    const state = loadState();
+    let changed = false;
+
+    for (const row of rows) {
+      const def = missionDef(row.missionId);
+      if (!def) continue;
+      const key = progressKey(def);
+      const serverProgress = Math.max(0, Number(row.progress) || 0);
+      const target = def.target || 1;
+
+      if (row.complete || serverProgress >= target) {
+        const local = getProgress(state, def);
+        const next = Math.min(target, Math.max(local, serverProgress));
+        if (next !== local) {
+          state.progress[key] = next;
+          changed = true;
+        }
+      }
+
+      if (row.claimed || row.claimedAt) {
+        if (!state.claimed[key]) {
+          state.claimed[key] = Date.now();
+          changed = true;
+        }
+        if (def.once && !state.onceDone[def.id]) {
+          state.onceDone[def.id] = Date.now();
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      saveState(state);
+      dispatchScoutMissionSync();
+    }
+  } catch {
+    /* offline or unauthenticated */
+  }
+}
+
 /** @returns {Promise<{ ok: boolean, rewardSavvy?: number, newBalance?: number, message?: string }>} */
 export async function claimScoutMission(missionId) {
+  if (claimInFlight) {
+    return { ok: false, message: "Claim already in progress." };
+  }
+
   const def = missionDef(missionId);
   if (!def) return { ok: false, message: "Mission not found." };
 
   const state = loadState();
-  if (!isComplete(state, def)) return { ok: false, message: "Mission not complete yet." };
   if (isClaimed(state, def)) return { ok: false, message: "Already claimed." };
 
   const periodKey = progressKey(def);
+  claimInFlight = true;
 
   try {
     const data = await apiClaimScoutMissionReward({ missionId: def.id, periodKey });
@@ -539,6 +593,12 @@ export async function claimScoutMission(missionId) {
       markMissionClaimedLocally(state, def);
       return { ok: false, message: "Already claimed." };
     }
+    if (status === 403 || body?.error === "mission_not_complete") {
+      return {
+        ok: false,
+        message: body?.message || "Complete this mission before claiming.",
+      };
+    }
     if (status === 401) {
       return { ok: false, message: "Log in to claim Savvy rewards." };
     }
@@ -546,6 +606,8 @@ export async function claimScoutMission(missionId) {
       ok: false,
       message: body?.message || err?.message || "Could not claim reward. Try again.",
     };
+  } finally {
+    claimInFlight = false;
   }
 }
 

@@ -106,8 +106,53 @@ async function getMissionProgressSnapshot(userId) {
     progress: r.progress,
     target: r.target,
     complete: Boolean(r.completedAt) || Number(r.progress) >= Number(r.target),
+    claimed: Boolean(r.claimedAt),
     completedAt: r.completedAt,
+    claimedAt: r.claimedAt,
   }));
+}
+
+/**
+ * Atomically reserve a mission claim slot (one grant per user + mission + period).
+ * @returns {{ ok: true, periodKey: string } | { ok: false, error: string }}
+ */
+async function tryAcquireMissionClaim(userId, mission) {
+  const periodKey = periodKeyForMission(mission);
+
+  const row = await ScoutMissionProgress.findOneAndUpdate(
+    {
+      userId,
+      missionId: mission.id,
+      periodKey,
+      claimedAt: null,
+      completedAt: { $ne: null },
+    },
+    { $set: { claimedAt: new Date() } },
+    { new: true }
+  );
+
+  if (row) {
+    return { ok: true, periodKey };
+  }
+
+  const existing = await ScoutMissionProgress.findOne({
+    userId,
+    missionId: mission.id,
+    periodKey,
+  }).lean();
+
+  if (existing?.claimedAt) {
+    return { ok: false, error: 'already_claimed' };
+  }
+
+  return { ok: false, error: 'mission_not_complete' };
+}
+
+async function releaseMissionClaim(userId, mission, periodKey) {
+  await ScoutMissionProgress.updateOne(
+    { userId, missionId: mission.id, periodKey, claimedAt: { $ne: null } },
+    { $unset: { claimedAt: 1 } }
+  );
 }
 
 /**
@@ -126,4 +171,6 @@ module.exports = {
   getMissionProgressSnapshot,
   recordScoutProgressFromProgressionEvent,
   getOrCreateProgress,
+  tryAcquireMissionClaim,
+  releaseMissionClaim,
 };

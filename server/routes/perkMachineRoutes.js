@@ -3,6 +3,7 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { HttpError } = require('../middleware/apiErrors');
+const { perkMachineSpinLimiter } = require('../middleware/rateLimits');
 const { getPerkMachineStatus, getPerkMachineStatusWithEvents, spinPerkMachine, hatchEgg } = require('../services/perkMachineService');
 const { activatePerkItem } = require('../services/perkBoostService');
 const {
@@ -38,7 +39,7 @@ router.get('/history', auth, async (req, res, next) => {
   }
 });
 
-router.post('/spin', auth, async (req, res, next) => {
+router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));

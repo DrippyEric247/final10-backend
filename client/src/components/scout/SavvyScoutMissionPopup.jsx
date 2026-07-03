@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { SCOUT_MISSION_POPUP_EVENT } from "../../lib/savvyScoutMissions";
 import Final10Slogan from "../branding/Final10Slogan";
 import "../../styles/SavvyScoutMissions.css";
+import "../../styles/ScoutMobilePopups.css";
 
 export default function SavvyScoutMissionPopupHost({ onOpenMissions }) {
   const [popup, setPopup] = useState(null);
@@ -26,7 +27,7 @@ export default function SavvyScoutMissionPopupHost({ onOpenMissions }) {
   if (!popup) return null;
 
   return (
-    <div className="scout-mission-popup" role="status" aria-live="polite">
+    <div className="scout-mission-popup f10-scout-surface-popup" role="status" aria-live="polite">
       <button
         type="button"
         className="scout-mission-popup__close"

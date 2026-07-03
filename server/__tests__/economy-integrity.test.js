@@ -192,6 +192,22 @@ describeReal('Economy integrity (Phase 1)', () => {
     await assertBalanceMatchesLedger();
   });
 
+  it('scout mission concurrent claims grant Savvy once', async () => {
+    await recordScoutMissionTrigger(user._id, 'scan_complete');
+    const before = (await reloadUser()).savvyPoints;
+    const u = await reloadUser();
+    const results = await Promise.all([
+      claimScoutMissionReward(u, { missionId: 'scan_deal' }),
+      claimScoutMissionReward(await reloadUser(), { missionId: 'scan_deal' }),
+      claimScoutMissionReward(await reloadUser(), { missionId: 'scan_deal' }),
+    ]);
+    const granted = results.filter((r) => r.granted).length;
+    expect(granted).toBe(1);
+    const u2 = await reloadUser();
+    expect(u2.savvyPoints).toBe(before + 15);
+    await assertBalanceMatchesLedger();
+  });
+
   it('simulates 1000 unique grants and verifies balance sum', async () => {
     let expected = (await reloadUser()).savvyPoints;
     for (let i = 0; i < 50; i += 1) {
