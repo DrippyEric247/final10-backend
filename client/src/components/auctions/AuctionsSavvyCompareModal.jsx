@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Lock, Sparkles, X } from "lucide-react";
 import SavvyAlertButton from "../alerts/SavvyAlertButton";
 import { getBestListingImageUrl } from "../../lib/listingImageUrl";
 import "../../styles/ListingCardImage.css";
+import "../../styles/AuctionsSavvyCompareModal.css";
 
 /**
  * @typedef {{
@@ -106,13 +107,40 @@ function MiniListingCard({ row, badgeLabel, privacyMode = false }) {
                 persona: "buyer",
                 kind: "price_drop",
                 context: { source: "auctions_compare_modal", listingId: String(item?.id || "") },
-            }}
+              }}
             />
           ) : null}
         </div>
       </div>
     </div>
   );
+}
+
+function lockPageScroll() {
+  const y = window.scrollY || window.pageYOffset || 0;
+  const body = document.body;
+  const prev = {
+    overflow: body.style.overflow,
+    position: body.style.position,
+    top: body.style.top,
+    width: body.style.width,
+    scrollY: y,
+  };
+  body.style.overflow = "hidden";
+  body.style.position = "fixed";
+  body.style.top = `-${y}px`;
+  body.style.width = "100%";
+  return prev;
+}
+
+function unlockPageScroll(prev) {
+  if (!prev) return;
+  const body = document.body;
+  body.style.overflow = prev.overflow;
+  body.style.position = prev.position;
+  body.style.top = prev.top;
+  body.style.width = prev.width;
+  window.scrollTo(0, prev.scrollY);
 }
 
 export default function AuctionsSavvyCompareModal({
@@ -122,6 +150,13 @@ export default function AuctionsSavvyCompareModal({
   savvyRow,
   subTier,
 }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const scrollState = lockPageScroll();
+    window.dispatchEvent(new CustomEvent("f10:savvy-wallet-collapse"));
+    return () => unlockPageScroll(scrollState);
+  }, [open]);
+
   if (!open || !userRow || !savvyRow) return null;
 
   const unlocked = subTier !== "free";
@@ -129,242 +164,128 @@ export default function AuctionsSavvyCompareModal({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 135,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-        background: "rgba(0,0,0,0.72)",
-      }}
+      className="auctions-compare-overlay"
       role="presentation"
       onClick={onClose}
     >
       <div
+        className="auctions-compare-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="auctions-savvy-compare-title"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 980,
-          maxHeight: "92vh",
-          overflowY: "auto",
-          borderRadius: 20,
-          border: "1px solid rgba(129,140,248,0.35)",
-          background: "linear-gradient(165deg, rgba(15,23,42,0.98), rgba(17,24,39,0.99))",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.55)",
-          padding: "22px 22px 20px",
-        }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
-          <div>
-            <h2 id="auctions-savvy-compare-title" style={{ margin: 0, color: "#f8fafc", fontSize: "1.35rem", fontWeight: 800 }}>
+        <header className="auctions-compare-header">
+          <div className="auctions-compare-header__copy">
+            <h2 id="auctions-savvy-compare-title" className="auctions-compare-title">
               Savvy found a stronger move.
             </h2>
-            <p style={{ margin: "8px 0 0", color: "#94a3b8", fontSize: 14, lineHeight: 1.5, maxWidth: 640 }}>
+            <p className="auctions-compare-subtitle">
               Browse the market free — unlock Savvy+ to reveal the highest-ranked deal.
             </p>
           </div>
           <button
             type="button"
+            className="auctions-compare-close"
             aria-label="Close"
             onClick={onClose}
-            style={{
-              flexShrink: 0,
-              border: "1px solid rgba(148,163,184,0.35)",
-              background: "rgba(15,23,42,0.6)",
-              color: "#e2e8f0",
-              borderRadius: 10,
-              padding: 8,
-              cursor: "pointer",
-            }}
           >
             <X size={20} />
           </button>
-        </div>
+        </header>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 18,
-            alignItems: "stretch",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 8 }}>
-              Here&apos;s what you found
+        <div className="auctions-compare-body">
+          <div className="auctions-compare-grid">
+            <div>
+              <div className="auctions-compare-section-label">Here&apos;s what you found</div>
+              <MiniListingCard row={userRow} badgeLabel="Strong Pick" />
             </div>
-            <MiniListingCard row={userRow} badgeLabel="Strong Pick" />
-          </div>
 
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "#c4b5fd",
-                marginBottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <Sparkles size={14} aria-hidden />
-              Savvy Best Move
-            </div>
-            {unlocked ? (
-              <>
-                <MiniListingCard
-                  row={savvyRow}
-                  badgeLabel={
-                    priority ? "Savvy Best Move Unlocked · Priority" : "Savvy Best Move Unlocked"
-                  }
-                />
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "#86efac",
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    background: "rgba(34,197,94,0.12)",
-                    border: "1px solid rgba(74,222,128,0.35)",
-                  }}
-                >
-                  Full Savvy ranking is active on your plan.
-                  {priority ? (
-                    <span style={{ display: "block", marginTop: 4, color: "#bbf7d0" }}>
-                      Priority ranking on.
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
-                  <a
-                    href={savvyRow.item?.itemUrl || savvyRow.item?.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      padding: "10px 16px",
-                      borderRadius: 10,
-                      background: "linear-gradient(135deg,#6366f1,#a855f7)",
-                      color: "#fff",
-                      fontWeight: 800,
-                      textDecoration: "none",
-                    }}
-                  >
-                    View on eBay
-                  </a>
-                  <SavvyAlertButton
-                    label="🔔 Alert this deal"
-                    payload={{
-                      name: `${String(savvyRow.item?.title || "").slice(0, 48)} • Savvy pick`,
-                      keywords: [String(savvyRow.item?.title || "").slice(0, 40)],
-                      maxPrice:
-                        savvyRow.displayPrice != null ? Number(savvyRow.displayPrice) : undefined,
-                      minConfidence: 72,
-                      persona: "buyer",
-                      kind: "price_drop",
-                      context: { source: "auctions_savvy_compare_unlocked", listingId: String(savvyRow.item?.id || "") },
-                    }}
-                  />
-                </div>
-              </>
-            ) : (
-              <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ filter: "blur(9px)", opacity: 0.42, transform: "scale(1.02)", pointerEvents: "none" }} aria-hidden>
-                  <MiniListingCard row={savvyRow} badgeLabel="Savvy Best Move" privacyMode />
-                </div>
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 12,
-                    background: "linear-gradient(180deg, rgba(15,23,42,0.25), rgba(15,23,42,0.88))",
-                    padding: 20,
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 999,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "rgba(99,102,241,0.25)",
-                      border: "1px solid rgba(165,180,252,0.45)",
-                      color: "#e0e7ff",
-                    }}
-                  >
-                    <Lock size={26} strokeWidth={2.2} />
-                  </div>
-                  <ul
-                    style={{
-                      listStyle: "none",
-                      padding: 0,
-                      margin: 0,
-                      color: "#cbd5e1",
-                      fontSize: 14,
-                      fontWeight: 600,
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    <li>Higher trust</li>
-                    <li>Better savings</li>
-                    <li>Lower competition</li>
-                  </ul>
-                  <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", maxWidth: 280, lineHeight: 1.45 }}>
-                    Get the strongest ranked move, not just the open market.
-                  </p>
-                </div>
+            <div>
+              <div className="auctions-compare-section-label auctions-compare-section-label--savvy">
+                <Sparkles size={14} aria-hidden />
+                Savvy Best Move
               </div>
-            )}
+              {unlocked ? (
+                <>
+                  <MiniListingCard
+                    row={savvyRow}
+                    badgeLabel={
+                      priority ? "Savvy Best Move Unlocked · Priority" : "Savvy Best Move Unlocked"
+                    }
+                  />
+                  <div className="auctions-compare-unlocked-note">
+                    Full Savvy ranking is active on your plan.
+                    {priority ? (
+                      <span style={{ display: "block", marginTop: 4, color: "#bbf7d0" }}>
+                        Priority ranking on.
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="auctions-compare-unlocked-actions">
+                    <a
+                      href={savvyRow.item?.itemUrl || savvyRow.item?.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="auctions-compare-ebay-link"
+                    >
+                      View on eBay
+                    </a>
+                    <SavvyAlertButton
+                      label="🔔 Alert this deal"
+                      payload={{
+                        name: `${String(savvyRow.item?.title || "").slice(0, 48)} • Savvy pick`,
+                        keywords: [String(savvyRow.item?.title || "").slice(0, 40)],
+                        maxPrice:
+                          savvyRow.displayPrice != null ? Number(savvyRow.displayPrice) : undefined,
+                        minConfidence: 72,
+                        persona: "buyer",
+                        kind: "price_drop",
+                        context: {
+                          source: "auctions_savvy_compare_unlocked",
+                          listingId: String(savvyRow.item?.id || ""),
+                        },
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="auctions-compare-lock-overlay">
+                  <div className="auctions-compare-lock-blur" aria-hidden>
+                    <MiniListingCard row={savvyRow} badgeLabel="Savvy Best Move" privacyMode />
+                  </div>
+                  <div className="auctions-compare-lock-panel">
+                    <div className="auctions-compare-lock-icon">
+                      <Lock size={26} strokeWidth={2.2} />
+                    </div>
+                    <ul className="auctions-compare-lock-list">
+                      <li>Higher trust</li>
+                      <li>Better savings</li>
+                      <li>Lower competition</li>
+                    </ul>
+                    <p className="auctions-compare-lock-hint">
+                      Get the strongest ranked move, not just the open market.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <footer className="auctions-compare-footer">
           {!unlocked ? (
             <Link
               to="/premium?trigger=savvy_plus_auctions_compare"
-              style={{
-                padding: "10px 16px",
-                borderRadius: 10,
-                background: "linear-gradient(135deg,#facc15,#a855f7)",
-                color: "#1a0f24",
-                fontWeight: 900,
-                textDecoration: "none",
-              }}
+              className="auctions-compare-btn-upgrade"
             >
               Unlock Savvy+ — $7/mo
             </Link>
           ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: "10px 16px",
-              borderRadius: 10,
-              border: "1px solid rgba(148,163,184,0.45)",
-              background: "transparent",
-              color: "#e2e8f0",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" className="auctions-compare-btn-ghost" onClick={onClose}>
             Keep Browsing
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

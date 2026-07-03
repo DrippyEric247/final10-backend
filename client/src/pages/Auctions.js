@@ -28,6 +28,7 @@ import { emitBattlePassAction } from "../lib/battlePassActionBus";
 import PlaceBidModal from "../components/ebay/PlaceBidModal";
 import GlobalSmartSearch from "../components/search/GlobalSmartSearch";
 import AuctionsSavvyCompareModal from "../components/auctions/AuctionsSavvyCompareModal";
+import AuctionsStrongerMoveBanner from "../components/auctions/AuctionsStrongerMoveBanner";
 import { useSearchIntent } from "../context/SearchIntentContext";
 import { filterItemsByIntent } from "../lib/smartSearch";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
@@ -301,6 +302,7 @@ export default function Auctions() {
   const [devPollTick, setDevPollTick] = useState(0);
   const [upgradeSearchOpen, setUpgradeSearchOpen] = useState(false);
   const [compareModalOpen, setCompareModalOpen] = useState(false);
+  const [compareBannerVisible, setCompareBannerVisible] = useState(false);
   const compareOfferedForKeyRef = useRef(null);
   const [now, setNow] = useState(Date.now());
   const [startTime, setStartTime] = useState(Date.now());
@@ -819,6 +821,8 @@ export default function Auctions() {
 
   useEffect(() => {
     compareOfferedForKeyRef.current = null;
+    setCompareBannerVisible(false);
+    setCompareModalOpen(false);
   }, [compareSessionKey]);
 
   useEffect(() => {
@@ -830,7 +834,7 @@ export default function Auctions() {
     if (!compareModalRows) return;
     if (compareOfferedForKeyRef.current === compareSessionKey) return;
     compareOfferedForKeyRef.current = compareSessionKey;
-    setCompareModalOpen(true);
+    setCompareBannerVisible(true);
   }, [
     loading,
     error,
@@ -840,6 +844,15 @@ export default function Auctions() {
     marketSearchKeywords,
     location.search,
   ]);
+
+  const onCompareBannerDismiss = useCallback(() => {
+    setCompareBannerVisible(false);
+  }, []);
+
+  const onCompareBannerView = useCallback(() => {
+    setCompareBannerVisible(false);
+    setCompareModalOpen(true);
+  }, []);
 
   const onCompareModalClose = useCallback(() => {
     setCompareModalOpen(false);
@@ -2226,6 +2239,11 @@ export default function Auctions() {
           {bidStatus.text}
         </div>
       ) : null}
+      <AuctionsStrongerMoveBanner
+        visible={compareBannerVisible && Boolean(compareModalRows) && !compareModalOpen}
+        onView={onCompareBannerView}
+        onDismiss={onCompareBannerDismiss}
+      />
       <AuctionsSavvyCompareModal
         open={compareModalOpen && Boolean(compareModalRows)}
         onClose={onCompareModalClose}
