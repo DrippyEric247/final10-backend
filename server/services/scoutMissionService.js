@@ -1,5 +1,6 @@
 const { getMissionById, periodKeyForMission } = require('../config/scoutMissions');
 const { grantSavvyReward } = require('./savvyRewardService');
+const { isMissionCompleteOnServer } = require('./scoutMissionProgressService');
 
 /**
  * Grant Savvy for a completed Scout mission claim. Idempotent per user + mission + period.
@@ -16,6 +17,17 @@ async function claimScoutMissionReward(user, { missionId, periodKey }) {
   }
 
   const period = periodKeyForMission(mission, periodKey);
+
+  const complete = await isMissionCompleteOnServer(user._id, mission);
+  if (!complete) {
+    return {
+      ok: false,
+      granted: false,
+      error: 'mission_not_complete',
+      message: 'Complete this mission in the app before claiming.',
+    };
+  }
+
   const idempotencyKey = `scout_mission:${user._id}:${mission.id}:${period}`;
   const oldBalance = Math.max(0, Math.round(Number(user.savvyPoints) || 0));
   const rewardAmount = Math.max(1, Math.round(Number(mission.rewardSavvy) || 0));

@@ -24,13 +24,14 @@ async function expireStaleSales() {
 function serializeSavvySale(event) {
   if (!event) return null;
   const msLeft = Math.max(0, new Date(event.expiresAt).getTime() - Date.now());
+  const live = validateActiveSavvySale({ ...event, active: event.active });
   return {
     eventId: event.eventId,
     type: event.type,
-    active: event.active && msLeft > 0,
+    active: live,
     startAt: event.startAt,
     expiresAt: event.expiresAt,
-    msRemaining: msLeft,
+    msRemaining: live ? msLeft : 0,
     saleSpinCost: SAVVY_SALE_SPIN_COST,
     source: event.source,
   };
@@ -50,7 +51,19 @@ async function getActiveSavvySale() {
 
 function isSavvySaleActive(sale) {
   if (!sale) return false;
-  return sale.active && sale.msRemaining > 0;
+  return validateActiveSavvySale(sale);
+}
+
+/**
+ * Server-clock validation — client timestamps cannot extend or spoof sale windows.
+ */
+function validateActiveSavvySale(sale) {
+  if (!sale || sale.active !== true) return false;
+  const now = Date.now();
+  const startAt = new Date(sale.startAt).getTime();
+  const expiresAt = new Date(sale.expiresAt).getTime();
+  if (Number.isNaN(startAt) || Number.isNaN(expiresAt)) return false;
+  return startAt <= now && expiresAt > now;
 }
 
 async function startSavvySale({
@@ -90,14 +103,43 @@ async function endSavvySale() {
 }
 
 function applySavvySaleToSpinCost(baseCost, saleActive) {
-  if (!saleActive || baseCost <= 0) {
-    return { cost: baseCost, originalCost: baseCost, saleApplied: false, savings: 0 };
+  if (!saleActive) {
+    return resolveSavvySaleSpinPricing(baseCost, null);
   }
+  const now = Date.now();
+  return resolveSavvySaleSpinPricing(baseCost, {
+    active: true,
+    startAt: new Date(now - 60_000),
+    expiresAt: new Date(now + 60_000),
+    eventId: 'legacy-boolean-sale',
+  });
+}
+
+/**
+ * Resolve Perk Machine spin cost with at most one sale discount (no stacking).
+ * Paid spin tokens and other discounts must zero sale separately in perkMachineService.
+ */
+function resolveSavvySaleSpinPricing(baseCost, saleEvent) {
+  const originalCost = Math.max(0, Math.round(Number(baseCost) || 0));
+  const saleLive = saleEvent === true ? true : validateActiveSavvySale(saleEvent);
+
+  if (!saleLive || originalCost <= 0) {
+    return {
+      cost: originalCost,
+      originalCost,
+      saleApplied: false,
+      savings: 0,
+      saleEventId: null,
+    };
+  }
+
+  const cost = SAVVY_SALE_SPIN_COST;
   return {
-    cost: SAVVY_SALE_SPIN_COST,
-    originalCost: baseCost,
+    cost,
+    originalCost,
     saleApplied: true,
-    savings: Math.max(0, baseCost - SAVVY_SALE_SPIN_COST),
+    savings: Math.max(0, originalCost - cost),
+    saleEventId: saleEvent?.eventId || null,
   };
 }
 
@@ -105,9 +147,11 @@ module.exports = {
   SavvySaleError,
   getActiveSavvySale,
   isSavvySaleActive,
+  validateActiveSavvySale,
   startSavvySale,
   endSavvySale,
   applySavvySaleToSpinCost,
+  resolveSavvySaleSpinPricing,
   serializeSavvySale,
   SAVVY_SALE_SPIN_COST,
 };

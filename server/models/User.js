@@ -75,6 +75,8 @@ const userSchema = new mongoose.Schema({
   perkMachine: {
     lastFreeSpinDay: { type: String, default: null },
     lastSpinAt: { type: Date, default: null },
+    /** Atomic spin lock — cleared after spin completes or TTL expires. */
+    spinLockUntil: { type: Date, default: null },
     lastHatchAt: { type: Date, default: null },
     extraFreeSpins: { type: Number, default: 0 },
     scoutUpgrades: { type: Number, default: 0 },

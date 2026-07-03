@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { isBetaTester, logBetaUsage, BETA_FEEDBACK_SAVVY_BONUS } = require('../services/betaTesterService');
 const { grantSavvyReward } = require('../services/savvyRewardService');
+const { classifyBugReport, formatIssueBody } = require('../services/bugReportClassifier');
 
 function isQualityFeedback({ title, steps, expected, actual }) {
   const t = String(title || '').trim();
@@ -14,8 +15,101 @@ function isQualityFeedback({ title, steps, expected, actual }) {
   return t.length >= 10 && s.length >= 40 && e.length >= 8 && a.length >= 8;
 }
 
+const PRIORITY_LABEL_COLORS = Object.freeze({
+  P0: 'b60205',
+  P1: 'd93f0b',
+  P2: 'fbca04',
+  P3: '0e8a16',
+});
+
+async function ensureGithubLabels(owner, repo, labelNames) {
+  if (!process.env.GITHUB_TOKEN || !labelNames.length) return labelNames;
+
+  const headers = {
+    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  let existing = new Set();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/labels?per_page=100`, {
+      headers,
+    });
+    if (res.ok) {
+      const labels = await res.json();
+      existing = new Set(labels.map((l) => l.name));
+    }
+  } catch (err) {
+    console.warn('[bugReports] could not list GitHub labels:', err?.message);
+    return labelNames;
+  }
+
+  for (const name of labelNames) {
+    if (existing.has(name)) continue;
+    const priorityMatch = name.match(/^priority:(p[0-3])$/i);
+    const appMatch = name.match(/^app:(.+)$/);
+    let color = '6f42c1';
+    if (priorityMatch) color = PRIORITY_LABEL_COLORS[priorityMatch[1].toUpperCase()] || color;
+    if (appMatch) color = '1d76db';
+
+    try {
+      const createRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/labels`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color, description: 'Auto-created by Final10 Bug Reporter' }),
+      });
+      if (createRes.ok || createRes.status === 422) {
+        existing.add(name);
+      }
+    } catch (err) {
+      console.warn(`[bugReports] could not create label ${name}:`, err?.message);
+    }
+  }
+
+  return labelNames.filter((n) => existing.has(n));
+}
+
 // Apply auth middleware to all routes
 router.use(auth);
+
+// Preview classification before submit (no GitHub issue)
+router.post('/classify', (req, res) => {
+  try {
+    const { title, steps, expected, actual, severity, page, userAgent } = req.body || {};
+    if (!title || !steps) {
+      return res.status(400).json({ message: 'Title and steps are required for classification' });
+    }
+
+    const classification = classifyBugReport({
+      title,
+      steps,
+      expected,
+      actual,
+      severity,
+      page,
+      userAgent,
+    });
+
+    res.json({
+      success: true,
+      classification: {
+        priority: classification.priority,
+        app: classification.app,
+        subsystems: classification.subsystems,
+        summary: classification.summary,
+        rootCauseHypothesis: classification.rootCauseHypothesis,
+        suggestedFix: classification.suggestedFix,
+        filesLikelyInvolved: classification.filesLikelyInvolved,
+        regressionTests: classification.regressionTests,
+        githubLabels: classification.githubLabels,
+      },
+    });
+  } catch (error) {
+    console.error('Error classifying bug report:', error);
+    res.status(500).json({ message: 'Failed to classify bug report' });
+  }
+});
 
 // Create bug report and GitHub issue
 router.post('/', async (req, res) => {
@@ -30,62 +124,53 @@ router.post('/', async (req, res) => {
       userAgent,
       timestamp,
       userId,
-      username
+      username,
     } = req.body;
 
     // Validate required fields
     if (!title || !steps) {
       return res.status(400).json({
-        message: 'Title and steps to reproduce are required'
+        message: 'Title and steps to reproduce are required',
       });
     }
 
-    // Create GitHub issue body
-    const issueBody = [
-      `**Severity:** ${severity?.toUpperCase() || 'MEDIUM'}`,
-      `**Reported by:** ${username || 'Anonymous'} (User ID: ${userId || 'N/A'})`,
-      `**Page:** \`${page || 'Unknown'}\``,
-      `**Timestamp:** ${timestamp || new Date().toISOString()}`,
-      `**User Agent:** \`${userAgent || 'Unknown'}\``,
-      '',
-      '## 🐛 Bug Description',
+    const report = {
       title,
-      '',
-      '## 📋 Steps to Reproduce',
-      steps || '_not provided_',
-      '',
-      '## ✅ Expected Behavior',
-      expected || '_not provided_',
-      '',
-      '## ❌ Actual Behavior',
-      actual || '_not provided_',
-      '',
-      '## 🔧 AI Development Team',
-      'This issue has been automatically tagged for AI analysis and fixing.',
-      '',
-      '---',
-      '*This bug report was automatically created from the Final10 application.*'
-    ].join('\n');
+      steps,
+      expected,
+      actual,
+      severity,
+      page,
+      userAgent,
+      timestamp: timestamp || new Date().toISOString(),
+      userId,
+      username,
+    };
+
+    const classification = classifyBugReport(report);
+    const issueBody = formatIssueBody(report, classification);
 
     // Create GitHub issue
     let githubIssue = null;
     if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPO) {
       try {
         const [owner, repo] = process.env.GITHUB_REPO.split('/');
+        const labels = await ensureGithubLabels(owner, repo, classification.githubLabels);
+
         const githubResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github+json',
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            title: `🐛 ${title}`,
+            title: `${classification.priority.label.split('–')[0].trim()} ${title}`,
             body: issueBody,
-            labels: ['bug', 'triage:ai', `severity:${severity}`],
-            assignees: process.env.GITHUB_ASSIGNEE ? [process.env.GITHUB_ASSIGNEE] : []
-          })
+            labels,
+            assignees: process.env.GITHUB_ASSIGNEE ? [process.env.GITHUB_ASSIGNEE] : [],
+          }),
         });
 
         if (githubResponse.ok) {
@@ -99,30 +184,33 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Store bug report in database (optional)
-    // You could create a BugReport model if you want to track locally
     const bugReport = {
-      title,
-      steps,
-      expected,
-      actual,
-      severity,
-      page,
-      userAgent,
-      timestamp: timestamp || new Date().toISOString(),
-      userId,
-      username,
+      ...report,
+      classification: {
+        priority: classification.priority.id,
+        priorityLabel: classification.priority.label,
+        app: classification.app.id,
+        appLabel: classification.app.label,
+        subsystems: classification.subsystems,
+        summary: classification.summary,
+        rootCauseHypothesis: classification.rootCauseHypothesis,
+        suggestedFix: classification.suggestedFix,
+        filesLikelyInvolved: classification.filesLikelyInvolved,
+        regressionTests: classification.regressionTests,
+        githubLabels: classification.githubLabels,
+      },
       githubIssueNumber: githubIssue?.number,
       githubIssueUrl: githubIssue?.html_url,
-      status: 'open'
+      status: 'open',
     };
 
-    // Log the bug report
     console.log('🐛 Bug Report Received:', {
       title,
-      severity,
+      priority: classification.priority.id,
+      app: classification.app.id,
+      subsystems: classification.subsystems.join(', '),
       reporter: username,
-      githubIssue: githubIssue?.number
+      githubIssue: githubIssue?.number,
     });
 
     let feedbackBonus = null;
@@ -136,7 +224,7 @@ router.post('/', async (req, res) => {
             amount: BETA_FEEDBACK_SAVVY_BONUS,
             idempotencyKey: `beta_feedback:${reporter._id}`,
             note: 'Quality beta feedback bonus',
-            meta: { page, severity },
+            meta: { page, severity, priority: classification.priority.id },
           });
           if (grant.granted) {
             reporter.betaFeedbackBonusGrantedAt = new Date();
@@ -159,18 +247,20 @@ router.post('/', async (req, res) => {
         ? `Bug report submitted. +${BETA_FEEDBACK_SAVVY_BONUS} Savvy awarded for quality feedback!`
         : 'Bug report submitted successfully',
       feedbackBonus,
-      githubIssue: githubIssue ? {
-        number: githubIssue.number,
-        url: githubIssue.html_url
-      } : null,
-      bugReport
+      classification: bugReport.classification,
+      githubIssue: githubIssue
+        ? {
+            number: githubIssue.number,
+            url: githubIssue.html_url,
+          }
+        : null,
+      bugReport,
     });
-
   } catch (error) {
     console.error('Error creating bug report:', error);
     res.status(500).json({
       message: 'Failed to create bug report',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
     });
   }
 });
@@ -178,20 +268,16 @@ router.post('/', async (req, res) => {
 // Get bug reports (admin only)
 router.get('/', async (req, res) => {
   try {
-    // Check if user is admin
     const user = await require('../models/User').findById(req.user.id);
     if (!user || user.role !== 'admin') {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
-    // This would fetch from a BugReport model if you create one
-    // For now, return empty array
     res.json({
       success: true,
       bugReports: [],
-      total: 0
+      total: 0,
     });
-
   } catch (error) {
     console.error('Error fetching bug reports:', error);
     res.status(500).json({ message: 'Failed to fetch bug reports' });
@@ -210,10 +296,10 @@ router.get('/github/:issueNumber', async (req, res) => {
     const [owner, repo] = process.env.GITHUB_REPO.split('/');
     const githubResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
       headers: {
-        'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
     });
 
     if (!githubResponse.ok) {
@@ -229,14 +315,13 @@ router.get('/github/:issueNumber', async (req, res) => {
         title: issue.title,
         state: issue.state,
         url: issue.html_url,
-        labels: issue.labels?.map(label => label.name) || [],
+        labels: issue.labels?.map((label) => label.name) || [],
         createdAt: issue.created_at,
         updatedAt: issue.updated_at,
         closedAt: issue.closed_at,
-        pullRequests: issue.pull_requests || []
-      }
+        pullRequests: issue.pull_requests || [],
+      },
     });
-
   } catch (error) {
     console.error('Error fetching GitHub issue:', error);
     res.status(500).json({ message: 'Failed to fetch issue status' });
@@ -244,9 +329,3 @@ router.get('/github/:issueNumber', async (req, res) => {
 });
 
 module.exports = router;
-
-
-
-
-
-

@@ -26,6 +26,11 @@ async function aiBugFixer() {
     console.log(`📝 Issue: ${issue.title}`);
     console.log(`🏷️  Labels: ${issue.labels.map(l => l.name).join(', ')}`);
 
+    const metadata = parseIssueMetadata(issue);
+    console.log(`🎯 Priority: ${metadata.priorityLabel}`);
+    console.log(`📱 App: ${metadata.appLabel}`);
+    console.log(`🧩 Subsystems: ${metadata.subsystems.join(', ')}`);
+
     // Check if issue has AI triage label
     const hasAiTriage = issue.labels.some(label => label.name === 'triage:ai');
     if (!hasAiTriage) {
@@ -55,14 +60,19 @@ async function aiBugFixer() {
     const fileList = repoFiles.split('\n').filter(f => f.trim()).slice(0, 30); // Limit to 30 files
 
     // 4) Get relevant file contents for analysis
-    const relevantFiles = fileList.filter(f => 
-      f.includes('src') || 
-      f.includes('components') || 
-      f.includes('pages') || 
-      f.includes('routes') ||
-      f.includes('models') ||
-      f.includes('services')
-    ).slice(0, 10); // Limit to 10 most relevant files
+    const relevantFiles = [
+      ...new Set([
+        ...(metadata.filesLikelyInvolved || []).filter((f) => f && !f.endsWith('/')),
+        ...fileList.filter(f =>
+          f.includes('src') ||
+          f.includes('components') ||
+          f.includes('pages') ||
+          f.includes('routes') ||
+          f.includes('models') ||
+          f.includes('services')
+        ),
+      ]),
+    ].slice(0, 12);
 
     const fileContents = {};
     for (const file of relevantFiles) {
@@ -78,7 +88,7 @@ async function aiBugFixer() {
     }
 
     // 5) Create AI prompt for bug analysis and fix
-    const aiPrompt = createAIPrompt(issue, fileContents);
+    const aiPrompt = createAIPrompt(issue, fileContents, metadata);
 
     // 6) Call AI service (OpenAI, Claude, or your preferred LLM)
     console.log('🧠 Analyzing bug with AI...');
@@ -244,16 +254,93 @@ This issue requires human intervention. Please review manually.`
   }
 }
 
-function createAIPrompt(issue, fileContents) {
+function parseIssueMetadata(issue) {
+  const body = String(issue.body || '');
+  const labels = (issue.labels || []).map((l) => l.name);
+
+  const section = (name) => {
+    const re = new RegExp(`## [^\\n]*${name}[^\\n]*\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+    const match = body.match(re);
+    return match ? match[1].trim() : '';
+  };
+
+  const priorityLabel =
+    body.match(/\*\*Priority:\*\*\s*(.+)/i)?.[1]?.trim() ||
+    labels.find((l) => l.startsWith('priority:p')) ||
+    'unknown';
+
+  const appLabel =
+    body.match(/\*\*Affected App:\*\*\s*([^(]+)/i)?.[1]?.trim() ||
+    labels.find((l) => l.startsWith('app:')) ||
+    'final10';
+
+  const subsystems = body.match(/\*\*Subsystems:\*\*\s*(.+)/i)?.[1]
+    ? body
+        .match(/\*\*Subsystems:\*\*\s*(.+)/i)[1]
+        .split(/[`,\s]+/)
+        .map((s) => s.replace(/`/g, '').trim())
+        .filter(Boolean)
+    : labels.filter((l) => !l.startsWith('priority:') && !l.startsWith('app:') && l !== 'bug' && l !== 'triage:ai');
+
+  return {
+    priorityLabel,
+    appLabel,
+    subsystems,
+    summary: section('Summary'),
+    steps: section('Steps to Reproduce'),
+    expected: section('Expected Result'),
+    actual: section('Actual Result'),
+    rootCauseHypothesis: section('Root Cause Hypothesis'),
+    suggestedFix: section('Suggested Fix'),
+    filesLikelyInvolved: section('Files Likely Involved')
+      .split('\n')
+      .map((l) => l.replace(/^- /, '').replace(/`/g, '').trim())
+      .filter(Boolean),
+    regressionTests: section('Regression Tests Required')
+      .split('\n')
+      .map((l) => l.replace(/^- \[[ x]\]\s*/i, '').trim())
+      .filter(Boolean),
+  };
+}
+
+function createAIPrompt(issue, fileContents, metadata) {
   const fileList = Object.keys(fileContents).join('\n');
   const fileSnippets = Object.entries(fileContents)
     .map(([file, content]) => `\n=== ${file} ===\n${content}`)
     .join('\n');
 
   return `
-You are an AI developer tasked with fixing a bug in the Final10 application.
+You are an AI developer tasked with fixing a bug in the Savvy Universe platform.
 
-BUG REPORT:
+AUTO-CLASSIFICATION (use this — do not re-triage):
+- Priority: ${metadata.priorityLabel}
+- Affected App: ${metadata.appLabel}
+- Subsystems: ${metadata.subsystems.join(', ')}
+
+STRUCTURED BUG REPORT:
+Summary: ${metadata.summary || issue.title}
+Steps to Reproduce:
+${metadata.steps || '_see issue body_'}
+
+Expected Result:
+${metadata.expected || '_not provided_'}
+
+Actual Result:
+${metadata.actual || '_not provided_'}
+
+Root Cause Hypothesis:
+${metadata.rootCauseHypothesis || '_not provided_'}
+
+Suggested Fix:
+${metadata.suggestedFix || '_not provided_'}
+
+Files Likely Involved:
+${metadata.filesLikelyInvolved.length ? metadata.filesLikelyInvolved.map((f) => `- ${f}`).join('\n') : '_infer from repo_'}
+
+Regression Tests Required:
+${metadata.regressionTests.length ? metadata.regressionTests.map((t) => `- ${t}`).join('\n') : '_add smoke tests_'}
+
+RAW ISSUE:
 Title: ${issue.title}
 Description: ${issue.body}
 
@@ -264,14 +351,14 @@ RELEVANT FILE CONTENTS:
 ${fileSnippets}
 
 TASK:
-1. Analyze the bug description and identify the root cause
-2. Determine which files need to be modified
-3. Provide the corrected code for each file
-4. Ensure the fix follows best practices
+1. Use the root cause hypothesis and file hints as your starting point
+2. Verify the hypothesis against the codebase snippets
+3. Apply a minimal, focused fix in the files likely involved
+4. Ensure regression tests listed above would pass
 
 RESPONSE FORMAT (JSON):
 {
-  "analysis": "Brief analysis of the bug and proposed fix",
+  "analysis": "Brief analysis confirming or refining the hypothesis",
   "filesToModify": [
     {
       "filePath": "path/to/file.js",
@@ -288,6 +375,7 @@ RULES:
 - Maintain existing code style and patterns
 - Include error handling where appropriate
 - Ensure the fix doesn't break existing functionality
+- Address all regression tests in your verification steps
 `;
 }
 
@@ -363,7 +451,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = { aiBugFixer };
+module.exports = { aiBugFixer, parseIssueMetadata };
 
 
 

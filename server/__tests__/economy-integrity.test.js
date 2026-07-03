@@ -9,6 +9,7 @@ const SavvyTransaction = require('../models/SavvyTransaction');
 const { creditSavvy, debitSavvy, sumCompletedTransactions } = require('../services/savvyBalanceService');
 const { grantSavvyReward } = require('../services/savvyRewardService');
 const { claimScoutMissionReward } = require('../services/scoutMissionService');
+const { recordScoutMissionTrigger } = require('../services/scoutMissionProgressService');
 const { claimDailyStreak } = require('../services/dailyStreakService');
 const { periodKeyForMission } = require('../config/scoutMissions');
 const { getMissionById } = require('../config/scoutMissions');
@@ -126,21 +127,31 @@ describeReal('Economy integrity (Phase 1)', () => {
     await assertBalanceMatchesLedger();
   });
 
-  it('scout mission ignores client periodKey override', async () => {
+  it('scout mission requires server completion and ignores client periodKey override', async () => {
     const mission = getMissionById('save_deal');
     const serverKey = periodKeyForMission(mission, 'evil-client-key-1');
     const serverKey2 = periodKeyForMission(mission, 'evil-client-key-2');
     expect(serverKey).toBe(serverKey2);
 
     const u = await reloadUser();
-    const c1 = await claimScoutMissionReward(u, {
+    const blocked = await claimScoutMissionReward(u, {
+      missionId: 'save_deal',
+      periodKey: 'evil-client-key-1',
+    });
+    expect(blocked.granted).toBe(false);
+    expect(blocked.error).toBe('mission_not_complete');
+
+    await recordScoutMissionTrigger(u._id, 'save_deal');
+
+    const u2 = await reloadUser();
+    const c1 = await claimScoutMissionReward(u2, {
       missionId: 'save_deal',
       periodKey: 'evil-client-key-1',
     });
     expect(c1.granted).toBe(true);
 
-    const u2 = await reloadUser();
-    const c2 = await claimScoutMissionReward(u2, {
+    const u3 = await reloadUser();
+    const c2 = await claimScoutMissionReward(u3, {
       missionId: 'save_deal',
       periodKey: 'evil-client-key-2',
     });

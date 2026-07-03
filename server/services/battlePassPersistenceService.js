@@ -389,6 +389,8 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
     throw e;
   }
 
+  const tierBefore = Number(bp.tier) || 0;
+
   const result = processBattlePassActionEvent(event, activeTasks, { maxCascadeSteps: 32 });
 
   const claimed = new Set(bp.claimedRewardIds || []);
@@ -464,6 +466,21 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
       },
     }
   );
+
+  setImmediate(() => {
+    try {
+      const {
+        recordScoutProgressFromProgressionEvent,
+        recordScoutMissionTrigger,
+      } = require('./scoutMissionProgressService');
+      void recordScoutProgressFromProgressionEvent(userId, event.type);
+      if (Number(bp.tier) > tierBefore) {
+        void recordScoutMissionTrigger(userId, 'battle_pass_tier_up');
+      }
+    } catch (_e) {
+      /* non-blocking */
+    }
+  });
 
   auditFireAndForget('PROGRESSION_EVENT_PROCESSED', {
     userId,

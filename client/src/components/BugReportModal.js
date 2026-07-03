@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { X, Bug, AlertTriangle, AlertCircle, AlertOctagon, Send, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,50 @@ const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [classification, setClassification] = useState(null);
+  const [classifying, setClassifying] = useState(false);
+  const classifyTimerRef = useRef(null);
+
+  const fetchClassification = useCallback(async (data) => {
+    if (!data.title.trim() || !data.steps.trim()) {
+      setClassification(null);
+      return;
+    }
+    setClassifying(true);
+    try {
+      const response = await fetch(buildApiUrl('/bug-reports/classify'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          ...data,
+          page: window.location.pathname,
+          userAgent: navigator.userAgent,
+        }),
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        setClassification(payload.classification || null);
+      }
+    } catch {
+      setClassification(null);
+    } finally {
+      setClassifying(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    if (classifyTimerRef.current) clearTimeout(classifyTimerRef.current);
+    classifyTimerRef.current = setTimeout(() => {
+      void fetchClassification(formData);
+    }, 450);
+    return () => {
+      if (classifyTimerRef.current) clearTimeout(classifyTimerRef.current);
+    };
+  }, [formData, isOpen, fetchClassification]);
 
   const severityOptions = [
     { value: 'low', label: 'Low', icon: AlertCircle, color: 'text-green-400', bgColor: 'bg-green-500/20' },
@@ -67,6 +111,7 @@ const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
           setSubmitSuccess(false);
           onClose();
           setFormData({ title: '', steps: '', expected: '', actual: '', severity: 'med' });
+          setClassification(null);
         }, 2000);
       } else {
         throw new Error('Failed to submit bug report');
@@ -226,6 +271,48 @@ const BugReportModal = ({ isOpen, onClose, onReportSubmitted }) => {
               />
             </div>
           </div>
+
+          {/* AI auto-classification preview */}
+          {(classification || classifying) ? (
+            <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-indigo-200">AI Bug Fixer Preview</h4>
+                {classifying ? (
+                  <span className="text-xs text-indigo-300/80">Classifying…</span>
+                ) : (
+                  <span className="text-xs text-indigo-300/80">Ready for submission</span>
+                )}
+              </div>
+              {classification ? (
+                <>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="px-2 py-1 rounded-full bg-gray-800 border border-gray-600 text-gray-100">
+                      {classification.priority?.label}
+                    </span>
+                    <span className="px-2 py-1 rounded-full bg-gray-800 border border-gray-600 text-violet-200">
+                      {classification.app?.label}
+                    </span>
+                    {(classification.subsystems || []).map((sub) => (
+                      <span
+                        key={sub}
+                        className="px-2 py-1 rounded-full bg-gray-800 border border-gray-600 text-slate-300"
+                      >
+                        {sub}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    <span className="font-medium text-gray-200">Summary:</span>{' '}
+                    {classification.summary}
+                  </p>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    <span className="font-medium text-gray-300">Hypothesis:</span>{' '}
+                    {classification.rootCauseHypothesis}
+                  </p>
+                </>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Auto-collected Info */}
           <div className="bg-gray-700/50 rounded-lg p-4">

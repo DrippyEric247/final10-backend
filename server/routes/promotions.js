@@ -369,6 +369,15 @@ router.post('/watch/:listingId', async (req, res) => {
       }).catch((err) => {
         if (err?.code !== 11000) throw err;
       });
+
+      setImmediate(() => {
+        try {
+          const { recordScoutMissionTrigger } = require('../services/scoutMissionProgressService');
+          void recordScoutMissionTrigger(user._id, 'add_watchlist');
+        } catch (_e) {
+          /* non-blocking */
+        }
+      });
     }
     await user.save();
 

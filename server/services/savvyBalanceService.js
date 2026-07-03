@@ -189,6 +189,12 @@ async function adjustSavvyBalance(userOrId, {
       } catch (_e) {
         /* non-blocking */
       }
+      try {
+        const { recordScoutMissionTrigger } = require('./scoutMissionProgressService');
+        void recordScoutMissionTrigger(String(userId), 'savvy_earned_today', { increment: amt });
+      } catch (_e) {
+        /* non-blocking */
+      }
     });
   }
 

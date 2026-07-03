@@ -7,7 +7,14 @@ const { utcDayKey } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { grantSavvyReward, spendSavvyReward } = require('./savvyRewardService');
 const { getSavvyMultiplier, serializeActiveBoosts } = require('./perkBoostService');
-const { getActiveSavvySale, applySavvySaleToSpinCost, SAVVY_SALE_SPIN_COST } = require('./savvySaleService');
+const { getActiveSavvySale, resolveSavvySaleSpinPricing } = require('./savvySaleService');
+const {
+  acquirePerkSpinLock,
+  releasePerkSpinLock,
+  claimFreeSpinSlot,
+  assertSpinCooldown,
+  SpinLockError,
+} = require('./perkSpinLockService');
 const {
   SPIN_MODES,
   SPIN_COOLDOWN_MS,
@@ -250,6 +257,7 @@ function highestRarity(rewards) {
 }
 
 async function spinPerkMachine(user, options = {}) {
+  const userId = user._id;
   const mode = String(options.mode || '').trim();
   const config = getSpinConfig(mode);
   if (!config) {
@@ -259,176 +267,172 @@ async function spinPerkMachine(user, options = {}) {
     throw err;
   }
 
-  const pm = ensurePerkMachineDoc(user);
-  const now = Date.now();
-  const lastSpin = pm.lastSpinAt ? new Date(pm.lastSpinAt).getTime() : 0;
-  if (lastSpin && now - lastSpin < SPIN_COOLDOWN_MS) {
-    const err = new Error('Spin already in progress. Please wait.');
-    err.status = 429;
-    err.code = 'SPIN_IN_PROGRESS';
-    throw err;
-  }
+  let lockedUser;
+  try {
+    lockedUser = await acquirePerkSpinLock(userId);
+    assertSpinCooldown(lockedUser, options.adminBypassCost);
+    user = lockedUser;
+    ensurePerkMachineDoc(user);
 
-  const tier = readTier(user);
-  const today = utcDayKey();
-  let savvyCost = config.savvy;
-  let originalSavvyCost = config.savvy;
-  let savvySaleApplied = false;
-  let savvySaleSavings = 0;
-  let usedPaid3Token = false;
-  let usedExtraFreeSpin = false;
+    const tier = readTier(user);
+    let savvyCost = config.savvy;
+    let originalSavvyCost = config.savvy;
+    let savvySaleApplied = false;
+    let savvySaleSavings = 0;
+    let usedPaid3Token = false;
+    let usedExtraFreeSpin = false;
 
-  const savvySale = await getActiveSavvySale();
-  const saleActive = savvySale?.active;
+    const savvySale = await getActiveSavvySale();
 
-  if (mode === SPIN_MODES.FREE) {
-    if (!canUseFreeSpin(user)) {
-      const err = new Error('Free spin already used today. Come back tomorrow or spend Savvy.');
-      err.status = 400;
-      err.code = 'FREE_SPIN_UNAVAILABLE';
-      throw err;
-    }
-    if (pm.lastFreeSpinDay === today) {
-      if (Number(pm.extraFreeSpins) > 0) {
-        pm.extraFreeSpins -= 1;
-        usedExtraFreeSpin = true;
-      } else if (Number(pm.eggInventory?.extraFreeSpin) > 0) {
-        pm.eggInventory.extraFreeSpin -= 1;
-        usedExtraFreeSpin = true;
-      }
+    if (mode === SPIN_MODES.FREE) {
+      const claim = await claimFreeSpinSlot(userId);
+      user = claim.user;
+      usedExtraFreeSpin = claim.usedExtraFreeSpin;
+      ensurePerkMachineDoc(user);
     } else {
-      pm.lastFreeSpinDay = today;
-    }
-  } else {
-    const salePricing = applySavvySaleToSpinCost(config.savvy, saleActive);
-    originalSavvyCost = salePricing.originalCost;
-    savvyCost = salePricing.cost;
-    savvySaleApplied = salePricing.saleApplied;
-    savvySaleSavings = salePricing.savings;
+      const salePricing = resolveSavvySaleSpinPricing(config.savvy, savvySale);
+      originalSavvyCost = salePricing.originalCost;
+      savvyCost = salePricing.cost;
+      savvySaleApplied = salePricing.saleApplied;
+      savvySaleSavings = salePricing.savings;
 
-    const pmTokens = ensurePerkMachineDoc(user).tokens || {};
-    if (mode === SPIN_MODES.PAID_3 && Number(pmTokens.paid3Spin) > 0 && !options.adminBypassCost) {
-      pm.tokens.paid3Spin = Number(pm.tokens.paid3Spin) - 1;
-      savvyCost = 0;
-      originalSavvyCost = config.savvy;
-      usedPaid3Token = true;
-      savvySaleApplied = false;
-      savvySaleSavings = 0;
+      const pm = ensurePerkMachineDoc(user);
+      const pmTokens = pm.tokens || {};
+      if (mode === SPIN_MODES.PAID_3 && Number(pmTokens.paid3Spin) > 0 && !options.adminBypassCost) {
+        pm.tokens.paid3Spin = Number(pm.tokens.paid3Spin) - 1;
+        savvyCost = 0;
+        originalSavvyCost = config.savvy;
+        usedPaid3Token = true;
+        savvySaleApplied = false;
+        savvySaleSavings = 0;
+      }
+
+      const balance = Math.round(Number(user.savvyPoints) || 0);
+      if (!options.adminBypassCost) {
+        if (savvyCost > 0 && balance < savvyCost) {
+          const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
+          err.status = 400;
+          err.code = 'INSUFFICIENT_SAVVY';
+          err.required = savvyCost;
+          err.balance = balance;
+          throw err;
+        }
+      } else {
+        savvyCost = 0;
+        originalSavvyCost = 0;
+      }
     }
 
-    // Round before spending so balances stay integer (heals any legacy fraction).
-    const balance = Math.round(Number(user.savvyPoints) || 0);
-    if (!options.adminBypassCost) {
-      if (savvyCost > 0 && balance < savvyCost) {
+    const pm = ensurePerkMachineDoc(user);
+    pm.lastSpinAt = new Date();
+    const spinId = crypto.randomUUID();
+
+    if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
+      const spend = await spendSavvyReward(user, {
+        amount: savvyCost,
+        source: 'perk_machine_spin',
+        idempotencyKey: `perk_spin_spend:${spinId}`,
+        note: `Perk Machine spin (${mode})`,
+        meta: { mode, spinId, savvySaleApplied, savvySaleEventId: savvySale?.eventId || null },
+      });
+      if (!spend.spent && !spend.duplicate) {
         const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
         err.status = 400;
         err.code = 'INSUFFICIENT_SAVVY';
-        err.required = savvyCost;
-        err.balance = balance;
         throw err;
       }
-    } else {
-      savvyCost = 0;
-      originalSavvyCost = 0;
     }
-  }
 
-  pm.lastSpinAt = new Date();
-  const spinId = crypto.randomUUID();
+    const pool = buildWeightedPool(tier, options.forceRewardId || null);
+    const slots = config.slots;
+    const rewards = [];
 
-  if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
-    const spend = await spendSavvyReward(user, {
-      amount: savvyCost,
-      source: 'perk_machine_spin',
-      idempotencyKey: `perk_spin_spend:${spinId}`,
-      note: `Perk Machine spin (${mode})`,
-      meta: { mode, spinId },
-    });
-    if (!spend.spent && !spend.duplicate) {
-      const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
-      err.status = 400;
-      err.code = 'INSUFFICIENT_SAVVY';
-      throw err;
+    for (let i = 0; i < slots; i += 1) {
+      const forceId = i === 0 ? options.forceRewardId : null;
+      const slotPool = forceId ? buildWeightedPool(tier, forceId) : pool;
+      const picked = pickWeightedReward(slotPool);
+      const granted = await applyReward(user, picked, `${spinId}:${i}`);
+      rewards.push(granted);
     }
-  }
 
-  const pool = buildWeightedPool(tier, options.forceRewardId || null);
-  const slots = config.slots;
-  const rewards = [];
+    const finalCost = mode === SPIN_MODES.FREE ? 0 : savvyCost;
+    const savvyWon = rewards.reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
+    const netSavvy = savvyWon - finalCost;
 
-  for (let i = 0; i < slots; i += 1) {
-    const forceId = i === 0 ? options.forceRewardId : null;
-    const slotPool = forceId ? buildWeightedPool(tier, forceId) : pool;
-    const picked = pickWeightedReward(slotPool);
-    const granted = await applyReward(user, picked, `${spinId}:${i}`);
-    rewards.push(granted);
-  }
+    const historyEntry = {
+      spinId,
+      mode,
+      slots,
+      savvyCost: finalCost,
+      originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
+      savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
+      savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
+      savvyWon,
+      rewards: rewards.map((r) => ({
+        id: r.id,
+        label: r.label,
+        rarity: r.rarity,
+        type: r.type,
+        savvyGranted: Number(r.savvyGranted) || 0,
+      })),
+      createdAt: new Date(),
+    };
 
-  const finalCost = mode === SPIN_MODES.FREE ? 0 : savvyCost;
-  const savvyWon = rewards.reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
-  const netSavvy = savvyWon - finalCost;
+    pm.spinHistory.push(historyEntry);
+    if (pm.spinHistory.length > MAX_HISTORY) {
+      pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
+    }
 
-  const historyEntry = {
-    spinId,
-    mode,
-    slots,
-    savvyCost: finalCost,
-    originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
-    savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
-    savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
-    savvyWon,
-    rewards: rewards.map((r) => ({
-      id: r.id,
-      label: r.label,
-      rarity: r.rarity,
-      type: r.type,
-      savvyGranted: Number(r.savvyGranted) || 0,
-    })),
-    createdAt: new Date(),
-  };
+    const ticketResult = recordSpinForTournamentTicket(user, pm);
 
-  pm.spinHistory.push(historyEntry);
-  if (pm.spinHistory.length > MAX_HISTORY) {
-    pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
-  }
+    user.markModified('perkMachine');
+    await user.save();
 
-  const ticketResult = recordSpinForTournamentTicket(user, pm);
+    const topRarity = highestRarity(rewards);
+    const resultMessage = pickResultMessage(topRarity);
 
-  user.markModified('perkMachine');
-  await user.save();
+    const eggsWon = rewards
+      .filter((r) => r.type === 'egg')
+      .map((r) => r.label);
 
-  const topRarity = highestRarity(rewards);
-  const resultMessage = pickResultMessage(topRarity);
-
-  const eggsWon = rewards
-    .filter((r) => r.type === 'egg')
-    .map((r) => r.label);
-
-  return {
-    spinId,
-    mode,
-    slots,
-    savvyCost: finalCost,
-    savvyWon,
-    net: netSavvy,
-    summary: {
-      cost: finalCost,
+    return {
+      spinId,
+      mode,
+      slots,
+      savvyCost: finalCost,
       savvyWon,
       net: netSavvy,
-      eggs: eggsWon,
-    },
-    savvyBalance: Math.round(Number(user.savvyPoints) || 0),
-    rewards,
-    resultMessage,
-    topRarity,
-    usedExtraFreeSpin,
-    usedPaid3Token,
-    savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
-    savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
-    originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
-    tournamentTicket: ticketResult,
-    status: await getPerkMachineStatusWithEvents(user),
-  };
+      summary: {
+        cost: finalCost,
+        savvyWon,
+        net: netSavvy,
+        eggs: eggsWon,
+      },
+      savvyBalance: Math.round(Number(user.savvyPoints) || 0),
+      rewards,
+      resultMessage,
+      topRarity,
+      usedExtraFreeSpin,
+      usedPaid3Token,
+      savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
+      savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
+      originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
+      tournamentTicket: ticketResult,
+      status: await getPerkMachineStatusWithEvents(user),
+    };
+  } catch (err) {
+    if (err instanceof SpinLockError) {
+      const mapped = new Error(err.message);
+      mapped.status = err.status;
+      mapped.code = err.code;
+      mapped.required = err.required;
+      mapped.balance = err.balance;
+      throw mapped;
+    }
+    throw err;
+  } finally {
+    await releasePerkSpinLock(userId);
+  }
 }
 
 async function hatchEgg(user, options = {}) {

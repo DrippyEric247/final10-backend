@@ -85,6 +85,15 @@ router.post('/', auth, async (req, res) => {
     existingCount,
   });
 
+  setImmediate(() => {
+    try {
+      const { recordScoutMissionTrigger } = require('../services/scoutMissionProgressService');
+      void recordScoutMissionTrigger(req.user.id, 'create_alert');
+    } catch (_e) {
+      /* non-blocking */
+    }
+  });
+
   res.status(201).json(alert);
   } catch (err) {
     auditAlertCreated({
