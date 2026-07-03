@@ -1,5 +1,5 @@
 // client/src/pages/Register.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
@@ -16,8 +16,10 @@ import { buildSignupAttributionPayload, getAttribution } from '../lib/attributio
 import { resetOnboardingForNewAccount, onboardingUserId } from '../lib/onboardingPreferences';
 import { ANALYTICS_EVENTS, trackEvent } from '../lib/analytics';
 import { parseApiError } from '../lib/apiErrorParsing';
+import { isPasswordStrongEnough, scorePasswordStrength } from '../lib/passwordStrength';
 
 const fieldLabelClass = 'block text-sm text-[var(--f10-text-dim)] mb-1';
+const STRENGTH_COLORS = ['', 'bg-red-500', 'bg-yellow-500', 'bg-emerald-500', 'bg-purple-400'];
 
 export default function Register() {
   const { register, refreshProfile } = useAuth();
@@ -27,8 +29,19 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     username: '', firstName: '', lastName: '',
-    email: '', password: '', referralCode: ''
+    email: '', password: '', confirmPassword: '', referralCode: ''
   });
+
+  const strength = useMemo(() => scorePasswordStrength(form.password), [form.password]);
+  const passwordsMatch = form.confirmPassword.length > 0 && form.password === form.confirmPassword;
+  const canSubmit =
+    Boolean(form.username.trim()) &&
+    Boolean(form.firstName.trim()) &&
+    Boolean(form.lastName.trim()) &&
+    Boolean(form.email.trim()) &&
+    isPasswordStrongEnough(form.password) &&
+    passwordsMatch &&
+    !busy;
 
   // auto-fill ref/creator code if coming from a deep link or stored attribution
   useEffect(() => {
@@ -52,13 +65,22 @@ export default function Register() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    if (!canSubmit) return;
     setErr('');
     setBusy(true);
     try {
       const attributionPayload = buildSignupAttributionPayload();
+      const signupPayload = {
+        username: form.username.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        referralCode: form.referralCode.trim(),
+      };
       const payload = attributionPayload
-        ? { ...form, attribution: attributionPayload }
-        : form;
+        ? { ...signupPayload, attribution: attributionPayload }
+        : signupPayload;
       const newUser = await register(payload);
       resetOnboardingForNewAccount(onboardingUserId(newUser));
       trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, { method: 'email' });
@@ -147,12 +169,62 @@ export default function Register() {
         <div>
           <label htmlFor="email" className={fieldLabelClass}>Email</label>
           <input className="input" placeholder="you@example.com" type="email" name="email" id="email"
+                 autoComplete="email"
                  value={form.email} onChange={e=>setForm({...form, email:e.target.value})}/>
         </div>
         <div>
           <label htmlFor="password" className={fieldLabelClass}>Password</label>
-          <input className="input" placeholder="Create a password" type="password" name="password" id="password"
-                 value={form.password} onChange={e=>setForm({...form, password:e.target.value})}/>
+          <input
+            className="input"
+            placeholder="Create a password (10+ characters)"
+            type="password"
+            name="password"
+            id="password"
+            autoComplete="new-password"
+            required
+            minLength={10}
+            value={form.password}
+            onChange={e => setForm({ ...form, password: e.target.value })}
+          />
+          {form.password ? (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span>Strength</span>
+                <span className="font-semibold text-gray-200">{strength.label}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                <div
+                  className={`h-full transition-all ${STRENGTH_COLORS[strength.score] || 'bg-red-500'}`}
+                  style={{ width: `${Math.min(100, strength.score * 25)}%` }}
+                />
+              </div>
+              <ul className="mt-2 space-y-0.5 text-xs">
+                {strength.checks.map((c) => (
+                  <li key={c.id} className={c.ok ? 'text-emerald-400' : 'text-gray-500'}>
+                    {c.ok ? '✓' : '○'} {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+        <div>
+          <label htmlFor="confirmPassword" className={fieldLabelClass}>Confirm password</label>
+          <input
+            className="input"
+            placeholder="Confirm your password"
+            type="password"
+            name="confirmPassword"
+            id="confirmPassword"
+            autoComplete="new-password"
+            required
+            minLength={10}
+            value={form.confirmPassword}
+            onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
+          />
+          {form.confirmPassword && !passwordsMatch ? (
+            <p className="mt-1 text-xs text-red-300">Passwords do not match.</p>
+          ) : null}
         </div>
         <div>
           <label htmlFor="referralCode" className={fieldLabelClass}>Referral code (optional)</label>
@@ -161,7 +233,7 @@ export default function Register() {
         </div>
         <button
           type="submit"
-          disabled={busy}
+          disabled={!canSubmit}
           className="btn btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
           aria-busy={busy}
         >

@@ -65,23 +65,27 @@ const attributionPayload = Joi.object({
   landingPath: Joi.string().trim().max(512).allow('', null).optional(),
 }).unknown(true);
 
+function normalizeEmailField(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 exports.authSignupBody = Joi.object({
   firstName: Joi.string().trim().min(1).max(80).required(),
   lastName: Joi.string().trim().min(1).max(80).required(),
   username: Joi.string().trim().min(2).max(40).pattern(/^[a-zA-Z0-9_-]+$/).required(),
-  email: Joi.string().trim().email().max(254).required(),
+  email: Joi.string().trim().email().max(254).required().custom(normalizeEmailField),
   password: Joi.string().min(10).max(128).required(),
   referralCode: Joi.string().trim().max(64).allow('', null).optional(),
   attribution: attributionPayload.optional(),
 });
 
 exports.authLoginBody = Joi.object({
-  email: Joi.string().trim().email().max(254).required(),
+  email: Joi.string().trim().email().max(254).required().custom(normalizeEmailField),
   password: Joi.string().min(1).max(128).required(),
 });
 
 exports.authForgotPasswordBody = Joi.object({
-  email: Joi.string().trim().email().max(254).required(),
+  email: Joi.string().trim().email().max(254).required().custom(normalizeEmailField),
 });
 
 exports.authResetPasswordBody = Joi.object({

@@ -22,6 +22,32 @@ const router = express.Router();
 
 const BCRYPT_ROUNDS = 12;
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Case-insensitive email lookup; migrates legacy mixed-case emails on successful match. */
+async function findUserByEmail(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+
+  let user = await User.findOne({ email: normalized });
+  if (user) return user;
+
+  user = await User.findOne({ email: new RegExp(`^${escapeRegExp(normalized)}$`, 'i') });
+  if (user && user.email !== normalized) {
+    user.email = normalized;
+    try {
+      await user.save();
+    } catch (migrateErr) {
+      // Duplicate normalized email exists — keep login working with the matched record.
+      // eslint-disable-next-line no-console
+      console.warn('[auth] email normalization migration skipped:', migrateErr.message);
+    }
+  }
+  return user;
+}
+
 function signUserToken(user) {
   const sub = String(user._id);
   return jwt.sign({ sub, id: user._id, userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -145,8 +171,12 @@ async function handleSignup(req, res, next) {
     // we never block a signup on missing/extra attribution fields.
     const attribution = (req.body && typeof req.body.attribution === 'object') ? req.body.attribution : null;
 
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
-    if (existing) {
+    const existingEmail = await findUserByEmail(email);
+    if (existingEmail) {
+      return next(new HttpError(400, 'SIGNUP_CONFLICT', 'Email or username already in use'));
+    }
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
       return next(new HttpError(400, 'SIGNUP_CONFLICT', 'Email or username already in use'));
     }
 
@@ -261,7 +291,7 @@ router.post('/register', signupMiddleware);
 router.post('/login', authLoginLimiter, validateRequest(schemas.authLoginBody), async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await findUserByEmail(email);
     const ok = user ? await bcrypt.compare(password, user.password) : false;
     if (!user || !ok) {
       auditFireAndForget('AUTH_LOGIN_FAILED', { req, severity: 'warn', meta: {} });
