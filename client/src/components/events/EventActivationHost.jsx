@@ -81,10 +81,6 @@ export default function EventActivationHost() {
     [advanceQueue]
   );
 
-  const handleSkip = useCallback(() => {
-    void advanceQueue(current);
-  }, [advanceQueue, current]);
-
   const bubblesWithTimers = useMemo(() => {
     return (bubbles || []).map((b) => {
       if (b.eventKey === 'max_supply_drop' && ctx?.dropMs > 0) {
@@ -102,7 +98,7 @@ export default function EventActivationHost() {
   return (
     <>
       {canReveal ? (
-        <EventActivationReveal event={current} onActivated={handleActivated} onSkip={handleSkip} />
+        <EventActivationReveal event={current} onActivated={handleActivated} />
       ) : null}
 
       <EventHudBubbles bubbles={bubblesWithTimers} onSelect={setDetailEvent} />
