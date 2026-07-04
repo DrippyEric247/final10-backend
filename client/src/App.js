@@ -116,6 +116,7 @@ import Final10Slogan from './components/branding/Final10Slogan';
 import NotFound from './pages/NotFound';
 import './styles/SavvyScoutMissions.css';
 import './styles/final10Branding.css';
+import './styles/scoutFlightGameplayFocus.css';
 
 /* Protect any route by requiring a token/user */
 function ProtectedRoute({ children }) {

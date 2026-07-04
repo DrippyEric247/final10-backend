@@ -77,6 +77,7 @@ export function createGame(width, height, difficultyId = loadSavedDifficulty(), 
     phase: PHASE.IDLE,
     score: 0,
     best: simMode ? 0 : loadBest(),
+    coinsGrabbed: 0,
     simMode,
     difficultyId: resolvedDifficulty,
     hitPad: HIT_PAD,
@@ -117,6 +118,7 @@ export function resetGame(game) {
 export function startGame(game) {
   game.phase = PHASE.PLAYING;
   game.score = 0;
+  game.coinsGrabbed = 0;
   game.elapsed = 0;
   game.scout.y = game.height / 2 - game.scout.h / 2;
   game.scout.vy = 0;
@@ -206,6 +208,7 @@ function scoutHitsObstacle(game) {
 function collectCoin(game, c) {
   c.collected = true;
   game.score += c.value;
+  game.coinsGrabbed = Number(game.coinsGrabbed || 0) + 1;
   game.comboStreak += 1;
 
   game.coinPopups.push({

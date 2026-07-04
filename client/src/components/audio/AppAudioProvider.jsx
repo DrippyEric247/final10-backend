@@ -12,6 +12,7 @@ import {
 } from '../../lib/appMusicCoordinator';
 import { AUDIO_UNLOCKED_EVENT, clearPendingAudioResume } from '../../lib/audioUnlockManager';
 import { isDedicatedMusicOverrideRoute } from '../../lib/menuMusicLibrary';
+import { isScoutFlightGameplayFocusActive } from '../../lib/scoutFlightGameplayFocus';
 import { menuMusicEngine } from '../../lib/menuMusicEngine';
 import { perkMachineMusicEngine } from '../../lib/perkMachineMusicEngine';
 import { scoutFlightMusicEngine } from '../../lib/scoutFlightMusicEngine';
@@ -20,6 +21,7 @@ import AudioUnlockPrompt from './AudioUnlockPrompt';
 const AUTH_SESSION_EVENT = 'f10:auth-session-started';
 
 function shouldPlayMenuMusic(pathname = '') {
+  if (isScoutFlightGameplayFocusActive()) return false;
   return (
     isMenuMusicRoute(pathname) &&
     !isDedicatedMusicOverrideRoute(pathname) &&

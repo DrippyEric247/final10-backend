@@ -1,0 +1,38 @@
+/**
+ * Global app chrome hidden during Scout Flight Practice / Tournament gameplay.
+ */
+
+html.f10-scout-flight-gameplay .main-navigation,
+html.f10-scout-flight-gameplay .app-auth-header,
+html.f10-scout-flight-gameplay .f10-universal-boost-bar,
+html.f10-scout-flight-gameplay .f10-assistant-dock,
+html.f10-scout-flight-gameplay .savvy-wallet-bubble,
+html.f10-scout-flight-gameplay .events-floating-tab,
+html.f10-scout-flight-gameplay .sq-dock,
+html.f10-scout-flight-gameplay .f10-tab-journey-panel,
+html.f10-scout-flight-gameplay .savvy-scout-updating,
+html.f10-scout-flight-gameplay footer {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+html.f10-scout-flight-gameplay,
+html.f10-scout-flight-gameplay body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+html.f10-scout-flight-gameplay main.container {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+html.f10-scout-flight-gameplay .bg-app {
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}

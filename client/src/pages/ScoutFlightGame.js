@@ -28,24 +28,23 @@ import {
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
 import {
-  enterScoutFlightGameplayMusic,
   exitScoutFlightGameplayMusic,
   isMenuMusicRoute,
+  startScoutFlightGameplayMusicFromGesture,
 } from '../lib/appMusicCoordinator';
 import {
   duckScoutFlightMusicForDuration,
   SCOUT_FLIGHT_MUSIC_DUCK,
   scoutFlightMusicEngine,
 } from '../lib/scoutFlightMusicEngine';
+import { menuMusicEngine } from '../lib/menuMusicEngine';
 import {
-  exitNativeFullscreen,
-  getFocusViewportHeight,
-  isNativeFullscreenActive,
-  isNativeFullscreenSupported,
   lockBodyScroll,
-  requestNativeFullscreen,
   unlockBodyScroll,
 } from '../lib/scoutFlightFocusMode';
+import {
+  setScoutFlightGameplayFocus,
+} from '../lib/scoutFlightGameplayFocus';
 import '../styles/ScoutFlight.css';
 import {
   ScoutFlightChampionshipScreen,
@@ -57,7 +56,13 @@ import {
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 const BOTTOM_UI_RESERVE = 88;
-const FOCUS_CHROME_H = 44;
+
+function formatFlightTime(ms) {
+  const sec = Math.max(0, Math.floor(Number(ms) / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 function drawBackground(ctx, w, h, t) {
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -269,7 +274,9 @@ export default function ScoutFlightGame() {
   const [isNewBest, setIsNewBest] = useState(false);
   const [difficultyId, setDifficultyId] = useState(() => loadSavedDifficulty());
   const [debugHitbox] = useState(() => loadDebugHitboxEnabled());
-  const [focusMode, setFocusMode] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [coinsGrabbed, setCoinsGrabbed] = useState(0);
   const [menuMode, setMenuMode] = useState(null);
   const [tournamentStatus, setTournamentStatus] = useState(null);
   const [championship, setChampionship] = useState(null);
@@ -284,11 +291,13 @@ export default function ScoutFlightGame() {
   const [leaderboardPeriod, setLeaderboardPeriod] = useState('monthly');
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const submitLock = useRef(false);
+  const musicStartedRef = useRef(false);
   const debugAllowed = isDebugHitboxAllowed();
 
   const isPracticeSession = menuMode === 'practice';
   const isTournamentSession = menuMode === 'tournament';
   const isPracticeMode = isPracticeSession || difficultyId === 'PRACTICE';
+  const gameplayActive = Boolean(menuMode);
 
   const loadChampionship = useCallback(async () => {
     try {
@@ -349,28 +358,39 @@ export default function ScoutFlightGame() {
     void loadLeaderboard('monthly');
   }, [loadChampionship, loadTournamentStatus, loadLeaderboard]);
 
+  const stopGameplayMusic = useCallback(() => {
+    musicStartedRef.current = false;
+    void exitScoutFlightGameplayMusic({
+      resumeMenu: isMenuMusicRoute(window.location.pathname),
+      pathname: window.location.pathname,
+    });
+  }, []);
+
   useEffect(() => {
-    if (menuMode === 'practice' || menuMode === 'tournament') {
-      void enterScoutFlightGameplayMusic(menuMode);
-      if (menuMode === 'tournament') {
-        duckScoutFlightMusicForDuration(SCOUT_FLIGHT_MUSIC_DUCK.TOURNAMENT_START, 2400);
-      }
-    } else if (menuMode === null && scoutFlightMusicEngine.isActive()) {
-      void exitScoutFlightGameplayMusic({
-        resumeMenu: isMenuMusicRoute(window.location.pathname),
-        pathname: window.location.pathname,
-      });
+    if (!menuMode) {
+      setScoutFlightGameplayFocus(false);
+      unlockBodyScroll();
+      return undefined;
     }
+    lockBodyScroll();
+    setScoutFlightGameplayFocus(true);
+    setPaused(false);
+    menuMusicEngine.pausedForRoute = true;
+    void menuMusicEngine.pause({ fadeMs: 600 });
+    void scoutFlightMusicEngine.preload(menuMode);
+    return () => {
+      setScoutFlightGameplayFocus(false);
+      unlockBodyScroll();
+    };
   }, [menuMode]);
 
   useEffect(
     () => () => {
-      void exitScoutFlightGameplayMusic({
-        resumeMenu: isMenuMusicRoute(window.location.pathname),
-        pathname: window.location.pathname,
-      });
+      setScoutFlightGameplayFocus(false);
+      unlockBodyScroll();
+      stopGameplayMusic();
     },
-    []
+    [stopGameplayMusic]
   );
 
   useEffect(() => {
@@ -398,20 +418,21 @@ export default function ScoutFlightGame() {
     const page = pageRef.current;
     if (!wrap || !canvas || !page) return;
 
-    const inFocus = focusMode;
-    let availH;
-    if (inFocus) {
-      availH = Math.max(280, getFocusViewportHeight() - FOCUS_CHROME_H);
-      wrap.style.height = `${availH}px`;
+    if (gameplayActive) {
+      wrap.style.flex = '1';
+      wrap.style.height = 'auto';
+      wrap.style.minHeight = '0';
     } else {
+      wrap.style.flex = '';
       const top = page.getBoundingClientRect().top;
-      availH = Math.max(320, Math.floor(window.innerHeight - top - BOTTOM_UI_RESERVE));
+      const availH = Math.max(320, Math.floor(window.innerHeight - top - BOTTOM_UI_RESERVE));
       wrap.style.height = `${availH}px`;
+      wrap.style.minHeight = '';
     }
 
     const rect = wrap.getBoundingClientRect();
     const w = Math.max(320, Math.floor(rect.width));
-    const h = Math.max(280, Math.floor(rect.height));
+    const h = Math.max(240, Math.floor(rect.height));
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = w * dpr;
     canvas.height = h * dpr;
@@ -432,43 +453,16 @@ export default function ScoutFlightGame() {
         applyDifficultyToScout(gameRef.current, gameRef.current.difficultyId);
       }
     }
-  }, [difficultyId, focusMode]);
-
-  const exitFocusMode = useCallback(async () => {
-    await exitNativeFullscreen();
-    unlockBodyScroll();
-    setFocusMode(false);
-    window.setTimeout(() => resize(), 50);
-  }, [resize]);
-
-  const enterFocusMode = useCallback(async () => {
-    lockBodyScroll();
-    setFocusMode(true);
-    const page = pageRef.current;
-    if (page && isNativeFullscreenSupported(page)) {
-      await requestNativeFullscreen(page);
-    }
-    window.setTimeout(() => resize(), 80);
-  }, [resize]);
+  }, [difficultyId, gameplayActive]);
 
   useEffect(() => {
-    const onFullscreenChange = () => {
-      if (!isNativeFullscreenActive() && focusMode) {
-        unlockBodyScroll();
-        setFocusMode(false);
-        window.setTimeout(() => resize(), 50);
-      }
-    };
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-    };
-  }, [focusMode, resize]);
+    if (!gameplayActive) return undefined;
+    const t = window.setTimeout(() => resize(), 40);
+    return () => window.clearTimeout(t);
+  }, [gameplayActive, resize]);
 
   useEffect(() => {
-    if (!focusMode) return undefined;
+    if (!gameplayActive) return undefined;
     const onViewportChange = () => resize();
     window.visualViewport?.addEventListener('resize', onViewportChange);
     window.visualViewport?.addEventListener('scroll', onViewportChange);
@@ -476,28 +470,18 @@ export default function ScoutFlightGame() {
       window.visualViewport?.removeEventListener('resize', onViewportChange);
       window.visualViewport?.removeEventListener('scroll', onViewportChange);
     };
-  }, [focusMode, resize]);
+  }, [gameplayActive, resize]);
 
-  useEffect(
-    () => () => {
-      void exitNativeFullscreen();
-      unlockBodyScroll();
-    },
-    []
-  );
-
-  const handleFocusToggle = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (focusMode) {
-        void exitFocusMode();
-      } else {
-        void enterFocusMode();
+  const startGameplayMusic = useCallback((mode) => {
+    if (musicStartedRef.current || !mode) return;
+    musicStartedRef.current = true;
+    void startScoutFlightGameplayMusicFromGesture(mode).then((ok) => {
+      if (!ok) musicStartedRef.current = false;
+      if (mode === 'tournament' && ok) {
+        duckScoutFlightMusicForDuration(SCOUT_FLIGHT_MUSIC_DUCK.TOURNAMENT_START, 2400);
       }
-    },
-    [focusMode, enterFocusMode, exitFocusMode]
-  );
+    });
+  }, []);
 
   const drawFrame = useCallback((ts) => {
     const canvas = canvasRef.current;
@@ -508,7 +492,7 @@ export default function ScoutFlightGame() {
     const w = game.width;
     const h = game.height;
 
-    if (lastTsRef.current) {
+    if (lastTsRef.current && !paused) {
       const dt = Math.min(32, ts - lastTsRef.current);
       updateGame(game, dt);
       if (game.events.length) handleGameEvents(game.events);
@@ -516,6 +500,8 @@ export default function ScoutFlightGame() {
       setBest(game.best);
       setUiPhase(game.phase);
       setIsNewBest(game.isNewBest);
+      setElapsedMs(Math.round(game.elapsed || 0));
+      setCoinsGrabbed(Number(game.coinsGrabbed) || 0);
     }
     lastTsRef.current = ts;
 
@@ -569,7 +555,7 @@ export default function ScoutFlightGame() {
     }
 
     rafRef.current = requestAnimationFrame(drawFrame);
-  }, [debugAllowed, debugHitbox]);
+  }, [debugAllowed, debugHitbox, paused]);
 
   useEffect(() => {
     const img = new Image();
@@ -649,14 +635,19 @@ export default function ScoutFlightGame() {
 
   const handleInput = useCallback((e) => {
     e.preventDefault();
+    if (paused) return;
     const game = gameRef.current;
     if (!game) return;
     if (game.phase === PHASE.GAMEOVER) return;
+    if (game.phase === PHASE.IDLE && menuMode) {
+      startGameplayMusic(menuMode);
+    }
     flap(game);
-  }, []);
+  }, [menuMode, paused, startGameplayMusic]);
 
   const handleRestart = useCallback(() => {
     if (isTournamentSession) {
+      stopGameplayMusic();
       setMenuMode(null);
       setTournamentResult(null);
       setActiveRunId(null);
@@ -665,6 +656,8 @@ export default function ScoutFlightGame() {
       setUiPhase(PHASE.IDLE);
       setScore(0);
       setIsNewBest(false);
+      setElapsedMs(0);
+      setCoinsGrabbed(0);
       void loadChampionship();
       void loadTournamentStatus();
       void loadLeaderboard(leaderboardPeriod);
@@ -674,9 +667,13 @@ export default function ScoutFlightGame() {
     setUiPhase(PHASE.PLAYING);
     setScore(0);
     setIsNewBest(false);
-  }, [isTournamentSession, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+    setElapsedMs(0);
+    setCoinsGrabbed(0);
+  }, [isTournamentSession, stopGameplayMusic, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
 
   const handleBackToIdle = useCallback(() => {
+    setPaused(false);
+    stopGameplayMusic();
     setMenuMode(null);
     setTournamentResult(null);
     setActiveRunId(null);
@@ -685,10 +682,12 @@ export default function ScoutFlightGame() {
     setUiPhase(PHASE.IDLE);
     setScore(0);
     setIsNewBest(false);
+    setElapsedMs(0);
+    setCoinsGrabbed(0);
     void loadChampionship();
     void loadTournamentStatus();
     void loadLeaderboard(leaderboardPeriod);
-  }, [loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+  }, [stopGameplayMusic, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
 
   useEffect(() => {
     if (uiPhase !== PHASE.GAMEOVER || !isTournamentSession || !activeRunId || submitLock.current) {
@@ -736,46 +735,76 @@ export default function ScoutFlightGame() {
     leaderboardPeriod,
   ]);
 
+  const ticketCount = Number(tournamentStatus?.ticketsOwned) || 0;
+
   return (
     <div
       ref={pageRef}
-      className={`scout-flight-page${focusMode ? ' scout-flight-page--focus' : ''}`}
+      className={`scout-flight-page${gameplayActive ? ' scout-flight-page--focus' : ''}`}
     >
-      <header className="scout-flight-page__header">
-        <Link to="/events" className="scout-flight-page__back">
-          ← Events
-        </Link>
-        <span className="scout-flight-page__title">Savvy Scout Flight</span>
-        <div className="scout-flight-page__header-actions">
-          {!focusMode ? (
+      {!gameplayActive ? (
+        <header className="scout-flight-page__header">
+          <Link to="/events" className="scout-flight-page__back">
+            ← Events
+          </Link>
+          <span className="scout-flight-page__title">Savvy Scout Flight</span>
+          <div className="scout-flight-page__header-actions">
+            <span className="scout-flight-page__beta">
+              {tournamentStatus ? `🎟️ ${ticketCount} tickets` : 'Tournament'}
+            </span>
+          </div>
+        </header>
+      ) : null}
+
+      {gameplayActive ? (
+        <div className="scout-flight-game-hud" aria-label="Flight HUD">
+          <div className="scout-flight-game-hud__stats">
+            <span className="scout-flight-game-hud__chip scout-flight-game-hud__chip--mode">
+              {isTournamentSession ? '🏆 Tournament' : '🎮 Practice'}
+            </span>
+            <span className="scout-flight-game-hud__chip">
+              Score <strong>{score.toLocaleString()}</strong>
+            </span>
+            <span className="scout-flight-game-hud__chip">
+              🪙 <strong>{coinsGrabbed}</strong>
+            </span>
+            <span className="scout-flight-game-hud__chip">
+              🎟️ <strong>{ticketCount}</strong>
+            </span>
+            <span className="scout-flight-game-hud__chip">
+              ⏱ <strong>{formatFlightTime(elapsedMs)}</strong>
+            </span>
+          </div>
+          <div className="scout-flight-game-hud__actions">
+            {uiPhase === PHASE.PLAYING ? (
+              <button
+                type="button"
+                className="scout-flight-game-hud__btn"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPaused((p) => !p);
+                }}
+                aria-label={paused ? 'Resume flight' : 'Pause flight'}
+              >
+                {paused ? '▶ Resume' : '⏸ Pause'}
+              </button>
+            ) : null}
             <button
               type="button"
-              className="scout-flight-focus-btn"
-              onClick={handleFocusToggle}
-              aria-label="Enter focus mode"
+              className="scout-flight-game-hud__btn scout-flight-game-hud__btn--exit"
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBackToIdle();
+              }}
+              aria-label="Exit Scout Flight"
             >
-              ⛶ Focus Mode
+              ✕ Exit
             </button>
-          ) : null}
-          <span className="scout-flight-page__beta">
-            {tournamentStatus
-              ? `🎟️ ${Number(tournamentStatus.ticketsOwned) || 0} tickets`
-              : 'Tournament'}
-          </span>
-        </div>
-      </header>
-
-      {focusMode ? (
-        <div className="scout-flight-focus-bar">
-          <span className="scout-flight-focus-bar__label">Focus Mode</span>
-          <button
-            type="button"
-            className="scout-flight-focus-btn scout-flight-focus-btn--exit"
-            onClick={handleFocusToggle}
-            aria-label="Exit full screen"
-          >
-            ✕ Exit Full Screen
-          </button>
+          </div>
         </div>
       ) : null}
 
@@ -783,39 +812,43 @@ export default function ScoutFlightGame() {
         ref={wrapRef}
         className={`scout-flight-stage${isPracticeMode ? ' scout-flight-stage--practice' : ''}${
           isTournamentSession ? ' scout-flight-stage--tournament' : ''
-        }`}
+        }${gameplayActive ? ' scout-flight-stage--gameplay' : ''}`}
         role="application"
         aria-label="Savvy Scout Flight mini-game"
         onPointerDown={handleInput}
         onTouchStart={handleInput}
       >
-        {focusMode && uiPhase === PHASE.PLAYING ? (
-          <button
-            type="button"
-            className="scout-flight-focus-btn scout-flight-focus-btn--in-game"
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onClick={handleFocusToggle}
-            aria-label="Exit full screen"
-          >
-            ✕ Exit
-          </button>
-        ) : null}
-        {isTournamentSession && uiPhase === PHASE.PLAYING ? (
-          <div className="scout-flight-tournament-header" aria-label="Tournament Mode">
-            <h2 className="scout-flight-tournament-header__title">🏆 Tournament Mode</h2>
-            <p className="scout-flight-tournament-header__subtitle">Official run · Savvy on the line</p>
-          </div>
-        ) : null}
-        {isPracticeMode && uiPhase !== PHASE.IDLE ? (
-          <div className="scout-flight-practice-header" aria-label="Practice Mode">
-            <h2 className="scout-flight-practice-header__title">🎮 Practice Mode</h2>
-            <p className="scout-flight-practice-header__subtitle">
-              Train here. Compete for Savvy Points in Tournament.
-            </p>
-          </div>
-        ) : null}
         <canvas ref={canvasRef} className="scout-flight-canvas" />
+
+        {paused && uiPhase === PHASE.PLAYING ? (
+          <div className="scout-flight-overlay scout-flight-overlay--pause">
+            <p className="scout-flight-go-title">Paused</p>
+            <div className="scout-flight-go-actions">
+              <button
+                type="button"
+                className="scout-flight-btn scout-flight-btn--primary"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPaused(false);
+                }}
+              >
+                ▶ Resume
+              </button>
+              <button
+                type="button"
+                className="scout-flight-btn scout-flight-btn--ghost"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBackToIdle();
+                }}
+              >
+                ✕ Exit
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {uiPhase === PHASE.IDLE && !menuMode ? (
           <ScoutFlightChampionshipScreen
@@ -838,7 +871,22 @@ export default function ScoutFlightGame() {
               </p>
             )}
             <img src={SCOUT_IMG} alt="" className="scout-flight-scout-preview" />
-            <p className="scout-flight-hint">Tap or click to launch</p>
+            <p className="scout-flight-hint">Tap Start or anywhere on the flight deck to launch</p>
+            <button
+              type="button"
+              className="scout-flight-btn scout-flight-btn--primary"
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                const game = gameRef.current;
+                if (!game || !menuMode) return;
+                startGameplayMusic(menuMode);
+                if (game.phase === PHASE.IDLE) flap(game);
+              }}
+            >
+              Start Flight
+            </button>
             <button
               type="button"
               className="scout-flight-btn scout-flight-btn--ghost"
@@ -885,18 +933,6 @@ export default function ScoutFlightGame() {
 
         {uiPhase === PHASE.GAMEOVER && !isTournamentSession ? (
           <div className="scout-flight-overlay scout-flight-overlay--gameover">
-            {focusMode ? (
-              <button
-                type="button"
-                className="scout-flight-focus-btn scout-flight-focus-btn--overlay-top"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void exitFocusMode();
-                }}
-              >
-                ✕ Exit Full Screen
-              </button>
-            ) : null}
             <h2 className="scout-flight-go-title">Flight Ended</h2>
             <p className="scout-flight-go-mode">
               {getDifficultyConfig(difficultyId).emoji}{' '}

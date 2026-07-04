@@ -175,8 +175,15 @@ export async function exitPerkMachineMusic(pathname = '') {
   }, CROSSFADE_MS);
 }
 
+export async function startScoutFlightGameplayMusicFromGesture(mode = 'practice') {
+  try {
+    return await enterScoutFlightGameplayMusic(mode);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Fade in Scout Flight gameplay music when Practice or Tournament begins.
  * @param {'practice'|'tournament'} mode
  */
 export async function enterScoutFlightGameplayMusic(mode = 'practice') {

@@ -69,87 +69,88 @@
   gap: 0.45rem;
 }
 
-/* Focus / fullscreen mode */
+/* Focus / fullscreen gameplay mode */
 .scout-flight-page--focus {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 10050;
   width: 100vw;
+  width: 100dvw;
   height: 100dvh;
+  height: -webkit-fill-available;
   max-width: none;
   margin: 0 !important;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   background: #050511;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
-.scout-flight-page--focus .scout-flight-page__header {
-  display: none;
-}
-
-.scout-flight-focus-bar {
+.scout-flight-game-hud {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.45rem 0.65rem;
+  min-height: 48px;
+  padding: 0.35rem 0.55rem;
   background: rgba(5, 5, 17, 0.96);
   border-bottom: 1px solid rgba(168, 85, 247, 0.35);
+  z-index: 6;
 }
 
-.scout-flight-focus-bar__label {
-  font-size: 0.72rem;
+.scout-flight-game-hud__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.scout-flight-game-hud__chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #c4b5fd;
+  white-space: nowrap;
+}
+
+.scout-flight-game-hud__chip strong {
+  color: #f8fafc;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #fcd34d;
 }
 
-.scout-flight-focus-btn {
-  pointer-events: auto;
-  padding: 0.35rem 0.65rem;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(252, 211, 77, 0.45);
-  background: rgba(15, 8, 32, 0.85);
+.scout-flight-game-hud__chip--mode {
   color: #fcd34d;
-  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scout-flight-game-hud__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.scout-flight-game-hud__btn {
+  padding: 0.32rem 0.55rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(252, 211, 77, 0.4);
+  background: rgba(15, 8, 32, 0.9);
+  color: #fcd34d;
+  font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.scout-flight-focus-btn:hover {
-  background: rgba(88, 28, 135, 0.45);
-  border-color: rgba(252, 211, 77, 0.65);
-}
-
-.scout-flight-focus-btn--exit {
+.scout-flight-game-hud__btn--exit {
   border-color: rgba(196, 181, 253, 0.45);
   color: #e9d5ff;
-}
-
-.scout-flight-focus-btn--overlay {
-  margin: 0.55rem 0 0.35rem;
-}
-
-.scout-flight-focus-btn--overlay-top {
-  position: absolute;
-  top: 0.65rem;
-  right: 0.65rem;
-  z-index: 5;
-}
-
-.scout-flight-focus-btn--in-game {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  z-index: 5;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.68rem;
-  opacity: 0.92;
 }
 
 .scout-flight-page--focus .scout-flight-stage {
@@ -159,6 +160,11 @@
   border-radius: 0;
   border-left: none;
   border-right: none;
+  border-bottom: none;
+}
+
+.scout-flight-stage--gameplay {
+  touch-action: none;
 }
 
 .scout-flight-stage {
@@ -246,6 +252,12 @@
 
 .scout-flight-overlay--start {
   background: radial-gradient(ellipse at 50% 30%, rgba(88, 28, 135, 0.35) 0%, rgba(6, 4, 15, 0.88) 55%);
+}
+
+.scout-flight-overlay--pause {
+  z-index: 8;
+  background: rgba(5, 5, 17, 0.78);
+  backdrop-filter: blur(5px);
 }
 
 .scout-flight-overlay--start .scout-flight-difficulty {
