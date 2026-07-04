@@ -31,7 +31,7 @@ import MembershipStatusBadge from './membership/MembershipStatusBadge';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
-import { DEAL_PHILOSOPHY_LANES } from '../lib/primaryNavigation';
+import { DEAL_PHILOSOPHY_LANES, NAV_ITEM_KEYS, PROFILE_NAV_PATH } from '../lib/primaryNavigation';
 import '../styles/PrimaryNavigation.css';
 
 const NAV_ICON_SIZE = 17;
@@ -107,10 +107,16 @@ const Navigation = () => {
     setMoreOpen(false);
   }, [location.pathname, location.hash]);
 
+  const profileNavItem = useMemo(
+    () => ({ key: NAV_ITEM_KEYS.profile, name: 'Profile', path: PROFILE_NAV_PATH, Icon: User }),
+    []
+  );
+
   const discoveryNavItems = useMemo(
     () => [
-      { name: 'Home', path: '/', Icon: Home },
+      { key: NAV_ITEM_KEYS.home, name: 'Home', path: '/', Icon: Home },
       {
+        key: NAV_ITEM_KEYS.alerts,
         name: 'Alerts',
         path: '/alerts',
         Icon: Bell,
@@ -119,6 +125,7 @@ const Navigation = () => {
         title: DEAL_PHILOSOPHY_LANES.alerts.helperText,
       },
       {
+        key: NAV_ITEM_KEYS.quickSnipes,
         name: 'Quick Snipes',
         path: '/local-deals',
         Icon: Zap,
@@ -126,6 +133,7 @@ const Navigation = () => {
         title: DEAL_PHILOSOPHY_LANES.quickSnipes.helperText,
       },
       {
+        key: NAV_ITEM_KEYS.auctions,
         name: 'Auctions',
         path: '/auctions',
         Icon: Gavel,
@@ -133,15 +141,21 @@ const Navigation = () => {
         title: DEAL_PHILOSOPHY_LANES.auctions.helperText,
       },
       {
+        key: NAV_ITEM_KEYS.lifeOptimizer,
         name: 'Life Optimizer',
         path: '/business-offers',
         Icon: Building2,
         philosophy: DEAL_PHILOSOPHY_LANES.lifeOptimizer.philosophy,
         title: DEAL_PHILOSOPHY_LANES.lifeOptimizer.helperText,
       },
-      { name: 'Profile', path: '/profile', Icon: User },
+      profileNavItem,
     ],
-    []
+    [profileNavItem]
+  );
+
+  const discoveryScrollItems = useMemo(
+    () => discoveryNavItems.filter((item) => item.path !== PROFILE_NAV_PATH),
+    [discoveryNavItems]
   );
 
   const progressionNavItems = useMemo(
@@ -171,6 +185,7 @@ const Navigation = () => {
         Icon: Users,
       },
       { name: 'Founding Tester', path: '/founding-tester', Icon: TestTube2 },
+      profileNavItem,
       { name: 'Settings', path: '/settings', Icon: Settings },
       ...(showAdminNav
         ? [
@@ -180,18 +195,20 @@ const Navigation = () => {
           ]
         : []),
     ],
-    [showAdminNav, user]
+    [profileNavItem, showAdminNav, user]
   );
 
   const isMoreActive = useMemo(
     () =>
-      moreNavItems.some((item) =>
-        isNavActive(location.pathname, location.hash, item)
+      moreNavItems.some(
+        (item) =>
+          item.path !== PROFILE_NAV_PATH &&
+          isNavActive(location.pathname, location.hash, item)
       ),
     [location.hash, location.pathname, moreNavItems]
   );
 
-  const renderNavLink = (item, { variant = 'default' } = {}) => {
+  const renderNavLink = (item, { variant = 'default', pinned = false } = {}) => {
     const Icon = item.Icon;
     const active = isNavActive(location.pathname, location.hash, item);
     const to = item.hash ? `${item.path}${item.hash}` : item.path;
@@ -201,7 +218,7 @@ const Navigation = () => {
         key={`${item.path}${item.hash || ''}`}
         to={to}
         title={item.title || item.name}
-        className={`nav-item nav-item--${variant} ${active ? 'active' : ''}`}
+        className={`nav-item nav-item--${variant} ${pinned ? 'nav-item--pinned' : ''} ${active ? 'active' : ''}`}
       >
         <span className="nav-icon nav-icon-wrap">
           {item.bell ? (
@@ -242,7 +259,12 @@ const Navigation = () => {
         className="nav-items nav-discovery-row"
         aria-label="Deal discovery"
       >
-        {discoveryNavItems.map((item) => renderNavLink(item, { variant: 'discovery' }))}
+        <div className="nav-discovery-scroll">
+          {discoveryScrollItems.map((item) => renderNavLink(item, { variant: 'discovery' }))}
+        </div>
+        <div className="nav-discovery-pinned">
+          {renderNavLink(profileNavItem, { variant: 'discovery', pinned: true })}
+        </div>
       </div>
 
       <div
@@ -271,11 +293,11 @@ const Navigation = () => {
           {moreNavItems.map((item) => renderNavLink(item, { variant: 'more' }))}
           <button
             onClick={() => setShowBugReport(true)}
-            className="nav-item nav-item--more bug-report-btn"
+            className="nav-item nav-item--more nav-item--bug-report bug-report-btn"
             title="Report a Bug"
             type="button"
           >
-            <Bug className="nav-lucide-icon" size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} aria-hidden />
+            <Bug className="nav-lucide-icon nav-lucide-icon--bug" size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} aria-hidden />
             <span className="nav-label">Report Bug</span>
           </button>
         </div>

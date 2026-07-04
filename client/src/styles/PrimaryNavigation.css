@@ -26,6 +26,20 @@
   flex-wrap: nowrap;
 }
 
+.nav-discovery-scroll {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.nav-discovery-pinned {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .nav-progression-row {
   gap: 8px;
   flex-wrap: nowrap;
@@ -74,6 +88,23 @@
 
 .nav-item--discovery.active .nav-philosophy {
   color: #fde68a;
+}
+
+.nav-item--pinned {
+  position: relative;
+}
+
+.nav-item--bug-report {
+  border: 1px dashed rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.nav-item--bug-report .nav-lucide-icon--bug {
+  color: #fca5a5;
+}
+
+.nav-item--bug-report:hover {
+  background: rgba(127, 29, 29, 0.32);
 }
 
 .nav-item--progression,
@@ -134,7 +165,48 @@
     justify-content: center;
   }
 
-  .nav-discovery-row,
+  .nav-discovery-row {
+    overflow: hidden;
+    gap: 0;
+    padding-bottom: 4px;
+  }
+
+  .nav-discovery-row.nav-items {
+    overflow-x: hidden;
+    overflow-y: visible;
+    white-space: normal;
+  }
+
+  .nav-discovery-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  .nav-discovery-pinned {
+    padding-left: 6px;
+    margin-left: 2px;
+    border-left: 1px solid rgba(167, 139, 250, 0.35);
+    background: linear-gradient(90deg, rgba(11, 11, 15, 0) 0%, rgba(17, 18, 24, 0.98) 28%);
+    box-shadow: -10px 0 18px rgba(11, 11, 15, 0.85);
+    z-index: 2;
+  }
+
+  .nav-item--pinned .nav-label {
+    display: block;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #e2e8f0;
+  }
+
+  .nav-item--pinned.active .nav-label {
+    color: #fff;
+  }
+
   .nav-progression-row {
     overflow-x: auto;
     overflow-y: hidden;
@@ -148,6 +220,11 @@
     flex: 0 0 auto;
     scroll-snap-align: start;
     min-width: 64px;
+  }
+
+  .nav-discovery-pinned .nav-item--discovery {
+    min-width: 56px;
+    scroll-snap-align: none;
   }
 
   .nav-item--discovery .nav-philosophy {
@@ -169,12 +246,22 @@
     max-height: 42vh;
     overflow-y: auto;
   }
+
+  .nav-more-panel .nav-label {
+    display: block;
+    font-size: 10px;
+  }
 }
 
 @media (min-width: 769px) {
   .nav-brand-row {
     flex: 0 0 auto;
     align-self: center;
+  }
+
+  .nav-discovery-scroll,
+  .nav-discovery-pinned {
+    display: contents;
   }
 
   .nav-discovery-row {

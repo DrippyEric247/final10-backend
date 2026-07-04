@@ -47,3 +47,15 @@ export const DEFAULT_DISCOVERY_PATH = '/local-deals';
 
 /** Passive discovery entry — let Final10 watch for you. */
 export const PASSIVE_DISCOVERY_PATH = '/alerts';
+
+/** Stable keys for nav items — used for mobile pinned layout and tests. */
+export const NAV_ITEM_KEYS = Object.freeze({
+  home: 'home',
+  alerts: 'alerts',
+  quickSnipes: 'quickSnipes',
+  auctions: 'auctions',
+  lifeOptimizer: 'lifeOptimizer',
+  profile: 'profile',
+});
+
+export const PROFILE_NAV_PATH = '/profile';

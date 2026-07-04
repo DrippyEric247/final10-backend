@@ -161,6 +161,11 @@
   .nav-label {
     display: none;
   }
+
+  .nav-more-panel .nav-label,
+  .nav-item--pinned .nav-label {
+    display: block;
+  }
   
   .nav-item {
     flex: 0 0 auto;
