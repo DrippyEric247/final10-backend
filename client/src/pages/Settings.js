@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { FileText, LifeBuoy, Shield, Trash2, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Final10Slogan from "../components/branding/Final10Slogan";
+import MenuMusicSettings from "../components/audio/MenuMusicSettings";
 
 const linkClass =
   "flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 no-underline transition-colors hover:border-purple-400/50 hover:bg-white/[0.05]";
@@ -40,6 +41,8 @@ export default function Settings() {
             </Link>
           </section>
         ) : null}
+
+        {user ? <MenuMusicSettings /> : null}
 
         <section className="mb-8">
           <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--f10-text-dim)] mb-3">

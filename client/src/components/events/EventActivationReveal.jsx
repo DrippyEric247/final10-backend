@@ -3,6 +3,11 @@ import { EventIconVisual } from './EventIconVisual';
 import { EventActivationParticles } from './EventActivationParticles';
 import { playEventAudio } from '../../lib/eventActivationAudio';
 import {
+  duckMenuMusic,
+  MENU_MUSIC_DUCK,
+  unduckMenuMusic,
+} from '../../lib/menuMusicEngine';
+import {
   getEventActivationProfile,
   triggerActivationHaptic,
 } from '../../lib/eventActivationProfiles';
@@ -28,7 +33,10 @@ export function EventActivationReveal({ event, onActivated }) {
     setPhase('idle');
     setFlyStyle(null);
     tapLockRef.current = false;
-    return clearTimers;
+    return () => {
+      clearTimers();
+      unduckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
+    };
   }, [event?.activationId, clearTimers]);
 
   const startFlyAnimation = useCallback(() => {
@@ -48,6 +56,7 @@ export function EventActivationReveal({ event, onActivated }) {
     }
     startTransition(() => setPhase('fly'));
     const flyTimer = window.setTimeout(() => {
+      unduckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
       if (typeof onActivated === 'function') onActivated(event);
     }, FLY_MS);
     timersRef.current.push(flyTimer);
@@ -58,6 +67,7 @@ export function EventActivationReveal({ event, onActivated }) {
     tapLockRef.current = true;
     setPhase('playing');
 
+    duckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
     triggerActivationHaptic(profile.vibrationPattern);
 
     void playEventAudio(profile.audioKey, { fallbackMs: profile.audioFallbackMs }).then(() => {

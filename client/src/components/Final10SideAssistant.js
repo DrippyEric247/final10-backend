@@ -47,6 +47,11 @@ import "../styles/ScoutMobilePopups.css";
 import "../styles/SavvyScoutMissions.css";
 import SavvyWalletBubble from "./wallet/SavvyWalletBubble";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
+import {
+  duckMenuMusic,
+  MENU_MUSIC_DUCK,
+  unduckMenuMusic,
+} from "../lib/menuMusicEngine";
 
 const SCOUT_GREETING =
   "Savvy Scout reporting. What opportunity are we hunting today?";
@@ -1231,6 +1236,7 @@ export default function Final10SideAssistant() {
     }
     utteranceRef.current = null;
     setSpeaking(false);
+    unduckMenuMusic(MENU_MUSIC_DUCK.VOICE_LINE);
   }, []);
 
   const aiStateLabel = useMemo(() => {
@@ -1259,14 +1265,19 @@ export default function Final10SideAssistant() {
       u.rate = 1.12;
       u.pitch = 1.05;
       u.volume = 1;
-      u.onstart = () => setSpeaking(true);
+      u.onstart = () => {
+        setSpeaking(true);
+        duckMenuMusic(MENU_MUSIC_DUCK.VOICE_LINE);
+      };
       u.onend = () => {
         setSpeaking(false);
         utteranceRef.current = null;
+        unduckMenuMusic(MENU_MUSIC_DUCK.VOICE_LINE);
       };
       u.onerror = () => {
         setSpeaking(false);
         utteranceRef.current = null;
+        unduckMenuMusic(MENU_MUSIC_DUCK.VOICE_LINE);
       };
       utteranceRef.current = u;
       try {
