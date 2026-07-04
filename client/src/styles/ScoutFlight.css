@@ -511,3 +511,331 @@
     margin-right: 0;
   }
 }
+
+/* Tournament mode UI */
+.scout-flight-overlay--menu {
+  overflow-y: auto;
+  padding: 1rem 0.85rem 1.25rem;
+}
+
+.sf-ticket-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0.5rem auto 0.85rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 185, 66, 0.45);
+  background: rgba(88, 28, 135, 0.35);
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: #fde68a;
+}
+
+.sf-ticket-pill__resume {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #c4b5fd;
+}
+
+.sf-mode-grid {
+  display: grid;
+  gap: 0.65rem;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 0.85rem;
+}
+
+.sf-mode-card {
+  text-align: left;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 7, 32, 0.75);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.sf-mode-card--practice {
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.sf-mode-card--tournament {
+  border-color: rgba(245, 185, 66, 0.55);
+  background: linear-gradient(145deg, rgba(88, 28, 135, 0.45), rgba(30, 15, 60, 0.85));
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.2);
+}
+
+.sf-mode-card__icon { font-size: 1.35rem; display: block; margin-bottom: 0.25rem; }
+.sf-mode-card__title { display: block; font-weight: 900; font-size: 0.95rem; color: #f8fafc; }
+.sf-mode-card__desc { display: block; margin-top: 0.25rem; font-size: 0.72rem; color: #94a3b8; line-height: 1.35; }
+.sf-mode-card__cta {
+  display: inline-block;
+  margin-top: 0.55rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #0f0720;
+  background: linear-gradient(90deg, #fcd34d, #c4b5fd);
+}
+
+.sf-stats-row {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.sf-stat {
+  min-width: 110px;
+  padding: 0.5rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+
+.sf-stat__label { display: block; font-size: 0.62rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+.sf-stat__value { display: block; font-size: 1rem; color: #fde68a; font-weight: 900; }
+
+.sf-reward-tiers {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(192, 132, 252, 0.35);
+  background: rgba(46, 16, 72, 0.25);
+}
+
+.sf-reward-tiers__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #e9d5ff;
+}
+
+.sf-reward-tiers__list {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+.sf-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(6, 4, 15, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.sf-modal {
+  width: min(380px, 100%);
+  padding: 1.2rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  background: linear-gradient(160deg, rgba(46, 16, 72, 0.95), rgba(10, 6, 24, 0.98));
+  text-align: center;
+}
+
+.sf-modal--confirm { border-color: rgba(245, 185, 66, 0.55); }
+.sf-modal__icon { font-size: 2rem; display: block; margin-bottom: 0.35rem; }
+.sf-modal__title { margin: 0 0 0.45rem; font-size: 1.05rem; font-weight: 900; color: #f5f3ff; }
+.sf-modal__text { margin: 0; font-size: 0.88rem; color: #e2e8f0; }
+.sf-modal__sub { margin: 0.35rem 0 0.85rem; font-size: 0.78rem; color: #94a3b8; }
+.sf-modal__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+
+.sf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+}
+
+.sf-btn--gold {
+  background: linear-gradient(90deg, #fcd34d, #f59e0b);
+  color: #0f0720;
+}
+
+.sf-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #c4b5fd;
+}
+
+.scout-flight-stage--tournament {
+  box-shadow: inset 0 0 40px rgba(245, 185, 66, 0.08);
+}
+
+.scout-flight-tournament-header {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.55rem;
+  right: 0.55rem;
+  z-index: 3;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(88, 28, 135, 0.55);
+  border: 1px solid rgba(245, 185, 66, 0.35);
+  pointer-events: none;
+}
+
+.scout-flight-tournament-header__title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.scout-flight-tournament-header__subtitle {
+  margin: 0.1rem 0 0;
+  font-size: 0.62rem;
+  color: #e9d5ff;
+}
+
+.scout-flight-practice-intro--tournament {
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.scout-flight-overlay--tournament-result {
+  text-align: center;
+}
+
+.scout-flight-tournament-result__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #fcd34d;
+}
+
+.scout-flight-tournament-result__stats {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.scout-flight-tournament-result__stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.82rem;
+}
+
+.scout-flight-tournament-result__stat--savvy strong { color: #4ade80; }
+.scout-flight-tournament-result__pb {
+  margin: 0 0 0.75rem;
+  color: #fcd34d;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.scout-flight-go-error {
+  color: #fca5a5;
+  font-size: 0.82rem;
+  margin: 0.5rem 0;
+}
+
+.scout-flight-page__error {
+  margin: 0.5rem 0.85rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+  font-size: 0.8rem;
+}
+
+.sf-leaderboard {
+  margin: 0.75rem 0.85rem 1rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  background: rgba(10, 6, 24, 0.9);
+}
+
+.sf-leaderboard__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.sf-leaderboard__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: #e9d5ff;
+}
+
+.sf-leaderboard__tabs { display: flex; gap: 0.35rem; }
+
+.sf-leaderboard__tab {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sf-leaderboard__tab--active {
+  border-color: rgba(245, 185, 66, 0.55);
+  color: #fde68a;
+  background: rgba(88, 28, 135, 0.35);
+}
+
+.sf-leaderboard__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sf-leaderboard__row {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr auto auto;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.sf-leaderboard__row--me {
+  border: 1px solid rgba(245, 185, 66, 0.45);
+  background: rgba(88, 28, 135, 0.3);
+}
+
+.sf-leaderboard__rank { color: #94a3b8; font-weight: 800; }
+.sf-leaderboard__name { color: #e2e8f0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-leaderboard__score { color: #fde68a; font-weight: 900; }
+.sf-leaderboard__savvy { color: #86efac; font-weight: 700; font-size: 0.65rem; }
+.sf-leaderboard__empty,
+.sf-leaderboard__loading,
+.sf-leaderboard__me {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}

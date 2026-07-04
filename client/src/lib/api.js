@@ -320,6 +320,32 @@ export async function spinPerkMachine(mode) {
   return data;
 }
 
+export async function getScoutFlightTournamentStatus() {
+  const { data } = await api.get("/scout-flight/tournament/status");
+  return data;
+}
+
+export async function startScoutFlightTournament() {
+  const { data } = await api.post("/scout-flight/tournament/start");
+  return data;
+}
+
+export async function submitScoutFlightTournamentScore({ runId, score, elapsedMs }) {
+  const { data } = await api.post("/scout-flight/tournament/submit", {
+    runId,
+    score,
+    elapsedMs,
+  });
+  return data;
+}
+
+export async function getScoutFlightLeaderboard(period = "daily", limit = 50) {
+  const { data } = await api.get("/scout-flight/tournament/leaderboard", {
+    params: { period, limit },
+  });
+  return data;
+}
+
 export async function hatchPerkEgg(eggTier) {
   const { data } = await api.post("/perk-machine/hatch", { eggTier });
   return data;

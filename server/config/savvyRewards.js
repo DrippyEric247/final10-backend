@@ -11,6 +11,7 @@ const SAVVY_REWARD_TYPES = Object.freeze({
   DAILY_TASK_LEGACY: 'daily_task_legacy',
   SCOUT_MISSION: 'scout_mission',
   PERK_MACHINE: 'perk_machine',
+  SCOUT_FLIGHT_TOURNAMENT: 'scout_flight_tournament',
 });
 
 const REWARDS = Object.freeze({

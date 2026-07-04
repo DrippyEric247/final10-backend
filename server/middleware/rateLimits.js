@@ -117,6 +117,26 @@ const perkMachineSpinLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many spins. Wait a moment before trying again.'),
 });
 
+const scoutFlightTournamentStartLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().scoutFlightTournamentStart,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many tournament starts. Wait a moment.'),
+});
+
+const scoutFlightTournamentSubmitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().scoutFlightTournamentSubmit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many score submissions. Wait a moment.'),
+});
+
 /** Scout mission claims — per-user cap against spam clicking Complete. */
 const scoutMissionClaimLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -172,6 +192,8 @@ module.exports = {
   ebaySellerTrendsLimiter,
   marketValueLimiter,
   perkMachineSpinLimiter,
+  scoutFlightTournamentStartLimiter,
+  scoutFlightTournamentSubmitLimiter,
   scoutMissionClaimLimiter,
   easterEggRedeemLimiter,
 };

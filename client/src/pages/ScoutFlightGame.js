@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import {
+  getScoutFlightTournamentStatus,
+  startScoutFlightTournament,
+  submitScoutFlightTournamentScore,
+  getScoutFlightLeaderboard,
+} from '../lib/api';
+import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import {
   createGame,
   updateGame,
@@ -8,14 +16,12 @@ import {
   resetGame,
   PHASE,
   coinsUntilCombo,
-  getSelectableDifficulties,
   getDifficultyConfig,
   loadSavedDifficulty,
   saveDifficulty,
   applyDifficultyToScout,
   getScoutCollisionRadius,
   loadDebugHitboxEnabled,
-  saveDebugHitboxEnabled,
   isDebugHitboxAllowed,
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
@@ -29,6 +35,13 @@ import {
   unlockBodyScroll,
 } from '../lib/scoutFlightFocusMode';
 import '../styles/ScoutFlight.css';
+import {
+  ScoutFlightModeMenu,
+  ScoutFlightLockedModal,
+  ScoutFlightConfirmModal,
+  ScoutFlightTournamentResult,
+  ScoutFlightLeaderboardPanel,
+} from '../components/scoutFlight/ScoutFlightTournamentUI';
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 const BOTTOM_UI_RESERVE = 88;
@@ -230,6 +243,7 @@ function handleGameEvents(events) {
 }
 
 export default function ScoutFlightGame() {
+  const { patchUser, refreshProfile } = useAuth();
   const pageRef = useRef(null);
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
@@ -242,12 +256,56 @@ export default function ScoutFlightGame() {
   const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
   const [difficultyId, setDifficultyId] = useState(() => loadSavedDifficulty());
-  const [debugHitbox, setDebugHitbox] = useState(() => loadDebugHitboxEnabled());
-  const debugAllowed = isDebugHitboxAllowed();
-  const selectableDifficulties = getSelectableDifficulties();
-  const isPracticeMode = difficultyId === 'PRACTICE';
-  const isTournamentMode = difficultyId === 'TOURNAMENT';
+  const [debugHitbox] = useState(() => loadDebugHitboxEnabled());
   const [focusMode, setFocusMode] = useState(false);
+  const [menuMode, setMenuMode] = useState(null);
+  const [tournamentStatus, setTournamentStatus] = useState(null);
+  const [activeRunId, setActiveRunId] = useState(null);
+  const [showLockedModal, setShowLockedModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [startingTournament, setStartingTournament] = useState(false);
+  const [tournamentResult, setTournamentResult] = useState(null);
+  const [submittingScore, setSubmittingScore] = useState(false);
+  const [tournamentError, setTournamentError] = useState('');
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState('daily');
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const submitLock = useRef(false);
+  const debugAllowed = isDebugHitboxAllowed();
+
+  const isPracticeSession = menuMode === 'practice';
+  const isTournamentSession = menuMode === 'tournament';
+  const isPracticeMode = isPracticeSession || difficultyId === 'PRACTICE';
+
+  const loadTournamentStatus = useCallback(async () => {
+    try {
+      const data = await getScoutFlightTournamentStatus();
+      setTournamentStatus(data);
+      if (data?.activeRun?.runId) {
+        setActiveRunId(data.activeRun.runId);
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const loadLeaderboard = useCallback(async (period = leaderboardPeriod) => {
+    setLeaderboardLoading(true);
+    try {
+      const data = await getScoutFlightLeaderboard(period);
+      setLeaderboard(data);
+    } catch {
+      setLeaderboard(null);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [leaderboardPeriod]);
+
+  useEffect(() => {
+    void loadTournamentStatus();
+    void loadLeaderboard('daily');
+  }, [loadTournamentStatus, loadLeaderboard]);
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
@@ -454,14 +512,55 @@ export default function ScoutFlightGame() {
     }
   }, []);
 
-  const handleDebugHitboxToggle = useCallback((e) => {
-    e.stopPropagation();
-    setDebugHitbox((prev) => {
-      const next = !prev;
-      saveDebugHitboxEnabled(next);
-      return next;
-    });
-  }, []);
+  const handlePracticeStart = useCallback(() => {
+    setMenuMode('practice');
+    setTournamentResult(null);
+    setTournamentError('');
+    handleDifficultySelect('PRACTICE');
+  }, [handleDifficultySelect]);
+
+  const handleTournamentRequest = useCallback(() => {
+    const tickets = Number(tournamentStatus?.ticketsOwned) || 0;
+    const resumedRunId = tournamentStatus?.activeRun?.runId || activeRunId;
+    const hasActive = Boolean(resumedRunId);
+    if (hasActive) {
+      setActiveRunId(resumedRunId);
+      setMenuMode('tournament');
+      setTournamentResult(null);
+      submitLock.current = false;
+      handleDifficultySelect('TOURNAMENT');
+      return;
+    }
+    if (tickets < 1) {
+      setShowLockedModal(true);
+      return;
+    }
+    setShowConfirmModal(true);
+  }, [tournamentStatus, activeRunId, handleDifficultySelect]);
+
+  const handleConfirmTournament = useCallback(async () => {
+    setStartingTournament(true);
+    setTournamentError('');
+    try {
+      const result = await startScoutFlightTournament();
+      setActiveRunId(result.runId);
+      setTournamentStatus(result.status || tournamentStatus);
+      setMenuMode('tournament');
+      setTournamentResult(null);
+      submitLock.current = false;
+      handleDifficultySelect('TOURNAMENT');
+      setShowConfirmModal(false);
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Could not start tournament.';
+      setTournamentError(msg);
+      if (e?.response?.data?.code === 'NO_TICKETS') {
+        setShowConfirmModal(false);
+        setShowLockedModal(true);
+      }
+    } finally {
+      setStartingTournament(false);
+    }
+  }, [tournamentStatus, handleDifficultySelect]);
 
   const handleInput = useCallback((e) => {
     e.preventDefault();
@@ -472,18 +571,81 @@ export default function ScoutFlightGame() {
   }, []);
 
   const handleRestart = useCallback(() => {
+    if (isTournamentSession) {
+      setMenuMode(null);
+      setTournamentResult(null);
+      setActiveRunId(null);
+      submitLock.current = false;
+      gameRef.current = resetGame(gameRef.current);
+      setUiPhase(PHASE.IDLE);
+      setScore(0);
+      setIsNewBest(false);
+      void loadTournamentStatus();
+      void loadLeaderboard(leaderboardPeriod);
+      return;
+    }
     gameRef.current = restartGame(gameRef.current);
     setUiPhase(PHASE.PLAYING);
     setScore(0);
     setIsNewBest(false);
-  }, []);
+  }, [isTournamentSession, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
 
   const handleBackToIdle = useCallback(() => {
+    setMenuMode(null);
+    setTournamentResult(null);
+    setActiveRunId(null);
+    submitLock.current = false;
     gameRef.current = resetGame(gameRef.current);
     setUiPhase(PHASE.IDLE);
     setScore(0);
     setIsNewBest(false);
-  }, []);
+    void loadTournamentStatus();
+    void loadLeaderboard(leaderboardPeriod);
+  }, [loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+
+  useEffect(() => {
+    if (uiPhase !== PHASE.GAMEOVER || !isTournamentSession || !activeRunId || submitLock.current) {
+      return;
+    }
+    submitLock.current = true;
+    setSubmittingScore(true);
+    const elapsedMs = Math.round(Number(gameRef.current?.elapsed) || 0);
+    void (async () => {
+      try {
+        const result = await submitScoutFlightTournamentScore({
+          runId: activeRunId,
+          score,
+          elapsedMs,
+        });
+        setTournamentResult(result);
+        setTournamentStatus(result.status || tournamentStatus);
+        if (Number(result.savvyEarned) > 0 && typeof patchUser === 'function') {
+          const nextBalance = Math.round(Number(result.savvyBalance ?? result.status?.savvyBalance ?? 0));
+          if (nextBalance > 0) {
+            patchUser({ savvyPointsServerBase: nextBalance, savvyPoints: nextBalance });
+          }
+        }
+        window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+        if (typeof refreshProfile === 'function') await refreshProfile();
+        void loadLeaderboard(leaderboardPeriod);
+      } catch (e) {
+        setTournamentError(e?.response?.data?.message || e?.message || 'Score submission failed.');
+      } finally {
+        setSubmittingScore(false);
+        setActiveRunId(null);
+      }
+    })();
+  }, [
+    uiPhase,
+    isTournamentSession,
+    activeRunId,
+    score,
+    tournamentStatus,
+    patchUser,
+    refreshProfile,
+    loadLeaderboard,
+    leaderboardPeriod,
+  ]);
 
   return (
     <div
@@ -506,7 +668,11 @@ export default function ScoutFlightGame() {
               ⛶ Focus Mode
             </button>
           ) : null}
-          <span className="scout-flight-page__beta">Local score</span>
+          <span className="scout-flight-page__beta">
+            {tournamentStatus
+              ? `🎟️ ${Number(tournamentStatus.ticketsOwned) || 0} tickets`
+              : 'Tournament'}
+          </span>
         </div>
       </header>
 
@@ -526,7 +692,9 @@ export default function ScoutFlightGame() {
 
       <div
         ref={wrapRef}
-        className={`scout-flight-stage${isPracticeMode ? ' scout-flight-stage--practice' : ''}`}
+        className={`scout-flight-stage${isPracticeMode ? ' scout-flight-stage--practice' : ''}${
+          isTournamentSession ? ' scout-flight-stage--tournament' : ''
+        }`}
         role="application"
         aria-label="Savvy Scout Flight mini-game"
         onPointerDown={handleInput}
@@ -544,7 +712,13 @@ export default function ScoutFlightGame() {
             ✕ Exit
           </button>
         ) : null}
-        {isPracticeMode ? (
+        {isTournamentSession && uiPhase === PHASE.PLAYING ? (
+          <div className="scout-flight-tournament-header" aria-label="Tournament Mode">
+            <h2 className="scout-flight-tournament-header__title">🏆 Tournament Mode</h2>
+            <p className="scout-flight-tournament-header__subtitle">Official run · Savvy on the line</p>
+          </div>
+        ) : null}
+        {isPracticeMode && uiPhase !== PHASE.IDLE ? (
           <div className="scout-flight-practice-header" aria-label="Practice Mode">
             <h2 className="scout-flight-practice-header__title">🎮 Practice Mode</h2>
             <p className="scout-flight-practice-header__subtitle">
@@ -554,88 +728,73 @@ export default function ScoutFlightGame() {
         ) : null}
         <canvas ref={canvasRef} className="scout-flight-canvas" />
 
-        {uiPhase === PHASE.IDLE ? (
+        {uiPhase === PHASE.IDLE && !menuMode ? (
+          <ScoutFlightModeMenu
+            tournamentStatus={tournamentStatus}
+            rewardTiers={tournamentStatus?.rewardTiers}
+            onPractice={() => handlePracticeStart()}
+            onTournament={() => handleTournamentRequest()}
+          />
+        ) : null}
+
+        {uiPhase === PHASE.IDLE && menuMode ? (
           <div className="scout-flight-overlay scout-flight-overlay--start">
-            {!isPracticeMode ? (
-              <>
-                <div className="scout-flight-logo">
-                  <span className="scout-flight-logo__wings">🪽</span>
-                  <h1>SAVVY SCOUT FLIGHT</h1>
-                  <span className="scout-flight-logo__wings">🪽</span>
-                </div>
-                <p className="scout-flight-tagline">Collect Savvy Coins. Dodge the hazards.</p>
-              </>
-            ) : (
+            {isPracticeSession ? (
               <p className="scout-flight-practice-intro">
-                Most forgiving hitbox — perfect for learning pipes and coin routes.
+                Practice Mode — most forgiving hitbox. No Savvy awarded.
+              </p>
+            ) : (
+              <p className="scout-flight-practice-intro scout-flight-practice-intro--tournament">
+                🏆 Official Tournament Run — score counts toward leaderboard and Savvy rewards.
               </p>
             )}
-            <section className="scout-flight-difficulty" aria-label="Difficulty">
-              <h2 className="scout-flight-difficulty__title">Difficulty</h2>
-              <div className="scout-flight-difficulty__options" role="radiogroup" aria-label="Select difficulty">
-                {selectableDifficulties.map((d) => {
-                  const selected = difficultyId === d.id;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      className={`scout-flight-difficulty__option${selected ? ' scout-flight-difficulty__option--active' : ''}`}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDifficultySelect(d.id);
-                      }}
-                    >
-                      <span className="scout-flight-difficulty__label">
-                        {d.emoji} {d.label}
-                      </span>
-                      <span className="scout-flight-difficulty__desc">{d.description}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-            {debugAllowed ? (
-              <label
-                className="scout-flight-debug-toggle"
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="checkbox"
-                  checked={debugHitbox}
-                  onChange={handleDebugHitboxToggle}
-                />
-                Show hitbox overlay (testing)
-              </label>
-            ) : null}
             <img src={SCOUT_IMG} alt="" className="scout-flight-scout-preview" />
             <p className="scout-flight-hint">Tap or click to launch</p>
-            {!focusMode ? (
-              <button
-                type="button"
-                className="scout-flight-focus-btn scout-flight-focus-btn--overlay"
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                onClick={handleFocusToggle}
-              >
-                ⛶ Focus Mode
-              </button>
-            ) : null}
-            <p className="scout-flight-note">
-              {isPracticeMode
-                ? 'Practice runs are local only — earn Tournament Tickets on the Perk Machine to compete for Savvy Points.'
-                : isTournamentMode
-                  ? 'Tournament Mode — compete for Savvy Points. Requires a Tournament Ticket from the Perk Machine.'
-                  : 'Score is local only. Select Tournament when you have a ticket.'}
-            </p>
+            <button
+              type="button"
+              className="scout-flight-btn scout-flight-btn--ghost"
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBackToIdle();
+              }}
+            >
+              ← Back to Modes
+            </button>
           </div>
         ) : null}
 
-        {uiPhase === PHASE.GAMEOVER ? (
+        {uiPhase === PHASE.GAMEOVER && isTournamentSession ? (
+          submittingScore ? (
+            <div className="scout-flight-overlay scout-flight-overlay--gameover">
+              <p className="scout-flight-go-title">Verifying tournament score…</p>
+            </div>
+          ) : tournamentResult ? (
+            <ScoutFlightTournamentResult
+              result={tournamentResult}
+              score={score}
+              onPlayAgain={(e) => {
+                e.stopPropagation();
+                handleRestart();
+              }}
+              onReturn={(e) => {
+                e.stopPropagation();
+                handleBackToIdle();
+              }}
+            />
+          ) : (
+            <div className="scout-flight-overlay scout-flight-overlay--gameover">
+              <p className="scout-flight-go-title">Flight Ended</p>
+              {tournamentError ? <p className="scout-flight-go-error">{tournamentError}</p> : null}
+              <button type="button" className="scout-flight-btn scout-flight-btn--ghost" onClick={handleBackToIdle}>
+                Return to Scout Flight
+              </button>
+            </div>
+          )
+        ) : null}
+
+        {uiPhase === PHASE.GAMEOVER && !isTournamentSession ? (
           <div className="scout-flight-overlay scout-flight-overlay--gameover">
             {focusMode ? (
               <button
@@ -691,6 +850,32 @@ export default function ScoutFlightGame() {
           </div>
         ) : null}
       </div>
+
+      {uiPhase === PHASE.IDLE && !menuMode ? (
+        <ScoutFlightLeaderboardPanel
+          leaderboard={leaderboard}
+          period={leaderboardPeriod}
+          loading={leaderboardLoading}
+          onPeriodChange={(p) => {
+            setLeaderboardPeriod(p);
+            void loadLeaderboard(p);
+          }}
+        />
+      ) : null}
+
+      {tournamentError && uiPhase !== PHASE.GAMEOVER ? (
+        <p className="scout-flight-page__error" role="alert">
+          {tournamentError}
+        </p>
+      ) : null}
+
+      <ScoutFlightLockedModal open={showLockedModal} onClose={() => setShowLockedModal(false)} />
+      <ScoutFlightConfirmModal
+        open={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => void handleConfirmTournament()}
+        starting={startingTournament}
+      />
     </div>
   );
 }
