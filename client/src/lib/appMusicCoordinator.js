@@ -1,20 +1,28 @@
 /**
- * Orchestrates menu ↔ Perk Machine crossfades and unified ducking.
+ * Orchestrates menu ↔ Perk Machine ↔ Scout Flight crossfades and unified ducking.
  */
 
 import { isMenuMusicRoute } from './menuMusicLibrary';
 import { isMenuMusicEnabled, menuMusicEngine } from './menuMusicEngine';
 import { isPerkMachineRoute } from './perkMachineMusicLibrary';
 import { perkMachineMusicEngine } from './perkMachineMusicEngine';
+import { isScoutFlightGameplayRoute } from './scoutFlightMusicLibrary';
+import { scoutFlightMusicEngine } from './scoutFlightMusicEngine';
 
 export const CROSSFADE_MS = 1500;
+
+export function isScoutFlightMusicActive() {
+  return scoutFlightMusicEngine.isActive();
+}
 
 export function isPerkMusicActive() {
   return perkMachineMusicEngine.isActive();
 }
 
 export function duckAppMusic(reason, level) {
-  if (perkMachineMusicEngine.isActive()) {
+  if (scoutFlightMusicEngine.isActive()) {
+    scoutFlightMusicEngine.duck(reason, level);
+  } else if (perkMachineMusicEngine.isActive()) {
     perkMachineMusicEngine.duck(reason, level);
   } else if (menuMusicEngine.isPlaying()) {
     menuMusicEngine.duck(reason, level);
@@ -22,6 +30,7 @@ export function duckAppMusic(reason, level) {
 }
 
 export function unduckAppMusic(reason) {
+  scoutFlightMusicEngine.unduck(reason);
   perkMachineMusicEngine.unduck(reason);
   menuMusicEngine.unduck(reason);
 }
@@ -35,12 +44,12 @@ export async function preloadAppMusic() {
   await Promise.all([
     menuMusicEngine.preload(),
     perkMachineMusicEngine.preload(),
+    scoutFlightMusicEngine.preload('practice'),
   ]);
 }
 
 /**
  * Crossfade menu music out while fading Perk Machine theme in.
- * Falls back gracefully if the perk asset is unavailable.
  */
 export async function enterPerkMachineMusic() {
   if (!isMenuMusicEnabled()) {
@@ -86,9 +95,6 @@ export async function enterPerkMachineMusic() {
   return true;
 }
 
-/**
- * Crossfade Perk Machine theme out while restoring menu ambience.
- */
 export async function exitPerkMachineMusic(pathname = '') {
   perkMachineMusicEngine.markActive(false);
   menuMusicEngine.pausedForRoute = false;
@@ -118,4 +124,84 @@ export async function exitPerkMachineMusic(pathname = '') {
   }, CROSSFADE_MS);
 }
 
-export { isPerkMachineRoute, isMenuMusicRoute };
+/**
+ * Fade in Scout Flight gameplay music when Practice or Tournament begins.
+ * @param {'practice'|'tournament'} mode
+ */
+export async function enterScoutFlightGameplayMusic(mode = 'practice') {
+  if (!isMenuMusicEnabled()) {
+    await menuMusicEngine.pause({ fadeMs: CROSSFADE_MS });
+    return false;
+  }
+
+  const loadOk = await scoutFlightMusicEngine.preload(mode);
+  if (!loadOk || scoutFlightMusicEngine.loadFailed) {
+    return false;
+  }
+
+  scoutFlightMusicEngine.markActive(true);
+  menuMusicEngine.pausedForRoute = true;
+
+  const menuWasPlaying = menuMusicEngine.isPlaying();
+
+  await scoutFlightMusicEngine.play({ fadeMs: 0, fromStart: true, mode });
+  if (scoutFlightMusicEngine.audio) {
+    scoutFlightMusicEngine.audio.volume = 0;
+  }
+
+  if (menuWasPlaying) {
+    menuMusicEngine.fadeVolumeTo(0, CROSSFADE_MS);
+    window.setTimeout(() => {
+      if (menuMusicEngine.audio) {
+        try {
+          menuMusicEngine.audio.pause();
+        } catch {
+          /* ignore */
+        }
+        menuMusicEngine.playing = false;
+      }
+    }, CROSSFADE_MS);
+  }
+
+  scoutFlightMusicEngine.fadeVolumeTo(
+    scoutFlightMusicEngine.getTargetVolume(),
+    CROSSFADE_MS
+  );
+
+  return true;
+}
+
+/**
+ * Fade out Scout Flight gameplay music; optionally restore menu theme.
+ * @param {{ resumeMenu?: boolean, pathname?: string }} opts
+ */
+export async function exitScoutFlightGameplayMusic(opts = {}) {
+  const { resumeMenu, pathname = '' } = opts;
+  scoutFlightMusicEngine.markActive(false);
+  menuMusicEngine.pausedForRoute = false;
+
+  const shouldResumeMenu =
+    typeof resumeMenu === 'boolean'
+      ? resumeMenu
+      : isMenuMusicRoute(pathname) && isMenuMusicEnabled();
+
+  const wasPlaying = scoutFlightMusicEngine.isPlaying();
+
+  if (wasPlaying) {
+    scoutFlightMusicEngine.fadeVolumeTo(0, CROSSFADE_MS);
+  }
+
+  window.setTimeout(async () => {
+    await scoutFlightMusicEngine.pause({ fadeMs: 0 });
+
+    if (shouldResumeMenu) {
+      await menuMusicEngine.play({ fadeMs: 0, fromStart: false });
+      if (menuMusicEngine.audio) {
+        menuMusicEngine.audio.volume = 0;
+      }
+      menuMusicEngine.fadeVolumeTo(menuMusicEngine.getTargetVolume(), CROSSFADE_MS);
+    }
+  }, CROSSFADE_MS);
+}
+
+export { isPerkMachineRoute, isMenuMusicRoute, isScoutFlightGameplayRoute };

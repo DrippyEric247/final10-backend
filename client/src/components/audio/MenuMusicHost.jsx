@@ -4,22 +4,25 @@ import { useAuth } from '../../context/AuthContext';
 import {
   enterPerkMachineMusic,
   exitPerkMachineMusic,
+  exitScoutFlightGameplayMusic,
   isMenuMusicRoute,
   isPerkMachineRoute,
+  isScoutFlightGameplayRoute,
   preloadAppMusic,
 } from '../../lib/appMusicCoordinator';
 import { menuMusicEngine } from '../../lib/menuMusicEngine';
 import { perkMachineMusicEngine } from '../../lib/perkMachineMusicEngine';
+import { scoutFlightMusicEngine } from '../../lib/scoutFlightMusicEngine';
 
 /**
- * Route-aware background
- * + Perk Machine music host with cinematic crossfades.
+ * Route-aware menu, Perk Machine, and Scout Flight music host.
  */
 export default function MenuMusicHost() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const wasMenuRef = useRef(false);
   const wasPerkRef = useRef(false);
+  const wasScoutFlightRef = useRef(false);
   const bootReadyRef = useRef(false);
 
   useEffect(() => {
@@ -49,14 +52,18 @@ export default function MenuMusicHost() {
     if (!user) {
       wasMenuRef.current = false;
       wasPerkRef.current = false;
+      wasScoutFlightRef.current = false;
       void menuMusicEngine.stop({ fadeMs: 400 });
       void perkMachineMusicEngine.stop({ fadeMs: 400 });
+      void scoutFlightMusicEngine.stop({ fadeMs: 400 });
       return undefined;
     }
 
     const onPerkRoute = isPerkMachineRoute(location.pathname);
+    const onScoutFlightRoute = isScoutFlightGameplayRoute(location.pathname);
     const onMenuRoute = isMenuMusicRoute(location.pathname);
     const wasPerk = wasPerkRef.current;
+    const wasScoutFlight = wasScoutFlightRef.current;
     const wasMenu = wasMenuRef.current;
 
     if (onPerkRoute && !wasPerk) {
@@ -78,9 +85,17 @@ export default function MenuMusicHost() {
       }
     } else if (!onPerkRoute && wasPerk) {
       void exitPerkMachineMusic(location.pathname);
-    } else if (onMenuRoute && !wasMenu && !onPerkRoute) {
+    } else if (!onScoutFlightRoute && wasScoutFlight) {
+      void exitScoutFlightGameplayMusic({ pathname: location.pathname });
+    } else if (onMenuRoute && !wasMenu && !onPerkRoute && !onScoutFlightRoute) {
       const startMenuMusic = () => {
-        if (!isMenuMusicRoute(location.pathname) || isPerkMachineRoute(location.pathname)) return;
+        if (
+          !isMenuMusicRoute(location.pathname) ||
+          isPerkMachineRoute(location.pathname) ||
+          isScoutFlightGameplayRoute(location.pathname)
+        ) {
+          return;
+        }
         void menuMusicEngine.play({ fadeMs: 2000, fromStart: true });
       };
 
@@ -95,11 +110,12 @@ export default function MenuMusicHost() {
           window.clearTimeout(timer);
         };
       }
-    } else if (!onMenuRoute && wasMenu && !wasPerk && !onPerkRoute) {
+    } else if (!onMenuRoute && wasMenu && !wasPerk && !onPerkRoute && !onScoutFlightRoute) {
       void menuMusicEngine.pause({ fadeMs: 900 });
     }
 
     wasPerkRef.current = onPerkRoute;
+    wasScoutFlightRef.current = onScoutFlightRoute;
     wasMenuRef.current = onMenuRoute;
     return undefined;
   }, [user, loading, location.pathname]);

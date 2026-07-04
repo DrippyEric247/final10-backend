@@ -28,6 +28,15 @@ import {
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
 import {
+  enterScoutFlightGameplayMusic,
+  exitScoutFlightGameplayMusic,
+} from '../lib/appMusicCoordinator';
+import {
+  duckScoutFlightMusicForDuration,
+  SCOUT_FLIGHT_MUSIC_DUCK,
+  scoutFlightMusicEngine,
+} from '../lib/scoutFlightMusicEngine';
+import {
   exitNativeFullscreen,
   getFocusViewportHeight,
   isNativeFullscreenActive,
@@ -338,6 +347,43 @@ export default function ScoutFlightGame() {
     void loadTournamentStatus();
     void loadLeaderboard('monthly');
   }, [loadChampionship, loadTournamentStatus, loadLeaderboard]);
+
+  useEffect(() => {
+    if (menuMode === 'practice' || menuMode === 'tournament') {
+      void enterScoutFlightGameplayMusic(menuMode);
+      if (menuMode === 'tournament') {
+        duckScoutFlightMusicForDuration(SCOUT_FLIGHT_MUSIC_DUCK.TOURNAMENT_START, 2400);
+      }
+    } else if (menuMode === null && scoutFlightMusicEngine.isActive()) {
+      void exitScoutFlightGameplayMusic({ resumeMenu: false });
+    }
+  }, [menuMode]);
+
+  useEffect(
+    () => () => {
+      void exitScoutFlightGameplayMusic({ resumeMenu: false });
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!menuMode) return undefined;
+    const onVisibility = () => {
+      if (document.hidden) {
+        void scoutFlightMusicEngine.pauseForBackground({ fadeMs: 400 });
+      } else {
+        void scoutFlightMusicEngine.resumeFromPause({ fadeMs: 600 });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [menuMode]);
+
+  useEffect(() => {
+    if (tournamentResult) {
+      duckScoutFlightMusicForDuration(SCOUT_FLIGHT_MUSIC_DUCK.TOURNAMENT_COMPLETE, 5200);
+    }
+  }, [tournamentResult]);
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
