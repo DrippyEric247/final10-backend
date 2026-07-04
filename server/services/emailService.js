@@ -20,6 +20,12 @@ const {
   allowResendSandboxFrom,
 } = require('../config/emailFrom');
 const { ensureAccessibleEmailProductImageUrl } = require('../templates/email/emailTemplateUtils');
+const {
+  cloneForLog,
+  describeResendApiKeyEnv,
+  logEmailSendTrace,
+  buildSendAttemptMeta,
+} = require('../lib/emailSendTrace');
 
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_SMTP_TIMEOUT_MS = 60000;
@@ -184,17 +190,9 @@ function formatMailerError(err) {
   };
 }
 
-/** Safe Resend error object for logs/API (no secrets). */
+/** Full Resend error/response object for logs and API (no shortening). */
 function serializeResendError(error) {
-  if (!error) return null;
-  if (typeof error === 'string') return { message: error };
-  const out = {
-    name: error.name || null,
-    message: error.message || String(error),
-    statusCode: error.statusCode || error.status || null,
-  };
-  if (error.code && !out.name) out.code = error.code;
-  return out;
+  return cloneForLog(error);
 }
 
 function buildTransportOptions() {
@@ -334,10 +332,42 @@ function getEmailConfigStatus() {
 }
 
 async function sendViaResend({ to, subject, text, html, trace = null }) {
+  const attemptId = `resend-${Date.now()}`;
   const client = getResendClient();
   const from = getEmailFrom();
+  const fromAudit = auditEmailFrom();
+
+  logEmailSendTrace(
+    'ATTEMPT_START',
+    buildSendAttemptMeta({
+      context: 'sendViaResend',
+      from,
+      to,
+      subject,
+      extra: {
+        attemptId,
+        envEmailFrom: fromAudit.envEmailFrom,
+        resolvedFrom: fromAudit.resolvedFrom,
+        resolvedAddress: fromAudit.resolvedAddress,
+        verifiedDomain: fromAudit.verifiedDomain,
+        resendSendWillBeCalled: Boolean(client && from),
+      },
+    })
+  );
+
   if (!client || !from) {
-    const result = { sent: false, logOnly: true, provider: 'resend', reason: 'resend_not_configured' };
+    logEmailSendTrace('RESEND_SEND_SKIPPED', {
+      attemptId,
+      reason: 'resend_not_configured',
+      resendSendCalled: false,
+      hasClient: Boolean(client),
+      hasFrom: Boolean(from),
+      from,
+      to,
+      subject,
+      resendApiKey: describeResendApiKeyEnv(),
+    });
+    const result = { sent: false, logOnly: true, provider: 'resend', reason: 'resend_not_configured', resendSendCalled: false };
     trace?.step('provider_resend_not_configured', {
       ok: false,
       hasClient: Boolean(client),
@@ -348,7 +378,15 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
   }
 
   if (isResendSandboxAddress(from) && !allowResendSandboxFrom()) {
-    const audit = auditEmailFrom();
+    logEmailSendTrace('RESEND_SEND_SKIPPED', {
+      attemptId,
+      reason: 'resend_sandbox_from_blocked',
+      resendSendCalled: false,
+      from,
+      to,
+      subject,
+      fromAudit,
+    });
     const result = {
       sent: false,
       logOnly: false,
@@ -357,14 +395,16 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
       errorCode: 'RESEND_SANDBOX_FROM',
       errorReason:
         'Resend sandbox sender onboarding@resend.dev only delivers to your Resend account email.',
-      resendValidationHint: audit.fixHint,
+      resendValidationHint: fromAudit.fixHint,
+      resendSendCalled: false,
     };
-    trace?.step('provider_resend_sandbox_blocked', { ok: false, ...result, fromAudit: audit });
+    trace?.step('provider_resend_sandbox_blocked', { ok: false, ...result, fromAudit });
     return result;
   }
 
-  const fromAudit = auditEmailFrom();
   trace?.step('provider_resend_from_audit', {
+    envEmailFrom: fromAudit.envEmailFrom,
+    resolvedFrom: fromAudit.resolvedFrom,
     resolvedAddress: fromAudit.resolvedAddress,
     isResendSandboxFrom: fromAudit.isResendSandboxFrom,
     verifiedDomain: fromAudit.verifiedDomain,
@@ -379,48 +419,52 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
   };
 
   trace?.step('provider_resend_request', {
-    to: `${String(to).slice(0, 3)}***`,
-    from: from.replace(/(.{0,12}).+@/, '$1…@'),
-    subjectLen: String(subject || '').length,
+    attemptId,
+    from,
+    to,
+    subject,
     htmlLen: String(html || '').length,
     textLen: String(text || '').length,
   });
-  trace?.step('provider_resend_payload', {
-    from: from.replace(/(.{0,12}).+@/, '$1…@'),
-    to: [to],
-    subject: String(subject || '').slice(0, 160),
-    textBytes: Buffer.byteLength(String(text || ''), 'utf8'),
-    htmlBytes: Buffer.byteLength(String(html || ''), 'utf8'),
-  });
-  console.log(
-    '[email] Resend request payload',
-    JSON.stringify({
-      from: from.replace(/(.{0,12}).+@/, '$1…@'),
-      to,
-      subject: String(subject || '').slice(0, 160),
+
+  logEmailSendTrace('RESEND_SEND_CALLED', {
+    attemptId,
+    resendSendCalled: true,
+    from,
+    to,
+    subject,
+    resendApiKey: describeResendApiKeyEnv(),
+    payload: {
+      from: resendPayload.from,
+      to: resendPayload.to,
+      subject: resendPayload.subject,
       textBytes: Buffer.byteLength(String(text || ''), 'utf8'),
       htmlBytes: Buffer.byteLength(String(html || ''), 'utf8'),
-    })
-  );
+    },
+  });
+
   logEmailDiagnostics({ provider: 'resend', action: 'send_start' });
 
   try {
     const { data, error } = await client.emails.send(resendPayload);
+    const resendFullResponse = {
+      data: cloneForLog(data),
+      error: cloneForLog(error),
+    };
+
+    logEmailSendTrace('RESEND_SEND_RESPONSE', {
+      attemptId,
+      resendSendCalled: true,
+      from,
+      to,
+      subject,
+      resendFullResponse,
+    });
 
     if (error) {
       const formatted = formatMailerError(error);
       const resendError = serializeResendError(error);
       const validationHint = resendValidationHint(formatted.errorReason);
-      console.warn(
-        '[email] Resend API error (full)',
-        JSON.stringify({
-          provider: 'resend',
-          to,
-          validationHint,
-          resendError,
-          ...formatted,
-        })
-      );
       const result = {
         sent: false,
         logOnly: false,
@@ -428,41 +472,47 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
         reason: 'resend_send_failed',
         resendValidationHint: validationHint,
         resendError,
+        resendFullResponse,
+        resendSendCalled: true,
         ...formatted,
       };
-      trace?.step('provider_resend_error', { ok: false, ...result });
+      trace?.step('provider_resend_error', { ok: false, attemptId, from, to, subject, ...result });
       return result;
     }
 
-    console.log(
-      '[email] Email sent',
-      JSON.stringify({ provider: 'resend', to, messageId: data?.id || null })
-    );
-    const result = { sent: true, provider: 'resend', messageId: data?.id || null };
-    trace?.step('provider_resend_success', { ok: true, messageId: result.messageId });
+    const result = {
+      sent: true,
+      provider: 'resend',
+      messageId: data?.id || null,
+      resendFullResponse,
+      resendSendCalled: true,
+    };
+    trace?.step('provider_resend_success', { ok: true, attemptId, messageId: result.messageId, from, to, subject });
     return result;
   } catch (err) {
     const formatted = formatMailerError(err);
     const resendError = serializeResendError(err);
-    console.warn(
-      '[email] Resend send exception',
-      JSON.stringify({
-        provider: 'resend',
-        to,
-        resendError,
-        stack: String(err?.stack || '').split('\n').slice(0, 8),
-        ...formatted,
-      })
-    );
+    logEmailSendTrace('RESEND_SEND_EXCEPTION', {
+      attemptId,
+      resendSendCalled: true,
+      from,
+      to,
+      subject,
+      resendError,
+      stack: err?.stack || null,
+      ...formatted,
+    });
     const result = {
       sent: false,
       logOnly: false,
       provider: 'resend',
       reason: 'resend_send_failed',
       resendError,
+      resendSendCalled: true,
+      stack: err?.stack || null,
       ...formatted,
     };
-    trace?.step('provider_resend_exception', { ok: false, ...result });
+    trace?.step('provider_resend_exception', { ok: false, attemptId, from, to, subject, ...result });
     return result;
   }
 }
@@ -704,11 +754,23 @@ async function sendSavvyScoutMonthlyReportEmail({
 }) {
   trace?.step('monthly_report_email_enter', {
     hasRecipient: Boolean(to),
-    recipient: to ? `${String(to).slice(0, 3)}***` : null,
+    recipient: to || null,
+    from: getEmailFrom(),
+    fromAudit: auditEmailFrom(),
     forceSend,
-    resendApiKeyPresent: Boolean(readResendApiKey()),
-    emailFromPresent: Boolean(getEmailFrom()),
+    resendApiKey: describeResendApiKeyEnv(),
   });
+
+  logEmailSendTrace(
+    'MONTHLY_REPORT_ENTER',
+    buildSendAttemptMeta({
+      context: 'sendSavvyScoutMonthlyReportEmail',
+      from: getEmailFrom(),
+      to,
+      subject: subjectOverride || data?.subject || null,
+      extra: { forceSend, fromAudit: auditEmailFrom() },
+    })
+  );
 
   const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
   let subject;
@@ -745,14 +807,39 @@ async function sendSavvyScoutMonthlyReportEmail({
     return { sent: false, logOnly: true, reason: 'alert_email_disabled', subject, html, text };
   }
 
-  trace?.step('monthly_report_dispatch', { via: 'sendOperationalEmail', provider: getEmailProvider() });
-  const result = await sendOperationalEmail({ to, subject, text, html, trace });
+  trace?.step('monthly_report_dispatch', {
+    via: 'sendOperationalEmail',
+    provider: getEmailProvider(),
+    from: getEmailFrom(),
+    to,
+    subject,
+  });
+  logEmailSendTrace(
+    'MONTHLY_REPORT_DISPATCH',
+    buildSendAttemptMeta({
+      context: 'sendSavvyScoutMonthlyReportEmail',
+      from: getEmailFrom(),
+      to,
+      subject,
+    })
+  );
+  const result = await sendOperationalEmail({
+    to,
+    subject,
+    text,
+    html,
+    trace,
+    sendContext: 'sendSavvyScoutMonthlyReportEmail',
+  });
   trace?.step('monthly_report_dispatch_done', {
     sent: Boolean(result.sent),
     reason: result.reason || null,
     provider: result.provider || null,
     messageId: result.messageId || null,
     errorReason: result.errorReason || null,
+    resendFullResponse: result.resendFullResponse || null,
+    resendSendCalled: result.resendSendCalled ?? null,
+    stack: result.stack || null,
   });
   auditEmailDelivery({
     kind: 'savvy_scout_monthly_report',
@@ -962,9 +1049,30 @@ async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) 
   return { ...result, config: getEmailConfigStatus() };
 }
 
-async function sendOperationalEmail({ to, subject, text, html, trace = null }) {
+async function sendOperationalEmail({
+  to,
+  subject,
+  text,
+  html,
+  trace = null,
+  sendContext = 'sendOperationalEmail',
+}) {
+  const from = getEmailFrom();
+  const attemptId = `${sendContext}-${Date.now()}`;
+
+  logEmailSendTrace(
+    'OPERATIONAL_EMAIL_ENTER',
+    buildSendAttemptMeta({
+      context: sendContext,
+      from,
+      to,
+      subject,
+      extra: { attemptId, fromAudit: auditEmailFrom(), provider: getEmailProvider() },
+    })
+  );
+
   try {
-    return await sendMailMessage({
+    const result = await sendMailMessage({
       to,
       subject,
       text,
@@ -972,27 +1080,53 @@ async function sendOperationalEmail({ to, subject, text, html, trace = null }) {
       verifyFirst: getEmailProvider() === 'smtp',
       trace,
     });
+
+    logEmailSendTrace('OPERATIONAL_EMAIL_RESULT', {
+      attemptId,
+      context: sendContext,
+      from,
+      to,
+      subject,
+      sent: Boolean(result.sent),
+      reason: result.reason || null,
+      provider: result.provider || null,
+      resendSendCalled: result.resendSendCalled ?? null,
+      resendFullResponse: result.resendFullResponse || null,
+      resendError: result.resendError || null,
+      stack: result.stack || null,
+    });
+
+    return { ...result, attemptId, from, to, subject };
   } catch (err) {
     const formatted = formatMailerError(err);
-    console.error(
-      '[email] sendOperationalEmail unexpected throw',
-      JSON.stringify({
-        to,
-        message: err?.message,
-        stack: String(err?.stack || '').split('\n').slice(0, 8),
-        ...formatted,
-      })
-    );
+    logEmailSendTrace('OPERATIONAL_EMAIL_EXCEPTION', {
+      attemptId,
+      context: sendContext,
+      from,
+      to,
+      subject,
+      message: err?.message || String(err),
+      stack: err?.stack || null,
+      ...formatted,
+    });
     trace?.step('send_operational_exception', {
       ok: false,
-      message: String(err?.message || err).slice(0, 500),
-      stack: String(err?.stack || '').split('\n').slice(0, 6),
+      attemptId,
+      from,
+      to,
+      subject,
+      message: String(err?.message || err),
+      stack: err?.stack || null,
       ...formatted,
     });
     return {
       sent: false,
       logOnly: false,
       reason: 'send_operational_exception',
+      stack: err?.stack || null,
+      from,
+      to,
+      subject,
       ...formatted,
     };
   }

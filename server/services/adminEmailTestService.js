@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdminEmailTestLog = require('../models/AdminEmailTestLog');
 const { sendOperationalEmail, getEmailEnvPresence, getEmailConfigStatus } = require('./emailService');
+const { describeResendApiKeyEnv } = require('../lib/emailSendTrace');
 const {
   buildAdminTestEmail,
   TEMPLATE_LABELS,
@@ -185,7 +186,15 @@ async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser,
   }
 
   const deliveryId = buildDeliveryId();
-  trace?.step('admin_email_test_send_start', { via: 'sendOperationalEmail', deliveryId });
+  trace?.step('admin_email_test_send_start', {
+    via: 'sendOperationalEmail',
+    deliveryId,
+    from: getEmailConfigStatus().emailFrom,
+    to: user.email,
+    subject: built.subject,
+    fromAudit: getEmailConfigStatus().fromAudit,
+    resendApiKey: describeResendApiKeyEnv(),
+  });
 
   let result;
   try {
@@ -195,6 +204,7 @@ async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser,
       html: built.html,
       text: built.text,
       trace,
+      sendContext: `adminEmailTest:${templateKey}`,
     });
   } catch (err) {
     trace?.step('admin_email_test_send_threw', {
@@ -218,6 +228,12 @@ async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser,
     provider: result.provider || null,
     errorReason: result.errorReason || null,
     resendError: result.resendError || null,
+    resendFullResponse: result.resendFullResponse || null,
+    resendSendCalled: result.resendSendCalled ?? null,
+    stack: result.stack || null,
+    from: result.from || null,
+    to: result.to || user.email,
+    subject: result.subject || built.subject,
   });
 
   const status = result.sent ? 'sent' : result.logOnly ? 'log_only' : 'failed';
@@ -267,6 +283,10 @@ async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser,
     errorReason: result.errorReason || null,
     resendError: result.resendError || null,
     resendValidationHint: result.resendValidationHint || null,
+    resendFullResponse: result.resendFullResponse || null,
+    resendSendCalled: result.resendSendCalled ?? null,
+    stack: result.stack || null,
+    from: result.from || getEmailConfigStatus().emailFrom || null,
     subject: built.subject,
   };
 

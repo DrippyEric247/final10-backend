@@ -30,13 +30,42 @@ function extractDomainFromUrl(rawUrl) {
 }
 
 function readVerifiedDomain() {
-  const explicit = String(process.env.RESEND_VERIFIED_DOMAIN || '').trim().toLowerCase();
-  if (explicit) return explicit.replace(/^@/, '');
-  return (
+  const explicit = normalizeVerifiedDomain(String(process.env.RESEND_VERIFIED_DOMAIN || '').trim());
+  if (explicit) return explicit;
+  const fromUrl =
     extractDomainFromUrl(process.env.CLIENT_URL) ||
-    extractDomainFromUrl(process.env.PUBLIC_APP_URL) ||
-    'final10.app'
+    extractDomainFromUrl(process.env.PUBLIC_APP_URL);
+  return normalizeVerifiedDomain(fromUrl) || 'final10.app';
+}
+
+/** Strip www. so Resend uses the verified apex domain (final10.app). */
+function normalizeVerifiedDomain(domain) {
+  let d = String(domain || '').trim().toLowerCase().replace(/^@/, '');
+  if (d.startsWith('www.')) d = d.slice(4);
+  return d;
+}
+
+function extractDisplayName(from) {
+  const raw = String(from || '').trim();
+  const match = raw.match(/^([^<]+)</);
+  return match ? match[1].trim() : 'Savvy Scout';
+}
+
+/**
+ * Resend verifies final10.app — not www.final10.app subaddresses.
+ * Rewrite any @www.final10.app sender to support@final10.app.
+ */
+function rewriteWwwFinal10Sender(from) {
+  const raw = String(from || '').trim();
+  const addr = extractEmailAddress(raw);
+  if (!addr || !addr.includes('@www.final10.app')) return raw;
+  const displayName = extractDisplayName(raw);
+  const rewritten = `${displayName} <support@final10.app>`;
+  console.warn(
+    '[email] FROM contained @www.final10.app — rewriting sender.',
+    JSON.stringify({ originalFrom: raw, originalAddress: addr, rewrittenFrom: rewritten })
   );
+  return rewritten;
 }
 
 function isResendSandboxAddress(from) {
@@ -46,9 +75,9 @@ function isResendSandboxAddress(from) {
 
 function buildVerifiedFromAddress() {
   const domain = readVerifiedDomain();
-  const localPart = String(process.env.RESEND_FROM_LOCAL || 'scout').trim() || 'scout';
+  const localPart = String(process.env.RESEND_FROM_LOCAL || 'support').trim() || 'support';
   const displayName = String(process.env.RESEND_FROM_NAME || 'Savvy Scout').trim() || 'Savvy Scout';
-  return `${displayName} <${localPart}@${domain}>`;
+  return rewriteWwwFinal10Sender(`${displayName} <${localPart}@${domain}>`);
 }
 
 function allowResendSandboxFrom() {
@@ -68,8 +97,12 @@ function resolveEmailFrom() {
     if (hasResendKey && isResendSandboxAddress(explicit) && !allowResendSandboxFrom()) {
       if (isProduction()) {
         console.warn(
-          '[email] EMAIL_FROM uses Resend sandbox (onboarding@resend.dev) — using verified domain sender instead:',
-          verifiedFrom.replace(/<([^@]+)@.+>/, '<$1@…>')
+          '[email] EMAIL_FROM env is Resend sandbox — production override active.',
+          JSON.stringify({
+            envEmailFrom: explicit,
+            overriddenTo: verifiedFrom,
+            reason: 'sandbox_only_delivers_to_resend_account_owner',
+          })
         );
         return verifiedFrom;
       }
@@ -77,12 +110,23 @@ function resolveEmailFrom() {
         '[email] EMAIL_FROM is Resend sandbox — only delivers to your Resend account email. Set EMAIL_FROM=',
         verifiedFrom
       );
+    } else {
+      console.log(
+        '[email] Using explicit EMAIL_FROM from environment:',
+        JSON.stringify({ envEmailFrom: explicit })
+      );
     }
-    return explicit;
+    return rewriteWwwFinal10Sender(explicit);
   }
 
   if (hasResendKey) {
-    if (isProduction() || !allowResendSandboxFrom()) return verifiedFrom;
+    if (isProduction() || !allowResendSandboxFrom()) {
+      console.log(
+        '[email] Resolved verified-domain sender (no EMAIL_FROM env):',
+        JSON.stringify({ resolvedFrom: verifiedFrom, verifiedDomain: readVerifiedDomain() })
+      );
+      return verifiedFrom;
+    }
     return `Savvy Scout <${RESEND_SANDBOX_ADDRESS}>`;
   }
 
@@ -137,8 +181,10 @@ module.exports = {
   RESEND_SANDBOX_ADDRESS,
   extractEmailAddress,
   isResendSandboxAddress,
+  normalizeVerifiedDomain,
   readVerifiedDomain,
   buildVerifiedFromAddress,
+  rewriteWwwFinal10Sender,
   allowResendSandboxFrom,
   resolveEmailFrom,
   auditEmailFrom,

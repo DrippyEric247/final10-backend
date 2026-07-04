@@ -45,6 +45,10 @@ function buildEmailRouteFailureBody(result = {}, meta = {}) {
       provider: result.provider || null,
       envPresent: getEmailEnvPresence(),
       config: getEmailConfigStatus(),
+      resendFullResponse: result.resendFullResponse || null,
+      resendSendCalled: result.resendSendCalled ?? null,
+      stack: result.stack || null,
+      from: result.from || null,
     };
   }
 

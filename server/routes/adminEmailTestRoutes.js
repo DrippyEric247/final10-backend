@@ -4,6 +4,8 @@ const auth = require('../middleware/auth');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { isProduction } = require('../config/envValidation');
 const { createEmailPipelineTrace } = require('../lib/emailPipelineTrace');
+const { getEmailConfigStatus } = require('../services/emailService');
+const { logEmailSendTrace } = require('../lib/emailSendTrace');
 const {
   buildEmailRouteExceptionBody,
   maskEmail,
@@ -126,6 +128,16 @@ router.post('/send', auth, requireAdminAccess(), upload.single('image'), async (
       imageUrl,
     };
 
+    const emailConfig = getEmailConfigStatus();
+    logEmailSendTrace('ADMIN_ROUTE_SEND_INVOKE', {
+      route: 'POST /api/admin/email-test/send',
+      templateKey,
+      userId,
+      from: emailConfig.emailFrom,
+      fromAudit: emailConfig.fromAudit,
+      authenticatedUserId,
+    });
+
     const result = await sendAdminTestEmail({
       userId,
       templateKey,
@@ -141,6 +153,11 @@ router.post('/send', auth, requireAdminAccess(), upload.single('image'), async (
       reason: result.reason || null,
       errorReason: result.errorReason || null,
       provider: result.provider || null,
+      resendFullResponse: result.resendFullResponse || null,
+      resendSendCalled: result.resendSendCalled ?? null,
+      from: result.from || null,
+      to: result.recipient?.email || null,
+      subject: result.subject || null,
       templateKey,
       userId,
     }));
