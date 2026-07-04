@@ -179,6 +179,20 @@ const authPasswordResetSubmitLimiter = rateLimit({
   message: { code: 'RATE_LIMIT', message: 'Too many reset attempts. Try again later.' },
 });
 
+/** POST /api/founder-messages — public contact relay via Savvy Scout */
+const founderMessageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: {
+    code: 'RATE_LIMIT',
+    message: 'Too many messages sent recently. Please wait before trying again.',
+  },
+});
+
 module.exports = {
   isAuthMeRequest,
   authMeLimiter,
@@ -196,4 +210,5 @@ module.exports = {
   scoutFlightTournamentSubmitLimiter,
   scoutMissionClaimLimiter,
   easterEggRedeemLimiter,
+  founderMessageLimiter,
 };

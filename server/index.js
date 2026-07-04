@@ -212,6 +212,7 @@ app.use('/api/payments',    paymentRoutes);
 app.use('/api/local-deals', localDealsRoutes);
 app.use('/api/community',   communityRoutes);
 app.use('/api/beta-community', betaCommunityRoutes);
+app.use('/api/founder-messages', require('./routes/founderMessageRoutes'));
 app.use('/api/founding-tester', require('./routes/foundingTester'));
 app.use('/api/founding-beta', require('./routes/foundingBeta'));
 app.use('/api/alerts',      alertsRoutes);

@@ -1031,6 +1031,12 @@ export async function submitBetaSavvyShopFeedback(payload) {
   return data;
 }
 
+/** Savvy Scout relay — message the founder (multipart: optional screenshot). */
+export async function submitFounderMessage(formData) {
+  const { data } = await api.post("/founder-messages", formData);
+  return data;
+}
+
 export async function getAdminSavvyShopFeedback(limit = 50) {
   const { data } = await api.get("/beta-community/admin/savvy-shop-feedback", { params: { limit } });
   return data;

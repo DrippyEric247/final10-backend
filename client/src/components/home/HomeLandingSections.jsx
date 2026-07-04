@@ -22,6 +22,7 @@ import {
 } from '../../config/homeLandingContent';
 import { saveDonationFeedback } from '../../lib/donationFeedbackStorage';
 import DonationSuccessModal from './DonationSuccessModal';
+import MessageTheFounderSection from './MessageTheFounderSection';
 import SavvyUniverseRoadmap from './SavvyUniverseRoadmap';
 import '../../styles/HomeLanding.css';
 
@@ -254,6 +255,8 @@ export default function HomeLandingSections({ user }) {
           </div>
         ) : null}
       </section>
+
+      <MessageTheFounderSection />
 
       <p className="home-closing">{HOME_CLOSING_LINE}</p>
 
