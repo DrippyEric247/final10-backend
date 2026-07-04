@@ -37,6 +37,7 @@ const {
   cacheControl,
   cookieSecurity,
   createCorsMiddleware,
+  logCorsStartup,
   rateLimitConfig,
   cspConfig,
 } = require('./middleware/security');
@@ -58,6 +59,7 @@ app.set('trust proxy', 1);
 const corsMiddleware = createCorsMiddleware();
 app.use(corsMiddleware);
 app.options('*', corsMiddleware);
+logCorsStartup();
 
 // --- Compression Middleware (apply early) ---
 app.use(compression({
@@ -497,7 +499,9 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
   });
 
 // --- 404 HANDLER (before centralized error handler) ---
+const { ensureCorsHeaders } = require('./middleware/cors');
 app.use('*', (req, res) => {
+  ensureCorsHeaders(req, res);
   res.status(404).json({ code: 'NOT_FOUND', message: 'Route not found' });
 });
 

@@ -1,6 +1,7 @@
 const { isHttpError } = require('./apiErrors');
 const { isProduction } = require('../config/envValidation');
 const { logRouteError } = require('../services/structuredLog');
+const { ensureCorsHeaders } = require('./cors');
 
 function isPerkMachineSpinRequest(req) {
   const path = String(req.originalUrl || req.url || req.path || '');
@@ -45,6 +46,7 @@ function errorHandler(err, req, res, next) {
   if (res.headersSent) {
     return;
   }
+  ensureCorsHeaders(req, res);
   res.status(status).json(body);
 }
 
