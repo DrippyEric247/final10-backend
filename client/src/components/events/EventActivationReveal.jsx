@@ -15,7 +15,7 @@ import {
 const FLY_MS = 720;
 const ACTIVATED_HOLD_MS = 520;
 
-export function EventActivationReveal({ event, onActivated }) {
+export function EventActivationReveal({ event, onFlyComplete }) {
   const [phase, setPhase] = useState('idle');
   const [flyStyle, setFlyStyle] = useState(null);
   const cardRef = useRef(null);
@@ -57,10 +57,11 @@ export function EventActivationReveal({ event, onActivated }) {
     startTransition(() => setPhase('fly'));
     const flyTimer = window.setTimeout(() => {
       unduckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
-      if (typeof onActivated === 'function') onActivated(event);
+      startTransition(() => setPhase('done'));
+      if (typeof onFlyComplete === 'function') onFlyComplete(event);
     }, FLY_MS);
     timersRef.current.push(flyTimer);
-  }, [event, onActivated]);
+  }, [event, onFlyComplete]);
 
   const handleTap = useCallback(() => {
     if (phase !== 'idle' || tapLockRef.current || !event) return;
@@ -79,7 +80,7 @@ export function EventActivationReveal({ event, onActivated }) {
     });
   }, [phase, event, profile, startFlyAnimation]);
 
-  if (!event) return null;
+  if (!event || phase === 'done') return null;
 
   const isInteractive = phase === 'idle';
   const showParticles = phase === 'playing';

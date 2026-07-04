@@ -169,13 +169,14 @@ const userSchema = new mongoose.Schema({
       claimedAt: { type: Date, default: Date.now },
     },
   ],
-  /** Live event login reveal — activated per event per UTC day */
+  /** Live event login reveal — activated per event instance */
   liveEventActivations: [
     {
       activationId: String,
       eventKey: String,
       dayKey: String,
       activatedAt: { type: Date, default: Date.now },
+      explanationDismissedAt: { type: Date, default: null },
     },
   ],
   lastActive: Date,

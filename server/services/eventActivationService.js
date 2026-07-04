@@ -55,7 +55,8 @@ function isTriplePointsLive() {
   return readPointsEnvMultiplier() >= 3;
 }
 
-function buildActivationCard(def, instance) {
+function buildActivationCard(def, instance, user) {
+  const row = (user?.liveEventActivations || []).find((r) => r.activationId === instance.activationId);
   return {
     activationId: instance.activationId,
     eventKey: def.eventKey,
@@ -72,6 +73,7 @@ function buildActivationCard(def, instance) {
     startsAt: instance.startsAt ?? null,
     sortOrder: def.sortOrder,
     meta: instance.meta ?? {},
+    explanationDismissed: Boolean(row?.explanationDismissedAt),
   };
 }
 
@@ -127,7 +129,7 @@ async function collectLiveActivationInstances(user) {
     .map((inst) => {
       const def = getActivationDef(inst.eventKey);
       if (!def) return null;
-      return buildActivationCard(def, inst);
+      return buildActivationCard(def, inst, user);
     })
     .filter(Boolean)
     .sort((a, b) => (a.sortOrder || 99) - (b.sortOrder || 99));
@@ -203,6 +205,33 @@ async function markEventActivated(user, { activationId, eventKey }) {
   return buildActivationState(user);
 }
 
+async function markExplanationDismissed(user, { activationId }) {
+  const id = String(activationId || '').trim();
+  if (!id) {
+    const err = new Error('activationId is required.');
+    err.status = 400;
+    err.code = 'INVALID_ACTIVATION';
+    throw err;
+  }
+
+  const rows = ensureActivationDoc(user);
+  const row = rows.find((r) => r.activationId === id);
+  if (!row) {
+    const err = new Error('Activate this event before dismissing its explanation.');
+    err.status = 400;
+    err.code = 'NOT_ACTIVATED';
+    throw err;
+  }
+
+  if (!row.explanationDismissedAt) {
+    row.explanationDismissedAt = new Date();
+    user.markModified('liveEventActivations');
+    await user.save();
+  }
+
+  return buildActivationState(user);
+}
+
 async function resetActivationSeen(user) {
   user.liveEventActivations = [];
   user.markModified('liveEventActivations');
@@ -213,6 +242,7 @@ async function resetActivationSeen(user) {
 module.exports = {
   buildActivationState,
   markEventActivated,
+  markExplanationDismissed,
   resetActivationSeen,
   isDoublePointsLive,
   isTriplePointsLive,

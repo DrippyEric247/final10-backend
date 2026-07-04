@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLiveEventsOptional } from '../../context/LiveEventsContext';
-import { activateLiveEvent } from '../../lib/api';
+import { activateLiveEvent, dismissEventExplanation } from '../../lib/api';
 import { EventActivationReveal } from './EventActivationReveal';
+import { EventExplanationCard } from './EventExplanationCard';
 import { EventHudBubbles } from './EventHudBubbles';
 import { EventDetailModal } from './EventDetailModal';
 import MaxSupplyDropModal from './MaxSupplyDropModal';
@@ -19,6 +20,8 @@ export default function EventActivationHost() {
   const [current, setCurrent] = useState(null);
   const [bubbles, setBubbles] = useState([]);
   const [detailEvent, setDetailEvent] = useState(null);
+  const [explanationEvent, setExplanationEvent] = useState(null);
+  const [explanationFromHud, setExplanationFromHud] = useState(false);
   const [showDropModal, setShowDropModal] = useState(false);
   const queueRef = useRef([]);
   const processingRef = useRef(false);
@@ -42,43 +45,86 @@ export default function EventActivationHost() {
     if (!activation) return;
     setBubbles(activation.activatedBubbles || []);
     queueRef.current = [...(activation.activationQueue || [])];
-    if (!current && !processingRef.current && queueRef.current.length > 0) {
+    if (!current && !processingRef.current && !explanationEvent && queueRef.current.length > 0) {
       setCurrent(queueRef.current[0]);
     }
-  }, [activation, current]);
+  }, [activation, current, explanationEvent]);
 
   const canReveal = Boolean(
-    user && bootReady && !onOnboarding && current && !processingRef.current
+    user &&
+      bootReady &&
+      !onOnboarding &&
+      current &&
+      !processingRef.current &&
+      !explanationEvent
   );
 
-  const advanceQueue = useCallback(async (event) => {
-    processingRef.current = true;
-    try {
-      if (event) {
+  const advanceToNextInQueue = useCallback(async () => {
+    const next = queueRef.current[0] || null;
+    setCurrent(next);
+    await ctx?.refresh?.();
+  }, [ctx]);
+
+  const handleFlyComplete = useCallback(
+    async (event) => {
+      if (!event) return;
+      processingRef.current = true;
+      try {
         const state = await activateLiveEvent({
           activationId: event.activationId,
           eventKey: event.eventKey,
         });
         setBubbles(state.activatedBubbles || []);
         queueRef.current = [...(state.activationQueue || [])];
-      }
-    } catch {
-      if (event) {
+        setCurrent(null);
+        setExplanationFromHud(false);
+        setExplanationEvent(event);
+      } catch {
         queueRef.current = queueRef.current.filter((e) => e.activationId !== event.activationId);
+        setCurrent(null);
+        await advanceToNextInQueue();
+      } finally {
+        processingRef.current = false;
       }
-    } finally {
-      processingRef.current = false;
-      const next = queueRef.current[0] || null;
-      setCurrent(next);
-      await ctx?.refresh?.();
-    }
-  }, [ctx]);
-
-  const handleActivated = useCallback(
-    (event) => {
-      void advanceQueue(event);
     },
-    [advanceQueue]
+    [advanceToNextInQueue]
+  );
+
+  const handleExplanationDismiss = useCallback(
+    async (event) => {
+      if (event?.activationId && !explanationFromHud) {
+        try {
+          const state = await dismissEventExplanation({ activationId: event.activationId });
+          setBubbles(state.activatedBubbles || []);
+          queueRef.current = [...(state.activationQueue || [])];
+        } catch {
+          /* best-effort — still close card */
+        }
+      }
+      setExplanationEvent(null);
+      setExplanationFromHud(false);
+      if (!explanationFromHud) {
+        await advanceToNextInQueue();
+      }
+    },
+    [advanceToNextInQueue, explanationFromHud]
+  );
+
+  const handleViewDetails = useCallback((event) => {
+    setDetailEvent(null);
+    setExplanationFromHud(true);
+    setExplanationEvent(event);
+  }, []);
+
+  const handleExplanationPrimary = useCallback(
+    (event) => {
+      setExplanationEvent(null);
+      setExplanationFromHud(false);
+      if (event?.eventKey === 'max_supply_drop') {
+        setShowDropModal(true);
+      }
+    },
+    []
   );
 
   const bubblesWithTimers = useMemo(() => {
@@ -98,7 +144,16 @@ export default function EventActivationHost() {
   return (
     <>
       {canReveal ? (
-        <EventActivationReveal event={current} onActivated={handleActivated} />
+        <EventActivationReveal event={current} onFlyComplete={handleFlyComplete} />
+      ) : null}
+
+      {explanationEvent ? (
+        <EventExplanationCard
+          event={explanationEvent}
+          showFromHud={explanationFromHud}
+          onDismiss={handleExplanationDismiss}
+          onPrimaryAction={handleExplanationPrimary}
+        />
       ) : null}
 
       <EventHudBubbles bubbles={bubblesWithTimers} onSelect={setDetailEvent} />
@@ -106,6 +161,7 @@ export default function EventActivationHost() {
       <EventDetailModal
         event={detailEvent}
         onClose={() => setDetailEvent(null)}
+        onViewDetails={handleViewDetails}
         onOpenSupplyDrop={() => {
           setDetailEvent(null);
           setShowDropModal(true);

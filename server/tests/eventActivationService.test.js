@@ -13,6 +13,7 @@ jest.mock('../services/savvySaleService', () => ({
 const {
   buildActivationState,
   markEventActivated,
+  markExplanationDismissed,
   resetActivationSeen,
   isDoublePointsLive,
   isTriplePointsLive,
@@ -70,6 +71,27 @@ describe('eventActivationService', () => {
     expect(after.activationQueue.some((e) => e.activationId === target.activationId)).toBe(false);
     expect(after.activatedBubbles.some((e) => e.activationId === target.activationId)).toBe(true);
     expect(user.save).toHaveBeenCalled();
+  });
+
+  test('markExplanationDismissed records dismiss state on activation row', async () => {
+    process.env.DOUBLE_POINTS_EVENT_ACTIVE = 'true';
+    process.env.TRIPLE_POINTS_EVENT_ACTIVE = 'false';
+    process.env.POINTS_EVENT_MULTIPLIER = '1';
+
+    const user = makeUser();
+    const before = await buildActivationState(user);
+    const target = before.activationQueue[0];
+    await markEventActivated(user, {
+      activationId: target.activationId,
+      eventKey: target.eventKey,
+    });
+
+    const afterDismiss = await markExplanationDismissed(user, {
+      activationId: target.activationId,
+    });
+
+    expect(user.liveEventActivations[0].explanationDismissedAt).toBeTruthy();
+    expect(afterDismiss.activatedBubbles[0].explanationDismissed).toBe(true);
   });
 
   test('resetActivationSeen clears seen state', async () => {

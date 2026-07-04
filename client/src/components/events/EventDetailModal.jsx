@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { formatTimer } from './MaxSupplyDropModal';
 import { EventIconVisual } from './EventIconVisual';
 
-export function EventDetailModal({ event, onClose, onOpenSupplyDrop }) {
+export function EventDetailModal({ event, onClose, onViewDetails, onOpenSupplyDrop }) {
   if (!event) return null;
 
   const isDrop = event.eventKey === 'max_supply_drop';
@@ -24,19 +24,26 @@ export function EventDetailModal({ event, onClose, onOpenSupplyDrop }) {
           </p>
         ) : null}
         <div className="f10-event-detail__actions">
+          <button
+            type="button"
+            className="f10-event-detail__cta"
+            onClick={() => onViewDetails?.(event)}
+          >
+            View Details
+          </button>
           {isDrop ? (
-            <button type="button" className="f10-event-detail__cta" onClick={onOpenSupplyDrop}>
+            <button type="button" className="f10-event-detail__cta f10-event-detail__cta--ghost" onClick={onOpenSupplyDrop}>
               Open Supply Drop
             </button>
           ) : null}
           {isSale ? (
-            <Link to="/perk-machine" className="f10-event-detail__cta" onClick={onClose}>
+            <Link to="/perk-machine" className="f10-event-detail__cta f10-event-detail__cta--ghost" onClick={onClose}>
               Open Perk Machine
             </Link>
           ) : null}
           {!isDrop && !isSale ? (
             <Link to="/events" className="f10-event-detail__cta f10-event-detail__cta--ghost" onClick={onClose}>
-              View Events Hub
+              Events Hub
             </Link>
           ) : null}
         </div>

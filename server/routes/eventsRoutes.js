@@ -19,7 +19,7 @@ const {
 const { logLiveEventAdmin } = require('../services/liveEventsAdminService');
 const { DEFAULT_CLAIM_WINDOW_MS } = require('../config/supplyDropRewards');
 const { buildEventsHub } = require('../services/eventsHubService');
-const { buildActivationState, markEventActivated, resetActivationSeen } = require('../services/eventActivationService');
+const { buildActivationState, markEventActivated, markExplanationDismissed, resetActivationSeen } = require('../services/eventActivationService');
 
 const router = express.Router();
 
@@ -104,6 +104,22 @@ router.post('/activation/activate', auth, async (req, res, next) => {
       return res.status(err.status).json({ message: err.message, code: err.code });
     }
     console.error('[events/activation/activate]', err);
+    next(err);
+  }
+});
+
+router.post('/activation/dismiss-explanation', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const activationId = String(req.body?.activationId || '').trim();
+    const state = await markExplanationDismissed(user, { activationId });
+    res.json({ message: 'Explanation dismissed.', ...state });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message, code: err.code });
+    }
+    console.error('[events/activation/dismiss-explanation]', err);
     next(err);
   }
 });

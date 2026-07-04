@@ -48,7 +48,7 @@ const ACTIVATION_EVENT_DEFS = Object.freeze({
     subtitle: 'Your Savvy goes further',
     detailTitle: 'Savvy Sale',
     detailBody:
-      'During Savvy Sale, eligible Savvy redemption costs may be discounted. Example: 10,000 Savvy value may cost only 5,000 Savvy during select Savvy Sale periods.',
+      'During Savvy Sale, eligible Savvy point redemptions cost 50% less — including Perk Machine spins at 10 / 20 / 30 Savvy.',
     theme: 'red',
     sortOrder: 30,
   },

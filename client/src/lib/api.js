@@ -427,6 +427,11 @@ export async function activateLiveEvent({ activationId, eventKey }) {
   return data;
 }
 
+export async function dismissEventExplanation({ activationId }) {
+  const { data } = await api.post("/events/activation/dismiss-explanation", { activationId });
+  return data;
+}
+
 export async function resetEventActivation() {
   const { data } = await api.post("/events/admin/reset-activation");
   return data;
