@@ -239,6 +239,12 @@ class MenuMusicEngine {
     }, FADE_TICK_MS);
   }
 
+  fadeVolumeTo(targetVolume, fadeMs = 500) {
+    const audio = this.audio;
+    if (!audio) return;
+    this.applyVolume(audio.volume, targetVolume, fadeMs);
+  }
+
   preload(trackId = this.trackId) {
     if (typeof window === 'undefined') return Promise.resolve(false);
     this.trackId = getMenuTrack(trackId).id;

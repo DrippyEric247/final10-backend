@@ -21,6 +21,10 @@ import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournam
 import PerkRewardIndexModal from '../components/perk/PerkRewardIndexModal';
 import { playTournamentTicketUnlockSound } from '../lib/tournamentTicketSound';
 import { playMultiplierSound } from '../lib/perkMultiplierSound';
+import {
+  duckPerkMusicForDuration,
+  PERK_MUSIC_DUCK,
+} from '../lib/perkMachineMusicEngine';
 import { SavvySalePerkBadge } from '../components/events/SavvySaleBanner';
 import '../styles/PerkMachine.css';
 import '../styles/EggHatchery.css';
@@ -166,6 +170,7 @@ export default function PerkMachine() {
   const toastTimer = useRef(null);
 
   const showConfirm = useCallback((message, tone = 'success') => {
+    duckPerkMusicForDuration(PERK_MUSIC_DUCK.REWARD, 2800);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     setConfirmToast({ message, tone, id: Date.now() });
     toastTimer.current = window.setTimeout(() => setConfirmToast(null), 2800);
@@ -180,6 +185,7 @@ export default function PerkMachine() {
   const showDirectTicketAward = useCallback((ticketResult, statusAfter) => {
     const granted = Number(ticketResult?.ticketsGranted) || 0;
     if (granted < 1) return;
+    duckPerkMusicForDuration(PERK_MUSIC_DUCK.JACKPOT, 4200);
     playTournamentTicketUnlockSound();
     setDirectTicketAward({
       id: Date.now(),
@@ -190,6 +196,7 @@ export default function PerkMachine() {
   }, []);
   const showTicketUnlock = useCallback((ticketResult) => {
     if (!ticketResult?.ticketEarned) return;
+    duckPerkMusicForDuration(PERK_MUSIC_DUCK.JACKPOT, 4200);
     playTournamentTicketUnlockSound();
     setTicketUnlock({
       id: Date.now(),
@@ -334,6 +341,7 @@ export default function PerkMachine() {
             setResultMessage(message);
             setSpinning(false);
             spinLock.current = false;
+            duckPerkMusicForDuration(PERK_MUSIC_DUCK.SPIN_COMPLETE, 2600);
             if (typeof onComplete === 'function') onComplete();
           }, 600);
         }
@@ -409,7 +417,17 @@ export default function PerkMachine() {
           () => {
             setResolvedRewards(rewards);
             const multFactor = Number(result.multiplier?.factor) || 1;
+            const isLegendary = rewards.some(
+              (r) => r.rarity === 'legendary' || r.eggTier === 'legendary'
+            );
+            if (isLegendary) {
+              duckPerkMusicForDuration(PERK_MUSIC_DUCK.LEGENDARY, 3600);
+            }
+            if (result.multiplier?.isJackpot) {
+              duckPerkMusicForDuration(PERK_MUSIC_DUCK.JACKPOT, 4200);
+            }
             if (multFactor > 1) {
+              duckPerkMusicForDuration(PERK_MUSIC_DUCK.MULTIPLIER, 900);
               playMultiplierSound(multFactor);
               setMultiplierPulse(true);
               window.setTimeout(() => setMultiplierPulse(false), 2200);

@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { POWER_TOAST_EVENT } from "../lib/final10PowerFeedback";
 import { REWARD_EVENT, triggerFirstActionBonusOnce } from "../lib/rewardEngine";
 import {
-  duckMenuMusic,
-  MENU_MUSIC_DUCK,
-  unduckMenuMusic,
-} from "../lib/menuMusicEngine";
+  duckAppMusic,
+  unduckAppMusic,
+} from "../lib/appMusicCoordinator";
+import { MENU_MUSIC_DUCK } from "../lib/menuMusicEngine";
 import SavvyMark from "./SavvyMark";
 import { SavvyPointsIcon } from "./rewards/SavvyPointsIcon";
 import "../styles/Final10RewardHost.css";
@@ -61,10 +61,10 @@ export default function Final10RewardHost() {
       return;
     }
     playSoftTick(active.accent, active.intensity || 1);
-    duckMenuMusic(MENU_MUSIC_DUCK.REWARD);
+    duckAppMusic(MENU_MUSIC_DUCK.REWARD);
     const ms = Number(active.durationMs) || DEFAULT_MS;
     timerRef.current = window.setTimeout(() => {
-      unduckMenuMusic(MENU_MUSIC_DUCK.REWARD);
+      unduckAppMusic(MENU_MUSIC_DUCK.REWARD);
       setActive(null);
       timerRef.current = null;
       window.setTimeout(() => pump(), 70);
@@ -72,7 +72,7 @@ export default function Final10RewardHost() {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = null;
-      unduckMenuMusic(MENU_MUSIC_DUCK.REWARD);
+      unduckAppMusic(MENU_MUSIC_DUCK.REWARD);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
