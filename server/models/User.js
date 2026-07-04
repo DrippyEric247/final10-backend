@@ -264,6 +264,9 @@ const userSchema = new mongoose.Schema({
   betaTester: { type: Boolean, default: false },
   foundingAccess: { type: Boolean, default: false },
   foundingTesterProgramCompleted: { type: Boolean, default: false },
+  /** Founding Beta Calling Card slot (#001–#100), permanent once assigned. */
+  founderNumber: { type: Number, min: 1, max: 100, unique: true, sparse: true },
+  founderJoinedAt: { type: Date, default: null },
   betaAccessExpiresAt: { type: Date, default: null },
   /** One-time Savvy bonus for quality beta feedback (bug report). */
   betaFeedbackBonusGrantedAt: { type: Date, default: null },

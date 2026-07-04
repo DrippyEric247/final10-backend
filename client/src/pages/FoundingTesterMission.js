@@ -14,6 +14,8 @@ import {
   formatEstDate,
   formatFoundingTesterCountdown,
 } from "../lib/foundingTesterMission";
+import FoundersRemainingBanner from "../components/founding/FoundersRemainingBanner";
+import FoundingBetaCallingCard from "../components/founding/FoundingBetaCallingCard";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import "../styles/FoundingTesterMission.css";
 
@@ -188,7 +190,13 @@ export default function FoundingTesterMission() {
       setFeedbackDrafts((prev) => ({ ...prev, [missionId]: "" }));
 
       if (res?.grandReward?.granted) {
-        setCelebration(res.snapshot?.grandReward || null);
+        setCelebration({
+          ...(res.snapshot?.grandReward || {}),
+          legacy: res.snapshot?.legacy,
+          founderNumber: res.snapshot?.legacy?.founderNumber,
+          username: res.snapshot?.legacy?.username,
+          joinedAt: res.snapshot?.legacy?.joinedAt,
+        });
       } else {
         setToast(res?.message || "Mission complete!");
       }
@@ -231,11 +239,12 @@ export default function FoundingTesterMission() {
 
         <section className="home-card">
           <h2 className="text-lg font-black mb-2">🧪 Build Final10 With Us</h2>
-          <p className="text-sm text-slate-300 leading-relaxed m-0">
+          <p className="text-sm text-slate-300 leading-relaxed m-0 mb-4">
             We designed the Founding Tester Program to be completed over several days—not all at once. Taking your time lets
             you experience new features as they&apos;re updated, helping us collect thoughtful feedback and build the
             strongest version of Final10 before launch.
           </p>
+          <FoundersRemainingBanner />
         </section>
 
         <section className="home-card">
@@ -367,11 +376,25 @@ export default function FoundingTesterMission() {
             animate={{ opacity: 1, scale: 1 }}
           >
             <img src={SCOUT_IMG} alt="" className="ft-celebration__scout" />
-            <h2 className="ft-celebration__title">🏆 {celebration.title}</h2>
-            <p className="ft-celebration__line">+{celebration.savvy} Savvy Points</p>
-            <p className="ft-celebration__line">+{celebration.proDays} days Final10 Pro</p>
-            <p className="ft-celebration__line">Exclusive badge, calling card, and profile emblem unlocked.</p>
-            <p className="ft-celebration__line font-semibold text-amber-100 mt-3">{celebration.scoutLine}</p>
+            <h2 className="ft-celebration__title">🏆 {celebration.title || 'Founding Tester Completed'}</h2>
+            <p className="ft-celebration__line text-amber-200 font-black text-lg">
+              {celebration.welcomeLine || celebration.legacy?.welcome || 'Welcome to the Founding 100.'}
+            </p>
+            {celebration.founderNumber ? (
+              <FoundingBetaCallingCard
+                founderNumber={celebration.founderNumber}
+                username={celebration.username}
+                joinedAt={celebration.joinedAt}
+                programCompleted
+                compact
+              />
+            ) : null}
+            <p className="ft-celebration__line">+{celebration.savvy || 2500} Savvy Points</p>
+            <p className="ft-celebration__line">+{celebration.proDays || 30} days Final10 Pro</p>
+            <p className="ft-celebration__line">🏆 Founder Calling Card · 🎖 Legacy Badge · ⭐ Founder Emblem</p>
+            <p className="ft-celebration__line font-semibold text-amber-100 mt-3">
+              {celebration.scoutLine || celebration.legacy?.scoutLine}
+            </p>
             <p className="ft-celebration__legacy">📜 Founding Tester Legacy</p>
             <p className="ft-celebration__legacy">{celebration.legacyLine}</p>
             <button

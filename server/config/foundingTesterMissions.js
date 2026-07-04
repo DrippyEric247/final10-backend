@@ -129,8 +129,9 @@ const GRAND_REWARD = {
   emblemId: 'sigil_founding_tester',
   callingCardId: 'card_founding_tester',
   title: 'Founding Tester Completed',
-  scoutLine: 'Outstanding work, Operator. Your feedback helped shape the future of Final10.',
+  scoutLine: 'Outstanding work, Founder. You didn\'t just test Final10—you helped build it. Your legacy is now part of the Savvy Universe.',
   legacyLine: "You weren't just an early user—you helped shape Final10 before the world saw it.",
+  welcomeLine: 'Welcome to the Founding 100.',
 };
 
 function utcDayKey(d = new Date()) {

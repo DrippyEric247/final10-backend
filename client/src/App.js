@@ -92,6 +92,7 @@ import Settings from "./pages/Settings";
 import SavvyShopPage from "./pages/SavvyShopPage";
 import SavvyShopStudio from "./pages/SavvyShopStudio";
 import FoundingTesterMission from "./pages/FoundingTesterMission";
+import FoundingHall from "./pages/FoundingHall";
 import AppTelemetry from "./components/AppTelemetry";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import { useEntitlement } from "./hooks/useEntitlement";
@@ -364,6 +365,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <FoundingTesterMission />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/founding-hall"
+            element={
+              <ProtectedRoute>
+                <FoundingHall />
               </ProtectedRoute>
             }
           />

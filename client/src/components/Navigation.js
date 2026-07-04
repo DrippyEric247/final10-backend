@@ -140,6 +140,7 @@ const Navigation = () => {
       { name: 'Life Optimizer', path: '/business-offers', Icon: Building2 },
       { name: 'Savvy Programs', path: '/savvy-programs', Icon: Shield },
       { name: 'Founding Tester', path: '/founding-tester', Icon: TestTube2 },
+      { name: 'Founding Hall', path: '/founding-hall', Icon: Award },
       { name: 'Leaderboard', path: '/leaderboard', Icon: Medal },
       { name: 'Build Wars', path: '/build-wars', Icon: Swords },
       { name: 'Battle Pass', path: '/battle-pass', Icon: Target },

@@ -55,6 +55,7 @@ function signUserToken(user) {
 
 const { isBetaTester: checkBetaTester } = require('../services/betaTesterService');
 const { isBetaMode, hasBetaProAccess } = require('../config/betaMode');
+const { tryAssignFounderSlot } = require('../services/foundingBetaService');
 const {
   ensureFounderAdminRole,
   applyFounderAdminAuthOverride,
@@ -93,6 +94,9 @@ function serializeAuthUserPayload(user) {
     },
     betaTester: Boolean(user.betaTester),
     foundingAccess: Boolean(user.foundingAccess),
+    founderNumber: user.founderNumber || null,
+    founderJoinedAt: user.founderJoinedAt || null,
+    foundingTesterProgramCompleted: Boolean(user.foundingTesterProgramCompleted),
     foundingTesterActive,
     isBetaTester: foundingTesterActive,
     betaMode: isBetaMode(),
@@ -218,6 +222,13 @@ async function handleSignup(req, res, next) {
     }
 
     await user.save();
+
+    if (isBetaMode()) {
+      user.betaTester = true;
+      user.foundingAccess = true;
+      await user.save();
+      await tryAssignFounderSlot(user);
+    }
 
     if (referrer) {
       await processReferralOnSignup({
@@ -504,6 +515,9 @@ router.get('/me', authMeLimiter, auth, async (req, res, next) => {
     if (!user) return next(new HttpError(404, 'USER_NOT_FOUND', 'User not found'));
 
     await ensureFounderAdminRole(user);
+    if (user.betaTester || user.foundingAccess) {
+      await tryAssignFounderSlot(user);
+    }
 
     return res.json(serializeAuthMePayload(user));
   } catch (err) {

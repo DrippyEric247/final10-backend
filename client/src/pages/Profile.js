@@ -44,6 +44,7 @@ import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore'
 import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import ProgramBadge from '../components/programs/ProgramBadge';
 import { getEquippedCallingCardId, getEquippedEmblemId } from '../lib/customizationCatalog';
+import FoundingLegacySection from '../components/founding/FoundingLegacySection';
 import {
   applyTierMultiplier,
   DEV_SUBSCRIPTION_TOOLS_EVENT,
@@ -1142,6 +1143,9 @@ const Profile = () => {
         equippedCallingCardId={user?.equippedCallingCardId || getEquippedCallingCardId()}
         equippedEmblemId={user?.equippedEmblemId || getEquippedEmblemId()}
       />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <FoundingLegacySection username={user?.username} />
+        </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
           <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4 flex flex-wrap gap-4 text-sm">
             <Link to="/settings" className="text-purple-300 hover:text-purple-200">Settings</Link>

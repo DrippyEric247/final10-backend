@@ -1,0 +1,122 @@
+/* Founding Beta Calling Card — #001–#100 legacy */
+
+.fbc-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  background: linear-gradient(145deg, rgba(10, 10, 20, 0.98), rgba(49, 46, 129, 0.55) 45%, rgba(120, 53, 15, 0.35));
+  padding: 1.1rem 1rem 1rem;
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.12) inset,
+    0 16px 40px rgba(0, 0, 0, 0.35);
+  animation: fbcMetallic 4.5s ease-in-out infinite;
+}
+
+.fbc-card--compact {
+  padding: 0.85rem 0.75rem;
+}
+
+.fbc-card--clickable {
+  cursor: pointer;
+}
+
+.fbc-card--clickable:hover {
+  border-color: rgba(252, 211, 77, 0.55);
+  transform: translateY(-2px);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+@keyframes fbcMetallic {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+.fbc-card__glow {
+  position: absolute;
+  inset: -40% -20%;
+  background: radial-gradient(circle at 30% 20%, rgba(192, 132, 252, 0.28), transparent 55%),
+    radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.2), transparent 50%);
+  pointer-events: none;
+}
+
+.fbc-card__particles span {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(253, 224, 71, 0.75);
+  animation: fbcParticle 3.2s ease-in-out infinite;
+}
+
+.fbc-card__particles span:nth-child(1) { top: 18%; left: 12%; animation-delay: 0s; }
+.fbc-card__particles span:nth-child(2) { top: 62%; left: 78%; animation-delay: 0.8s; }
+.fbc-card__particles span:nth-child(3) { top: 38%; left: 55%; animation-delay: 1.4s; }
+.fbc-card__particles span:nth-child(4) { top: 72%; left: 24%; animation-delay: 2s; }
+
+@keyframes fbcParticle {
+  0%, 100% { opacity: 0.2; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-6px); }
+}
+
+.fbc-card__ribbon {
+  position: absolute;
+  top: 12px;
+  right: -28px;
+  transform: rotate(35deg);
+  background: linear-gradient(90deg, #7c3aed, #f59e0b);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.2rem 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.fbc-card__brand,
+.fbc-card__founder,
+.fbc-card__user,
+.fbc-card__joined,
+.fbc-card__badge,
+.fbc-card__legacy {
+  position: relative;
+  margin: 0.2rem 0;
+  font-size: 0.82rem;
+  color: #e9d5ff;
+  font-weight: 700;
+}
+
+.fbc-card__founder {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #fde68a;
+  margin-top: 0.55rem;
+}
+
+.fbc-card__legacy {
+  margin-top: 0.55rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #86efac;
+}
+
+.fbc-card__legacy--pending {
+  color: #94a3b8;
+}
+
+.fbc-card--compact .fbc-card__founder {
+  font-size: 0.92rem;
+}
+
+.fbc-card--compact .fbc-card__brand,
+.fbc-card--compact .fbc-card__user,
+.fbc-card--compact .fbc-card__joined,
+.fbc-card--compact .fbc-card__badge {
+  font-size: 0.72rem;
+}

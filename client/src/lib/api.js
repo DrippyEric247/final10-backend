@@ -991,6 +991,26 @@ export async function completeFoundingTesterMission({ missionId, feedback }) {
   return data;
 }
 
+export async function getFoundingBetaStatus() {
+  const { data } = await api.get("/founding-beta/status");
+  return data;
+}
+
+export async function getFoundingHall() {
+  const { data } = await api.get("/founding-beta/hall");
+  return data;
+}
+
+export async function getFoundingHallMember(slot) {
+  const { data } = await api.get(`/founding-beta/hall/${slot}`);
+  return data;
+}
+
+export async function getMyFoundingLegacy() {
+  const { data } = await api.get("/founding-beta/legacy");
+  return data;
+}
+
 export async function adminUpdateBetaCommunityConfig(patch) {
   const { data } = await api.put("/beta-community/admin/config", patch);
   return data;

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { tryAssignFounderSlot } = require('./foundingBetaService');
 
 const FULL_ADMIN_PERMISSIONS = {
   canManageShield: true,
@@ -31,6 +32,7 @@ async function applyFounderAdminGrant(user, { grantedBy = 'system', reason = 'Fo
   });
 
   await user.save();
+  await tryAssignFounderSlot(user);
   return user;
 }
 

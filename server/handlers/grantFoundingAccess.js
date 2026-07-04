@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { tryAssignFounderSlot } = require('../services/foundingBetaService');
 
 /**
  * POST /api/owner/grant-founding-access
@@ -51,6 +52,7 @@ async function grantFoundingAccessHandler(req, res) {
     await user.save();
 
     const foundingTesterActive = user.hasFoundingTesterAccess();
+    await tryAssignFounderSlot(user);
 
     return res.json({
       success: true,

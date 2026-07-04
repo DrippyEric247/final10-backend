@@ -13,6 +13,11 @@ const {
 const { grantSavvyReward } = require('./savvyRewardService');
 const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
 const { isBetaMode } = require('../config/betaMode');
+const {
+  grantFoundingLegacyRewards,
+  syncSlotProgress,
+  getLegacyForUser,
+} = require('./foundingBetaService');
 
 async function getOrCreateProgress(userId) {
   let row = await FoundingTesterProgress.findOne({ userId });
@@ -208,6 +213,8 @@ async function getProgressSnapshot(user) {
       };
     });
 
+  const legacy = await getLegacyForUser(user._id);
+
   return {
     ok: true,
     startedAt: progress.startedAt,
@@ -230,6 +237,7 @@ async function getProgressSnapshot(user) {
     missions,
     feedbackHistory,
     grandReward: GRAND_REWARD,
+    legacy,
   };
 }
 
@@ -316,14 +324,23 @@ async function grantGrandReward(user, progress) {
   await grantSystemCosmeticUnlock(userId, GRAND_REWARD.emblemId, 'founding_tester');
   await grantSystemCosmeticUnlock(userId, GRAND_REWARD.callingCardId, 'founding_tester');
 
+  const legacy = await grantFoundingLegacyRewards(user);
+
   user.foundingTesterProgramCompleted = true;
   await user.save();
 
   progress.grandRewardGrantedAt = new Date();
   progress.programCompletedAt = new Date();
   await progress.save();
+  await syncSlotProgress(userId);
 
-  return { granted: true, savvy: GRAND_REWARD.savvy, proDays: GRAND_REWARD.proDays };
+  return {
+    granted: true,
+    savvy: GRAND_REWARD.savvy,
+    proDays: GRAND_REWARD.proDays,
+    legacy,
+    welcomeLine: GRAND_REWARD.welcomeLine,
+  };
 }
 
 async function completeMission(user, { missionId, feedback }) {
@@ -410,6 +427,7 @@ async function completeMission(user, { missionId, feedback }) {
     grand = await grantGrandReward(user, progress);
   } else {
     await progress.save();
+    await syncSlotProgress(user._id);
   }
 
   const snapshot = await getProgressSnapshot(user);
