@@ -5,6 +5,7 @@ const User = require('../models/User');
 const {
   sendTestEmail,
   getEmailConfigStatus,
+  getEmailEnvPresence,
   buildSavvyScoutDealFoundEmail,
   buildSavvyScoutMonthlyReportEmail,
   sendEarlyMonthlyReportTest,
@@ -13,6 +14,8 @@ const { sampleMonthlyReportData } = require('../templates/email/savvyScoutMonthl
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { FOUNDER_ADMIN_EMAIL } = require('../lib/founderAdminAccess');
 const { HttpError } = require('../middleware/apiErrors');
+const { createEmailPipelineTrace } = require('../lib/emailPipelineTrace');
+const { isProduction } = require('../config/envValidation');
 
 function readGrantSecretHeader(req) {
   return String(
@@ -54,13 +57,49 @@ function smtpFailureStatus(result) {
   return 502;
 }
 
+function maskEmail(email) {
+  const value = String(email || '').trim().toLowerCase();
+  if (!value || !value.includes('@')) return null;
+  const [local, domain] = value.split('@');
+  return `${local.slice(0, 3)}***@${domain}`;
+}
+
+function buildEmailFailureBody(result, meta = {}) {
+  const isDev = !isProduction();
+  const failureReason =
+    result.errorReason ||
+    result.resendValidationHint ||
+    result.reason ||
+    'email_send_failed';
+
+  const body = {
+    ok: false,
+    ...result,
+    ...meta,
+    failureReason,
+    message: failureReason,
+  };
+
+  if (isDev) {
+    body.devDetail = {
+      reason: result.reason || null,
+      errorCode: result.errorCode || null,
+      errorReason: result.errorReason || null,
+      responseCode: result.responseCode || null,
+      resendValidationHint: result.resendValidationHint || null,
+      resendError: result.resendError || null,
+      provider: result.provider || null,
+      envPresent: getEmailEnvPresence(),
+      config: getEmailConfigStatus(),
+    };
+  }
+
+  return body;
+}
+
 function jsonEmailTestResult(res, result, meta) {
   if (!result.sent) {
-    return res.status(smtpFailureStatus(result)).json({
-      ok: false,
-      ...result,
-      ...meta,
-    });
+    return res.status(smtpFailureStatus(result)).json(buildEmailFailureBody(result, meta));
   }
   return res.json({
     ok: true,
@@ -125,17 +164,118 @@ router.get('/preview/monthly-report', (req, res, next) => {
  * POST /api/email/test/monthly-report-early
  * Admin-only — sends early Monthly Scout Report with Savvy Scout Goals to founder.
  */
-router.post('/test/monthly-report-early', auth, requireAdminAccess(), async (req, res, next) => {
+router.post('/test/monthly-report-early', auth, requireAdminAccess(), async (req, res) => {
+  const trace = createEmailPipelineTrace();
+  const isDev = !isProduction();
+  const authenticatedUserId = String(req.user?._id || req.user?.id || '');
+  const authenticatedUserEmail = String(req.user?.email || '').trim().toLowerCase();
+  const recipientEmail = String(req.body?.to || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
+
+  trace.step('endpoint_enter', {
+    route: 'POST /api/email/test/monthly-report-early',
+    authenticatedUserId,
+    authenticatedUserEmail: maskEmail(authenticatedUserEmail),
+    recipientEmail: maskEmail(recipientEmail),
+  });
+
+  const envPresent = getEmailEnvPresence();
+  const config = getEmailConfigStatus();
+  trace.step('env_check', {
+    RESEND_API_KEY: envPresent.RESEND_API_KEY,
+    EMAIL_FROM: envPresent.EMAIL_FROM,
+    resolvedFromPresent: Boolean(config.emailFrom),
+    resolvedFrom: config.emailFrom ? maskEmail(config.emailFrom) : null,
+    recipientPresent: Boolean(recipientEmail),
+    emailConfigured: config.emailConfigured,
+    provider: config.provider,
+  });
+
+  console.log('[monthly-report-early] request', JSON.stringify({
+    authenticatedUserId,
+    authenticatedUserEmail: maskEmail(authenticatedUserEmail),
+    recipientEmail: maskEmail(recipientEmail),
+    envPresent,
+    provider: config.provider,
+    emailFromPresent: Boolean(config.emailFrom),
+  }));
+
   try {
-    const to = String(req.body?.to || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
-    const result = await sendEarlyMonthlyReportTest({ to, data: req.body?.data || {} });
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+      trace.step('endpoint_stop', { ok: false, reason: 'missing_recipient' });
+      return res.status(400).json({
+        ok: false,
+        reason: 'missing_recipient',
+        message: 'Recipient email is required.',
+        pipeline: trace.steps,
+        ...(isDev && { devDetail: { envPresent, config } }),
+      });
+    }
+
+    if (!envPresent.RESEND_API_KEY && !config.smtpConfigured) {
+      trace.step('endpoint_stop', { ok: false, reason: 'email_not_configured' });
+      return res.status(503).json(buildEmailFailureBody(
+        { sent: false, reason: 'email_not_configured', logOnly: true },
+        { recipient: recipientEmail, pipeline: trace.steps, via: 'admin-early-monthly-report' }
+      ));
+    }
+
+    if (!config.emailFrom) {
+      trace.step('endpoint_stop', { ok: false, reason: 'missing_from_address' });
+      return res.status(503).json(buildEmailFailureBody(
+        {
+          sent: false,
+          reason: 'missing_from_address',
+          errorReason: 'EMAIL_FROM is not configured or could not be resolved.',
+        },
+        { recipient: recipientEmail, pipeline: trace.steps, via: 'admin-early-monthly-report' }
+      ));
+    }
+
+    trace.step('monthly_report_send_invoke', { recipientEmail: maskEmail(recipientEmail) });
+    const result = await sendEarlyMonthlyReportTest({
+      to: recipientEmail,
+      data: req.body?.data || {},
+      trace,
+    });
+
     return jsonEmailTestResult(res, result, {
-      recipient: to,
+      recipient: recipientEmail,
       via: 'admin-early-monthly-report',
       template: 'monthly_report_early',
+      pipeline: trace.steps,
+      authenticatedUserId,
     });
   } catch (err) {
-    return next(err);
+    console.error('[monthly-report-early] exception', {
+      message: err?.message,
+      stack: err?.stack,
+      authenticatedUserId,
+      recipientEmail: maskEmail(recipientEmail),
+    });
+    trace.step('endpoint_exception', {
+      ok: false,
+      phase: 'monthly_report_early',
+      message: String(err?.message || err).slice(0, 500),
+      ...(isDev && { stack: String(err?.stack || '').split('\n').slice(0, 12) }),
+    });
+
+    return res.status(500).json({
+      ok: false,
+      reason: 'monthly_report_exception',
+      message: err?.message || 'Monthly Scout Report send failed.',
+      failureReason: err?.message || 'Monthly Scout Report send failed.',
+      pipeline: trace.steps,
+      recipient: recipientEmail,
+      authenticatedUserId,
+      ...(isDev && {
+        stack: err?.stack,
+        errorName: err?.name,
+        devDetail: {
+          envPresent: getEmailEnvPresence(),
+          config: getEmailConfigStatus(),
+        },
+      }),
+    });
   }
 });
 

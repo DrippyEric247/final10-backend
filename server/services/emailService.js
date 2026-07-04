@@ -184,6 +184,19 @@ function formatMailerError(err) {
   };
 }
 
+/** Safe Resend error object for logs/API (no secrets). */
+function serializeResendError(error) {
+  if (!error) return null;
+  if (typeof error === 'string') return { message: error };
+  const out = {
+    name: error.name || null,
+    message: error.message || String(error),
+    statusCode: error.statusCode || error.status || null,
+  };
+  if (error.code && !out.name) out.code = error.code;
+  return out;
+}
+
 function buildTransportOptions() {
   const auth = readSmtpAuth();
   const settings = resolveSmtpTransportSettings();
@@ -357,6 +370,14 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
     verifiedDomain: fromAudit.verifiedDomain,
   });
 
+  const resendPayload = {
+    from,
+    to: [to],
+    subject,
+    text,
+    html,
+  };
+
   trace?.step('provider_resend_request', {
     to: `${String(to).slice(0, 3)}***`,
     from: from.replace(/(.{0,12}).+@/, '$1…@'),
@@ -364,26 +385,39 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
     htmlLen: String(html || '').length,
     textLen: String(text || '').length,
   });
+  trace?.step('provider_resend_payload', {
+    from: from.replace(/(.{0,12}).+@/, '$1…@'),
+    to: [to],
+    subject: String(subject || '').slice(0, 160),
+    textBytes: Buffer.byteLength(String(text || ''), 'utf8'),
+    htmlBytes: Buffer.byteLength(String(html || ''), 'utf8'),
+  });
+  console.log(
+    '[email] Resend request payload',
+    JSON.stringify({
+      from: from.replace(/(.{0,12}).+@/, '$1…@'),
+      to,
+      subject: String(subject || '').slice(0, 160),
+      textBytes: Buffer.byteLength(String(text || ''), 'utf8'),
+      htmlBytes: Buffer.byteLength(String(html || ''), 'utf8'),
+    })
+  );
   logEmailDiagnostics({ provider: 'resend', action: 'send_start' });
 
   try {
-    const { data, error } = await client.emails.send({
-      from,
-      to: [to],
-      subject,
-      text,
-      html,
-    });
+    const { data, error } = await client.emails.send(resendPayload);
 
     if (error) {
       const formatted = formatMailerError(error);
+      const resendError = serializeResendError(error);
       const validationHint = resendValidationHint(formatted.errorReason);
       console.warn(
-        '[email] Email failed',
+        '[email] Resend API error (full)',
         JSON.stringify({
           provider: 'resend',
           to,
           validationHint,
+          resendError,
           ...formatted,
         })
       );
@@ -393,6 +427,7 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
         provider: 'resend',
         reason: 'resend_send_failed',
         resendValidationHint: validationHint,
+        resendError,
         ...formatted,
       };
       trace?.step('provider_resend_error', { ok: false, ...result });
@@ -408,15 +443,23 @@ async function sendViaResend({ to, subject, text, html, trace = null }) {
     return result;
   } catch (err) {
     const formatted = formatMailerError(err);
+    const resendError = serializeResendError(err);
     console.warn(
-      '[email] Email failed',
-      JSON.stringify({ provider: 'resend', to, ...formatted })
+      '[email] Resend send exception',
+      JSON.stringify({
+        provider: 'resend',
+        to,
+        resendError,
+        stack: String(err?.stack || '').split('\n').slice(0, 8),
+        ...formatted,
+      })
     );
     const result = {
       sent: false,
       logOnly: false,
       provider: 'resend',
       reason: 'resend_send_failed',
+      resendError,
       ...formatted,
     };
     trace?.step('provider_resend_exception', { ok: false, ...result });
@@ -659,36 +702,58 @@ async function sendSavvyScoutMonthlyReportEmail({
   forceSend = false,
   trace = null,
 }) {
-  trace?.step('monthly_report_email_enter', { hasRecipient: Boolean(to), forceSend });
+  trace?.step('monthly_report_email_enter', {
+    hasRecipient: Boolean(to),
+    recipient: to ? `${String(to).slice(0, 3)}***` : null,
+    forceSend,
+    resendApiKeyPresent: Boolean(readResendApiKey()),
+    emailFromPresent: Boolean(getEmailFrom()),
+  });
 
   const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
   let subject;
   let html;
   let text;
   try {
+    trace?.step('monthly_report_render_start', {
+      monthLabel: payload.monthLabel || null,
+      userName: payload.userName || null,
+    });
     const built = buildSavvyScoutMonthlyReportEmail(payload);
     subject = built.subject;
     html = built.html;
     text = built.text;
     trace?.step('monthly_report_render_done', {
       ok: true,
+      subject: String(subject || '').slice(0, 120),
       subjectLen: String(subject || '').length,
       htmlLen: String(html || '').length,
+      textLen: String(text || '').length,
     });
   } catch (err) {
     trace?.step('monthly_report_render_failed', {
       ok: false,
-      message: String(err?.message || err).slice(0, 200),
+      message: String(err?.message || err).slice(0, 500),
+      stack: String(err?.stack || '').split('\n').slice(0, 6),
     });
     throw err;
   }
 
   if (!forceSend && !alertEmailEnabled()) {
     console.log(`[email] Savvy Scout monthly report (log-only) → ${to || 'no-email'} | ${subject}`);
+    trace?.step('monthly_report_log_only', { reason: 'alert_email_disabled' });
     return { sent: false, logOnly: true, reason: 'alert_email_disabled', subject, html, text };
   }
 
-  const result = await sendMailMessage({ to, subject, text, html, trace });
+  trace?.step('monthly_report_dispatch', { via: 'sendOperationalEmail', provider: getEmailProvider() });
+  const result = await sendOperationalEmail({ to, subject, text, html, trace });
+  trace?.step('monthly_report_dispatch_done', {
+    sent: Boolean(result.sent),
+    reason: result.reason || null,
+    provider: result.provider || null,
+    messageId: result.messageId || null,
+    errorReason: result.errorReason || null,
+  });
   auditEmailDelivery({
     kind: 'savvy_scout_monthly_report',
     to: to ? `${String(to).slice(0, 3)}***` : null,
@@ -718,18 +783,95 @@ async function sendPasswordResetEmail({ to, resetToken, firstName } = {}) {
 }
 
 /**
- * Admin/test — early Monthly Scout Report with dynamic goals to founder email.
+ * Admin/test — early Monthly Scout Report with dynamic goals.
+ * Uses the same sendOperationalEmail() path as Admin Email Test Center.
  */
 async function sendEarlyMonthlyReportTest({ to = FOUNDER_ADMIN_EMAIL, data = {}, trace = null } = {}) {
   const recipient = String(to || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
-  const payload = buildEarlyMonthlyReportTestPayload(data);
-  return sendSavvyScoutMonthlyReportEmail({
+
+  trace?.step('early_monthly_report_enter', {
+    recipient: recipient ? `${recipient.slice(0, 3)}***@${recipient.split('@')[1] || ''}` : null,
+    resendApiKeyPresent: Boolean(readResendApiKey()),
+    emailFromPresent: Boolean(getEmailFrom()),
+    emailConfigured: isEmailConfigured(),
+    provider: getEmailProvider(),
+  });
+
+  if (!recipient || !recipient.includes('@')) {
+    const result = { sent: false, logOnly: false, reason: 'missing_recipient' };
+    trace?.step('early_monthly_report_stop', { ok: false, ...result });
+    return result;
+  }
+
+  trace?.step('early_monthly_report_payload_start', {});
+  let payload;
+  try {
+    payload = buildEarlyMonthlyReportTestPayload(data);
+    trace?.step('early_monthly_report_payload_done', {
+      ok: true,
+      monthLabel: payload.monthLabel || null,
+      userName: payload.userName || null,
+      goalsCount: Array.isArray(payload.scoutGoals?.goals) ? payload.scoutGoals.goals.length : 0,
+    });
+  } catch (err) {
+    trace?.step('early_monthly_report_payload_failed', {
+      ok: false,
+      message: String(err?.message || err).slice(0, 500),
+      stack: String(err?.stack || '').split('\n').slice(0, 6),
+    });
+    throw err;
+  }
+
+  let built;
+  try {
+    trace?.step('early_monthly_report_render_start', {});
+    built = buildSavvyScoutMonthlyReportEmail({
+      ...payload,
+      subject: EARLY_MONTHLY_REPORT_SUBJECT,
+    });
+    trace?.step('early_monthly_report_render_done', {
+      ok: true,
+      subject: String(built.subject || '').slice(0, 120),
+      htmlLen: String(built.html || '').length,
+      textLen: String(built.text || '').length,
+    });
+  } catch (err) {
+    trace?.step('early_monthly_report_render_failed', {
+      ok: false,
+      message: String(err?.message || err).slice(0, 500),
+      stack: String(err?.stack || '').split('\n').slice(0, 6),
+    });
+    throw err;
+  }
+
+  trace?.step('early_monthly_report_send_start', { via: 'sendOperationalEmail' });
+  const result = await sendOperationalEmail({
     to: recipient,
-    data: payload,
-    subject: EARLY_MONTHLY_REPORT_SUBJECT,
-    forceSend: true,
+    subject: built.subject,
+    text: built.text,
+    html: built.html,
     trace,
   });
+  trace?.step('early_monthly_report_send_done', {
+    sent: Boolean(result.sent),
+    reason: result.reason || null,
+    provider: result.provider || null,
+    messageId: result.messageId || null,
+    errorReason: result.errorReason || null,
+    resendError: result.resendError || null,
+  });
+
+  auditEmailDelivery({
+    kind: 'savvy_scout_monthly_report_early_test',
+    to: `${recipient.slice(0, 3)}***`,
+    sent: Boolean(result?.sent),
+    reason: result?.reason || null,
+    provider: result?.provider || getEmailProvider(),
+    logOnly: Boolean(result?.logOnly),
+    messageId: result?.messageId || null,
+  });
+
+  return { ...result, subject: built.subject };
 }
 
 async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) {
@@ -848,6 +990,7 @@ module.exports = {
   getEmailEnvPresence,
   verifySmtpConnection,
   formatMailerError,
+  serializeResendError,
   getSmtpTransportSettings,
   getEmailProvider,
   isEmailConfigured,

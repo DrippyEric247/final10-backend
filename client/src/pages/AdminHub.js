@@ -50,25 +50,33 @@ export default function AdminHub() {
       if (result?.ok && result?.sent) {
         setReportResult(result);
       } else {
-        const reason = result?.reason || "Email was not sent.";
+        const reason = result?.failureReason || result?.errorReason || result?.reason || "Email was not sent.";
         setReportError(
           reason === "email_not_configured"
             ? "Email delivery is not configured on the server (RESEND_API_KEY or SMTP)."
             : reason === "alert_email_disabled"
               ? "Alert email is disabled on the server."
-              : reason
+              : reason === "missing_from_address"
+                ? "EMAIL_FROM is not configured on the server."
+                : reason
         );
         setReportResult(result || null);
       }
     } catch (err) {
       const data = err?.response?.data;
-      const reason = data?.reason || data?.message;
+      const reason =
+        data?.failureReason ||
+        data?.devDetail?.errorReason ||
+        data?.message ||
+        data?.reason;
       setReportError(
         reason === "email_not_configured"
           ? "Email delivery is not configured on the server (RESEND_API_KEY or SMTP)."
           : reason === "alert_email_disabled"
             ? "Alert email is disabled on the server."
-            : reason || err?.message || "Failed to send test monthly report."
+            : reason === "missing_from_address"
+              ? "EMAIL_FROM is not configured on the server."
+              : reason || err?.message || "Failed to send test monthly report."
       );
       setReportResult(data || null);
     } finally {
