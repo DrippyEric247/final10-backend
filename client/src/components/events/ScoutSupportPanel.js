@@ -8,7 +8,9 @@ export default function ScoutSupportPanel({ status, onCallInReady }) {
       ? Math.min(100, Math.round((status.progressCurrent / status.progressTotal) * 100))
       : 100;
 
-  const ready = status.milestonesReady || [];
+  const ready = (status.milestonesReady || []).filter(
+    (m) => !(status.milestonesClaimed || []).includes(Number(m.milestone))
+  );
 
   return (
     <section className="scout-support-panel" aria-labelledby="scout-support-heading">
@@ -43,7 +45,7 @@ export default function ScoutSupportPanel({ status, onCallInReady }) {
               style={{ width: 'auto', padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
               onClick={() => onCallInReady?.(m)}
             >
-              Call In {m.icon} {m.label}
+              {m.label === 'Max Supply Drop' ? 'View Supply Drops' : `Claim ${m.label}`}
             </button>
           ))}
         </div>

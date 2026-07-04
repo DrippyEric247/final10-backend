@@ -34,6 +34,7 @@ import {
   tryConsumeBestMoveCredit,
 } from '../lib/bestMoveUsage';
 import { isBetaTester, FOUNDING_TESTER_BADGE } from '../lib/betaTesterAccess';
+import { useScoutScanRegistration } from '../hooks/useScoutScanRegistration';
 import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trackBetaTesterUsage } from '../lib/analytics';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
@@ -531,6 +532,11 @@ const LocalDeals = () => {
   });
 
   const fallbackBestMove = localBestMove || externalFallbackQuery.data || null;
+
+  useScoutScanRegistration(
+    'local-deals-fallback',
+    Boolean(needsExternalFallback && externalFallbackQuery.isLoading)
+  );
 
   useEffect(() => {
     if (!hasSearchContext) return;

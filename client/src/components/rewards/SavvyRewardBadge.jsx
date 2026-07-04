@@ -3,6 +3,11 @@ import { SavvyPointsIcon } from "./SavvyPointsIcon";
 import { useFinal10Power } from "../../context/Final10PowerContext";
 import { getDevFeatureTests, isDev } from "../../lib/devOverride";
 import { getEffectiveSubscriptionTier, getTierMultiplier } from "../../lib/tierMultiplier";
+import {
+  applyBetaRewardUnlock,
+  getBetaRewardsActiveLabel,
+  getBetaRewardsCompactLabel,
+} from "../../lib/betaRewardsDisplay";
 
 /**
  * Unified Savvy reward display used by every listing/deal card in the app.
@@ -205,7 +210,7 @@ export default function SavvyRewardBadge({
       ? Math.max(0, Number(multiplier))
       : contextMultiplier;
 
-  const reward = useMemo(
+  const rawReward = useMemo(
     () =>
       computeSavvyReward({
         baseSavvy,
@@ -217,16 +222,41 @@ export default function SavvyRewardBadge({
     [baseSavvy, trustScore, price, savings, effectiveMultiplier]
   );
 
+  const { reward, rewardsLocked, betaUnlocked, betaLabel } = useMemo(
+    () => {
+      const resolved = applyBetaRewardUnlock({
+        reward: rawReward,
+        baseSavvy,
+        trustScore,
+        price,
+        savings,
+        multiplier: effectiveMultiplier,
+      });
+      return {
+        reward: resolved.reward,
+        rewardsLocked: resolved.rewardsLocked,
+        betaUnlocked: resolved.betaUnlocked,
+        betaLabel: resolved.betaLabel,
+      };
+    },
+    [rawReward, baseSavvy, trustScore, price, savings, effectiveMultiplier]
+  );
+
   const tweenedBoosted = useTweenedNumber(reward.boosted);
-  const rewardsLocked = reward.tier === "low" || reward.tier === "unverified";
   const tierClass = TIER_CLASSES[reward.tier] || TIER_CLASSES.medium;
   const prefix = live ? "Earn" : "Est. earn";
+  const betaCompactLabel = getBetaRewardsCompactLabel();
+  const betaFullLabel = betaLabel || getBetaRewardsActiveLabel();
   // Treat values within 1% of 1.0x as "no boost" so floating-point noise
   // doesn't flicker the boost suffix on/off.
   const hasBoost = !rewardsLocked && reward.userMultiplier > 1.01;
   const baseLabel = rewardsLocked
     ? "🔒 Rewards locked"
-    : `${prefix} ${reward.tier === "medium" ? "~" : ""}+${reward.baseAfterTrust.toLocaleString()} Savvy`;
+    : betaUnlocked
+      ? compact
+        ? `✨ ${betaCompactLabel}`
+        : `+${reward.baseAfterTrust.toLocaleString()} Savvy`
+      : `${prefix} ${reward.tier === "medium" ? "~" : ""}+${reward.baseAfterTrust.toLocaleString()} Savvy`;
 
   const multiplierLabel = `${reward.userMultiplier.toFixed(reward.userMultiplier >= 10 ? 0 : 1)}×`;
 
@@ -239,11 +269,20 @@ export default function SavvyRewardBadge({
     return (
       <span
         className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-extrabold shadow-sm ${tierClass.wrap} ${tierClass.text} ${className}`}
-        title={rewardsLocked ? "No rewards are issued on low-trust or unverified listings." : ariaLabel}
+        title={
+          rewardsLocked
+            ? "No rewards are issued on low-trust or unverified listings."
+            : betaUnlocked
+              ? betaFullLabel
+              : ariaLabel
+        }
         aria-label={ariaLabel}
       >
         {showIcon && !rewardsLocked ? <SavvyPointsIcon size={12} /> : null}
         <span>{baseLabel}</span>
+        {betaUnlocked && compact ? (
+          <span className="savvy-reward-badge__beta-amt">+{reward.baseAfterTrust.toLocaleString()}</span>
+        ) : null}
         {hasBoost ? (
           <span className="savvy-reward-badge__boost-chip">
             <span className="savvy-reward-badge__mult">{multiplierLabel}</span>
@@ -275,9 +314,11 @@ export default function SavvyRewardBadge({
               ? reward.tier === "unverified"
                 ? "Unverified seller"
                 : "Low trust listing"
-              : reward.tier === "medium"
-                ? "Reduced — medium trust"
-                : "Full payout — high trust"}
+              : betaUnlocked
+                ? betaFullLabel
+                : reward.tier === "medium"
+                  ? "Reduced — medium trust"
+                  : "Full payout — high trust"}
           </span>
         </div>
         <div className={`flex flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-sm font-extrabold ${tierClass.accent}`}>

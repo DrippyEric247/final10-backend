@@ -85,7 +85,7 @@ function buildSupplyDropCards(drop) {
 
   return {
     active: eventCard({ ...base, status: 'active', claimable: true, ctaLabel: 'Claim Drop', ctaPath: '/events' }),
-    claimable: eventCard({ ...base, status: 'claimable', claimable: true, ctaLabel: 'Claim Supply Drop', ctaPath: '/events' }),
+    claimable: eventCard({ ...base, status: 'claimable', claimable: true, ctaLabel: 'Claim Reward', ctaPath: '/events' }),
   };
 }
 
@@ -134,7 +134,16 @@ function buildScoutSupportCards(scoutStatus) {
     })
   );
 
-  for (const m of scoutStatus.milestonesReady || []) {
+  for (const m of (scoutStatus.milestonesReady || []).filter(
+    (row) => !(scoutStatus.milestonesClaimed || []).includes(Number(row.milestone))
+  )) {
+    const cfg = SCOUT_SUPPORT_MILESTONES.find((x) => x.milestone === Number(m.milestone));
+    const ctaLabel =
+      cfg?.rewardType === 'supply_drop'
+        ? 'Call In Support'
+        : cfg?.rewardType === 'savvy_sale'
+          ? 'Claim Reward'
+          : 'Claim Reward';
     cards.claimable.push(
       eventCard({
         id: `scout_milestone_${m.milestone}`,
@@ -142,9 +151,12 @@ function buildScoutSupportCards(scoutStatus) {
         status: 'claimable',
         title: `Scout Support — ${m.label}`,
         icon: m.icon || '🛰️',
-        description: 'Milestone unlocked. Call in support to activate your reward.',
+        description:
+          cfg?.rewardType === 'supply_drop'
+            ? 'Milestone unlocked. Call in support to activate your Max Supply Drop.'
+            : 'Milestone unlocked. Claim your reward.',
         claimable: true,
-        ctaLabel: 'Call In Support',
+        ctaLabel,
         ctaPath: '/events',
         claimAction: { type: 'scout_milestone', milestone: m.milestone },
         meta: { milestone: m.milestone },

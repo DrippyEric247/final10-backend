@@ -39,6 +39,8 @@ export type DevFeatureTests = {
   premiumBadges: boolean;
   savvyPrograms: boolean;
   leaderboardEffects: boolean;
+  /** Force "Rewards locked" UI even when BETA_MODE is active. */
+  showRewardsLocked: boolean;
 };
 
 export type Final10DevOverrideV1 = {
@@ -60,6 +62,7 @@ const DEFAULT_FEATURE_TESTS: DevFeatureTests = {
   premiumBadges: false,
   savvyPrograms: false,
   leaderboardEffects: false,
+  showRewardsLocked: false,
 };
 
 export const DEFAULT_DEV_OVERRIDE: Final10DevOverrideV1 = {

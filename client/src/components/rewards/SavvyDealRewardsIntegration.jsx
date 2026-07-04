@@ -12,6 +12,7 @@ import {
   readMockStreak,
   readMockWalletBalance,
 } from '../../lib/mockSavvyDealRewards';
+import { applyBetaRewardUnlock, getBetaRewardsActiveLabel } from '../../lib/betaRewardsDisplay';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import '../../styles/savvy-deal-rewards.css';
 import WhyPickedPanel from '../ai/WhyPickedPanel';
@@ -162,7 +163,7 @@ export default function SavvyDealRewardsIntegration({
   const effectiveMult =
     (listingMult ?? contextMult) * (mockModel.ecosystemActive ? mockModel.ecosystemMult : 1);
 
-  const reward = useMemo(
+  const rawReward = useMemo(
     () =>
       computeSavvyReward({
         baseSavvy: basePoints,
@@ -173,6 +174,25 @@ export default function SavvyDealRewardsIntegration({
       }),
     [basePoints, trustScore, price, savings, effectiveMult]
   );
+
+  const { reward, rewardsLocked, betaUnlocked, betaLabel } = useMemo(() => {
+    const resolved = applyBetaRewardUnlock({
+      reward: rawReward,
+      baseSavvy: basePoints,
+      trustScore,
+      price,
+      savings,
+      multiplier: effectiveMult,
+    });
+    return {
+      reward: resolved.reward,
+      rewardsLocked: resolved.rewardsLocked,
+      betaUnlocked: resolved.betaUnlocked,
+      betaLabel: resolved.betaLabel,
+    };
+  }, [rawReward, basePoints, trustScore, price, savings, effectiveMult]);
+
+  const betaRewardsLabel = betaLabel || getBetaRewardsActiveLabel();
 
   const walletBefore = readMockWalletBalance();
   const walletAfter = walletBefore + reward.boosted;
@@ -187,7 +207,6 @@ export default function SavvyDealRewardsIntegration({
         : null;
 
   const multLabel = `${effectiveMult.toFixed(effectiveMult >= 10 ? 0 : 1)}×`;
-  const rewardsLocked = reward.tier === 'low' || reward.tier === 'unverified';
   const eliteNextPct = 35 + ((hashStr(item.itemId) + hashStr(item.title)) % 55);
 
   return (
@@ -198,10 +217,15 @@ export default function SavvyDealRewardsIntegration({
         <div className="sdr-headline__row">
           {savingsLabel ? <span className="sdr-save">{savingsLabel}</span> : <span className="sdr-save sdr-save--muted">Savvy rewards</span>}
           {!rewardsLocked ? (
-            <span className="sdr-savvy-amt sdr-glow-pulse">💎 {formatSavvy(reward.boosted)}</span>
+            <span className={`sdr-savvy-amt sdr-glow-pulse${betaUnlocked ? ' sdr-savvy-amt--beta' : ''}`}>
+              {betaUnlocked ? `✨ ${betaRewardsLabel}` : `💎 ${formatSavvy(reward.boosted)}`}
+            </span>
           ) : (
             <span className="sdr-savvy-amt sdr-savvy-amt--locked">💎 Rewards locked</span>
           )}
+          {!rewardsLocked && betaUnlocked ? (
+            <span className="sdr-savvy-amt sdr-savvy-amt--beta-est">{formatSavvy(reward.boosted)}</span>
+          ) : null}
           {!rewardsLocked && effectiveMult > 1.02 ? (
             <span className="sdr-mult sdr-mult-shimmer" title="Tier power + ecosystem synergy (mock)">
               ⚡ {multLabel} BONUS ACTIVE

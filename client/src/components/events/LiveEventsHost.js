@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLiveEventsOptional } from '../../context/LiveEventsContext';
@@ -18,16 +18,26 @@ export default function LiveEventsHost() {
 
   const [modalDismissed, setModalDismissed] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [claiming, setClaiming] = useState(false);
-  const [rewardBurst, setRewardBurst] = useState(null);
   const [celebration, setCelebration] = useState(null);
   const lastDropId = useRef(null);
+  const dismissedMilestones = useRef(new Set());
 
   const supplyDrop = ctx?.supplyDrop ?? null;
   const savvySale = ctx?.savvySale ?? null;
   const dropMs = ctx?.dropMs ?? 0;
   const saleMs = ctx?.saleMs ?? 0;
-  const scoutReady = ctx?.hub?.scoutSupport?.milestonesReady;
+  const scoutReady = useMemo(() => ctx?.hub?.scoutSupport?.milestonesReady ?? [], [ctx?.hub?.scoutSupport?.milestonesReady]);
+  const milestonesClaimed = useMemo(
+    () => ctx?.hub?.scoutSupport?.milestonesClaimed ?? [],
+    [ctx?.hub?.scoutSupport?.milestonesClaimed]
+  );
+
+  const pendingMilestones = useMemo(() => {
+    const claimed = new Set((milestonesClaimed || []).map(Number));
+    return (scoutReady || []).filter(
+      (m) => !claimed.has(Number(m.milestone)) && !dismissedMilestones.current.has(Number(m.milestone))
+    );
+  }, [scoutReady, milestonesClaimed]);
 
   useEffect(() => {
     if (!supplyDrop?.dropId || supplyDrop.expired || supplyDrop.alreadyClaimed) return;
@@ -39,28 +49,20 @@ export default function LiveEventsHost() {
   }, [supplyDrop]);
 
   useEffect(() => {
-    const ready = scoutReady || [];
-    if (ready.length > 0 && !celebration && !onEventsPage) {
-      setCelebration(ready[0]);
+    if (pendingMilestones.length > 0 && !celebration && !onEventsPage) {
+      setCelebration(pendingMilestones[0]);
     }
-  }, [scoutReady, celebration, onEventsPage]);
+  }, [pendingMilestones, celebration, onEventsPage]);
 
   const handleClaim = useCallback(
     async (dropId) => {
-      if (!ctx?.claimSupplyDropById) return;
-      setClaiming(true);
-      try {
-        const result = await ctx.claimSupplyDropById(dropId);
-        setRewardBurst(result?.reward?.label || 'Reward claimed!');
-        setShowModal(false);
-        window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
-        if (typeof refreshProfile === 'function') await refreshProfile();
-        setTimeout(() => setRewardBurst(null), 2400);
-      } catch (e) {
-        window.alert(e?.response?.data?.message || e?.message || 'Claim failed.');
-      } finally {
-        setClaiming(false);
+      if (!ctx?.claimSupplyDropById) {
+        throw new Error('Supply drop claim unavailable.');
       }
+      const result = await ctx.claimSupplyDropById(dropId);
+      window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+      if (typeof refreshProfile === 'function') await refreshProfile();
+      return result;
     },
     [ctx, refreshProfile]
   );
@@ -68,6 +70,7 @@ export default function LiveEventsHost() {
   const handleCelebrationClaimed = useCallback(
     async (result) => {
       if (result?.supplyDrop) {
+        lastDropId.current = result.supplyDrop.dropId || null;
         setShowModal(true);
         setModalDismissed(false);
       }
@@ -77,6 +80,19 @@ export default function LiveEventsHost() {
     },
     [ctx, refreshProfile]
   );
+
+  const handleCelebrationComplete = useCallback(() => {
+    if (celebration?.milestone != null) {
+      dismissedMilestones.current.add(Number(celebration.milestone));
+    }
+    setCelebration(null);
+  }, [celebration?.milestone]);
+
+  const handleViewSupplyDrops = useCallback(() => {
+    setModalDismissed(false);
+    setShowModal(true);
+    navigate('/events');
+  }, [navigate]);
 
   if (!ctx) return null;
 
@@ -112,28 +128,23 @@ export default function LiveEventsHost() {
         <MaxSupplyDropModal
           drop={supplyDrop}
           msRemaining={dropMs}
-          claiming={claiming}
           onClaim={handleClaim}
-          onDismiss={() => {
+          onClose={() => {
             setModalDismissed(true);
             setShowModal(false);
-            navigate('/events');
           }}
+          onViewEvents={() => navigate('/events')}
         />
       ) : null}
 
       {celebration && !onEventsPage ? (
         <ScoutSupportCelebration
           milestone={celebration}
-          onComplete={() => setCelebration(null)}
+          milestonesClaimed={milestonesClaimed}
+          onComplete={handleCelebrationComplete}
           onClaimed={handleCelebrationClaimed}
+          onViewSupplyDrops={handleViewSupplyDrops}
         />
-      ) : null}
-
-      {rewardBurst ? (
-        <div className="supply-drop-reward-burst" aria-live="polite">
-          <div className="supply-drop-reward-burst__card">🎁 {rewardBurst}</div>
-        </div>
       ) : null}
     </div>
   );

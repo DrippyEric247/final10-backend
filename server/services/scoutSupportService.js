@@ -76,7 +76,9 @@ function buildStatus(user) {
           description: next.description,
         }
       : null,
-    milestonesReady: (ss.milestonesReady || []).map((m) => ({
+    milestonesReady: (ss.milestonesReady || [])
+      .filter((m) => !milestoneClaimed(ss, m.milestone))
+      .map((m) => ({
       milestone: m.milestone,
       label: m.label,
       icon: m.icon,

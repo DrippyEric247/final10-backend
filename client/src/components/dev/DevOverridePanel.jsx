@@ -272,6 +272,11 @@ export default function DevOverridePanel() {
                 checked={Boolean(ft.leaderboardEffects)}
                 onChange={(v) => setFt("leaderboardEffects", v)}
               />
+              <ToggleRow
+                label="Show Rewards locked (beta override)"
+                checked={Boolean(ft.showRewardsLocked)}
+                onChange={(v) => setFt("showRewardsLocked", v)}
+              />
             </div>
           </div>
 

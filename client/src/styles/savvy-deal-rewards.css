@@ -100,6 +100,20 @@
   background-clip: unset;
 }
 
+.sdr-savvy-amt--beta {
+  background: linear-gradient(90deg, #fcd34d, #c4b5fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 0.72rem;
+}
+
+.sdr-savvy-amt--beta-est {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #a7f3d0;
+}
+
 .sdr-mult {
   font-size: 0.68rem;
   font-weight: 900;

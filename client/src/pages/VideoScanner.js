@@ -23,6 +23,7 @@ import ListingCardImage from '../components/listings/ListingCardImage';
 import ErrorState from '../components/ui/states/ErrorState';
 import EmptyState from '../components/ui/states/EmptyState';
 import { parseApiError } from '../lib/apiErrorParsing';
+import { useScoutScanRegistration } from '../hooks/useScoutScanRegistration';
 
 const VideoScanner = () => {
   const [scanEarn, setScanEarn] = useState(() => {
@@ -107,6 +108,8 @@ const VideoScanner = () => {
       console.error('Failed to track daily task:', error);
     }
   });
+
+  useScoutScanRegistration('video-scanner', isScanning || scanMutation.isPending);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];

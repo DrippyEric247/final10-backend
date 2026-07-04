@@ -38,6 +38,7 @@ import {
 } from "../../lib/smartSearch";
 import { getEffectiveSubscriptionTier } from "../../lib/tierMultiplier";
 import { trackUpgradeClicked } from "../../lib/analytics";
+import { useScoutScanRegistration } from "../../hooks/useScoutScanRegistration";
 import "../../styles/GlobalSmartSearch.css";
 
 export type GlobalSmartSearchProps = {
@@ -125,6 +126,8 @@ export default function GlobalSmartSearch({
   }, []);
 
   const isPaid = subTier !== "free";
+
+  useScoutScanRegistration(`gss:${scope}`, listLoading);
 
   const notifyLockedPremium = useCallback(() => {
     trackUpgradeClicked("global_smart_search", { scope });

@@ -55,13 +55,41 @@
   position: relative;
   max-width: 420px;
   width: 100%;
-  padding: 1.75rem 1.5rem;
+  padding: 1.75rem 1.5rem 1.5rem;
   border-radius: 1.25rem;
   background: linear-gradient(160deg, #1a0a2e 0%, #2d1b4e 45%, #1a0a2e 100%);
   border: 1px solid rgba(168, 85, 247, 0.45);
   box-shadow: 0 0 60px rgba(168, 85, 247, 0.35), 0 0 120px rgba(234, 179, 8, 0.15);
   text-align: center;
   overflow: hidden;
+}
+
+.supply-drop-modal--success {
+  border-color: rgba(251, 191, 36, 0.55);
+  box-shadow: 0 0 70px rgba(251, 191, 36, 0.28), 0 0 100px rgba(168, 85, 247, 0.25);
+}
+
+.supply-drop-modal__close,
+.scout-celebration__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.supply-drop-modal__close:hover,
+.scout-celebration__close:hover {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fde68a;
 }
 
 .supply-drop-modal__smoke {
@@ -86,6 +114,70 @@
 @keyframes crateBob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
+}
+
+.supply-drop-modal__crate.is-opened {
+  animation: rewardPop 0.55s ease-out;
+}
+
+.supply-drop-modal__reward-card,
+.scout-celebration__reward-card {
+  position: relative;
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.35), rgba(234, 179, 8, 0.2));
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: #fef3c7;
+  font-weight: 800;
+  font-size: 1rem;
+  overflow: hidden;
+}
+
+.supply-drop-modal__reward-burst,
+.scout-celebration__reward-burst {
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.35), transparent 65%);
+  animation: supplySmoke 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.supply-drop-modal__error,
+.scout-celebration__error {
+  color: #fca5a5;
+  font-size: 0.82rem;
+  margin: 0 0 0.75rem;
+}
+
+.scout-celebration__claimed-note {
+  color: #cbd5e1;
+  font-size: 0.86rem;
+  margin: 0 0 1rem;
+}
+
+.scout-celebration__label {
+  color: #e2e8f0;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.scout-celebration--success {
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 80px rgba(251, 191, 36, 0.22);
+}
+
+.scout-celebration__secondary {
+  margin-top: 0.65rem;
+  width: 100%;
+  padding: 0.55rem;
+  border: none;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .supply-drop-modal__title {
