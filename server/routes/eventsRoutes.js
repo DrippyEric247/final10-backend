@@ -19,6 +19,7 @@ const {
 const { logLiveEventAdmin } = require('../services/liveEventsAdminService');
 const { DEFAULT_CLAIM_WINDOW_MS } = require('../config/supplyDropRewards');
 const { buildEventsHub } = require('../services/eventsHubService');
+const { buildActivationState, markEventActivated, resetActivationSeen } = require('../services/eventActivationService');
 
 const router = express.Router();
 
@@ -75,6 +76,46 @@ router.get('/hub', auth, async (req, res, next) => {
     res.json(hub);
   } catch (err) {
     console.error('[events/hub]', err);
+    next(err);
+  }
+});
+
+router.get('/activation/state', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    res.json(await buildActivationState(user));
+  } catch (err) {
+    console.error('[events/activation/state]', err);
+    next(err);
+  }
+});
+
+router.post('/activation/activate', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const activationId = String(req.body?.activationId || '').trim();
+    const eventKey = String(req.body?.eventKey || '').trim();
+    const state = await markEventActivated(user, { activationId, eventKey });
+    res.json({ message: 'Event activated.', ...state });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message, code: err.code });
+    }
+    console.error('[events/activation/activate]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/reset-activation', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const state = await resetActivationSeen(user);
+    res.json({ message: 'Event activation state reset.', ...state });
+  } catch (err) {
+    console.error('[events/admin/reset-activation]', err);
     next(err);
   }
 });

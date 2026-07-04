@@ -169,6 +169,15 @@ const userSchema = new mongoose.Schema({
       claimedAt: { type: Date, default: Date.now },
     },
   ],
+  /** Live event login reveal — activated per event per UTC day */
+  liveEventActivations: [
+    {
+      activationId: String,
+      eventKey: String,
+      dayKey: String,
+      activatedAt: { type: Date, default: Date.now },
+    },
+  ],
   lastActive: Date,
 
   // ---- referrals ----

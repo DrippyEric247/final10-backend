@@ -403,6 +403,16 @@ export async function getEventsHub() {
   return data;
 }
 
+export async function activateLiveEvent({ activationId, eventKey }) {
+  const { data } = await api.post("/events/activation/activate", { activationId, eventKey });
+  return data;
+}
+
+export async function resetEventActivation() {
+  const { data } = await api.post("/events/admin/reset-activation");
+  return data;
+}
+
 export async function getActiveSupplyDrop() {
   const { data } = await api.get("/events/supply-drop/active");
   return data;

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useLiveEventsOptional, LIVE_EVENTS_HUB_UPDATED } from "../../context/LiveEventsContext";
+import { resetEventActivation } from "../../lib/api";
 import { unlockAllCallingCardsForDev } from "../../lib/customizationCatalog";
 import {
   clearDevAlertLog,
@@ -76,6 +78,7 @@ function ToggleRow({ label, checked, onChange }) {
 export default function DevOverridePanel() {
   const isProd = process.env.NODE_ENV === "production";
   const { user } = useAuth();
+  const liveEvents = useLiveEventsOptional();
   const [, bump] = useState(0);
   const [open, setOpen] = useState(false);
   const [alertCategory, setAlertCategory] = useState("gaming");
@@ -148,6 +151,16 @@ export default function DevOverridePanel() {
   const resetOnboarding = () => {
     resetOnboardingPreferences();
     window.dispatchEvent(new CustomEvent(DEV_SUBSCRIPTION_TOOLS_EVENT));
+  };
+
+  const resetEventActivationSeen = async () => {
+    try {
+      await resetEventActivation();
+      await liveEvents?.refresh?.();
+      window.dispatchEvent(new CustomEvent(LIVE_EVENTS_HUB_UPDATED));
+    } catch (err) {
+      console.error("[dev] reset event activation failed", err);
+    }
   };
 
   const devEmailActive = isDeveloper(user);
@@ -479,6 +492,13 @@ export default function DevOverridePanel() {
               onClick={resetOnboarding}
             >
               Reset onboarding
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-lg bg-fuchsia-950/50 py-1 text-[11px] font-semibold text-fuchsia-100 hover:bg-fuchsia-950/70"
+              onClick={() => void resetEventActivationSeen()}
+            >
+              Reset live event activation (login reveal)
             </button>
           </div>
 

@@ -10,6 +10,7 @@ const { getActiveSavvySale } = require('./savvySaleService');
 const { buildStatus } = require('./scoutSupportService');
 const { getEggExchangeStatus } = require('./eggExchangeService');
 const { applyTierEventMultiplier } = require('../lib/pointsEventMultipliers');
+const { buildActivationState } = require('./eventActivationService');
 
 function msUntilEndOfUtcDay(date = new Date()) {
   const end = new Date(date);
@@ -279,6 +280,7 @@ async function buildEventsHub(user) {
   }
 
   const claimableCount = claimableRewards.length;
+  const activation = await buildActivationState(user);
 
   return {
     claimableCount,
@@ -288,6 +290,7 @@ async function buildEventsHub(user) {
     completedHistory,
     scoutSupport: scoutStatus,
     eggExchange: eggExchange.mythicFusionProgress,
+    activation,
     timers: {
       supplyDrop: drop && !drop.expired ? { msRemaining: drop.msRemaining, dropId: drop.dropId } : null,
       savvySale: sale?.active ? { msRemaining: sale.msRemaining, eventId: sale.eventId } : null,

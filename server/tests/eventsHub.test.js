@@ -38,6 +38,7 @@ describe('eventsHubService', () => {
     expect(hub).toHaveProperty('completedHistory');
     expect(hub).toHaveProperty('scoutSupport');
     expect(hub).toHaveProperty('claimableCount');
+    expect(hub).toHaveProperty('activation');
     expect(Array.isArray(hub.upcomingEvents)).toBe(true);
     expect(hub.upcomingEvents.length).toBeGreaterThan(0);
   });

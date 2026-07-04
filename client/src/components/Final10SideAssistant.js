@@ -2127,6 +2127,8 @@ export default function Final10SideAssistant() {
         </div>
       ) : null}
 
+      <div id="f10-event-hud-anchor" className="f10-event-hud-anchor" aria-hidden />
+
       <SavvyWalletBubble />
 
       <SavvyScoutButton

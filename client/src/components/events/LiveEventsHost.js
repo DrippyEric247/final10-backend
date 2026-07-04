@@ -32,6 +32,11 @@ export default function LiveEventsHost() {
     [ctx?.hub?.scoutSupport?.milestonesClaimed]
   );
 
+  const dropInActivationQueue = useMemo(() => {
+    const queue = ctx?.hub?.activation?.activationQueue ?? [];
+    return queue.some((e) => e.eventKey === 'max_supply_drop');
+  }, [ctx?.hub?.activation?.activationQueue]);
+
   const pendingMilestones = useMemo(() => {
     const claimed = new Set((milestonesClaimed || []).map(Number));
     return (scoutReady || []).filter(
@@ -41,12 +46,13 @@ export default function LiveEventsHost() {
 
   useEffect(() => {
     if (!supplyDrop?.dropId || supplyDrop.expired || supplyDrop.alreadyClaimed) return;
+    if (dropInActivationQueue) return;
     if (lastDropId.current !== supplyDrop.dropId) {
       lastDropId.current = supplyDrop.dropId;
       setModalDismissed(false);
       setShowModal(true);
     }
-  }, [supplyDrop]);
+  }, [supplyDrop, dropInActivationQueue]);
 
   useEffect(() => {
     if (pendingMilestones.length > 0 && !celebration && !onEventsPage) {
