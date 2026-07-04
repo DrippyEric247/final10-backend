@@ -976,6 +976,21 @@ export async function getAdminSavvyShopFeedback(limit = 50) {
   return data;
 }
 
+export async function getFoundingTesterProgress() {
+  const { data } = await api.get("/founding-tester/progress");
+  return data;
+}
+
+export async function attestFoundingTesterTask(missionId) {
+  const { data } = await api.post("/founding-tester/attest-task", { missionId });
+  return data;
+}
+
+export async function completeFoundingTesterMission({ missionId, feedback }) {
+  const { data } = await api.post("/founding-tester/complete", { missionId, feedback });
+  return data;
+}
+
 export async function adminUpdateBetaCommunityConfig(patch) {
   const { data } = await api.put("/beta-community/admin/config", patch);
   return data;

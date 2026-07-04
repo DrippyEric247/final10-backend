@@ -32,6 +32,7 @@ const EMBLEM_IDS = new Set([
   'sigil_founders_circle',
   'sigil_savvy_elite',
   'sigil_the_signal',
+  'sigil_founding_tester',
 ]);
 
 const CALLING_CARD_IDS = new Set([
@@ -72,6 +73,7 @@ const CALLING_CARD_IDS = new Set([
   'card_streak_30',
   'card_welcome_back',
   'card_legacy_loyalist',
+  'card_founding_tester',
 ]);
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);
@@ -91,6 +93,7 @@ const BATTLE_PASS_S1_COSMETIC_IDS = new Set([
   'dialogue_scout_s1',
   'badge_perk_animated',
   'badge_founder_animated',
+  'badge_founding_tester',
   'boost_egg_slot_s1',
 ]);
 

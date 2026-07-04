@@ -210,6 +210,7 @@ app.use('/api/payments',    paymentRoutes);
 app.use('/api/local-deals', localDealsRoutes);
 app.use('/api/community',   communityRoutes);
 app.use('/api/beta-community', betaCommunityRoutes);
+app.use('/api/founding-tester', require('./routes/foundingTester'));
 app.use('/api/alerts',      alertsRoutes);
 app.use('/api/project-alerts', projectAlertsRoutes);
 app.use('/api/build-wars', buildWarsRoutes);

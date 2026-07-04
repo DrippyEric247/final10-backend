@@ -263,6 +263,7 @@ const userSchema = new mongoose.Schema({
   // ---- subscription & search limits ----
   betaTester: { type: Boolean, default: false },
   foundingAccess: { type: Boolean, default: false },
+  foundingTesterProgramCompleted: { type: Boolean, default: false },
   betaAccessExpiresAt: { type: Date, default: null },
   /** One-time Savvy bonus for quality beta feedback (bug report). */
   betaFeedbackBonusGrantedAt: { type: Date, default: null },
