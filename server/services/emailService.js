@@ -963,14 +963,39 @@ async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) 
 }
 
 async function sendOperationalEmail({ to, subject, text, html, trace = null }) {
-  return sendMailMessage({
-    to,
-    subject,
-    text,
-    html,
-    verifyFirst: getEmailProvider() === 'smtp',
-    trace,
-  });
+  try {
+    return await sendMailMessage({
+      to,
+      subject,
+      text,
+      html,
+      verifyFirst: getEmailProvider() === 'smtp',
+      trace,
+    });
+  } catch (err) {
+    const formatted = formatMailerError(err);
+    console.error(
+      '[email] sendOperationalEmail unexpected throw',
+      JSON.stringify({
+        to,
+        message: err?.message,
+        stack: String(err?.stack || '').split('\n').slice(0, 8),
+        ...formatted,
+      })
+    );
+    trace?.step('send_operational_exception', {
+      ok: false,
+      message: String(err?.message || err).slice(0, 500),
+      stack: String(err?.stack || '').split('\n').slice(0, 6),
+      ...formatted,
+    });
+    return {
+      sent: false,
+      logOnly: false,
+      reason: 'send_operational_exception',
+      ...formatted,
+    };
+  }
 }
 
 module.exports = {

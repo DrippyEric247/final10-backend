@@ -1,18 +1,19 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdminEmailTestLog = require('../models/AdminEmailTestLog');
-const { sendOperationalEmail } = require('./emailService');
+const { sendOperationalEmail, getEmailEnvPresence, getEmailConfigStatus } = require('./emailService');
 const {
   buildAdminTestEmail,
   TEMPLATE_LABELS,
 } = require('../templates/email/adminTestEmailTemplates');
 
 class AdminEmailTestError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, extra = {}) {
     super(message);
     this.name = 'AdminEmailTestError';
     this.status = status;
     this.code = code;
+    this.extra = extra;
   }
 }
 
@@ -23,6 +24,10 @@ const VALID_TEMPLATE_KEYS = Object.keys(TEMPLATE_LABELS);
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function resolveActorId(user = {}) {
+  return user._id || user.id || null;
 }
 
 function buildUserSearchFilter(q) {
@@ -137,7 +142,15 @@ function buildDeliveryId() {
   return `F10-ET-${Date.now().toString(36).toUpperCase()}`;
 }
 
-async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser }) {
+async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser, trace = null }) {
+  trace?.step('admin_email_test_enter', {
+    userId: String(userId || ''),
+    templateKey,
+    resendApiKeyPresent: getEmailEnvPresence().RESEND_API_KEY,
+    emailFromPresent: Boolean(getEmailConfigStatus().emailFrom),
+    provider: getEmailConfigStatus().provider,
+  });
+
   if (!VALID_TEMPLATE_KEYS.includes(templateKey)) {
     throw new AdminEmailTestError(400, 'INVALID_TEMPLATE', 'Unknown email template.');
   }
@@ -147,66 +160,135 @@ async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser 
     throw new AdminEmailTestError(404, 'USER_NOT_FOUND', 'User not found or missing email.');
   }
 
+  trace?.step('admin_email_test_recipient', {
+    recipientId: String(user._id),
+    recipientEmail: `${String(user.email).slice(0, 3)}***@${String(user.email).split('@')[1] || ''}`,
+  });
+
   let built;
   try {
+    trace?.step('admin_email_test_template_build_start', { templateKey });
     built = buildAdminTestEmail(templateKey, user, custom);
+    trace?.step('admin_email_test_template_build_done', {
+      ok: true,
+      subjectLen: String(built.subject || '').length,
+      htmlLen: String(built.html || '').length,
+      textLen: String(built.text || '').length,
+    });
   } catch (err) {
+    trace?.step('admin_email_test_template_build_failed', {
+      ok: false,
+      message: String(err?.message || err).slice(0, 500),
+      stack: String(err?.stack || '').split('\n').slice(0, 6),
+    });
     throw new AdminEmailTestError(400, 'TEMPLATE_BUILD_FAILED', err.message || 'Could not build email.');
   }
 
   const deliveryId = buildDeliveryId();
-  const result = await sendOperationalEmail({
-    to: user.email,
-    subject: built.subject,
-    html: built.html,
-    text: built.text,
+  trace?.step('admin_email_test_send_start', { via: 'sendOperationalEmail', deliveryId });
+
+  let result;
+  try {
+    result = await sendOperationalEmail({
+      to: user.email,
+      subject: built.subject,
+      html: built.html,
+      text: built.text,
+      trace,
+    });
+  } catch (err) {
+    trace?.step('admin_email_test_send_threw', {
+      ok: false,
+      message: String(err?.message || err).slice(0, 500),
+      stack: String(err?.stack || '').split('\n').slice(0, 8),
+    });
+    console.error('[admin/email-test] sendOperationalEmail threw unexpectedly:', err?.message, err?.stack);
+    result = {
+      sent: false,
+      logOnly: false,
+      reason: 'send_operational_exception',
+      errorReason: err?.message || 'Unexpected email send error.',
+    };
+  }
+
+  trace?.step('admin_email_test_send_done', {
+    sent: Boolean(result.sent),
+    logOnly: Boolean(result.logOnly),
+    reason: result.reason || null,
+    provider: result.provider || null,
+    errorReason: result.errorReason || null,
+    resendError: result.resendError || null,
   });
 
   const status = result.sent ? 'sent' : result.logOnly ? 'log_only' : 'failed';
-  const log = await AdminEmailTestLog.create({
-    recipientUserId: user._id,
-    recipientEmail: user.email,
-    recipientUsername: user.username || '',
-    sentByUserId: adminUser._id,
-    sentByEmail: adminUser.email || '',
-    templateKey,
-    templateLabel: TEMPLATE_LABELS[templateKey],
-    subject: built.subject,
-    deliveryId,
-    status,
-    provider: result.provider || '',
-    reason: result.reason || '',
-    messageId: result.messageId || '',
-  });
+  const actorId = resolveActorId(adminUser);
 
-  await trimUserHistory(user._id);
-
-  if (status === 'failed') {
-    throw new AdminEmailTestError(
-      502,
-      'DELIVERY_FAILED',
-      result.reason || 'Email delivery failed.'
-    );
+  let log = null;
+  try {
+    log = await AdminEmailTestLog.create({
+      recipientUserId: user._id,
+      recipientEmail: user.email,
+      recipientUsername: user.username || '',
+      sentByUserId: actorId,
+      sentByEmail: adminUser?.email || '',
+      templateKey,
+      templateLabel: TEMPLATE_LABELS[templateKey],
+      subject: built.subject,
+      deliveryId,
+      status,
+      provider: result.provider || '',
+      reason: result.reason || '',
+      messageId: result.messageId || '',
+    });
+    await trimUserHistory(user._id);
+  } catch (logErr) {
+    console.error('[admin/email-test] log write failed (non-fatal):', logErr?.message, logErr?.stack);
+    trace?.step('admin_email_test_log_failed', {
+      ok: false,
+      message: String(logErr?.message || logErr).slice(0, 300),
+    });
   }
 
-  return {
-    ok: true,
-    queued: true,
-    message: 'Test email successfully queued.',
+  const base = {
     recipient: {
       id: String(user._id),
       username: user.username || '',
       email: user.email,
     },
-    timestamp: log.createdAt,
+    timestamp: log?.createdAt || new Date(),
     templateKey,
     templateLabel: TEMPLATE_LABELS[templateKey],
     deliveryId,
     status,
     provider: result.provider || null,
-    messageId: log.messageId || null,
+    messageId: log?.messageId || result.messageId || null,
     logOnly: Boolean(result.logOnly),
     reason: result.reason || null,
+    errorReason: result.errorReason || null,
+    resendError: result.resendError || null,
+    resendValidationHint: result.resendValidationHint || null,
+    subject: built.subject,
+  };
+
+  if (status === 'failed') {
+    const failureMessage =
+      result.errorReason || result.resendValidationHint || result.reason || 'Email delivery failed.';
+    return {
+      ok: false,
+      code: 'DELIVERY_FAILED',
+      message: failureMessage,
+      failureReason: failureMessage,
+      ...base,
+    };
+  }
+
+  return {
+    ok: true,
+    queued: true,
+    message: result.logOnly
+      ? 'Email logged only — delivery is not configured or was skipped.'
+      : 'Test email successfully queued.',
+    ...base,
   };
 }
 

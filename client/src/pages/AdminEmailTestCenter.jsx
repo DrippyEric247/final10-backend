@@ -136,6 +136,17 @@ export default function AdminEmailTestCenter() {
           userId: selected.id,
           templateKey,
         });
+        if (result?.ok === false) {
+          setSendError(
+            result.failureReason ||
+              result.errorReason ||
+              result.message ||
+              result.reason ||
+              "Email delivery failed."
+          );
+          setLastSend(result);
+          return;
+        }
         setLastSend(result);
         await loadHistory(selected.id);
         setSelected((prev) =>
@@ -153,7 +164,16 @@ export default function AdminEmailTestCenter() {
             : prev
         );
       } catch (err) {
-        setSendError(err?.response?.data?.message || err?.message || "Send failed.");
+        const data = err?.response?.data;
+        setSendError(
+          data?.failureReason ||
+            data?.errorReason ||
+            data?.message ||
+            data?.reason ||
+            err?.message ||
+            "Send failed."
+        );
+        setLastSend(data || null);
       } finally {
         setSendBusyKey("");
       }
@@ -183,11 +203,31 @@ export default function AdminEmailTestCenter() {
         buttonUrl: customButtonUrl.trim(),
         image: customImage,
       });
+      if (result?.ok === false) {
+        setSendError(
+          result.failureReason ||
+            result.errorReason ||
+            result.message ||
+            result.reason ||
+            "Email delivery failed."
+        );
+        setLastSend(result);
+        return;
+      }
       setLastSend(result);
       setCustomOpen(false);
       await loadHistory(selected.id);
     } catch (err) {
-      setSendError(err?.response?.data?.message || err?.message || "Send failed.");
+      const data = err?.response?.data;
+      setSendError(
+        data?.failureReason ||
+          data?.errorReason ||
+          data?.message ||
+          data?.reason ||
+          err?.message ||
+          "Send failed."
+      );
+      setLastSend(data || null);
     } finally {
       setSendBusyKey("");
     }
