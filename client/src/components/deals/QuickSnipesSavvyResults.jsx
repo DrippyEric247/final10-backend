@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import ListingModeTabs from '../ebay/ListingModeTabs';
 import { emitPowerToast } from '../../lib/final10PowerFeedback';
 import { trackQuickSnipeAction } from '../../lib/analytics';
 import { recordScoutMissionAction } from '../../lib/savvyScoutMissions';
@@ -442,7 +441,6 @@ export default function QuickSnipesSavvyResults({
   items,
   liveTick,
   mode,
-  setMode,
   showPass,
   setShowPass,
   runHunt,
@@ -577,7 +575,10 @@ export default function QuickSnipesSavvyResults({
 
       <div className="qscc-savvy-header flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
         <div>
-          <p className="text-xs font-black tracking-[0.22em] text-cyan-300/90 uppercase mb-2">Savvy Scout Report</p>
+          <p className="text-xs font-black tracking-[0.22em] text-cyan-300/90 uppercase mb-2">
+            Savvy Scout Report
+            {mode === 'best_move' ? ' · ⭐ Best Move' : mode === 'auction' ? ' · 🔨 Auctions' : ' · 🛒 Buy It Now'}
+          </p>
           <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
             {SAVVY_SCOUT.shortTitle} found{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-fuchsia-400">
@@ -597,13 +598,16 @@ export default function QuickSnipesSavvyResults({
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <ListingModeTabs mode={mode} onChange={setMode} />
           {mode === 'best_move' ? (
             <label className="text-xs text-slate-300 inline-flex items-center gap-2 whitespace-nowrap">
               <input type="checkbox" checked={showPass} onChange={(e) => setShowPass(e.target.checked)} />
-              Show pass
+              Show pass listings
             </label>
-          ) : null}
+          ) : (
+            <span className="qscc-savvy-pill qscc-savvy-pill--cyan">
+              {mode === 'auction' ? '🔨 Auctions only' : '🛒 Buy It Now only'}
+            </span>
+          )}
         </div>
       </div>
 

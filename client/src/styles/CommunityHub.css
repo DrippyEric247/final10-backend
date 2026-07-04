@@ -1,0 +1,558 @@
+/* Community Hub — Savvy Wins expansion (purple + gold, scoped .ch-) */
+
+.ch-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Savvy Scout banner ---------- */
+
+.ch-scout-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 22px 24px;
+  border-radius: 20px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  background:
+    radial-gradient(900px 220px at 0% 0%, rgba(168, 85, 247, 0.22), transparent 70%),
+    radial-gradient(700px 200px at 100% 100%, rgba(251, 191, 36, 0.18), transparent 65%),
+    linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.92));
+  box-shadow: 0 24px 48px -32px rgba(168, 85, 247, 0.45);
+}
+
+.ch-scout-avatar {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  font-size: 1.6rem;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.35), rgba(251, 191, 36, 0.25));
+  border: 1px solid rgba(253, 224, 71, 0.35);
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.25);
+}
+
+.ch-scout-eyebrow {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fde68a;
+}
+
+.ch-scout-copy h2 {
+  margin: 0 0 8px;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.ch-scout-copy p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 62ch;
+}
+
+.ch-scout-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.ch-scout-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 88px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.ch-scout-stat-val {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #fcd34d;
+  line-height: 1;
+}
+
+.ch-scout-stat-label {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  text-align: center;
+}
+
+/* ---------- Layout ---------- */
+
+.ch-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: 18px;
+}
+
+.ch-panel {
+  padding: 20px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(160deg, rgba(30, 27, 75, 0.55), rgba(15, 23, 42, 0.88));
+}
+
+.ch-panel-hd {
+  margin-bottom: 14px;
+}
+
+.ch-panel-hd--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ch-panel-eyebrow {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c084fc;
+}
+
+.ch-panel-hd h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.ch-panel-sub {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* ---------- Missions ---------- */
+
+.ch-mission-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ch-mission-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.5);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ch-mission-card.is-claimable {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.12);
+}
+
+.ch-mission-card.is-claimed {
+  opacity: 0.72;
+}
+
+.ch-mission-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 1.15rem;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.ch-mission-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.ch-mission-scout {
+  margin: 3px 0 6px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.ch-mission-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ch-mission-reward {
+  color: #fcd34d;
+}
+
+.ch-mission-cadence {
+  color: #64748b;
+  text-transform: capitalize;
+}
+
+.ch-mission-done {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #6ee7b7;
+}
+
+/* ---------- Why Help ---------- */
+
+.ch-why-help {
+  display: flex;
+  flex-direction: column;
+}
+
+.ch-why-icon {
+  color: #c084fc;
+  margin-bottom: 8px;
+}
+
+.ch-why-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.ch-why-list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+
+.ch-why-list li svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #fbbf24;
+}
+
+.ch-why-list strong {
+  color: #fde68a;
+}
+
+.ch-why-cta {
+  width: 100%;
+  margin-top: auto;
+}
+
+/* ---------- Goals ---------- */
+
+.ch-goals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ch-goal-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.ch-goal-card--violet { border-color: rgba(168, 85, 247, 0.3); }
+.ch-goal-card--gold { border-color: rgba(251, 191, 36, 0.3); }
+.ch-goal-card--cyan { border-color: rgba(34, 211, 238, 0.3); }
+.ch-goal-card--pink { border-color: rgba(236, 72, 153, 0.3); }
+.ch-goal-card--blue { border-color: rgba(59, 130, 246, 0.3); }
+.ch-goal-card--green { border-color: rgba(34, 197, 94, 0.3); }
+
+.ch-goal-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.ch-goal-value {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #f8fafc;
+  line-height: 1.1;
+}
+
+.ch-goal-target {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ch-goal-bar {
+  height: 5px;
+  margin: 10px 0 6px;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.8);
+  overflow: hidden;
+}
+
+.ch-goal-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a855f7, #fcd34d);
+  transition: width 0.8s ease;
+}
+
+.ch-goal-pct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #c084fc;
+}
+
+.ch-goals-reward {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.22);
+}
+
+.ch-goals-reward svg {
+  flex: 0 0 auto;
+  color: #fcd34d;
+  margin-top: 2px;
+}
+
+.ch-goals-reward p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.ch-goals-reward strong {
+  color: #fde68a;
+}
+
+.ch-goals-skeleton {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.ch-goal-skel {
+  height: 110px;
+  border-radius: 14px;
+  background: rgba(51, 65, 85, 0.5);
+  animation: ch-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ch-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+
+/* ---------- Feed ---------- */
+
+.ch-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ch-feed-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.ch-feed-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 1rem;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+}
+
+.ch-feed-headline {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.ch-feed-detail {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.ch-feed-time {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* ---------- Buttons ---------- */
+
+.ch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.ch-btn:active {
+  transform: scale(0.98);
+}
+
+.ch-btn--primary {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  border-color: rgba(168, 85, 247, 0.5);
+  box-shadow: 0 8px 20px -10px rgba(168, 85, 247, 0.6);
+}
+
+.ch-btn--gold {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1e1b4b;
+  border-color: rgba(253, 224, 71, 0.5);
+}
+
+.ch-btn--ghost {
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.ch-btn--ghost:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #fde68a;
+}
+
+/* ---------- Section divider (used in WinFeed) ---------- */
+
+.ch-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 4px;
+}
+
+.ch-section-divider::before,
+.ch-section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.35), transparent);
+}
+
+.ch-section-divider span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fcd34d;
+  white-space: nowrap;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1024px) {
+  .ch-goals-grid,
+  .ch-goals-skeleton {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ch-scout-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .ch-scout-stats {
+    justify-content: flex-start;
+  }
+
+  .ch-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ch-mission-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ch-mission-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .ch-goals-grid,
+  .ch-goals-skeleton {
+    grid-template-columns: 1fr;
+  }
+
+  .ch-feed-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ch-feed-time {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: -2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-goal-skel {
+    animation: none;
+  }
+}

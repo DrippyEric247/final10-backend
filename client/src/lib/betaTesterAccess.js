@@ -1,6 +1,13 @@
 /**
  * Founding / Beta Tester access — unlimited caps for Best Moves, searches, alerts, Scout missions.
+ * When BETA_MODE is on, all logged-in users receive the same effective Pro access.
  */
+
+import {
+  hasBetaProAccess as hasGlobalBetaProAccess,
+  isBetaModeActive,
+  isLoggedInForBetaAccess,
+} from './betaModeAccess';
 
 let betaGetter = () => false;
 
@@ -20,7 +27,11 @@ function evaluateBetaFromUser(user) {
 
 function evaluateBetaFromEntitlement(entitlement) {
   if (!entitlement) return false;
-  return Boolean(entitlement.isBetaTester || entitlement.foundingTesterAccess);
+  return Boolean(
+    entitlement.isBetaTester ||
+      entitlement.foundingTesterAccess ||
+      entitlement.betaModeProAccess
+  );
 }
 
 /**
@@ -28,6 +39,7 @@ function evaluateBetaFromEntitlement(entitlement) {
  * to `betaGetter` (avoids infinite recursion with registerBetaTesterGetter).
  */
 export function isBetaTester(user = null, entitlement = null) {
+  if (hasGlobalBetaProAccess(user, entitlement)) return true;
   if (evaluateBetaFromUser(user)) return true;
   if (evaluateBetaFromEntitlement(entitlement)) return true;
   if (user != null || entitlement != null) return false;
@@ -37,6 +49,12 @@ export function isBetaTester(user = null, entitlement = null) {
     return false;
   }
 }
+
+export function isBetaModeProAccess(user = null, entitlement = null) {
+  return hasGlobalBetaProAccess(user, entitlement);
+}
+
+export { isBetaModeActive, isLoggedInForBetaAccess };
 
 export const FOUNDING_TESTER_BADGE = "Founding Tester";
 export const FOUNDING_TESTER_THANKS = "Thanks for helping shape Final10.";

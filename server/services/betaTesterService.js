@@ -1,8 +1,15 @@
 const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
 const { BETA_UNLIMITED, BETA_FEEDBACK_SAVVY_BONUS } = require('../config/betaTester');
+const {
+  isBetaMode,
+  hasBetaProAccess,
+  getBetaModeAccessOverrides,
+  getBetaProTier,
+} = require('../config/betaMode');
 
 function isBetaTester(user) {
   if (!user) return false;
+  if (hasBetaProAccess(user)) return true;
   if (typeof user.hasFoundingTesterAccess === 'function') {
     return user.hasFoundingTesterAccess();
   }
@@ -13,11 +20,20 @@ function isBetaTester(user) {
 }
 
 function readUserTier(user) {
+  if (hasBetaProAccess(user)) return getBetaProTier();
   return normalizeTier(user?.subscription?.tier || user?.membershipTier || 'free');
 }
 
-/** Tier config with unlimited caps when beta tester is active. */
+/** Tier config with unlimited caps when beta tester or global beta mode is active. */
 function getTierConfigForUser(user) {
+  if (hasBetaProAccess(user)) {
+    const base = getTierConfig(getBetaProTier());
+    return {
+      ...base,
+      ...getBetaModeAccessOverrides(),
+      ...BETA_UNLIMITED,
+    };
+  }
   const base = getTierConfig(readUserTier(user));
   if (!isBetaTester(user)) return base;
   return {
@@ -47,4 +63,6 @@ module.exports = {
   getTierConfigForUser,
   logBetaUsage,
   BETA_FEEDBACK_SAVVY_BONUS,
+  hasBetaProAccess,
+  isBetaMode,
 };

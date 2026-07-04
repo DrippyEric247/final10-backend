@@ -17,6 +17,8 @@ export type EntitlementMe = {
   betaTester?: boolean;
   foundingAccess?: boolean;
   betaAccessExpiresAt?: string | null;
+  betaMode?: boolean;
+  betaModeProAccess?: boolean;
 };
 
 const DEFAULT_ENTITLEMENT: EntitlementMe = {

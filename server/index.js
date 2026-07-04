@@ -90,9 +90,17 @@ app.use(
 // --- Rate Limiting (skip OPTIONS + telemetry ingest) ---
 const { isAuthMeRequest } = require('./middleware/rateLimits');
 const { rateLimitSkipDev } = require('./lib/rateLimitDevBypass');
+const { isBetaMode, getRouteRateCaps } = require('./config/betaMode');
 
 const limiter = rateLimit({
   ...rateLimitConfig,
+  max: () => getRouteRateCaps().globalApi,
+  message: isBetaMode()
+    ? {
+        code: 'MARKETPLACE_BUSY',
+        message: 'Savvy Scout is updating — please try again shortly.',
+      }
+    : rateLimitConfig.message,
   skip: (req) =>
     req.method === 'OPTIONS' ||
     req.path.startsWith('/analytics') ||

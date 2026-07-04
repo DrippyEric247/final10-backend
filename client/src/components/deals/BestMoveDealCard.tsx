@@ -32,6 +32,7 @@ export default function BestMoveDealCard({
       cardTone="border-amber-400/50 shadow-[0_0_34px_rgba(251,191,36,0.23)]"
       typeTone="bg-black/60 border-amber-300/45 text-amber-100"
       emphasize
+      showBestMoveInsights
       boostedPower={boostedPower}
       hideCreateAlert={hideCreateAlert}
       onMeaningfulView={onMeaningfulView}

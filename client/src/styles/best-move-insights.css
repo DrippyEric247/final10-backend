@@ -1,0 +1,181 @@
+/* Best Move card — live countdown + Why Savvy Picked This */
+
+.bm-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(15, 23, 42, 0.72);
+  padding: 8px 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.bm-countdown__icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: #fbbf24;
+}
+
+.bm-countdown__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bm-countdown__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 224, 71, 0.85);
+}
+
+.bm-countdown__digits {
+  font-size: 1.05rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #fef3c7;
+  line-height: 1.1;
+}
+
+.bm-countdown--urgent {
+  border-color: rgba(251, 146, 60, 0.55);
+  background: linear-gradient(135deg, rgba(124, 45, 18, 0.55), rgba(15, 23, 42, 0.85));
+  box-shadow: 0 0 22px rgba(251, 146, 60, 0.22);
+}
+
+.bm-countdown--urgent .bm-countdown__digits {
+  font-size: 1.2rem;
+  color: #ffedd5;
+}
+
+.bm-countdown--critical {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.72), rgba(15, 23, 42, 0.9));
+  box-shadow:
+    0 0 28px rgba(248, 113, 113, 0.35),
+    0 0 0 1px rgba(248, 113, 113, 0.2) inset;
+  animation: bm-countdown-pulse 0.85s ease-in-out infinite;
+}
+
+.bm-countdown--critical .bm-countdown__label {
+  color: #fecaca;
+}
+
+.bm-countdown--critical .bm-countdown__digits {
+  font-size: 1.35rem;
+  color: #fff;
+}
+
+.bm-countdown--ended {
+  opacity: 0.72;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.bm-countdown--banner {
+  width: 100%;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.bm-countdown--overlay {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  left: auto;
+  z-index: 3;
+  max-width: calc(100% - 24px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.bm-countdown--overlay.bm-countdown--urgent,
+.bm-countdown--overlay.bm-countdown--critical {
+  top: 44px;
+  right: 10px;
+}
+
+@keyframes bm-countdown-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.bm-why-picked {
+  margin-top: 12px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  background: linear-gradient(145deg, rgba(69, 26, 3, 0.35), rgba(15, 23, 42, 0.82));
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.08);
+}
+
+.bm-why-picked__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bm-why-picked__spark {
+  color: #fde047;
+  font-size: 0.85rem;
+  filter: drop-shadow(0 0 8px rgba(253, 224, 71, 0.55));
+}
+
+.bm-why-picked__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fde68a;
+}
+
+.bm-why-picked__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bm-why-picked__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #f8fafc;
+}
+
+.bm-why-picked__tick {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+  font-size: 0.65rem;
+  font-weight: 900;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-countdown--critical {
+    animation: none;
+  }
+}

@@ -7,7 +7,12 @@ const { placeProxyBidForUser } = require('../services/ebayOfferService');
 const auth = require('../middleware/auth');
 const optionalUserAuth = require('../middleware/optionalUserAuth');
 const { validateRequest } = require('../middleware/validateRequest');
-const { ebaySearchLimiter, ebayBidLimiter, ebaySellerTrendsLimiter } = require('../middleware/rateLimits');
+const { ebayBidLimiter, ebaySellerTrendsLimiter } = require('../middleware/rateLimits');
+const {
+  assertLiveScanAllowed,
+  recordLiveScanSuccess,
+  marketplaceScanRouteGate,
+} = require('../middleware/marketplaceScanLimiter');
 const ebaySchemas = require('../validation/schemas');
 const { isProduction } = require('../config/envValidation');
 const { refreshScanDeck, issueBidFlowTokens } = require('../services/progressionTrustService');
@@ -113,8 +118,10 @@ async function loadEbayBrowseSearch(req, {
   if (filterParts.length) params.filter = filterParts.join(',');
 
   let data;
+  let liveExternal = false;
   try {
     data = await ebayBrowseGet('item_summary/search', params);
+    liveExternal = true;
     if (isEbayVerboseLogEnabled()) {
       console.log('eBay browse search ok', data?.itemSummaries?.length || 0, 'items');
     }
@@ -126,11 +133,13 @@ async function loadEbayBrowseSearch(req, {
       apiError.status === 403;
     if (useMock && isEbayVerboseLogEnabled()) {
       console.warn('eBay Browse: mock fallback for query:', searchQuery);
-      return buildMockBrowseResponse({
+      const mockData = buildMockBrowseResponse({
         searchQuery,
         limit,
         listingMode,
       });
+      mockData._scanMeta = { liveExternal: false, mock: true };
+      return mockData;
     }
     throw apiError;
   }
@@ -154,13 +163,16 @@ async function loadEbayBrowseSearch(req, {
     data.total = Math.min(Number(data.total) || data.itemSummaries.length, params.limit);
   }
 
+  data._scanMeta = { liveExternal, mock: Boolean(data.mock) };
   return data;
 }
 
 // GET /api/ebay/search?q=...
-router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQuery, 'query'), async (req, res) => {
+router.get('/search', marketplaceScanRouteGate, validateRequest(ebaySchemas.ebaySearchQuery, 'query'), async (req, res) => {
   let cacheRowKey = '';
   try {
+    if (!assertLiveScanAllowed(req, res)) return;
+
     const {
       q = '',
       keywords = '',
@@ -230,6 +242,12 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
     } else if (listingMode === 'buy_now') {
       items = items.filter((it) => it.isBuyNow);
     }
+
+    recordLiveScanSuccess(req, {
+      liveExternal: Boolean(data._scanMeta?.liveExternal),
+      mock: Boolean(data.mock || data._scanMeta?.mock),
+      itemCount: items.length,
+    });
 
     try {
       await enrichItemsWithMarketValue(items.slice(0, MAX_ENRICH_ITEMS), { fallbackQuery: searchQuery });
@@ -369,9 +387,11 @@ router.get('/search', ebaySearchLimiter, validateRequest(ebaySchemas.ebaySearchQ
 });
 
 // GET /api/ebay/final10?q=... — ending within 10 minutes, ≤3 bids (sniper picks)
-router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal10Query, 'query'), async (req, res) => {
+router.get('/final10', marketplaceScanRouteGate, validateRequest(ebaySchemas.ebayFinal10Query, 'query'), async (req, res) => {
   let cacheRowKey = '';
   try {
+    if (!assertLiveScanAllowed(req, res)) return;
+
     const {
       q = '',
       keywords = '',
@@ -418,6 +438,12 @@ router.get('/final10', ebaySearchLimiter, validateRequest(ebaySchemas.ebayFinal1
 
     let items = (data.itemSummaries || []).map(normalizeEbayItemSummary).slice(0, poolLimit);
     let final10Items = pickFinal10Items(items).slice(0, outLimit);
+
+    recordLiveScanSuccess(req, {
+      liveExternal: Boolean(data._scanMeta?.liveExternal),
+      mock: Boolean(data.mock || data._scanMeta?.mock),
+      itemCount: final10Items.length,
+    });
 
     try {
       await enrichItemsWithMarketValue(final10Items.slice(0, MAX_ENRICH_ITEMS), { fallbackQuery: searchQuery });

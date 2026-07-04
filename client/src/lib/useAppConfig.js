@@ -1,6 +1,7 @@
 // src/lib/useAppConfig.js
 import { useEffect, useState } from 'react';
 import { buildApiUrl } from './runtimeApi';
+import { applyBetaModeFromPublicConfig } from './betaModeAccess';
 
 export function useAppConfig() {
   const [cfg, setCfg] = useState(() =>
@@ -14,6 +15,7 @@ export function useAppConfig() {
 
   useEffect(() => {
     if (cfg) {
+      applyBetaModeFromPublicConfig(cfg);
       setLoading(false);
       return;
     }
@@ -36,6 +38,9 @@ export function useAppConfig() {
       })
       .then((next) => {
         if (!active) return;
+        if (typeof window !== 'undefined') {
+          window.__APP_CONFIG__ = next;
+        }
         setCfg(next);
       })
       .catch((fetchError) => {

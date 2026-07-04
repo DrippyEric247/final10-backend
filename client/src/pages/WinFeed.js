@@ -25,6 +25,7 @@ import {
 } from "../lib/winFeed";
 import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
 import Final10SocialLinks from "../components/Final10SocialLinks";
+import CommunityHubSections from "../components/community/CommunityHubSections";
 import CallingCard from "../components/CallingCard";
 import EmptyState from "../components/ui/states/EmptyState";
 import {
@@ -39,9 +40,11 @@ import {
   Zap,
 } from "lucide-react";
 import "../styles/WinFeed.css";
+import "../styles/CommunityHub.css";
 
 const FILTERS = [
   { id: "all", label: "All Wins" },
+  { id: "mine", label: "My Wins" },
   { id: "verified", label: "Verified" },
   { id: "big", label: "Biggest Saves" },
   { id: "fast", label: "Fastest Snipes" },
@@ -81,10 +84,12 @@ function verificationMeta(v) {
 }
 
 /** Applies the current filter + keeps stable sort (priority then createdAt). */
-function filterAndSort(wins, filter) {
+function filterAndSort(wins, filter, username) {
   const list = wins.map(decorateWin);
   let filtered = list;
-  if (filter === "verified") {
+  if (filter === "mine" && username) {
+    filtered = list.filter((w) => String(w.username).toLowerCase() === String(username).toLowerCase());
+  } else if (filter === "verified") {
     filtered = list.filter((w) => w.verification === WIN_VERIFICATION.VERIFIED);
   } else if (filter === "big") {
     filtered = [...list].sort((a, b) => (b.savings || 0) - (a.savings || 0));
@@ -596,14 +601,14 @@ export default function WinFeed() {
   const stats = useMemo(() => computeFeedStats(wins), [wins]);
 
   const filtered = useMemo(() => {
-    const base = filterAndSort(wins, filter);
+    const base = filterAndSort(wins, filter, defaultUsername);
     const q = search.trim().toLowerCase();
     if (!q) return base;
     return base.filter((w) => {
       const hay = `${w.title} ${w.username} ${w.category} ${(w.tags || []).join(" ")}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [wins, filter, search]);
+  }, [wins, filter, search, defaultUsername]);
 
   const handleSubmit = useCallback(
     (payload) => {
@@ -630,15 +635,15 @@ export default function WinFeed() {
     <div className="wf-page">
       <header className="wf-hero">
         <div className="wf-hero-copy">
-          <div className="wf-hero-eyebrow">Savvy Wins</div>
+          <div className="wf-hero-eyebrow">Savvy Wins · Community Hub</div>
           <h1>
-            Real wins. Real savings.
-            <span className="wf-hero-accent"> Get featured.</span>
+            Grow the Savvy Universe.
+            <span className="wf-hero-accent"> Celebrate every win.</span>
           </h1>
           <p>
-            The feed below is powered by actual Final10 users. Post your own and you'll
-            earn Savvy points, climb the leaderboard, and get front-row placement when
-            your save is huge.
+            Complete community missions, track live goals, and browse real purchase wins and
+            savings history — all in one place. Post your win to earn Savvy, climb the
+            leaderboard, and get featured when your save is huge.
           </p>
           <div className="wf-hero-actions">
             <button
@@ -672,6 +677,12 @@ export default function WinFeed() {
           </div>
         </dl>
       </header>
+
+      <CommunityHubSections onPostWin={() => setModalOpen(true)} />
+
+      <div className="ch-section-divider" aria-hidden>
+        <span>Purchase wins &amp; savings history</span>
+      </div>
 
       <section className="wf-highlights" aria-label="Weekly highlights">
         <HighlightCard
@@ -761,8 +772,16 @@ export default function WinFeed() {
       {filtered.length === 0 ? (
         <EmptyState
           className="wf-empty f10-state--page"
-          title="No wins match that filter yet"
-          description="Try a different tab or be the first to post a win in this category."
+          title={
+            filter === "mine"
+              ? "You haven't posted a win yet"
+              : "No wins match that filter yet"
+          }
+          description={
+            filter === "mine"
+              ? "Post your first purchase win to build your savings history and inspire the community."
+              : "Try a different tab or be the first to post a win in this category."
+          }
           action={
             <button
               type="button"

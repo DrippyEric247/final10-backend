@@ -1,5 +1,23 @@
 const rateLimit = require('express-rate-limit');
 const { rateLimitSkipDev } = require('../lib/rateLimitDevBypass');
+const { isBetaMode } = require('../config/betaMode');
+const { getRouteRateCaps } = require('../config/betaMode');
+const { getSoftBusyMessage } = require('./marketplaceScanLimiter');
+
+function caps() {
+  return getRouteRateCaps();
+}
+
+function betaRateLimitMessage(fallback) {
+  if (isBetaMode()) {
+    return {
+      code: 'MARKETPLACE_BUSY',
+      message: getSoftBusyMessage(),
+      retryAfterSec: 60,
+    };
+  }
+  return typeof fallback === 'string' ? { code: 'RATE_LIMIT', message: fallback } : fallback;
+}
 
 /** True for GET /api/auth/me (profile hydrate — not a credential guess). */
 function isAuthMeRequest(req) {
@@ -10,7 +28,7 @@ function isAuthMeRequest(req) {
 /** Lenient limiter for session hydration — separate bucket from login brute-force. */
 const authMeLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: () => (isBetaMode() ? 240 : 120),
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
@@ -41,101 +59,84 @@ const authSignupLimiter = rateLimit({
 
 const progressionEventsLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: () => caps().progressionEvents,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
-  message: { code: 'RATE_LIMIT', message: 'Too many progression events. Slow down.' },
+  message: () =>
+    betaRateLimitMessage('Too many progression events. Slow down.'),
 });
 
+/** @deprecated Route entry gate — live scans counted in marketplaceScanLimiter only. */
 const ebaySearchLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 90,
+  max: () => caps().progressionEvents,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  message: {
-    code: 'RATE_LIMIT',
-    message:
-      'Too many marketplace searches right now. Please wait about a minute, then try again.',
-  },
+  skip: () => true,
+  message: () => betaRateLimitMessage('Too many marketplace searches right now.'),
 });
 
 const ebayBidLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 40,
+  max: () => caps().ebayBid,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
-  message: {
-    code: 'RATE_LIMIT',
-    message: 'Too many bid attempts from your session. Pause briefly and retry.',
-  },
+  message: () => betaRateLimitMessage('Too many bid attempts from your session. Pause briefly and retry.'),
 });
 
 /** Browse-backed seller trends runs several internal searches — keep separate from product search. */
 const ebaySellerTrendsLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: () => caps().ebaySellerTrends,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
-  message: {
-    code: 'RATE_LIMIT',
-    message: 'Seller trend refresh limit reached. Try again in a minute.',
-  },
+  message: () => betaRateLimitMessage('Seller trend refresh limit reached. Try again in a minute.'),
 });
 
 /** True Market Value comp lookups — heavier than search, so bucketed separately. */
 const marketValueLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: () => caps().marketValue,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
-  message: { code: 'RATE_LIMIT', message: 'Too many market value lookups.' },
+  message: () => betaRateLimitMessage('Too many market value lookups.'),
 });
 
 /** Perk Machine spins — per-user cap to blunt double-tap / parallel request abuse. */
 const perkMachineSpinLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: () => caps().perkMachineSpin,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
   keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: {
-    code: 'RATE_LIMIT',
-    message: 'Too many spins. Wait a moment before trying again.',
-  },
+  message: () => betaRateLimitMessage('Too many spins. Wait a moment before trying again.'),
 });
 
 /** Scout mission claims — per-user cap against spam clicking Complete. */
 const scoutMissionClaimLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: () => caps().scoutMissionClaim,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
   keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: {
-    code: 'RATE_LIMIT',
-    message: 'Too many claim attempts. Slow down.',
-  },
+  message: () => betaRateLimitMessage('Too many claim attempts. Slow down.'),
 });
 
 /** Easter egg redemptions — per-user cap. */
 const easterEggRedeemLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 15,
+  max: () => caps().easterEggRedeem,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
   keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: {
-    code: 'RATE_LIMIT',
-    message: 'Too many redemption attempts. Try again shortly.',
-  },
+  message: () => betaRateLimitMessage('Too many redemption attempts. Try again shortly.'),
 });
 
 /** POST /api/auth/forgot-password — limit reset email requests per IP */

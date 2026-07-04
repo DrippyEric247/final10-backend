@@ -49,6 +49,8 @@ import {
 } from '../lib/quickSnipesBestMove';
 import { isBestMoveDisplayable } from '../lib/bestMoveListingValidation';
 import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
+import DealSearchModeSelector from '../components/deals/DealSearchModeSelector';
+import { listingModeForSearchMode, readPersistedSearchMode, writePersistedSearchMode } from '../lib/dealSearchMode';
 import '../styles/QuickSnipesCommandCenter.css';
 
 /** Survives React Strict Mode remounts so `?q=` hydration does not double-consume boosts. */
@@ -183,7 +185,7 @@ const LocalDeals = () => {
   const [searchInput, setSearchInput] = useState('');
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [mode, setMode] = useState('auction');
+  const [mode, setMode] = useState(() => readPersistedSearchMode());
   const [showPass, setShowPass] = useState(false);
   const [seen, setSeen] = useState({});
   const [boostedUsed, setBoostedUsed] = useState(() => readBestMoveUsage().used);
@@ -194,6 +196,7 @@ const LocalDeals = () => {
   const [liveTick, setLiveTick] = useState(0);
   /** When true, avoid overwriting the hunt input (e.g. boost-exhausted modal sync). Resets on tile/wheel/URL. */
   const searchInputUserEditedRef = useRef(false);
+  const lanesRef = useRef(null);
   const [tierTick, bumpTier] = useReducer((n) => n + 1, 0);
   void tierTick;
   const { intent: smartIntent } = useSearchIntent();
@@ -251,17 +254,18 @@ const LocalDeals = () => {
     return false;
   }, []);
 
-  const runBoostedSearch = (raw) => {
+  const runBoostedSearch = (raw, opts = {}) => {
+    const { preserveCategory = false, loadingMessage = null } = opts;
     const q = String(raw || '').trim();
     if (!q) return;
-    setCategoryId('');
-    setHuntLaneLoadingMessage(null);
+    if (!preserveCategory) setCategoryId('');
+    setHuntLaneLoadingMessage(loadingMessage);
     if (tryConsumeBoostedCredit()) {
       setQuery(q);
       trackLocalDealsSearch(q);
       recordSearchSignal(q);
-      trackQuickSnipeSearch({ mode: 'boosted', queryLen: q.length });
-      trackQuickSnipeAction('boosted_search', { queryLen: q.length });
+      trackQuickSnipeSearch({ mode: 'best_move', queryLen: q.length, listingMode: 'mixed' });
+      trackQuickSnipeAction('boosted_search', { queryLen: q.length, searchMode: 'best_move' });
       emitTourAction('quickSnipes', { query: q, source: 'search_bar' });
     } else {
       if (!searchInputUserEditedRef.current) {
@@ -272,17 +276,52 @@ const LocalDeals = () => {
     }
   };
 
-  const runNormalSearch = (raw) => {
+  const runModeSearch = (raw, searchMode, opts = {}) => {
+    const { preserveCategory = false, loadingMessage = null, source = 'search_bar' } = opts;
     const q = String(raw || '').trim();
     if (!q) return;
-    setCategoryId('');
+    if (!preserveCategory) setCategoryId('');
+    setHuntLaneLoadingMessage(loadingMessage);
+    setBoostedActive(false);
+    setQuery(q);
+    trackLocalDealsSearch(q);
+    recordSearchSignal(q);
+    trackQuickSnipeSearch({ mode: searchMode, queryLen: q.length, listingMode: listingModeForSearchMode(searchMode) });
+    trackQuickSnipeAction(`${searchMode}_search`, { queryLen: q.length, searchMode });
+    emitTourAction('quickSnipes', { query: q, source });
+  };
+
+  const executeSearch = (raw, opts = {}) => {
+    const { preserveCategory = true, loadingMessage = null, source = 'search_bar' } = opts;
+    const q = String(raw || '').trim();
+    if (!q) return;
+    if (mode === 'best_move') {
+      runBoostedSearch(q, { preserveCategory, loadingMessage });
+    } else {
+      runModeSearch(q, mode, { preserveCategory, loadingMessage, source });
+    }
+    requestAnimationFrame(() => {
+      lanesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const handleSearchModeChange = useCallback((next) => {
+    setMode(next);
+    writePersistedSearchMode(next);
+  }, []);
+
+  const runNormalSearch = (raw, opts = {}) => {
+    const { preserveCategory = false } = opts;
+    const q = String(raw || '').trim();
+    if (!q) return;
+    if (!preserveCategory) setCategoryId('');
     setHuntLaneLoadingMessage(null);
     setBoostedActive(false);
     setQuery(q);
     trackLocalDealsSearch(q);
     recordSearchSignal(q);
-    trackQuickSnipeSearch({ mode: 'normal', queryLen: q.length });
-    trackQuickSnipeAction('normal_search', { queryLen: q.length });
+    trackQuickSnipeSearch({ mode: mode === 'best_move' ? 'normal_best_move' : mode, queryLen: q.length });
+    trackQuickSnipeAction('normal_search', { queryLen: q.length, searchMode: mode });
     emitTourAction('quickSnipes', { query: q, source: 'search_bar_normal' });
   };
 
@@ -300,17 +339,26 @@ const LocalDeals = () => {
 
     searchInputUserEditedRef.current = false;
     setSearchInput(q);
-    if (tryConsumeBoostedCredit()) {
+    if (mode === 'best_move') {
+      if (tryConsumeBoostedCredit()) {
+        setQuery(q);
+        trackQuickSnipeSearch({ mode: 'best_move', queryLen: q.length, source: 'url_redirect' });
+        trackLocalDealsSearch(q);
+        recordSearchSignal(q);
+        emitTourAction('quickSnipes', { query: q, source: 'search_redirect' });
+      } else {
+        setPendingBoostQuery(q);
+        setBoostExhaustedOpen(true);
+      }
+    } else {
+      setBoostedActive(false);
       setQuery(q);
-      trackQuickSnipeSearch({ mode: 'boosted', queryLen: q.length, source: 'url_redirect' });
+      trackQuickSnipeSearch({ mode, queryLen: q.length, source: 'url_redirect', listingMode: listingModeForSearchMode(mode) });
       trackLocalDealsSearch(q);
       recordSearchSignal(q);
       emitTourAction('quickSnipes', { query: q, source: 'search_redirect' });
-    } else {
-      setPendingBoostQuery(q);
-      setBoostExhaustedOpen(true);
     }
-  }, [location.pathname, location.search, tryConsumeBoostedCredit]);
+  }, [location.pathname, location.search, tryConsumeBoostedCredit, mode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -348,7 +396,7 @@ const LocalDeals = () => {
     };
   }, []);
 
-  const listingMode = mode === 'best_move' ? 'mixed' : mode;
+  const listingMode = listingModeForSearchMode(mode);
   const listings = useEbayListings({
     enabled: Boolean(query || categoryId),
     query,
@@ -574,7 +622,6 @@ const LocalDeals = () => {
     }
   };
 
-  const lanesRef = useRef(null);
   const [wheelIndex, setWheelIndex] = useState(0);
   const [activityIndex, setActivityIndex] = useState(0);
 
@@ -630,13 +677,8 @@ const LocalDeals = () => {
     const { loadingMessage } = opts;
     searchInputUserEditedRef.current = false;
     setSearchInput(q);
-    setCategoryId('');
-    runBoostedSearch(q);
-    setHuntLaneLoadingMessage(loadingMessage ?? null);
-    requestAnimationFrame(() => {
-      lanesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    trackQuickSnipeAction('hunt_launch', { source });
+    executeSearch(q, { preserveCategory: false, loadingMessage, source });
+    trackQuickSnipeAction('hunt_launch', { source, searchMode: mode });
     emitTourAction('quickSnipes', { query: q, source });
   };
 
@@ -652,7 +694,7 @@ const LocalDeals = () => {
 
         <div className="qscc-glass rounded-2xl p-4 sm:p-6">
           <GlobalSmartSearch scope="quick-snipes" listLoading={Boolean(hasSearchContext && listings.isLoading)} />
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-4 qscc-search-stack">
             <input
               type="text"
               value={searchInput}
@@ -660,29 +702,34 @@ const LocalDeals = () => {
                 searchInputUserEditedRef.current = true;
                 setSearchInput(e.target.value);
               }}
-              onKeyDown={(e) => e.key === 'Enter' && runBoostedSearch(searchInput)}
+              onKeyDown={(e) => e.key === 'Enter' && executeSearch(searchInput)}
               placeholder="Search for your next snipe..."
-              className="min-w-[240px] flex-1 px-4 py-3 rounded-xl bg-slate-900/70 border border-slate-600 text-white"
+              aria-label="Search deals"
+              className="qscc-search-input"
             />
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="px-4 py-3 rounded-xl bg-slate-900/70 border border-slate-600 text-white"
-            >
-              <option value="">All categories</option>
-              <option value="electronics">Electronics</option>
-              <option value="collectibles">Collectibles</option>
-              <option value="fashion">Fashion</option>
-              <option value="tools">Tools</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => runBoostedSearch(searchInput)}
-              disabled={!searchInput.trim() || listings.isLoading}
-              className={`px-5 py-3 rounded-xl font-bold ${hasBoostedPower ? 'bg-gradient-to-r from-amber-400 to-fuchsia-500 text-black' : 'bg-violet-600 text-white'}`}
-            >
-              {listings.isLoading ? 'Scanning...' : 'Launch Hunt'}
-            </button>
+            <div className="qscc-search-controls">
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                aria-label="Category"
+                className="qscc-search-category"
+              >
+                <option value="">Category ▼</option>
+                <option value="electronics">Electronics</option>
+                <option value="collectibles">Collectibles</option>
+                <option value="fashion">Fashion</option>
+                <option value="tools">Tools</option>
+              </select>
+              <DealSearchModeSelector mode={mode} onChange={handleSearchModeChange} />
+              <button
+                type="button"
+                onClick={() => executeSearch(searchInput)}
+                disabled={!searchInput.trim() || listings.isLoading}
+                className={`qscc-search-launch ${mode === 'best_move' && hasBoostedPower ? 'qscc-search-launch--boosted' : 'qscc-search-launch--normal'}`}
+              >
+                {listings.isLoading ? 'Scanning...' : '🚀 Launch Hunt'}
+              </button>
+            </div>
           </div>
           <div className="mt-3 text-xs text-slate-300">
             <span className="f10-best-move-usage">{formatBestMoveUsageLine(quickSnipesBoostTier)}</span>
@@ -757,7 +804,6 @@ const LocalDeals = () => {
               items={visibleItems}
               liveTick={liveTick}
               mode={mode}
-              setMode={setMode}
               showPass={showPass}
               setShowPass={setShowPass}
               runHunt={runHunt}

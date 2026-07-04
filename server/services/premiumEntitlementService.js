@@ -41,7 +41,8 @@ function toUserObjectId(userId) {
   return new mongoose.Types.ObjectId(s);
 }
 
-const { isBetaTester: checkBetaTester, logBetaUsage } = require('../services/betaTesterService');
+const { isBetaTester: checkBetaTester, logBetaUsage, hasBetaProAccess } = require('../services/betaTesterService');
+const { isBetaMode } = require('../config/betaMode');
 const {
   isMembershipCurrentlyActive,
   serializeMembershipForClient,
@@ -50,6 +51,30 @@ const {
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
+}
+
+function buildBetaModeEntitlement(user) {
+  return {
+    isPremium: true,
+    premiumStatus: 'active',
+    premiumTier: 'elite',
+    tier: 'elite',
+    plan: 'pro',
+    subscriptionTier: 'elite',
+    membershipTier: 'pro',
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    trialEndsAt: null,
+    provider: 'beta_mode',
+    foundingTesterAccess: false,
+    isBetaTester: false,
+    betaTester: Boolean(user?.betaTester),
+    foundingAccess: Boolean(user?.foundingAccess),
+    betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+    betaMode: true,
+    betaModeProAccess: true,
+    entitlements: { pro: true, premium: true, core: true, elite: true },
+  };
 }
 
 async function getEntitlementByUserId(userId) {
@@ -91,6 +116,14 @@ function membershipFieldsForEntitlements(user) {
  * Public payload for GET /api/entitlements/me
  */
 function toMeResponse(doc, user = null) {
+  if (hasBetaProAccess(user)) {
+    const payload = buildBetaModeEntitlement(user);
+    return {
+      ...payload,
+      creatorMonetization: monetizationFromEntitlement(doc),
+    };
+  }
+
   const founding = hasFoundingTesterAccess(user);
   if (founding) {
     return {
@@ -111,6 +144,8 @@ function toMeResponse(doc, user = null) {
       betaTester: Boolean(user?.betaTester),
       foundingAccess: Boolean(user?.foundingAccess),
       betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+      betaMode: isBetaMode(),
+      betaModeProAccess: false,
       entitlements: { pro: true, premium: true, core: true, elite: true },
     };
   }
@@ -149,6 +184,8 @@ function toMeResponse(doc, user = null) {
       betaTester: Boolean(user?.betaTester),
       foundingAccess: Boolean(user?.foundingAccess),
       betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
+      betaMode: isBetaMode(),
+      betaModeProAccess: false,
       entitlements: { pro: false, premium: false, core: false, elite: false },
     };
   }

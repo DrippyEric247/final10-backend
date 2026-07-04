@@ -36,6 +36,12 @@ import ListingCardImage from '../listings/ListingCardImage';
 import TrueMarketValueBlock from '../market/TrueMarketValueBlock';
 import DealBadges from '../market/DealBadges';
 import { getMarketValue, getSavings, type DealBadge } from '../../lib/marketValue';
+import AuctionLiveCountdown, {
+  isAuctionCountdownCritical,
+  isAuctionCountdownUrgent,
+} from './AuctionLiveCountdown';
+import WhySavvyPickedSection from './WhySavvyPickedSection';
+import '../../styles/best-move-insights.css';
 
 export type DealListing = {
   itemId?: string;
@@ -113,6 +119,8 @@ type DealCardShellProps = {
   cardTone: string;
   typeTone?: string;
   emphasize?: boolean;
+  /** Best Move cards: show inline reasons + live auction countdown before opening listing. */
+  showBestMoveInsights?: boolean;
   boostedPower?: boolean;
   hideCreateAlert?: boolean;
   onMeaningfulView?: (item: DealListing, action: string) => void;
@@ -285,6 +293,7 @@ export function DealCardShell({
   cardTone,
   typeTone = 'bg-black/55 border-white/20 text-white',
   emphasize = false,
+  showBestMoveInsights = false,
   boostedPower = false,
   hideCreateAlert = false,
   onMeaningfulView,
@@ -330,6 +339,10 @@ export function DealCardShell({
     if (decision.bestMove === 'watch') return 'Watch and wait';
     return 'Skip for now';
   }, [decision.bestMove]);
+  const auctionUrgent =
+    showBestMoveInsights && item.isAuction && isAuctionCountdownUrgent(item.secondsRemaining);
+  const auctionCritical =
+    showBestMoveInsights && item.isAuction && isAuctionCountdownCritical(item.secondsRemaining);
   const secondsRemaining = Number(item.secondsRemaining);
   const isGoneDeal = Number.isFinite(secondsRemaining) && secondsRemaining <= 0;
   const [, bumpAiCaps] = useReducer((n: number) => n + 1, 0);
@@ -412,6 +425,13 @@ export function DealCardShell({
     >
       <div className="relative bg-gray-800">
         <ListingCardImage item={item} alt={title} aspectRatio="4 / 3" borderRadius="0" frameClassName="bg-gray-800" />
+        {auctionCritical ? (
+          <AuctionLiveCountdown
+            secondsRemaining={item.secondsRemaining}
+            itemKey={String(item.itemId || title)}
+            variant="overlay"
+          />
+        ) : null}
         <span className="absolute top-3 left-3 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-white/95 bg-black/60 border-black/20">
           {source}
         </span>
@@ -430,6 +450,23 @@ export function DealCardShell({
           {[item.condition, item.seller].filter(Boolean).join(' • ') || 'Marketplace listing'}
         </div>
         <p className="mt-2 text-sm font-semibold text-gray-100">{recommendationLine}</p>
+
+        {showBestMoveInsights ? (
+          <WhySavvyPickedSection
+            item={item}
+            decision={decision}
+            trustResult={trustResult}
+            effectiveSavings={effectiveSavings}
+          />
+        ) : null}
+
+        {auctionUrgent ? (
+          <AuctionLiveCountdown
+            secondsRemaining={item.secondsRemaining}
+            itemKey={String(item.itemId || title)}
+            variant="banner"
+          />
+        ) : null}
 
         <div className="deal-price">
           <span className="current">{item.isAuction ? currentBid : formatPrice(item.price, item.currency || 'USD')}</span>
@@ -462,14 +499,21 @@ export function DealCardShell({
           effectiveSavings={effectiveSavings}
           formatPrice={formatPrice}
           currency={item.currency || 'USD'}
+          hideWhyPickedPanel={showBestMoveInsights}
         />
 
         <div className="mt-3 flex items-center justify-between gap-2">
-          {item.isAuction ? (
+          {item.isAuction && !showBestMoveInsights ? (
             <div className="inline-flex items-center gap-1 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
               <Clock className="h-3.5 w-3.5" />
               Ends in {formatTime(item.secondsRemaining)}
             </div>
+          ) : item.isAuction && showBestMoveInsights ? (
+            <AuctionLiveCountdown
+              secondsRemaining={item.secondsRemaining}
+              itemKey={`${String(item.itemId || title)}-footer`}
+              variant="inline"
+            />
           ) : (
             <span />
           )}

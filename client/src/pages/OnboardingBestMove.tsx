@@ -24,6 +24,13 @@ import { ONBOARDING_FIRST_MOVE_SAVVY } from "../config/savvyRewards";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
 import Final10Slogan from "../components/branding/Final10Slogan";
+import AuctionLiveCountdown, {
+  isAuctionCountdownCritical,
+  isAuctionCountdownUrgent,
+} from "../components/deals/AuctionLiveCountdown";
+import WhySavvyPickedSection from "../components/deals/WhySavvyPickedSection";
+import type { DealListing } from "../components/deals/DealCard";
+import "../styles/best-move-insights.css";
 import "../styles/OnboardingBestMove.css";
 
 const LOADING_STAGES = [
@@ -47,17 +54,6 @@ function formatCurrency(value: number | string | null | undefined): string {
     currency: "USD",
     maximumFractionDigits: n >= 100 ? 0 : 2,
   }).format(n);
-}
-
-function formatCountdown(seconds: number | null | undefined): string | null {
-  const s = Number(seconds);
-  if (!Number.isFinite(s) || s <= 0) return null;
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h left`;
-  if (h > 0) return `${h}h ${m}m left`;
-  return `${Math.max(1, m)}m left`;
 }
 
 function getEstimatedEarn(c: InstantBestMoveCandidate): number {
@@ -560,7 +556,10 @@ function ResultPanel({
   const price =
     listing.buyNowPrice ?? listing.currentBidPrice ?? listing.currentBid ?? listing.price;
   const band = trustBand(trust.trustScore);
-  const countdown = formatCountdown(getSecondsRemaining(active));
+  const secondsLeft = getSecondsRemaining(active);
+  const isAuction = Boolean((listing as Record<string, unknown>).isAuction ?? secondsLeft);
+  const auctionUrgent = isAuction && isAuctionCountdownUrgent(secondsLeft ?? undefined);
+  const auctionCritical = isAuction && isAuctionCountdownCritical(secondsLeft ?? undefined);
   const estimatedEarn = getEstimatedEarn(active);
   const title = String(listing.title || "Featured listing");
   const imageSrc = String(
@@ -623,6 +622,14 @@ function ResultPanel({
         <div className="onboard-move-card-glow" aria-hidden />
         <div className="onboard-move-card-image">
           <img src={imageSrc} alt={title} loading="lazy" />
+          {auctionCritical && secondsLeft ? (
+            <AuctionLiveCountdown
+              secondsRemaining={secondsLeft}
+              itemKey={pickId}
+              variant="overlay"
+              className="onboard-move-card-countdown-overlay"
+            />
+          ) : null}
           <span
             className={`onboard-move-card-picked ${
               isHighConfidence ? "is-elite" : ""
@@ -647,6 +654,21 @@ function ResultPanel({
         <div className="onboard-move-card-body">
           <div className="onboard-move-card-move">{bestMoveLabel(active)}</div>
           <h3 className="onboard-move-card-title">{title}</h3>
+
+          <WhySavvyPickedSection
+            item={listing as DealListing}
+            decision={decision}
+            trustResult={trust}
+            effectiveSavings={savingsAmount}
+          />
+
+          {auctionUrgent && secondsLeft ? (
+            <AuctionLiveCountdown
+              secondsRemaining={secondsLeft}
+              itemKey={`${pickId}-banner`}
+              variant="banner"
+            />
+          ) : null}
 
           {hasSavings && listing.marketValue != null ? (
             <div className="onboard-move-price-hero" aria-label="Price vs market price">
@@ -705,8 +727,12 @@ function ResultPanel({
               <SavvyPointsIcon size={16} glow />
               Earn ~{estimatedEarn} Savvy
             </div>
-            {countdown ? (
-              <div className="onboard-move-meta-chip urgent">⏱ {countdown}</div>
+            {isAuction && secondsLeft ? (
+              <AuctionLiveCountdown
+                secondsRemaining={secondsLeft}
+                itemKey={`${pickId}-meta`}
+                variant="inline"
+              />
             ) : null}
             <div className="onboard-move-meta-chip fomo" aria-live="polite">
               👀 {watchers} people watching

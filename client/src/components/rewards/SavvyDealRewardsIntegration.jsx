@@ -88,6 +88,7 @@ export default function SavvyDealRewardsIntegration({
   effectiveSavings,
   formatPrice,
   currency = 'USD',
+  hideWhyPickedPanel = false,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [tierTick, setTierTick] = useState(0);
@@ -315,12 +316,14 @@ export default function SavvyDealRewardsIntegration({
         </div>
       ) : null}
 
-      <WhyPickedPanel
-        item={item}
-        trustResult={trustResult}
-        decision={decision}
-        effectiveSavings={Number(effectiveSavings ?? decision?.estimatedSavings) || 0}
-      />
+      {hideWhyPickedPanel ? null : (
+        <WhyPickedPanel
+          item={item}
+          trustResult={trustResult}
+          decision={decision}
+          effectiveSavings={Number(effectiveSavings ?? decision?.estimatedSavings) || 0}
+        />
+      )}
     </div>
   );
 }

@@ -54,6 +54,7 @@ function signUserToken(user) {
 }
 
 const { isBetaTester: checkBetaTester } = require('../services/betaTesterService');
+const { isBetaMode, hasBetaProAccess } = require('../config/betaMode');
 const {
   ensureFounderAdminRole,
   applyFounderAdminAuthOverride,
@@ -94,6 +95,8 @@ function serializeAuthUserPayload(user) {
     foundingAccess: Boolean(user.foundingAccess),
     foundingTesterActive,
     isBetaTester: foundingTesterActive,
+    betaMode: isBetaMode(),
+    betaModeProAccess: hasBetaProAccess(user),
   });
 }
 

@@ -1,4 +1,5 @@
 const C = require('./points');
+const { isBetaMode } = require('./betaMode');
 
 function getPublicConfig() {
   return {
@@ -8,7 +9,8 @@ function getPublicConfig() {
     weekendMultiplier: C.WEEKEND_MULTIPLIER,
     badgeTiers: C.BADGE_TIERS,
     discountRatio: C.DISCOUNT_RATIO,
-    version: 'v1'
+    betaMode: isBetaMode(),
+    version: 'v1',
   };
 }
 

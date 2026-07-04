@@ -12,6 +12,7 @@ import {
 import { parseRetryAfterSec, sleepMs } from "./parseRetryAfter";
 import { rateLimitBackoffMs, RATE_LIMIT_MAX_ATTEMPTS } from "./apiRateLimitBackoff";
 import { SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE } from "./savvyScoutRateLimitCopy";
+import { isBetaModeActive } from "./betaModeAccess";
 
 export {
   ApiCoolingDownError,
@@ -92,6 +93,20 @@ api.interceptors.response.use(
     } else {
       devDiagApiFailure("network", { message: error.message, url: error.config?.url });
     }
+    if (error.response?.status === 503) {
+      const path = String(url).split("?")[0];
+      const code = parsed.code;
+      if (isBetaModeActive() && (code === "MARKETPLACE_BUSY" || /^\/ebay\//i.test(path))) {
+        const busyError = new Error(SAVVY_SCOUT_RATE_LIMIT_USER_MESSAGE);
+        busyError.status = 503;
+        busyError.code = code;
+        busyError.isCoolingDown = true;
+        busyError.isRateLimited = false;
+        busyError.isMarketplaceBusy = true;
+        return Promise.reject(busyError);
+      }
+    }
+
     if (error.response?.status === 429) {
       const headers = error.response.headers;
       const retryAfter = parseRetryAfterSec(headers, 60);
@@ -917,6 +932,11 @@ export async function getCommunityProgress() {
 
 export async function claimCommunityReward() {
   const { data } = await api.post("/community/claim-reward");
+  return data;
+}
+
+export async function getCommunityMilestones(limit = 12) {
+  const { data } = await api.get("/community/milestones", { params: { limit } });
   return data;
 }
 

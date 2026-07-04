@@ -97,6 +97,8 @@ import AppErrorBoundary from "./components/AppErrorBoundary";
 import { useEntitlement } from "./hooks/useEntitlement";
 import { setCurrentSubscriptionTier } from "./lib/tierMultiplier";
 import { isBetaTester, registerBetaTesterGetter } from "./lib/betaTesterAccess";
+import { applyBetaModeFromPublicConfig, registerLoggedInGetter } from "./lib/betaModeAccess";
+import { useAppConfig } from "./lib/useAppConfig";
 import FoundingTesterBadge from "./components/beta/FoundingTesterBadge";
 import { SavvyScoutMissionsProvider } from './context/SavvyScoutMissionsContext';
 import MissionLog from './pages/MissionLog';
@@ -182,15 +184,18 @@ export default function App() {
   const onboardingComplete = user ? hasCompletedOnboarding(onboardingUserId(user)) : true;
   const showPostOnboardingFtue = Boolean(user) && onboardingComplete && !isOnboardingRoute;
   const entitlement = useEntitlement(Boolean(user));
+  const { cfg: publicConfig } = useAppConfig();
   const entIsBeta = Boolean(entitlement?.isBetaTester);
   const entFoundingAccess = Boolean(entitlement?.foundingTesterAccess);
+  const entBetaModePro = Boolean(entitlement?.betaModeProAccess || user?.betaModeProAccess);
   const isFoundingTester = useMemo(
     () =>
       isBetaTester(user, {
         isBetaTester: entIsBeta || Boolean(user?.isBetaTester),
         foundingTesterAccess: entFoundingAccess || Boolean(user?.foundingTesterAccess),
+        betaModeProAccess: entBetaModePro,
       }),
-    [user, entIsBeta, entFoundingAccess]
+    [user, entIsBeta, entFoundingAccess, entBetaModePro]
   );
   const [authLogoutBusy, setAuthLogoutBusy] = React.useState(false);
   const [showStartupBoot, setShowStartupBoot] = React.useState(() => shouldShowStartupBootSequence());
@@ -212,6 +217,15 @@ export default function App() {
   // exclusive grant/role-based unlock checks resolve the current user.
   useEffect(() => {
     setCurrentUserForCosmetics(user || null);
+  }, [user]);
+
+  useEffect(() => {
+    applyBetaModeFromPublicConfig(publicConfig);
+  }, [publicConfig]);
+
+  useEffect(() => {
+    registerLoggedInGetter(() => Boolean(user));
+    return () => registerLoggedInGetter(null);
   }, [user]);
 
   useEffect(() => {
