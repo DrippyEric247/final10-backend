@@ -26,12 +26,20 @@ export const DEAL_PHILOSOPHY_LANES = Object.freeze({
     philosophy: 'Traditional auction hunting',
     helperText: 'Master the final minutes. Win where competition is lowest.',
   },
+  lifeOptimizer: {
+    key: 'lifeOptimizer',
+    step: 4,
+    philosophy: 'Stay Savvy. Stay Smart.',
+    helperText:
+      'AI optimizes purchases, subscriptions, and daily decisions so you keep more Savvy.',
+  },
 });
 
 export const PRIMARY_NAV_PROGRESSION = [
   DEAL_PHILOSOPHY_LANES.alerts,
   DEAL_PHILOSOPHY_LANES.quickSnipes,
   DEAL_PHILOSOPHY_LANES.auctions,
+  DEAL_PHILOSOPHY_LANES.lifeOptimizer,
 ];
 
 /** Default discovery entry after onboarding — active hunt lane. */

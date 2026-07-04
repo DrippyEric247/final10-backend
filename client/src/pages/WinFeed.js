@@ -5,6 +5,7 @@
 // without a backend; when /api/wins exists, swap the service imports.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   WIN_CATEGORIES,
@@ -571,6 +572,7 @@ function WinCard({ win }) {
 
 export default function WinFeed() {
   const { user } = useAuth();
+  const location = useLocation();
   const [wins, setWins] = useState(() => listWins());
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -596,6 +598,16 @@ export default function WinFeed() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (location.hash !== '#community-hub') return undefined;
+    const el = document.getElementById('community-hub');
+    if (!el) return undefined;
+    const id = window.requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [location.hash, location.pathname]);
 
   const highlights = useMemo(() => computeWeeklyHighlights(wins), [wins]);
   const stats = useMemo(() => computeFeedStats(wins), [wins]);

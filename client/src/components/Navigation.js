@@ -10,29 +10,22 @@ import {
   ChevronDown,
   Crown,
   Dices,
-  Flame,
-  Gift,
   Gavel,
+  Gift,
   Home,
-  Lightbulb,
   Medal,
-  ScanLine,
+  Plane,
   Settings,
   Shield,
   ShieldCheck,
   ShoppingBag,
-  Smartphone,
-  Sparkles,
-  Swords,
   Target,
   TestTube2,
-  TrendingUp,
   Trophy,
-  User,
+  Users,
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useLiveEventsOptional } from '../context/LiveEventsContext';
 import MembershipStatusBadge from './membership/MembershipStatusBadge';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
@@ -43,9 +36,29 @@ import '../styles/PrimaryNavigation.css';
 const NAV_ICON_SIZE = 17;
 const NAV_ICON_STROKE = 2.25;
 
-function isNavActive(pathname, path) {
+function normalizeNavHash(hash) {
+  if (!hash) return '';
+  return hash.startsWith('#') ? hash : `#${hash}`;
+}
+
+function isNavActive(pathname, hash, item) {
+  const path = item.path;
+  const normalizedHash = normalizeNavHash(hash);
+
+  if (item.hash) {
+    return pathname === path && normalizedHash === normalizeNavHash(item.hash);
+  }
+
   if (path === '/') return pathname === '/';
-  return pathname === path || pathname.startsWith(`${path}/`);
+
+  const pathMatches = pathname === path || pathname.startsWith(`${path}/`);
+  if (!pathMatches) return false;
+
+  if (path === '/win-feed' && normalizedHash === '#community-hub') {
+    return false;
+  }
+
+  return true;
 }
 
 const Navigation = () => {
@@ -55,8 +68,6 @@ const Navigation = () => {
   const [alertUnreadCount, setAlertUnreadCount] = useState(0);
   const { user } = useAuth() || {};
   const showAdminNav = shouldShowAdminNav(user);
-  const liveEvents = useLiveEventsOptional();
-  const eventsBadge = liveEvents?.claimableCount ?? 0;
 
   useEffect(() => {
     if (!user) {
@@ -93,9 +104,9 @@ const Navigation = () => {
 
   useEffect(() => {
     setMoreOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.hash]);
 
-  const primaryNavItems = useMemo(
+  const discoveryNavItems = useMemo(
     () => [
       { name: 'Home', path: '/', Icon: Home },
       {
@@ -120,34 +131,45 @@ const Navigation = () => {
         philosophy: DEAL_PHILOSOPHY_LANES.auctions.philosophy,
         title: DEAL_PHILOSOPHY_LANES.auctions.helperText,
       },
-      { name: 'Profile / Rewards', path: '/profile', Icon: User },
+      {
+        name: 'Life Optimizer',
+        path: '/business-offers',
+        Icon: Building2,
+        philosophy: DEAL_PHILOSOPHY_LANES.lifeOptimizer.philosophy,
+        title: DEAL_PHILOSOPHY_LANES.lifeOptimizer.helperText,
+      },
     ],
     []
   );
 
-  const secondaryNavItems = useMemo(
+  const progressionNavItems = useMemo(
     () => [
+      { name: 'Perk Machine', path: '/perk-machine', Icon: Dices },
+      { name: 'Battle Pass', path: '/battle-pass', Icon: Target },
+      { name: 'Calling Cards & Emblems', path: '/customization', Icon: Award },
       { name: 'Savvy Wins', path: '/win-feed', Icon: Trophy },
-      { name: 'Trending Feed', path: '/feed', Icon: Smartphone },
-      { name: 'Scanner', path: '/scanner', Icon: ScanLine },
-      { name: 'Sell signals', path: '/seller-trends', Icon: TrendingUp },
-      { name: 'Promote', path: '/trending', Icon: Lightbulb },
+    ],
+    []
+  );
+
+  const moreNavItems = useMemo(
+    () => [
       { name: 'Seller Dashboard', path: '/seller-dashboard', Icon: BarChart3 },
       ...(user
         ? [{ name: 'My Savvy Shop', path: '/savvy-shop/studio', Icon: ShoppingBag }]
         : []),
       { name: 'Savvy Offers', path: '/savvy-offers', Icon: Gift },
-      { name: 'Life Optimizer', path: '/business-offers', Icon: Building2 },
       { name: 'Savvy Programs', path: '/savvy-programs', Icon: Shield },
+      { name: 'Scout Flight', path: '/scout-flight', Icon: Plane },
+      { name: 'Leaderboards', path: '/leaderboard', Icon: Medal },
+      {
+        name: 'Community Hub',
+        path: '/win-feed',
+        hash: '#community-hub',
+        Icon: Users,
+      },
       { name: 'Founding Tester', path: '/founding-tester', Icon: TestTube2 },
-      { name: 'Founding Hall', path: '/founding-hall', Icon: Award },
-      { name: 'Leaderboard', path: '/leaderboard', Icon: Medal },
-      { name: 'Build Wars', path: '/build-wars', Icon: Swords },
-      { name: 'Battle Pass', path: '/battle-pass', Icon: Target },
-      ...(user ? [{ name: 'Events', path: '/events', Icon: Sparkles, eventsBadge: true }] : []),
-      { name: 'Daily Streak', path: '/daily-streak', Icon: Flame },
-      { name: 'Perk Machine', path: '/perk-machine', Icon: Dices },
-      { name: 'Customize', path: '/customization', Icon: Award },
+      { name: 'Settings', path: '/settings', Icon: Settings },
       ...(showAdminNav
         ? [
             { name: 'Admin', path: '/admin', Icon: Settings },
@@ -159,16 +181,25 @@ const Navigation = () => {
     [showAdminNav, user]
   );
 
-  const renderNavLink = (item, { primary = false } = {}) => {
+  const isMoreActive = useMemo(
+    () =>
+      moreNavItems.some((item) =>
+        isNavActive(location.pathname, location.hash, item)
+      ),
+    [location.hash, location.pathname, moreNavItems]
+  );
+
+  const renderNavLink = (item, { variant = 'default' } = {}) => {
     const Icon = item.Icon;
-    const active = isNavActive(location.pathname, item.path);
+    const active = isNavActive(location.pathname, location.hash, item);
+    const to = item.hash ? `${item.path}${item.hash}` : item.path;
 
     return (
       <Link
-        key={item.path}
-        to={item.path}
+        key={`${item.path}${item.hash || ''}`}
+        to={to}
         title={item.title || item.name}
-        className={`nav-item ${primary ? 'nav-item--primary' : ''} ${active ? 'active' : ''}`}
+        className={`nav-item nav-item--${variant} ${active ? 'active' : ''}`}
       >
         <span className="nav-icon nav-icon-wrap">
           {item.bell ? (
@@ -181,20 +212,13 @@ const Navigation = () => {
               ) : null}
             </>
           ) : (
-            <>
-              {Icon ? (
-                <Icon className="nav-lucide-icon" size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} aria-hidden />
-              ) : null}
-              {item.eventsBadge && eventsBadge > 0 ? (
-                <span className="nav-alert-badge" aria-label={`${eventsBadge} claimable event reward${eventsBadge === 1 ? '' : 's'}`}>
-                  {eventsBadge > 99 ? '99+' : eventsBadge}
-                </span>
-              ) : null}
-            </>
+            Icon ? (
+              <Icon className="nav-lucide-icon" size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} aria-hidden />
+            ) : null
           )}
         </span>
         <span className="nav-label">{item.name}</span>
-        {primary && item.philosophy ? (
+        {variant === 'discovery' && item.philosophy ? (
           <span className="nav-philosophy">{item.philosophy}</span>
         ) : null}
       </Link>
@@ -202,24 +226,33 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="main-navigation" aria-label="Final10 primary navigation">
-      <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <h2>Final10</h2>
-        </Link>
-        {user ? <MembershipStatusBadge user={user} /> : null}
+    <nav className="main-navigation" aria-label="Final10 navigation">
+      <div className="nav-brand-row">
+        <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <h2>Final10</h2>
+          </Link>
+          {user ? <MembershipStatusBadge user={user} /> : null}
+        </div>
       </div>
 
-      <div className="nav-items nav-primary-items">
-        {primaryNavItems.map((item) => renderNavLink(item, { primary: true }))}
+      <div
+        className="nav-items nav-discovery-row"
+        aria-label="Deal discovery"
+      >
+        {discoveryNavItems.map((item) => renderNavLink(item, { variant: 'discovery' }))}
       </div>
 
-      <div className="nav-items nav-secondary-items">
+      <div
+        className="nav-items nav-progression-row f10-nav-progression-enter"
+        aria-label="Account progression"
+      >
+        {progressionNavItems.map((item) => renderNavLink(item, { variant: 'progression' }))}
         <button
           type="button"
-          className="nav-more-toggle"
+          className={`nav-more-toggle ${isMoreActive ? 'nav-more-toggle--active' : ''}`}
           aria-expanded={moreOpen}
-          aria-controls="nav-secondary-panel"
+          aria-controls="nav-more-panel"
           onClick={() => setMoreOpen((v) => !v)}
         >
           More
@@ -229,20 +262,20 @@ const Navigation = () => {
             style={{ transform: moreOpen ? 'rotate(180deg)' : undefined, transition: 'transform 160ms ease' }}
           />
         </button>
-        <button
-          onClick={() => setShowBugReport(true)}
-          className="nav-item bug-report-btn"
-          title="Report a Bug"
-          type="button"
-        >
-          <Bug className="nav-lucide-icon" size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} aria-hidden />
-          <span className="nav-label">Report Bug</span>
-        </button>
       </div>
 
       {moreOpen ? (
-        <div id="nav-secondary-panel" className="nav-secondary-panel">
-          {secondaryNavItems.map((item) => renderNavLink(item))}
+        <div id="nav-more-panel" className="nav-more-panel" aria-label="More tools and ecosystem">
+          {moreNavItems.map((item) => renderNavLink(item, { variant: 'more' }))}
+          <button
+            onClick={() => setShowBugReport(true)}
+            className="nav-item nav-item--more bug-report-btn"
+            title="Report a Bug"
+            type="button"
+          >
+            <Bug className="nav-lucide-icon" size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} aria-hidden />
+            <span className="nav-label">Report Bug</span>
+          </button>
         </div>
       ) : null}
 

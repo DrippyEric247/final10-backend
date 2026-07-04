@@ -1,39 +1,65 @@
-/* Philosophy-driven primary navigation */
+/* Two-row navigation — discovery + progression */
 
 .main-navigation {
   flex-wrap: wrap;
-  gap: 0.65rem 1rem;
+  align-items: stretch;
+  gap: 0.5rem 1rem;
 }
 
-.nav-primary-items,
-.nav-secondary-items {
+.nav-brand-row {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-.nav-primary-items {
+.nav-discovery-row,
+.nav-progression-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.nav-discovery-row {
   gap: 10px;
-  flex: 1 1 auto;
+  flex-wrap: nowrap;
 }
 
-.nav-secondary-items {
+.nav-progression-row {
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  padding-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.nav-item--primary {
+.f10-nav-progression-enter {
+  animation: f10NavProgressionFadeIn 520ms ease-out both;
+}
+
+@keyframes f10NavProgressionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-item--discovery {
   min-width: 72px;
   padding: 8px 10px 10px;
 }
 
-.nav-item--primary .nav-label {
+.nav-item--discovery .nav-label {
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.nav-item--primary .nav-philosophy {
+.nav-item--discovery .nav-philosophy {
   display: block;
   margin-top: 2px;
   font-size: 9px;
@@ -46,14 +72,30 @@
   text-align: center;
 }
 
-.nav-item--primary.active .nav-philosophy {
+.nav-item--discovery.active .nav-philosophy {
   color: #fde68a;
+}
+
+.nav-item--progression,
+.nav-item--more {
+  min-width: 64px;
+  padding: 8px 10px;
+}
+
+.nav-item--progression .nav-label,
+.nav-item--more .nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: 88px;
+  white-space: normal;
 }
 
 .nav-more-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -62,16 +104,18 @@
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
+  margin-left: auto;
 }
 
 .nav-more-toggle:hover,
-.nav-more-toggle[aria-expanded='true'] {
+.nav-more-toggle[aria-expanded='true'],
+.nav-more-toggle--active {
   color: #fff;
   border-color: rgba(167, 139, 250, 0.45);
   background: rgba(88, 28, 135, 0.35);
 }
 
-.nav-secondary-panel {
+.nav-more-panel {
   width: 100%;
   display: flex;
   flex-wrap: wrap;
@@ -80,13 +124,18 @@
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.nav-secondary-panel .nav-item .nav-label {
+.nav-more-panel .nav-item .nav-label {
   font-size: 11px;
 }
 
 @media (max-width: 768px) {
-  .nav-primary-items {
+  .nav-brand-row {
     width: 100%;
+    justify-content: center;
+  }
+
+  .nav-discovery-row,
+  .nav-progression-row {
     overflow-x: auto;
     overflow-y: hidden;
     flex-wrap: nowrap;
@@ -95,29 +144,65 @@
     scroll-snap-type: x proximity;
   }
 
-  .nav-item--primary {
+  .nav-item--discovery {
     flex: 0 0 auto;
     scroll-snap-align: start;
     min-width: 64px;
   }
 
-  .nav-item--primary .nav-philosophy {
+  .nav-item--discovery .nav-philosophy {
     display: none;
   }
 
-  .nav-secondary-items {
-    width: 100%;
-    justify-content: flex-end;
+  .nav-item--progression,
+  .nav-item--more {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
   }
 
-  .nav-secondary-panel {
+  .nav-progression-row .nav-more-toggle {
+    margin-left: 0;
+    scroll-snap-align: end;
+  }
+
+  .nav-more-panel {
     max-height: 42vh;
     overflow-y: auto;
   }
 }
 
 @media (min-width: 769px) {
-  .nav-item--primary[title] {
+  .nav-brand-row {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+
+  .nav-discovery-row {
+    flex: 1 1 auto;
+    width: auto;
+    justify-content: flex-end;
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .nav-progression-row {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 4px;
+  }
+
+  .nav-progression-row .nav-more-toggle {
+    margin-left: auto;
+  }
+
+  .nav-item--discovery[title] {
     cursor: help;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-nav-progression-enter {
+    animation: none;
   }
 }

@@ -187,7 +187,7 @@ export default function CommunityHubSections({ onPostWin }) {
   const claimableMissions = missions.filter((m) => m.claimable);
 
   return (
-    <div className="ch-hub">
+    <div id="community-hub" className="ch-hub">
       <section className="ch-scout-banner" aria-label="Savvy Scout community guide">
         <div className="ch-scout-avatar" aria-hidden>
           {SAVVY_SCOUT.emoji}
