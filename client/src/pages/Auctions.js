@@ -247,6 +247,11 @@ const getTaskBoost = (taskStreakWeeks) => {
 export default function Auctions() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setWatchlistOnly(params.get("watchlist") === "1");
+  }, [location.search]);
   const { user: authUser } = useAuth();
   const { intent: smartIntent, commitMarketSearch, marketSearchKeywords } = useSearchIntent();
 
@@ -265,7 +270,13 @@ export default function Auctions() {
   const [searchMarketPending, setSearchMarketPending] = useState(false);
   const [error, setError] = useState("");
   const [marketBanner, setMarketBanner] = useState(null);
-  const [watchlistOnly, setWatchlistOnly] = useState(false);
+  const [watchlistOnly, setWatchlistOnly] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("watchlist") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [bidModalItem, setBidModalItem] = useState(null);
   const [bidStatus, setBidStatus] = useState(null);
   const [poppedSavedId, setPoppedSavedId] = useState(null);
