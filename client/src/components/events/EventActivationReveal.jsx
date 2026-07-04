@@ -82,6 +82,7 @@ export function EventActivationReveal({ event, onActivated }) {
         'f10-event-reveal',
         profile.rarity === 'premium' ? 'f10-event-reveal--premium' : '',
         profile.rarity === 'limited' ? 'f10-event-reveal--limited' : '',
+        profile.rarity === 'rare' ? 'f10-event-reveal--rare' : '',
         `f10-event-reveal--${profile.theme}`,
       ]
         .filter(Boolean)
@@ -100,6 +101,7 @@ export function EventActivationReveal({ event, onActivated }) {
               'f10-event-reveal__headline',
               profile.rarity === 'premium' ? 'f10-event-reveal__headline--premium' : '',
               profile.rarity === 'limited' ? 'f10-event-reveal__headline--limited' : '',
+              profile.rarity === 'rare' ? 'f10-event-reveal__headline--rare' : '',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -118,6 +120,7 @@ export function EventActivationReveal({ event, onActivated }) {
                 'f10-event-reveal__glow--pulse',
                 profile.glowIntensity === 'strong' ? 'f10-event-reveal__glow--strong' : '',
                 profile.glowIntensity === 'sale' ? 'f10-event-reveal__glow--sale' : '',
+                profile.glowIntensity === 'drop' ? 'f10-event-reveal__glow--drop' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -143,6 +146,7 @@ export function EventActivationReveal({ event, onActivated }) {
                 : '',
               profile.rarity === 'premium' ? 'f10-event-reveal__card--premium' : '',
               profile.rarity === 'limited' ? 'f10-event-reveal__card--limited' : '',
+              profile.rarity === 'rare' ? 'f10-event-reveal__card--rare' : '',
             ]
               .filter(Boolean)
               .join(' ')}

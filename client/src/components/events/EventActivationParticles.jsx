@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 const COIN_COUNT = 14;
 const LIGHTNING_COUNT = 18;
 const SALE_SPARKLE_COUNT = 16;
+const CRATE_DROP_COUNT = 18;
 
 function buildCoinParticles(count) {
   return Array.from({ length: count }, (_, i) => ({
@@ -42,10 +43,27 @@ function buildSaleSparkleParticles(count) {
   });
 }
 
+function buildCrateDropParticles(count) {
+  return Array.from({ length: count }, (_, i) => {
+    const mod = i % 3;
+    const kind = mod === 0 ? 'crate' : mod === 1 ? 'spark' : 'sparkle';
+    return {
+      id: i,
+      kind,
+      angle: (360 / count) * i + (i % 2) * 12,
+      delay: (i % 4) * 0.032,
+      dist: 50 + (i % 5) * 24,
+      size: kind === 'crate' ? 10 + (i % 3) * 3 : kind === 'spark' ? 8 + (i % 2) * 2 : 5 + (i % 2) * 2,
+      spin: kind === 'crate' ? (i % 2 === 0 ? -22 : 16) : (i % 2 === 0 ? 1 : -1) * (20 + (i % 3) * 10),
+    };
+  });
+}
+
 export function EventActivationParticles({ active, particleClass = 'gold', effect = 'coin' }) {
   const particles = useMemo(() => {
     if (effect === 'lightning') return buildLightningParticles(LIGHTNING_COUNT);
     if (effect === 'sale_sparkle') return buildSaleSparkleParticles(SALE_SPARKLE_COUNT);
+    if (effect === 'crate_drop') return buildCrateDropParticles(CRATE_DROP_COUNT);
     return buildCoinParticles(COIN_COUNT);
   }, [effect]);
 
@@ -56,6 +74,7 @@ export function EventActivationParticles({ active, particleClass = 'gold', effec
     `f10-event-particles--${particleClass}`,
     effect === 'lightning' ? 'f10-event-particles--lightning' : '',
     effect === 'sale_sparkle' ? 'f10-event-particles--sale' : '',
+    effect === 'crate_drop' ? 'f10-event-particles--crate' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -93,6 +112,36 @@ export function EventActivationParticles({ active, particleClass = 'gold', effec
             >
               $
             </span>
+          );
+        }
+        if (p.kind === 'crate') {
+          return (
+            <span
+              key={p.id}
+              className="f10-event-particles__crate"
+              style={{
+                '--p-angle': `${p.angle}deg`,
+                '--p-dist': `${p.dist}px`,
+                '--p-delay': `${p.delay}s`,
+                '--p-size': `${p.size}px`,
+                '--p-spin': `${p.spin}deg`,
+              }}
+            />
+          );
+        }
+        if (p.kind === 'spark') {
+          return (
+            <span
+              key={p.id}
+              className="f10-event-particles__spark"
+              style={{
+                '--p-angle': `${p.angle}deg`,
+                '--p-dist': `${p.dist}px`,
+                '--p-delay': `${p.delay}s`,
+                '--p-size': `${p.size}px`,
+                '--p-spin': `${p.spin}deg`,
+              }}
+            />
           );
         }
         if (p.kind === 'sparkle') {
