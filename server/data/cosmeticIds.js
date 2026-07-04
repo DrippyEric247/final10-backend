@@ -34,6 +34,14 @@ const EMBLEM_IDS = new Set([
   'sigil_the_signal',
   'sigil_founding_tester',
   'sigil_founding_legacy',
+  // Scout Flight World Championship
+  'sigil_scout_flight_beta_champion',
+  'sigil_scout_flight_beta_silver',
+  'sigil_scout_flight_beta_bronze',
+  'sigil_scout_flight_beta_top10',
+  'sigil_scout_flight_silver',
+  'sigil_scout_flight_bronze',
+  'sigil_scout_flight_top10',
 ]);
 
 const CALLING_CARD_IDS = new Set([
@@ -76,6 +84,10 @@ const CALLING_CARD_IDS = new Set([
   'card_legacy_loyalist',
   'card_founding_tester',
   'card_founding_beta',
+  // Scout Flight World Championship
+  'card_scout_flight_beta_champion',
+  'card_scout_flight_monthly_champion',
+  'card_scout_flight_seasonal_top10',
 ]);
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);
@@ -96,6 +108,8 @@ const BATTLE_PASS_S1_COSMETIC_IDS = new Set([
   'badge_perk_animated',
   'badge_founder_animated',
   'badge_founding_tester',
+  'badge_scout_flight_beta_participation',
+  'badge_scout_flight_participation',
   'border_founding_beta',
   'boost_egg_slot_s1',
 ]);

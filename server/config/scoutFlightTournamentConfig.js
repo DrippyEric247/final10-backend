@@ -43,9 +43,14 @@ function getUtcWeekStart(date = new Date()) {
   return d;
 }
 
+function getUtcMonthStart(date = new Date()) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+}
+
 function getPeriodStart(period) {
   const key = String(period || 'daily').toLowerCase();
   if (key === 'alltime' || key === 'all') return null;
+  if (key === 'monthly' || key === 'month') return getUtcMonthStart();
   if (key === 'weekly' || key === 'week') return getUtcWeekStart();
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -62,5 +67,6 @@ module.exports = {
   getRewardTierPreview,
   getUtcDayKey,
   getUtcWeekStart,
+  getUtcMonthStart,
   getPeriodStart,
 };

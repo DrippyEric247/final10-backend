@@ -7,10 +7,11 @@ const scoutFlightRunSchema = new mongoose.Schema(
     mode: { type: String, enum: ['tournament'], default: 'tournament' },
     status: {
       type: String,
-      enum: ['active', 'completed', 'expired', 'invalid'],
+      enum: ['active', 'completed', 'expired', 'invalid', 'disqualified'],
       default: 'active',
       index: true,
     },
+    seasonId: { type: String, default: null, index: true },
     ticketSpent: { type: Boolean, default: true },
     startTime: { type: Date, default: Date.now },
     expiresAt: { type: Date, required: true, index: true },
@@ -29,6 +30,6 @@ const scoutFlightRunSchema = new mongoose.Schema(
 
 scoutFlightRunSchema.index({ userId: 1, status: 1, expiresAt: -1 });
 scoutFlightRunSchema.index({ status: 1, mode: 1, score: -1, completedAt: 1 });
-scoutFlightRunSchema.index({ userId: 1, mode: 1, status: 1, score: -1 });
+scoutFlightRunSchema.index({ seasonId: 1, status: 1, score: -1 });
 
 module.exports = mongoose.model('ScoutFlightRun', scoutFlightRunSchema);

@@ -839,3 +839,326 @@
   font-size: 0.75rem;
   color: #94a3b8;
 }
+
+/* ---- World Championship screen ---- */
+.scout-flight-overlay--championship {
+  --sf-champ-color: #818cf8;
+}
+
+.sf-champ-hero {
+  text-align: center;
+  margin-bottom: 0.65rem;
+}
+
+.sf-champ-hero__badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sf-champ-color);
+  margin-bottom: 0.35rem;
+}
+
+.sf-champ-hero__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.sf-champ-hero__theme {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.72rem;
+  color: #c4b5fd;
+}
+
+.sf-champ-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.sf-champ-pill {
+  font-size: 0.62rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+  color: #cbd5e1;
+}
+
+.sf-champ-pill strong {
+  color: #fde68a;
+}
+
+.sf-champ-pill--beta {
+  border-color: rgba(252, 211, 77, 0.45);
+  color: #fcd34d;
+}
+
+.sf-champ-messaging {
+  margin: 0.5rem 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  background: rgba(15, 23, 42, 0.55);
+  text-align: left;
+}
+
+.sf-champ-messaging__headline {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #e9d5ff;
+}
+
+.sf-champ-messaging__body,
+.sf-champ-messaging__note,
+.sf-champ-messaging__permanent {
+  margin: 0.15rem 0 0;
+  font-size: 0.65rem;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+.sf-ticket-pill--champ {
+  margin: 0.45rem 0;
+}
+
+.sf-champ-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin: 0.45rem 0 0.65rem;
+}
+
+.sf-champ-rewards {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(252, 211, 77, 0.22);
+  background: rgba(30, 16, 52, 0.45);
+  text-align: left;
+}
+
+.sf-champ-rewards__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #fcd34d;
+}
+
+.sf-champ-rewards__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.sf-champ-rewards__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.64rem;
+  color: #e2e8f0;
+}
+
+.sf-champ-rewards__savvy {
+  color: #86efac;
+  font-weight: 700;
+}
+
+.sf-champ-rewards__cosmetic {
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.sf-reward-tiers--compact {
+  margin-top: 0.35rem;
+}
+
+.sf-champ-hall-link {
+  display: inline-block;
+  margin-top: 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--sf-champ-color);
+  text-decoration: none;
+}
+
+.sf-champ-hall-link:hover {
+  text-decoration: underline;
+}
+
+.sf-leaderboard--championship .sf-leaderboard__row {
+  grid-template-columns: 2rem 1fr auto auto auto;
+}
+
+.sf-leaderboard__runs {
+  color: #94a3b8;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.sf-leaderboard__badge {
+  display: none;
+}
+
+.sf-leaderboard__row--top1 .sf-leaderboard__rank { color: #fcd34d; }
+.sf-leaderboard__row--top2 .sf-leaderboard__rank { color: #cbd5e1; }
+.sf-leaderboard__row--top3 .sf-leaderboard__rank { color: #d97706; }
+
+.sf-leaderboard__season-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.scout-flight-tournament-result__flag {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: #fca5a5;
+}
+
+/* ---- Hall of Champions page ---- */
+.scout-flight-page--hall {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2.5rem;
+}
+
+.sf-hall-header {
+  margin-bottom: 1.25rem;
+}
+
+.sf-hall-back {
+  display: inline-block;
+  margin-bottom: 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #a78bfa;
+  text-decoration: none;
+}
+
+.sf-hall-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.sf-hall-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.sf-hall-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.sf-hall-card {
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.92), rgba(30, 16, 52, 0.88));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.sf-hall-card--beta {
+  border-color: rgba(252, 211, 77, 0.35);
+}
+
+.sf-hall-card__season {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+}
+
+.sf-hall-card__month {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--sf-hall-accent, #818cf8);
+}
+
+.sf-hall-card__beta-tag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(252, 211, 77, 0.15);
+  color: #fcd34d;
+}
+
+.sf-hall-card__champion {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.sf-hall-card__medal {
+  font-size: 1.35rem;
+}
+
+.sf-hall-card__champ-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.sf-hall-card__username {
+  display: block;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+}
+
+.sf-hall-card__score {
+  font-size: 0.72rem;
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.sf-hall-card__reward {
+  text-align: right;
+  font-size: 0.68rem;
+  color: #86efac;
+  font-weight: 700;
+}
+
+.sf-hall-card__card {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.58rem;
+  color: #c4b5fd;
+}
+
+.sf-hall-card__date {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.62rem;
+  color: #64748b;
+}
+
+.sf-hall-empty,
+.sf-hall-loading,
+.sf-hall-error {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.sf-hall-empty__hint {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.75rem;
+}

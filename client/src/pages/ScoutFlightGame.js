@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   getScoutFlightTournamentStatus,
+  getScoutFlightChampionship,
   startScoutFlightTournament,
   submitScoutFlightTournamentScore,
   getScoutFlightLeaderboard,
+  getScoutFlightSeasonLeaderboard,
 } from '../lib/api';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import {
@@ -36,12 +38,12 @@ import {
 } from '../lib/scoutFlightFocusMode';
 import '../styles/ScoutFlight.css';
 import {
-  ScoutFlightModeMenu,
+  ScoutFlightChampionshipScreen,
+  ScoutFlightLeaderboardPanel,
+  ScoutFlightTournamentResult,
   ScoutFlightLockedModal,
   ScoutFlightConfirmModal,
-  ScoutFlightTournamentResult,
-  ScoutFlightLeaderboardPanel,
-} from '../components/scoutFlight/ScoutFlightTournamentUI';
+} from '../components/scoutFlight/ScoutFlightChampionshipUI';
 
 const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 const BOTTOM_UI_RESERVE = 88;
@@ -260,6 +262,7 @@ export default function ScoutFlightGame() {
   const [focusMode, setFocusMode] = useState(false);
   const [menuMode, setMenuMode] = useState(null);
   const [tournamentStatus, setTournamentStatus] = useState(null);
+  const [championship, setChampionship] = useState(null);
   const [activeRunId, setActiveRunId] = useState(null);
   const [showLockedModal, setShowLockedModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -268,7 +271,7 @@ export default function ScoutFlightGame() {
   const [submittingScore, setSubmittingScore] = useState(false);
   const [tournamentError, setTournamentError] = useState('');
   const [leaderboard, setLeaderboard] = useState(null);
-  const [leaderboardPeriod, setLeaderboardPeriod] = useState('daily');
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState('monthly');
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const submitLock = useRef(false);
   const debugAllowed = isDebugHitboxAllowed();
@@ -276,6 +279,19 @@ export default function ScoutFlightGame() {
   const isPracticeSession = menuMode === 'practice';
   const isTournamentSession = menuMode === 'tournament';
   const isPracticeMode = isPracticeSession || difficultyId === 'PRACTICE';
+
+  const loadChampionship = useCallback(async () => {
+    try {
+      const data = await getScoutFlightChampionship();
+      setChampionship(data);
+      if (data?.activeRun?.runId) {
+        setActiveRunId(data.activeRun.runId);
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const loadTournamentStatus = useCallback(async () => {
     try {
@@ -290,22 +306,38 @@ export default function ScoutFlightGame() {
     }
   }, []);
 
-  const loadLeaderboard = useCallback(async (period = leaderboardPeriod) => {
-    setLeaderboardLoading(true);
-    try {
-      const data = await getScoutFlightLeaderboard(period);
-      setLeaderboard(data);
-    } catch {
-      setLeaderboard(null);
-    } finally {
-      setLeaderboardLoading(false);
-    }
-  }, [leaderboardPeriod]);
+  const loadLeaderboard = useCallback(
+    async (period = leaderboardPeriod, champ = championship) => {
+      setLeaderboardLoading(true);
+      try {
+        let data;
+        if (period === 'previous') {
+          const prevId = champ?.previousSeason?.seasonId;
+          if (!prevId) {
+            setLeaderboard({ entries: [], period: 'previous' });
+            return;
+          }
+          data = await getScoutFlightSeasonLeaderboard(prevId);
+        } else if (period === 'monthly') {
+          data = await getScoutFlightLeaderboard('monthly');
+        } else {
+          data = await getScoutFlightLeaderboard(period);
+        }
+        setLeaderboard(data);
+      } catch {
+        setLeaderboard(null);
+      } finally {
+        setLeaderboardLoading(false);
+      }
+    },
+    [leaderboardPeriod, championship]
+  );
 
   useEffect(() => {
+    void loadChampionship();
     void loadTournamentStatus();
-    void loadLeaderboard('daily');
-  }, [loadTournamentStatus, loadLeaderboard]);
+    void loadLeaderboard('monthly');
+  }, [loadChampionship, loadTournamentStatus, loadLeaderboard]);
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
@@ -580,6 +612,7 @@ export default function ScoutFlightGame() {
       setUiPhase(PHASE.IDLE);
       setScore(0);
       setIsNewBest(false);
+      void loadChampionship();
       void loadTournamentStatus();
       void loadLeaderboard(leaderboardPeriod);
       return;
@@ -588,7 +621,7 @@ export default function ScoutFlightGame() {
     setUiPhase(PHASE.PLAYING);
     setScore(0);
     setIsNewBest(false);
-  }, [isTournamentSession, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+  }, [isTournamentSession, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
 
   const handleBackToIdle = useCallback(() => {
     setMenuMode(null);
@@ -599,9 +632,10 @@ export default function ScoutFlightGame() {
     setUiPhase(PHASE.IDLE);
     setScore(0);
     setIsNewBest(false);
+    void loadChampionship();
     void loadTournamentStatus();
     void loadLeaderboard(leaderboardPeriod);
-  }, [loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+  }, [loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
 
   useEffect(() => {
     if (uiPhase !== PHASE.GAMEOVER || !isTournamentSession || !activeRunId || submitLock.current) {
@@ -627,6 +661,7 @@ export default function ScoutFlightGame() {
         }
         window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
         if (typeof refreshProfile === 'function') await refreshProfile();
+        void loadChampionship();
         void loadLeaderboard(leaderboardPeriod);
       } catch (e) {
         setTournamentError(e?.response?.data?.message || e?.message || 'Score submission failed.');
@@ -643,6 +678,7 @@ export default function ScoutFlightGame() {
     tournamentStatus,
     patchUser,
     refreshProfile,
+    loadChampionship,
     loadLeaderboard,
     leaderboardPeriod,
   ]);
@@ -729,9 +765,9 @@ export default function ScoutFlightGame() {
         <canvas ref={canvasRef} className="scout-flight-canvas" />
 
         {uiPhase === PHASE.IDLE && !menuMode ? (
-          <ScoutFlightModeMenu
+          <ScoutFlightChampionshipScreen
+            championship={championship}
             tournamentStatus={tournamentStatus}
-            rewardTiers={tournamentStatus?.rewardTiers}
             onPractice={() => handlePracticeStart()}
             onTournament={() => handleTournamentRequest()}
           />
@@ -856,9 +892,10 @@ export default function ScoutFlightGame() {
           leaderboard={leaderboard}
           period={leaderboardPeriod}
           loading={leaderboardLoading}
+          previousSeasonName={championship?.previousSeason?.name}
           onPeriodChange={(p) => {
             setLeaderboardPeriod(p);
-            void loadLeaderboard(p);
+            void loadLeaderboard(p, championship);
           }}
         />
       ) : null}

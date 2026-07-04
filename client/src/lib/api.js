@@ -339,9 +339,28 @@ export async function submitScoutFlightTournamentScore({ runId, score, elapsedMs
   return data;
 }
 
-export async function getScoutFlightLeaderboard(period = "daily", limit = 50) {
+export async function getScoutFlightLeaderboard(period = "daily", limit = 50, seasonId = null) {
   const { data } = await api.get("/scout-flight/tournament/leaderboard", {
-    params: { period, limit },
+    params: { period, limit, ...(seasonId ? { seasonId } : {}) },
+  });
+  return data;
+}
+
+export async function getScoutFlightChampionship() {
+  const { data } = await api.get("/scout-flight/championship/current");
+  return data;
+}
+
+export async function getScoutFlightSeasonLeaderboard(seasonId, limit = 50) {
+  const { data } = await api.get(`/scout-flight/championship/season/${seasonId}/leaderboard`, {
+    params: { limit },
+  });
+  return data;
+}
+
+export async function getScoutFlightHallOfChampions(limit = 50) {
+  const { data } = await api.get("/scout-flight/championship/hall-of-champions", {
+    params: { limit },
   });
   return data;
 }

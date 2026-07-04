@@ -91,6 +91,7 @@ app.use(
 const { isAuthMeRequest } = require('./middleware/rateLimits');
 const { rateLimitSkipDev } = require('./lib/rateLimitDevBypass');
 const { isBetaMode, getRouteRateCaps } = require('./config/betaMode');
+const { rolloverPendingSeasons, ensureCurrentSeason } = require('./services/scoutFlightChampionshipService');
 
 const limiter = rateLimit({
   ...rateLimitConfig,
@@ -371,6 +372,35 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     } else {
       console.log('⏸ Auction cron refresh disabled (DISABLE_AUCTION_CRON_REFRESH=true)');
     }
+
+    cron.schedule('5 0 * * *', () => {
+      auditCronJob('scout_flight_season_rollover', { phase: 'start' });
+      rolloverPendingSeasons()
+        .then(() => ensureCurrentSeason())
+        .then((season) => {
+          console.log(`[cron] Scout Flight season ready: ${season?.seasonId} (${season?.status})`);
+          auditCronJob('scout_flight_season_rollover', {
+            phase: 'done',
+            seasonId: season?.seasonId,
+            status: season?.status,
+          });
+        })
+        .catch((err) => {
+          console.error('[cron] Scout Flight season rollover failed:', err?.message || err);
+          auditCronJob('scout_flight_season_rollover', {
+            phase: 'error',
+            message: String(err?.message || err).slice(0, 200),
+          });
+        });
+    });
+    ensureCurrentSeason()
+      .then((season) => {
+        console.log(`🏆 Scout Flight championship season: ${season?.seasonId} (${season?.name})`);
+      })
+      .catch((err) => {
+        console.warn('[ScoutFlight] ensureCurrentSeason on boot:', err?.message || err);
+      });
+    console.log('⏰ Scout Flight monthly season rollover enabled (daily 00:05 UTC).');
 
     if (isSavvyScoutBackgroundScanEnabled()) {
       const scoutCron = isProduction() ? '*/15 * * * *' : '*/5 * * * *';

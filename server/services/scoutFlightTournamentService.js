@@ -17,6 +17,10 @@ const {
 const { grantSavvyReward } = require('./savvyRewardService');
 const { ensureEventInventory } = require('./scoutFlightTicketService');
 
+function getChampionshipHelpers() {
+  return require('./scoutFlightChampionshipService');
+}
+
 class ScoutFlightTournamentError extends Error {
   constructor(status, code, message, extra = {}) {
     super(message);
@@ -54,6 +58,7 @@ async function getPersonalBest(userId) {
     mode: 'tournament',
     status: 'completed',
     score: { $ne: null },
+    suspicious: { $ne: true },
   })
     .sort({ score: -1 })
     .select('score completedAt')
@@ -68,6 +73,7 @@ async function getDailyRank(userId) {
     status: 'completed',
     completedAt: { $gte: dayStart },
     score: { $ne: null },
+    suspicious: { $ne: true },
   };
 
   const myAgg = await ScoutFlightRun.aggregate([
@@ -100,6 +106,14 @@ async function getTournamentStatus(user) {
   const activeRun = await getActiveRun(user._id);
   const personalBest = await getPersonalBest(user._id);
   const dailyRank = await getDailyRank(user._id);
+  let monthlyRank = { rank: null, score: 0, totalPlayers: 0 };
+  try {
+    const { ensureCurrentSeason, getSeasonRankForUser } = getChampionshipHelpers();
+    const season = await ensureCurrentSeason();
+    monthlyRank = await getSeasonRankForUser(user._id, season);
+  } catch {
+    /* championship module optional at boot */
+  }
 
   return {
     ticketsOwned,
@@ -117,6 +131,7 @@ async function getTournamentStatus(user) {
       : null,
     personalBest,
     dailyRank,
+    monthlyRank,
     rewardTiers: getRewardTierPreview(),
     runTimeoutMs: RUN_TIMEOUT_MS,
   };
@@ -192,6 +207,14 @@ async function startTournamentRun(user) {
   const runId = crypto.randomUUID();
   const startTime = new Date();
   const expiresAt = new Date(startTime.getTime() + RUN_TIMEOUT_MS);
+  let seasonId = null;
+  try {
+    const { ensureCurrentSeason } = getChampionshipHelpers();
+    const season = await ensureCurrentSeason();
+    seasonId = season.seasonId;
+  } catch {
+    /* ignore */
+  }
 
   await ScoutFlightRun.create({
     runId,
@@ -201,6 +224,7 @@ async function startTournamentRun(user) {
     ticketSpent: true,
     startTime,
     expiresAt,
+    seasonId,
   });
 
   await user.save();
@@ -304,6 +328,14 @@ async function submitTournamentScore(user, { runId, score, elapsedMs }) {
 
   const personalBest = await getPersonalBest(user._id);
   const dailyRank = await getDailyRank(user._id);
+  let monthlyRank = { rank: null, score: 0, totalPlayers: 0 };
+  try {
+    const { ensureCurrentSeason, getSeasonRankForUser } = getChampionshipHelpers();
+    const season = await ensureCurrentSeason();
+    monthlyRank = await getSeasonRankForUser(user._id, season);
+  } catch {
+    /* ignore */
+  }
   const isNewPersonalBest = finalScore > 0 && finalScore >= personalBest.score;
 
   return {
@@ -317,16 +349,26 @@ async function submitTournamentScore(user, { runId, score, elapsedMs }) {
     personalBest,
     isNewPersonalBest,
     dailyRank,
+    monthlyRank,
     status: await getTournamentStatus(user),
   };
 }
 
-async function getLeaderboard(period, { userId, limit = 50 } = {}) {
-  const since = getPeriodStart(period);
+async function getLeaderboard(period, { userId, limit = 50, seasonId = null } = {}) {
+  const periodKey = String(period || 'daily').toLowerCase();
+
+  if (periodKey === 'monthly' || periodKey === 'month') {
+    const { getSeasonLeaderboard, ensureCurrentSeason } = getChampionshipHelpers();
+    const sid = seasonId || (await ensureCurrentSeason()).seasonId;
+    return getSeasonLeaderboard(sid, { userId, limit });
+  }
+
+  const since = getPeriodStart(periodKey);
   const match = {
     mode: 'tournament',
     status: 'completed',
     score: { $ne: null },
+    suspicious: { $ne: true },
   };
   if (since) match.completedAt = { $gte: since };
 
@@ -337,7 +379,8 @@ async function getLeaderboard(period, { userId, limit = 50 } = {}) {
       $group: {
         _id: '$userId',
         bestScore: { $first: '$score' },
-        savvyEarned: { $first: '$savvyEarned' },
+        savvyEarned: { $sum: { $cond: [{ $eq: ['$savvyGranted', true] }, '$savvyEarned', 0] } },
+        runsSubmitted: { $sum: 1 },
         completedAt: { $first: '$completedAt' },
         runId: { $first: '$runId' },
       },
@@ -371,8 +414,10 @@ async function getLeaderboard(period, { userId, limit = 50 } = {}) {
     rank: idx + 1,
     userId: String(row.userId),
     username: row.username || 'Operator',
-    score: row.score,
+    score: row.bestScore ?? row.score,
     savvyEarned: Number(row.savvyEarned) || 0,
+    runsSubmitted: Number(row.runsSubmitted) || 1,
+    bestRunId: row.runId,
     completedAt: row.completedAt,
     isCurrentUser: userId ? String(row.userId) === String(userId) : false,
   }));
@@ -402,9 +447,11 @@ async function getLeaderboard(period, { userId, limit = 50 } = {}) {
           rank: higher + 1,
           userId: String(userId),
           username: displayName(userDoc),
-          score: myBest.score,
-          savvyEarned: myBest.savvyEarned || 0,
-          completedAt: myBest.completedAt,
+        score: myBest.score,
+        savvyEarned: myBest.savvyEarned || 0,
+        runsSubmitted: 1,
+        bestRunId: myBest.runId,
+        completedAt: myBest.completedAt,
           isCurrentUser: true,
         };
       }
@@ -412,7 +459,7 @@ async function getLeaderboard(period, { userId, limit = 50 } = {}) {
   }
 
   return {
-    period: String(period || 'daily').toLowerCase(),
+    period: periodKey,
     dayKey: getUtcDayKey(),
     entries: rows,
     currentUser: currentUserEntry,
