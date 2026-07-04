@@ -4,7 +4,7 @@
 
 const crypto = require('crypto');
 const LiveEvent = require('../models/LiveEvent');
-const { SAVVY_SALE_SPIN_COST } = require('../config/savvySaleConfig');
+const { SAVVY_SALE_DISCOUNT_PERCENT, applySavvySaleDiscountPercent } = require('../config/savvySaleConfig');
 
 class SavvySaleError extends Error {
   constructor(status, code, message) {
@@ -32,7 +32,9 @@ function serializeSavvySale(event) {
     startAt: event.startAt,
     expiresAt: event.expiresAt,
     msRemaining: live ? msLeft : 0,
-    saleSpinCost: SAVVY_SALE_SPIN_COST,
+    saleDiscountPercent: SAVVY_SALE_DISCOUNT_PERCENT,
+    /** @deprecated Use saleDiscountPercent — kept for legacy clients. */
+    saleSpinCost: applySavvySaleDiscountPercent(20),
     source: event.source,
   };
 }
@@ -133,13 +135,14 @@ function resolveSavvySaleSpinPricing(baseCost, saleEvent) {
     };
   }
 
-  const cost = SAVVY_SALE_SPIN_COST;
+  const cost = applySavvySaleDiscountPercent(originalCost);
   return {
     cost,
     originalCost,
     saleApplied: true,
     savings: Math.max(0, originalCost - cost),
     saleEventId: saleEvent?.eventId || null,
+    discountPercent: SAVVY_SALE_DISCOUNT_PERCENT,
   };
 }
 
@@ -153,5 +156,8 @@ module.exports = {
   applySavvySaleToSpinCost,
   resolveSavvySaleSpinPricing,
   serializeSavvySale,
-  SAVVY_SALE_SPIN_COST,
+  SAVVY_SALE_DISCOUNT_PERCENT,
+  applySavvySaleDiscountPercent,
+  /** @deprecated */
+  SAVVY_SALE_SPIN_COST: applySavvySaleDiscountPercent(20),
 };

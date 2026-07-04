@@ -11,6 +11,8 @@ import {
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import { isRateLimitError } from '../lib/apiErrorParsing';
+import { formatPerkMachineSpinError } from '../lib/perkMachineErrors';
+import { useLiveEventsOptional, LIVE_EVENTS_HUB_UPDATED } from '../context/LiveEventsContext';
 import Final10Slogan from '../components/branding/Final10Slogan';
 import LoadingState from '../components/ui/states/LoadingState';
 import PerkMachineAdminPanel from '../components/perk/PerkMachineAdminPanel';
@@ -145,6 +147,11 @@ function EggInventoryPanel({ inventory, pulseTier }) {
 export default function PerkMachine() {
   const { user, refreshProfile, patchUser } = useAuth();
   const savvy = useSavvyPoints();
+  const liveEvents = useLiveEventsOptional();
+  const showAdminDetail = shouldShowAdminNav(user) || process.env.NODE_ENV !== 'production';
+  const hubSaleActive = Boolean(
+    liveEvents?.hub?.timers?.savvySale?.active || liveEvents?.hub?.raw?.savvySale?.active
+  );
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -214,37 +221,77 @@ export default function PerkMachine() {
   }, []);
 
   useEffect(() => {
-    if (!status?.savvySale?.active) return undefined;
-    setSaleMs(status.savvySale.msRemaining || 0);
-    const tick = setInterval(() => setSaleMs((ms) => Math.max(0, ms - 1000)), 1000);
+    const saleActive = Boolean(status?.savvySale?.active || hubSaleActive);
+    if (!saleActive) return undefined;
+    const ms =
+      status?.savvySale?.msRemaining ??
+      liveEvents?.hub?.timers?.savvySale?.msRemaining ??
+      0;
+    setSaleMs(ms);
+    const tick = setInterval(() => setSaleMs((prev) => Math.max(0, prev - 1000)), 1000);
     return () => clearInterval(tick);
-  }, [status?.savvySale?.eventId, status?.savvySale?.active, status?.savvySale?.msRemaining]);
+  }, [
+    status?.savvySale?.eventId,
+    status?.savvySale?.active,
+    status?.savvySale?.msRemaining,
+    hubSaleActive,
+    liveEvents?.hub?.timers?.savvySale?.eventId,
+    liveEvents?.hub?.timers?.savvySale?.msRemaining,
+  ]);
+
+  const savvySaleDisplay = useMemo(() => {
+    if (status?.savvySale?.active) {
+      return { ...status.savvySale, active: true, msRemaining: saleMs || status.savvySale.msRemaining || 0 };
+    }
+    if (hubSaleActive) {
+      return {
+        active: true,
+        msRemaining: saleMs || liveEvents?.hub?.timers?.savvySale?.msRemaining || 0,
+      };
+    }
+    return status?.savvySale || null;
+  }, [status?.savvySale, hubSaleActive, saleMs, liveEvents?.hub?.timers?.savvySale?.msRemaining]);
 
   const paidCosts = useMemo(() => {
     const costs = status?.spinCosts || {};
-    return {
-      paid_1: costs.paid_1?.savvy ?? 20,
-      paid_2: costs.paid_2?.savvy ?? 40,
-      paid_3: costs.paid_3?.savvy ?? 60,
-      orig_1: costs.paid_1?.originalSavvy ?? 20,
-      orig_2: costs.paid_2?.originalSavvy ?? 40,
-      orig_3: costs.paid_3?.originalSavvy ?? 60,
-      sale: Boolean(costs.paid_1?.saleApplied || status?.savvySale?.active),
+    const sale = Boolean(costs.paid_1?.saleApplied || status?.savvySale?.active || hubSaleActive);
+    const base = {
+      paid_1: costs.paid_1?.originalSavvy ?? costs.paid_1?.savvy ?? 20,
+      paid_2: costs.paid_2?.originalSavvy ?? costs.paid_2?.savvy ?? 40,
+      paid_3: costs.paid_3?.originalSavvy ?? costs.paid_3?.savvy ?? 60,
     };
-  }, [status?.spinCosts, status?.savvySale?.active]);
+    const half = (n) => Math.max(0, Math.round(n / 2));
+    return {
+      paid_1: sale ? (costs.paid_1?.savvy ?? half(base.paid_1)) : (costs.paid_1?.savvy ?? 20),
+      paid_2: sale ? (costs.paid_2?.savvy ?? half(base.paid_2)) : (costs.paid_2?.savvy ?? 40),
+      paid_3: sale ? (costs.paid_3?.savvy ?? half(base.paid_3)) : (costs.paid_3?.savvy ?? 60),
+      orig_1: base.paid_1,
+      orig_2: base.paid_2,
+      orig_3: base.paid_3,
+      sale,
+    };
+  }, [status?.spinCosts, status?.savvySale?.active, hubSaleActive]);
 
   function renderSpinPrice(mode, fallback) {
+    const slotLabel =
+      mode === 'paid_1' ? '1 Slot' : mode === 'paid_2' ? '2 Slots' : '3 Slots';
     const cost = paidCosts[mode] ?? fallback;
     const orig = paidCosts[`orig_${mode.split('_')[1]}`] ?? fallback;
     if (paidCosts.sale && orig > cost) {
       return (
         <span className="perk-spin-price--sale">
-          <span className="perk-spin-price__original">{orig} Savvy</span>
-          <span className="perk-spin-price__sale">{cost} Savvy · {mode === 'paid_1' ? '1' : mode === 'paid_2' ? '2' : '3'} Slot{mode === 'paid_1' ? '' : 's'}</span>
+          <span className="perk-spin-price__row">
+            <span className="perk-spin-price__original">{orig} Savvy</span>
+            <span className="perk-spin-price__arrow" aria-hidden>
+              →
+            </span>
+            <span className="perk-spin-price__sale">{cost} Savvy</span>
+          </span>
+          <span className="perk-spin-price__slots">{slotLabel}</span>
         </span>
       );
     }
-    return `${cost} Savvy · ${mode === 'paid_1' ? '1 Slot' : mode === 'paid_2' ? '2 Slots' : '3 Slots'}`;
+    return `${cost} Savvy · ${slotLabel}`;
   }
 
   const loadStatus = useCallback(async () => {
@@ -255,16 +302,24 @@ export default function PerkMachine() {
       return data;
     } catch (e) {
       if (!isRateLimitError(e)) {
-        setError(e?.response?.data?.message || e?.message || 'Failed to load Perk Machine.');
+        setError(formatPerkMachineSpinError(e, { showAdminDetail }));
       }
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showAdminDetail]);
 
   useEffect(() => {
     void loadStatus();
+  }, [loadStatus]);
+
+  useEffect(() => {
+    const onHub = () => {
+      void loadStatus();
+    };
+    window.addEventListener(LIVE_EVENTS_HUB_UPDATED, onHub);
+    return () => window.removeEventListener(LIVE_EVENTS_HUB_UPDATED, onHub);
   }, [loadStatus]);
 
   useEffect(() => {
@@ -387,7 +442,9 @@ export default function PerkMachine() {
         }
 
         const savvyWin = rewards.reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
-        const spinCost = Number(result?.summary?.cost ?? result?.savvyCost ?? 0);
+        const spinCost = Number(
+          result?.actualCostCharged ?? result?.summary?.actualCostCharged ?? result?.summary?.cost ?? result?.savvyCost ?? 0
+        );
         const netSavvy = Number(result?.summary?.net ?? savvyWin - spinCost);
         const eggsAdded = Array.isArray(result?.summary?.eggs)
           ? result.summary.eggs
@@ -458,15 +515,19 @@ export default function PerkMachine() {
           }
         );
       } catch (e) {
-        const msg = e?.response?.data?.message || e?.message || 'Spin failed.';
+        const msg = formatPerkMachineSpinError(e, { showAdminDetail });
         stopPerkMachineSfx();
         setError(msg);
+        if (showAdminDetail) {
+          // eslint-disable-next-line no-console
+          console.error('[perk-machine/spin]', e?.response?.data?.detail || e?.response?.data || e);
+        }
         setSpinning(false);
         setReelPhase('idle');
         spinLock.current = false;
       }
     },
-    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock, showDirectTicketAward]
+    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock, showDirectTicketAward, showAdminDetail]
   );
 
   const handleHatch = useCallback(
@@ -553,7 +614,7 @@ export default function PerkMachine() {
   const multiplier = tierLabel === 'Pro' || tierLabel === 'Premium' ? '1.50x' : '1.00x';
 
   return (
-    <div className={`perk-page ${status?.savvySale?.active ? 'perk-page--savvy-sale' : ''} ${multiplierPulse ? 'perk-page--multiplier-pulse' : ''}`}>
+    <div className={`perk-page ${savvySaleDisplay?.active ? 'perk-page--savvy-sale' : ''} ${multiplierPulse ? 'perk-page--multiplier-pulse' : ''}`}>
       <div className="perk-page__glow" aria-hidden />
 
       {coinBurst > 0 ? (
@@ -590,7 +651,7 @@ export default function PerkMachine() {
           <p className="perk-kicker">Final10 × Savvy Universe</p>
           <h1 className="perk-title">🎰 Savvy Perk Machine</h1>
           <p className="perk-subtitle">Spin for boosts, eggs, Savvy, and exclusive rewards.</p>
-          <SavvySalePerkBadge sale={status?.savvySale} msRemaining={saleMs} scoutLine />
+          <SavvySalePerkBadge sale={savvySaleDisplay} msRemaining={saleMs} scoutLine />
         </div>
         <div className="perk-header__actions">
           <button

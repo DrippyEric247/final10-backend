@@ -410,6 +410,13 @@
   margin-bottom: 0.75rem;
 }
 
+.perk-savvy-sale-helper {
+  font-size: 0.88rem;
+  color: #fde68a;
+  font-weight: 600;
+  margin: 0.35rem 0 0.25rem;
+}
+
 .perk-savvy-sale-scout {
   font-size: 0.82rem;
   color: #fdba74;
@@ -421,7 +428,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.1rem;
+  gap: 0.15rem;
+}
+
+.perk-spin-price__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.perk-spin-price__arrow {
+  color: #fcd34d;
+  font-weight: 800;
 }
 
 .perk-spin-price__original {
@@ -433,6 +453,11 @@
 .perk-spin-price__sale {
   color: #fcd34d;
   font-weight: 800;
+}
+
+.perk-spin-price__slots {
+  font-size: 0.72rem;
+  opacity: 0.85;
 }
 
 /* Live events admin */

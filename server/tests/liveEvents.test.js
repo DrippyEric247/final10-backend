@@ -3,7 +3,7 @@
  */
 
 const { pickSupplyDropReward, SUPPLY_DROP_POOL } = require('../config/supplyDropRewards');
-const { applySavvySaleToSpinCost, SAVVY_SALE_SPIN_COST } = require('../services/savvySaleService');
+const { applySavvySaleToSpinCost } = require('../services/savvySaleService');
 const { SCOUT_SUPPORT_MILESTONES, nextMilestoneAfter } = require('../config/scoutSupportConfig');
 
 describe('supplyDropRewards', () => {
@@ -20,12 +20,17 @@ describe('supplyDropRewards', () => {
 });
 
 describe('savvySaleService pricing', () => {
-  test('applies 10 Savvy during sale', () => {
+  test('applies 50% off during sale', () => {
     const result = applySavvySaleToSpinCost(60, true);
-    expect(result.cost).toBe(SAVVY_SALE_SPIN_COST);
+    expect(result.cost).toBe(30);
     expect(result.originalCost).toBe(60);
     expect(result.saleApplied).toBe(true);
-    expect(result.savings).toBe(50);
+    expect(result.savings).toBe(30);
+  });
+
+  test('applies tiered sale prices', () => {
+    expect(applySavvySaleToSpinCost(20, true).cost).toBe(10);
+    expect(applySavvySaleToSpinCost(40, true).cost).toBe(20);
   });
 
   test('leaves cost unchanged when sale inactive', () => {

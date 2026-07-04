@@ -98,14 +98,14 @@ function buildSavvySaleCard(sale) {
     status: 'active',
     title: 'Savvy Sale',
     icon: '🔥',
-    description: 'Emergency Perk Machine pricing — all paid spins cost 10 Savvy.',
+    description: 'Savvy Sale — all Perk Machine point redemptions cost 50% less (10 / 20 / 30 Savvy).',
     msRemaining: sale.msRemaining,
     expiresAt: sale.expiresAt,
     timerLabel: 'Sale ends in',
     claimable: false,
     ctaLabel: 'Open Perk Machine',
     ctaPath: '/perk-machine',
-    meta: { saleSpinCost: sale.saleSpinCost },
+    meta: { saleDiscountPercent: sale.saleDiscountPercent, saleSpinCost: sale.saleSpinCost },
   });
 }
 

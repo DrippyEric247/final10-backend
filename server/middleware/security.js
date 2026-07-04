@@ -10,6 +10,7 @@ const PRODUCTION_CORS_ORIGINS = [
   'https://final10-backend-jo1t.vercel.app',
   'https://final10-backend-qf59.vercel.app',
   'https://final10-client.onrender.com',
+  'https://final10-client.vercel.app',
 ];
 
 function expandWwwApexVariants(origin) {
@@ -54,8 +55,9 @@ function buildAllowedOrigins() {
 function isOriginAllowed(origin, allowed) {
   if (!origin) return true;
   if (allowed.has(origin)) return true;
-  // Vercel preview/production aliases (e.g. final10-backend-jo1t.vercel.app)
+  // Vercel preview/production aliases (client + backend)
   if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return true;
+  if (/^https:\/\/final10[a-z0-9-]*\.vercel\.app$/i.test(origin)) return true;
   // Custom production domain (apex + www)
   if (/^https:\/\/(www\.)?final10\.app$/i.test(origin)) return true;
   return false;

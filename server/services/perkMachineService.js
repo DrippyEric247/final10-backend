@@ -175,11 +175,13 @@ async function getPerkMachineStatusWithEvents(user) {
   if (saleActive) {
     for (const key of ['paid_1', 'paid_2', 'paid_3']) {
       const base = status.spinCosts[key]?.savvy || 0;
+      const pricing = resolveSavvySaleSpinPricing(base, savvySale);
       status.spinCosts[key] = {
         ...status.spinCosts[key],
-        savvy: SAVVY_SALE_SPIN_COST,
-        originalSavvy: base,
-        saleApplied: true,
+        savvy: pricing.cost,
+        originalSavvy: pricing.originalCost,
+        saleApplied: pricing.saleApplied,
+        savings: pricing.savings,
       };
     }
   }
@@ -376,12 +378,23 @@ async function spinPerkMachine(user, options = {}) {
     const spinId = crypto.randomUUID();
 
     if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
+      const spendSource = savvySaleApplied ? 'perk_spin_sale_discount' : 'perk_machine_spin';
       const spend = await spendSavvyReward(user, {
         amount: savvyCost,
-        source: 'perk_machine_spin',
+        source: spendSource,
         idempotencyKey: `perk_spin_spend:${spinId}`,
-        note: `Perk Machine spin (${mode})`,
-        meta: { mode, spinId, savvySaleApplied, savvySaleEventId: savvySale?.eventId || null },
+        note: savvySaleApplied
+          ? `Perk Machine spin (${mode}) — Savvy Sale ${savvySaleSavings} off`
+          : `Perk Machine spin (${mode})`,
+        meta: {
+          mode,
+          spinId,
+          savvySaleApplied,
+          savvySaleEventId: savvySale?.eventId || null,
+          originalSavvyCost,
+          savvySaleSavings,
+          actualCostCharged: savvyCost,
+        },
       });
       if (!spend.spent && !spend.duplicate) {
         const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
@@ -475,10 +488,15 @@ async function spinPerkMachine(user, options = {}) {
       mode,
       slots,
       savvyCost: finalCost,
+      actualCostCharged: finalCost,
       savvyWon,
       net: netSavvy,
       summary: {
         cost: finalCost,
+        actualCostCharged: finalCost,
+        originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
+        savvySaleApplied: usedPaid3Token ? false : savvySaleApplied,
+        savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
         savvyWon,
         net: netSavvy,
         eggs: eggsWon,

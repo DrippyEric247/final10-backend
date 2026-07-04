@@ -23,7 +23,12 @@ router.get('/status', auth, async (req, res, next) => {
     res.json(await getPerkMachineStatusWithEvents(user));
   } catch (err) {
     console.error('[perk-machine/status]', err);
-    next(err);
+    if (res.headersSent) return next(err);
+    return res.status(500).json({
+      code: 'STATUS_FAILED',
+      message: 'Perk Machine status unavailable. Try again shortly.',
+      ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
+    });
   }
 });
 
@@ -60,6 +65,7 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
       ...result,
     });
   } catch (err) {
+    console.error('[perk-machine/spin]', err);
     if (err.status) {
       return res.status(err.status).json({
         message: err.message,
@@ -68,8 +74,11 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
         balance: err.balance,
       });
     }
-    console.error('[perk-machine/spin]', err);
-    next(err);
+    return res.status(500).json({
+      code: 'SPIN_FAILED',
+      message: 'Spin failed — no Savvy was spent. Try again.',
+      ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
+    });
   }
 });
 

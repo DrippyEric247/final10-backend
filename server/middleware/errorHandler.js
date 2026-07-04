@@ -2,6 +2,11 @@ const { isHttpError } = require('./apiErrors');
 const { isProduction } = require('../config/envValidation');
 const { logRouteError } = require('../services/structuredLog');
 
+function isPerkMachineSpinRequest(req) {
+  const path = String(req.originalUrl || req.url || req.path || '');
+  return /\/api\/perk-machine\/spin(?:\?|$)/i.test(path);
+}
+
 /**
  * Express error-handling middleware — must be registered after all routes.
  */
@@ -13,11 +18,17 @@ function errorHandler(err, req, res, next) {
       ? err.status
       : 500;
   const code = isHttpError(err) ? err.code : err.code && typeof err.code === 'string' ? err.code : 'INTERNAL_ERROR';
-  const safeMessage = isHttpError(err)
+  let safeMessage = isHttpError(err)
     ? err.message
     : isProduction()
       ? 'Request could not be completed.'
       : err.message || 'Internal server error';
+
+  if (isPerkMachineSpinRequest(req) && status >= 500) {
+    safeMessage = isProduction()
+      ? 'Spin failed — no Savvy was spent. Try again.'
+      : `Spin failed — no Savvy was spent. Try again. (${err.message || 'Internal server error'})`;
+  }
 
   logRouteError(req, err, status, code);
 

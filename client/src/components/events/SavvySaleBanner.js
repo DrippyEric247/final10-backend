@@ -7,7 +7,7 @@ export default function SavvySaleBanner({ sale, msRemaining, onClick }) {
   const inner = (
     <>
       <span>🔥</span>
-      <span>Savvy Sale active — all spins 10 Savvy · {formatTimer(msRemaining)}</span>
+      <span>Savvy Sale — 50% off point redemptions · {formatTimer(msRemaining)}</span>
     </>
   );
 
@@ -26,7 +26,8 @@ export function SavvySalePerkBadge({ sale, msRemaining, scoutLine }) {
   if (!sale?.active) return null;
   return (
     <>
-      <div className="perk-savvy-sale-badge">🔥 SAVVY SALE ACTIVE</div>
+      <div className="perk-savvy-sale-badge">🔥 SAVVY SALE 50% OFF</div>
+      <p className="perk-savvy-sale-helper">Savvy Sale is active — point redemptions cost half.</p>
       <div className="perk-savvy-sale-timer">Ends in {formatTimer(msRemaining)}</div>
       {scoutLine ? (
         <p className="perk-savvy-sale-scout">

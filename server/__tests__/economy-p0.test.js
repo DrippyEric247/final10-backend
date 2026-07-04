@@ -12,7 +12,6 @@ const {
   validateActiveSavvySale,
   resolveSavvySaleSpinPricing,
   applySavvySaleToSpinCost,
-  SAVVY_SALE_SPIN_COST,
 } = require('../services/savvySaleService');
 const { redeemEasterEggCode } = require('../services/easterEggService');
 const { withStripeEventIdempotency } = require('../services/stripeWebhookIdempotency');
@@ -36,7 +35,7 @@ describe('Economy P0 unit guards', () => {
     expect(pricing.cost).toBe(60);
   });
 
-  it('applies at most one savvy sale discount (fixed sale price)', () => {
+  it('applies 50% savvy sale discount per tier', () => {
     const now = Date.now();
     const live = {
       active: true,
@@ -44,13 +43,25 @@ describe('Economy P0 unit guards', () => {
       expiresAt: new Date(now + 60_000),
       eventId: 'live-sale',
     };
-    const pricing = resolveSavvySaleSpinPricing(60, live);
-    expect(pricing.saleApplied).toBe(true);
-    expect(pricing.cost).toBe(SAVVY_SALE_SPIN_COST);
-    expect(pricing.savings).toBe(60 - SAVVY_SALE_SPIN_COST);
+    expect(resolveSavvySaleSpinPricing(20, live)).toMatchObject({
+      saleApplied: true,
+      cost: 10,
+      originalCost: 20,
+      savings: 10,
+    });
+    expect(resolveSavvySaleSpinPricing(40, live)).toMatchObject({
+      saleApplied: true,
+      cost: 20,
+      savings: 20,
+    });
+    expect(resolveSavvySaleSpinPricing(60, live)).toMatchObject({
+      saleApplied: true,
+      cost: 30,
+      savings: 30,
+    });
 
     const legacy = applySavvySaleToSpinCost(40, true);
-    expect(legacy.cost).toBe(SAVVY_SALE_SPIN_COST);
+    expect(legacy.cost).toBe(20);
   });
 
   it('detects donation checkout sessions vs subscriptions', () => {
