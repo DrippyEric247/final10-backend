@@ -22,6 +22,7 @@ import {
   Target,
   TestTube2,
   Trophy,
+  User,
   Users,
   Zap,
 } from 'lucide-react';
@@ -138,6 +139,7 @@ const Navigation = () => {
         philosophy: DEAL_PHILOSOPHY_LANES.lifeOptimizer.philosophy,
         title: DEAL_PHILOSOPHY_LANES.lifeOptimizer.helperText,
       },
+      { name: 'Profile', path: '/profile', Icon: User },
     ],
     []
   );
