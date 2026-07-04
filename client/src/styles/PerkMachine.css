@@ -251,6 +251,49 @@
   animation: perk-reel-win 0.8s ease;
 }
 
+.perk-reel--multiplier {
+  border-color: rgba(192, 132, 252, 0.85);
+  background: linear-gradient(180deg, rgba(88, 28, 135, 0.65), rgba(120, 53, 15, 0.35));
+  box-shadow:
+    inset 0 0 24px rgba(192, 132, 252, 0.25),
+    0 0 28px rgba(245, 185, 66, 0.45),
+    0 0 40px rgba(168, 85, 247, 0.35);
+  animation: perk-reel-mult-glow 1.2s ease-in-out infinite alternate;
+}
+
+.perk-reel--multiplier.perk-reel--win {
+  animation: perk-reel-mult-pop 0.9s ease, perk-reel-mult-glow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes perk-reel-mult-glow {
+  from {
+    box-shadow:
+      inset 0 0 20px rgba(192, 132, 252, 0.2),
+      0 0 20px rgba(245, 185, 66, 0.35),
+      0 0 30px rgba(168, 85, 247, 0.25);
+  }
+  to {
+    box-shadow:
+      inset 0 0 28px rgba(192, 132, 252, 0.4),
+      0 0 36px rgba(245, 185, 66, 0.55),
+      0 0 48px rgba(168, 85, 247, 0.45);
+  }
+}
+
+@keyframes perk-reel-mult-pop {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.1); }
+}
+
+.perk-page--multiplier-pulse .perk-machine-stage {
+  animation: perk-page-mult-pulse 0.8s ease;
+}
+
+@keyframes perk-page-mult-pulse {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.45)); }
+}
+
 @keyframes perk-reel-win {
   0%,
   100% {
@@ -734,6 +777,97 @@
 .perk-reward--rare {
   border-color: #c084fc;
   box-shadow: 0 0 16px rgba(192, 132, 252, 0.35);
+}
+
+.perk-reward--epic {
+  border-color: #a78bfa;
+  box-shadow: 0 0 18px rgba(167, 139, 250, 0.4);
+}
+
+.perk-reward--multiplier,
+.perk-reward-card--multiplier {
+  border-color: rgba(245, 185, 66, 0.75);
+  background: linear-gradient(145deg, rgba(88, 28, 135, 0.45), rgba(120, 53, 15, 0.25));
+  box-shadow: 0 0 28px rgba(192, 132, 252, 0.45), 0 0 16px rgba(245, 185, 66, 0.35);
+}
+
+.perk-reward-card__mult-hint,
+.perk-reward-card__base,
+.perk-reward-card__spin-mult {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #e9d5ff;
+}
+
+.perk-reward-card__base {
+  color: #94a3b8;
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+.perk-reward-card__spin-mult {
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  color: #0b1220;
+  background: linear-gradient(90deg, #c4b5fd, #f5b942);
+}
+
+.perk-result-summary--above-hud {
+  position: relative;
+  z-index: 2147483000;
+}
+
+.perk-mult-breakdown {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(192, 132, 252, 0.45);
+  background: rgba(46, 16, 72, 0.35);
+  text-align: center;
+  animation: perk-mult-breakdown-in 0.45s ease;
+}
+
+.perk-mult-breakdown--jackpot {
+  border-color: rgba(245, 185, 66, 0.65);
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.4), rgba(88, 28, 135, 0.45));
+  box-shadow: 0 0 24px rgba(245, 185, 66, 0.25);
+}
+
+@keyframes perk-mult-breakdown-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.perk-mult-breakdown__badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #0b1220;
+  background: linear-gradient(90deg, #fcd34d, #c4b5fd);
+}
+
+.perk-mult-breakdown__expr {
+  margin: 0.45rem 0 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #f5f3ff;
+  line-height: 1.4;
+}
+
+.perk-mult-breakdown__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #c4b5fd;
+}
+
+.perk-ticket-unlock--direct .perk-ticket-unlock__card {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: linear-gradient(160deg, rgba(30, 58, 138, 0.55), rgba(5, 8, 6, 0.95));
 }
 
 .perk-reward--uncommon {

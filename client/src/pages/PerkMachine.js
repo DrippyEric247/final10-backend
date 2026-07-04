@@ -18,12 +18,15 @@ import PerkMachineScoutFloater from '../components/perk/PerkMachineScoutFloater'
 import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import EggHatchery from '../components/perk/EggHatchery';
 import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournamentProgress';
+import PerkRewardIndexModal from '../components/perk/PerkRewardIndexModal';
 import { playTournamentTicketUnlockSound } from '../lib/tournamentTicketSound';
+import { playMultiplierSound } from '../lib/perkMultiplierSound';
 import { SavvySalePerkBadge } from '../components/events/SavvySaleBanner';
 import '../styles/PerkMachine.css';
 import '../styles/EggHatchery.css';
+import '../styles/PerkRewardIndex.css';
 
-const REEL_SYMBOLS = ['🪙', '💰', '🥚', '⚡', '✨', '🛡️', '🎖️', '🎰', '💎', '🔥'];
+const REEL_SYMBOLS = ['🪙', '💰', '🥚', '⚡', '✨', '🛡️', '🎖️', '🎰', '💎', '🔥', '⭐', '🎟', '📦'];
 
 function formatCountdown(iso) {
   if (!iso) return null;
@@ -37,8 +40,10 @@ function formatCountdown(iso) {
   return `${s}s`;
 }
 
-function rarityClass(rarity) {
+function rarityClass(rarity, type) {
+  if (type === 'multiplier_2x') return 'perk-reward--multiplier';
   if (rarity === 'legendary') return 'perk-reward--legendary';
+  if (rarity === 'epic') return 'perk-reward--epic';
   if (rarity === 'rare') return 'perk-reward--rare';
   if (rarity === 'uncommon') return 'perk-reward--uncommon';
   return 'perk-reward--common';
@@ -75,12 +80,13 @@ const ACTIVATABLE_DEFS = [
   },
 ];
 
-function ReelColumn({ spinning, symbol, revealed, highlight }) {
+function ReelColumn({ spinning, symbol, revealed, highlight, isMultiplier }) {
   return (
     <div
       className={`perk-reel ${spinning ? 'perk-reel--spinning' : ''} ${revealed ? 'perk-reel--revealed' : ''} ${
         highlight ? 'perk-reel--win' : ''
-      }`}
+      } ${isMultiplier ? 'perk-reel--multiplier' : ''}`}
+      title={isMultiplier ? 'Doubles other rewards in this spin.' : undefined}
     >
       <div className="perk-reel__window">
         <div className={`perk-reel__strip ${spinning ? 'perk-reel__strip--animate' : ''}`}>
@@ -150,6 +156,11 @@ export default function PerkMachine() {
   const [saleMs, setSaleMs] = useState(0);
   const [ticketProgressPulse, setTicketProgressPulse] = useState(false);
   const [ticketUnlock, setTicketUnlock] = useState(null);
+  const [directTicketAward, setDirectTicketAward] = useState(null);
+  const [showRewardIndex, setShowRewardIndex] = useState(false);
+  const [resolvedRewards, setResolvedRewards] = useState([]);
+  const [lastMultiplier, setLastMultiplier] = useState(null);
+  const [multiplierPulse, setMultiplierPulse] = useState(false);
   const spinLock = useRef(false);
   const machinePanelRef = useRef(null);
   const toastTimer = useRef(null);
@@ -166,6 +177,17 @@ export default function PerkMachine() {
     window.setTimeout(() => setBalanceBump(false), 1400);
   }, []);
 
+  const showDirectTicketAward = useCallback((ticketResult, statusAfter) => {
+    const granted = Number(ticketResult?.ticketsGranted) || 0;
+    if (granted < 1) return;
+    playTournamentTicketUnlockSound();
+    setDirectTicketAward({
+      id: Date.now(),
+      ticketsGranted: granted,
+      ticketsOwned: statusAfter?.tournamentTicketProgress?.ticketsOwned ?? granted,
+    });
+    window.setTimeout(() => setDirectTicketAward(null), 4200);
+  }, []);
   const showTicketUnlock = useCallback((ticketResult) => {
     if (!ticketResult?.ticketEarned) return;
     playTournamentTicketUnlockSound();
@@ -327,6 +349,8 @@ export default function PerkMachine() {
       setSpinning(true);
       setError('');
       setResultMessage('');
+      setResolvedRewards([]);
+      setLastMultiplier(null);
       setReelPhase('spinning');
       setDisplayRewards([]);
       setRevealedCount(0);
@@ -335,9 +359,12 @@ export default function PerkMachine() {
       try {
         const result = await spinPerkMachine(mode);
         const rewards = Array.isArray(result.rewards) ? result.rewards : [];
+        const rawForReels =
+          Array.isArray(result.rawRewards) && result.rawRewards.length ? result.rawRewards : rewards;
         setStatus(result.status || status);
+        setLastMultiplier(result.multiplier || null);
 
-        const eggWin = rewards.find((r) => r.type === 'egg');
+        const eggWin = rewards.find((r) => r.type === 'egg' && !r.multiplierRole);
         if (eggWin?.eggTier) {
           setEggPulseTier(eggWin.eggTier);
           window.setTimeout(() => setEggPulseTier(null), 2400);
@@ -377,10 +404,21 @@ export default function PerkMachine() {
         }
 
         runRevealSequence(
-          rewards,
+          rawForReels,
           result.message || result.resultMessage || 'Nice pull, Operator.',
           () => {
-            if (result.tournamentTicket?.ticketEarned) {
+            setResolvedRewards(rewards);
+            const multFactor = Number(result.multiplier?.factor) || 1;
+            if (multFactor > 1) {
+              playMultiplierSound(multFactor);
+              setMultiplierPulse(true);
+              window.setTimeout(() => setMultiplierPulse(false), 2200);
+            }
+
+            const directTickets = Number(result.summary?.directTicketsWon) || 0;
+            if (directTickets > 0) {
+              showDirectTicketAward({ ticketsGranted: directTickets }, result.status);
+            } else if (result.tournamentTicket?.ticketEarned) {
               showTicketUnlock(result.tournamentTicket);
             } else if (result.status?.tournamentTicketProgress) {
               setTicketProgressPulse(true);
@@ -389,7 +427,7 @@ export default function PerkMachine() {
             if (savvyWin > 0) {
               fireCoinBurst();
               showConfirm(`+${savvyWin.toLocaleString()} Savvy added to wallet`);
-            } else if (!result.tournamentTicket?.ticketEarned) {
+            } else if (!result.tournamentTicket?.ticketEarned && directTickets < 1) {
               showConfirm('Balance updated');
             }
           }
@@ -402,7 +440,7 @@ export default function PerkMachine() {
         spinLock.current = false;
       }
     },
-    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock]
+    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock, showDirectTicketAward]
   );
 
   const handleHatch = useCallback(
@@ -489,7 +527,7 @@ export default function PerkMachine() {
   const multiplier = tierLabel === 'Pro' || tierLabel === 'Premium' ? '1.50x' : '1.00x';
 
   return (
-    <div className={`perk-page ${status?.savvySale?.active ? 'perk-page--savvy-sale' : ''}`}>
+    <div className={`perk-page ${status?.savvySale?.active ? 'perk-page--savvy-sale' : ''} ${multiplierPulse ? 'perk-page--multiplier-pulse' : ''}`}>
       <div className="perk-page__glow" aria-hidden />
 
       {coinBurst > 0 ? (
@@ -529,6 +567,14 @@ export default function PerkMachine() {
           <SavvySalePerkBadge sale={status?.savvySale} msRemaining={saleMs} scoutLine />
         </div>
         <div className="perk-header__actions">
+          <button
+            type="button"
+            className="perk-reward-index-btn"
+            onClick={() => setShowRewardIndex(true)}
+            aria-label="Open Reward Index"
+          >
+            ℹ️ Reward Index
+          </button>
           <Link to="/profile#savvy-balance" className="perk-balance-pill">
             <span className="perk-balance-pill__label">Savvy Balance</span>
             <span className={`perk-balance-pill__value ${balanceBump ? 'perk-balance-pill__value--bump' : ''}`}>
@@ -573,6 +619,7 @@ export default function PerkMachine() {
                     symbol={reelSymbols[idx]}
                     revealed={reelPhase === 'revealing' ? idx < revealedCount : reelPhase === 'complete'}
                     highlight={reelPhase === 'complete' && Boolean(displayRewards[idx])}
+                    isMultiplier={displayRewards[idx]?.type === 'multiplier_2x'}
                   />
                 ))}
               </div>
@@ -652,15 +699,46 @@ export default function PerkMachine() {
             </button>
           </div>
 
-          {reelPhase === 'complete' && displayRewards.length > 0 ? (
-            <div className="perk-result-summary">
+          {reelPhase === 'complete' && (resolvedRewards.length > 0 || displayRewards.length > 0) ? (
+            <div className="perk-result-summary perk-result-summary--above-hud">
               <div className="perk-result-summary__title">{resultMessage}</div>
+
+              {lastMultiplier?.factor > 1 && lastMultiplier.breakdown?.expression ? (
+                <div
+                  className={`perk-mult-breakdown ${lastMultiplier.isJackpot ? 'perk-mult-breakdown--jackpot' : ''}`}
+                  role="status"
+                >
+                  <span className="perk-mult-breakdown__badge">
+                    {lastMultiplier.isJackpot ? '8× Jackpot' : `${lastMultiplier.factor}× Multiplier`}
+                  </span>
+                  <p className="perk-mult-breakdown__expr">{lastMultiplier.breakdown.expression}</p>
+                  <p className="perk-mult-breakdown__hint">Doubles other rewards in this spin.</p>
+                </div>
+              ) : null}
+
               <div className="perk-result-summary__grid">
-                {displayRewards.map((reward) => (
-                  <div key={`${reward.id}-${reward.label}`} className={`perk-reward-card ${rarityClass(reward.rarity)}`}>
+                {(resolvedRewards.length ? resolvedRewards : displayRewards).map((reward) => (
+                  <div
+                    key={`${reward.id}-${reward.label}-${reward.multiplierRole ? 'm' : 'r'}`}
+                    className={`perk-reward-card ${rarityClass(reward.rarity, reward.type)} ${
+                      reward.multiplierRole ? 'perk-reward-card--multiplier' : ''
+                    }`}
+                    title={reward.type === 'multiplier_2x' ? 'Doubles other rewards in this spin.' : undefined}
+                  >
                     <span className="perk-reward-card__icon">{reward.icon}</span>
-                    <span className="perk-reward-card__label">{reward.label}</span>
+                    <span className="perk-reward-card__label">
+                      {reward.type === 'multiplier_2x' ? '2×' : reward.label}
+                    </span>
+                    {reward.multiplierRole ? (
+                      <span className="perk-reward-card__mult-hint">Doubles other rewards</span>
+                    ) : null}
+                    {reward.baseLabel && reward.label !== reward.baseLabel ? (
+                      <span className="perk-reward-card__base">{reward.baseLabel}</span>
+                    ) : null}
                     {reward.savvyBoosted ? <span className="perk-reward-card__boost">1.5× boost</span> : null}
+                    {reward.spinMultiplierApplied && reward.spinMultiplierApplied > 1 ? (
+                      <span className="perk-reward-card__spin-mult">{reward.spinMultiplierApplied}× spin</span>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -868,6 +946,23 @@ export default function PerkMachine() {
           </div>
         </div>
       ) : null}
+
+      {directTicketAward ? (
+        <div className="perk-ticket-unlock perk-ticket-unlock--direct" role="alert" aria-live="assertive" key={directTicketAward.id}>
+          <div className="perk-ticket-unlock__card">
+            <span className="perk-ticket-unlock__icon" aria-hidden>🎟</span>
+            <h3 className="perk-ticket-unlock__title">Scout Flight Ticket Awarded</h3>
+            <p className="perk-ticket-unlock__message">
+              Use this ticket to enter official Scout Flight Tournament Mode and compete for Savvy Points.
+            </p>
+            <p className="perk-ticket-unlock__count">
+              +{directTicketAward.ticketsGranted} · {directTicketAward.ticketsOwned} in inventory
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <PerkRewardIndexModal open={showRewardIndex} onClose={() => setShowRewardIndex(false)} />
 
       <footer className="perk-footer">
         <Final10Slogan variant="footer" />

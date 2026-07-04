@@ -12,7 +12,7 @@ const {
   adminGrantEgg,
   adminClearHistory,
 } = require('../services/perkMachineAdminService');
-const { SPIN_MODES } = require('../config/perkMachineRewards');
+const { SPIN_MODES, getRewardIndex } = require('../config/perkMachineRewards');
 
 const router = express.Router();
 
@@ -35,6 +35,15 @@ router.get('/history', auth, async (req, res, next) => {
     res.json({ history: status.recentSpins });
   } catch (err) {
     console.error('[perk-machine/history]', err);
+    next(err);
+  }
+});
+
+router.get('/reward-index', auth, async (req, res, next) => {
+  try {
+    res.json({ entries: getRewardIndex() });
+  } catch (err) {
+    console.error('[perk-machine/reward-index]', err);
     next(err);
   }
 });

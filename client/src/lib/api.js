@@ -310,6 +310,11 @@ export async function getPerkMachineHistory() {
   return data;
 }
 
+export async function getPerkMachineRewardIndex() {
+  const { data } = await api.get("/perk-machine/reward-index");
+  return data;
+}
+
 export async function spinPerkMachine(mode) {
   const { data } = await api.post("/perk-machine/spin", { mode });
   return data;

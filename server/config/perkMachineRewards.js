@@ -71,6 +71,76 @@ const REWARD_POOL = Object.freeze([
     rarity: 'rare',
     weight: 3,
   },
+  {
+    id: 'multiplier_2x',
+    type: 'multiplier_2x',
+    label: '2× Multiplier',
+    icon: '⭐',
+    rarity: 'epic',
+    weight: 3,
+    tooltip: 'Doubles other rewards in this spin.',
+  },
+  {
+    id: 'scout_flight_ticket',
+    type: 'scout_flight_ticket',
+    label: 'Scout Flight Ticket',
+    icon: '🎟',
+    rarity: 'rare',
+    weight: 3,
+  },
+  {
+    id: 'supply_drop',
+    type: 'supply_drop',
+    label: 'Supply Drop',
+    icon: '📦',
+    rarity: 'epic',
+    weight: 2,
+  },
+]);
+
+/** Reward Index copy for the Perk Machine ℹ️ modal (server source of truth). */
+const REWARD_INDEX = Object.freeze([
+  {
+    id: 'savvy',
+    icon: '🪙',
+    title: 'Savvy Points',
+    description: 'Earn Savvy Points added to your account balance.',
+  },
+  {
+    id: 'egg',
+    icon: '🥚',
+    title: 'Eggs',
+    description: 'Unlock temporary perks and bonuses.',
+  },
+  {
+    id: 'scout_flight_ticket',
+    icon: '🎟',
+    title: 'Scout Flight Ticket',
+    description: 'Use this ticket to enter official Scout Flight Tournament Mode and compete for Savvy Points.',
+  },
+  {
+    id: 'supply_drop',
+    icon: '📦',
+    title: 'Supply Drop',
+    description: 'Receive a random bonus reward.',
+  },
+  {
+    id: 'multiplier_2x',
+    icon: '⭐',
+    title: '2× Multiplier',
+    description: 'Doubles every non-2× reward in the same spin.',
+    examples: [
+      '2× + 500 Savvy + Rare Egg = 1,000 Savvy + 2 Rare Eggs',
+      '2× + 2× + 250 Savvy = 1,000 Savvy',
+      'Three 2× tiles stack to 8× on all other rewards.',
+    ],
+  },
+  {
+    id: 'rarity_tiers',
+    icon: '💎',
+    title: 'Rare / Epic / Legendary Rewards',
+    description: 'Higher rarity rewards have stronger effects or better cosmetic value.',
+  },
 ]);
 
 /**
@@ -237,12 +307,17 @@ function emptyEggInventory() {
   };
 }
 
+function getRewardIndex() {
+  return REWARD_INDEX.map((entry) => ({ ...entry }));
+}
+
 const HATCH_COOLDOWN_MS = 800;
 
 module.exports = {
   SPIN_MODES,
   SPIN_COSTS,
   REWARD_POOL,
+  REWARD_INDEX,
   REWARD_BY_ID,
   EXTRA_HATCH_REWARDS,
   HATCH_POOLS,
@@ -256,4 +331,5 @@ module.exports = {
   pickWeightedReward,
   pickResultMessage,
   emptyEggInventory,
+  getRewardIndex,
 };

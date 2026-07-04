@@ -29,8 +29,17 @@ const {
   emptyEggInventory,
 } = require('../config/perkMachineRewards');
 const {
+  computeSpinMultiplier,
+  countMultiplierTiles,
+  scaleRewardForMultiplier,
+  buildMultiplierBreakdown,
+  MULTIPLIER_TYPE,
+} = require('./perkMachineMultiplier');
+const { createSupplyDrop } = require('./supplyDropService');
+const {
   buildTournamentTicketProgress,
   recordSpinForTournamentTicket,
+  ensureEventInventory,
 } = require('./scoutFlightTicketService');
 
 function ensurePerkMachineDoc(user) {
@@ -189,56 +198,94 @@ function rewardToPayload(rewardDef) {
     amount: rewardDef.amount || null,
     eggTier: rewardDef.eggTier || null,
     tokenKey: rewardDef.tokenKey || null,
+    quantity: rewardDef.quantity || null,
+    baseLabel: rewardDef.baseLabel || null,
+    baseAmount: rewardDef.baseAmount || null,
+    spinMultiplier: rewardDef.spinMultiplier || null,
+    tooltip: rewardDef.tooltip || null,
   };
 }
 
 async function applyReward(user, rewardDef, spinId) {
   const pm = ensurePerkMachineDoc(user);
   const payload = rewardToPayload(rewardDef);
-  let granted = { ...payload, granted: true };
+  const qty = Math.max(1, Number(rewardDef.quantity) || 1);
+  let granted = { ...payload, granted: true, quantity: qty };
+
+  if (rewardDef.type === MULTIPLIER_TYPE) {
+    granted.multiplierRole = true;
+    granted.granted = true;
+    return granted;
+  }
 
   if (rewardDef.type === 'savvy') {
-    const baseAmount = Number(rewardDef.amount) || 0;
-    // Apply an active 1.5× Savvy boost (integer result) so the win is real.
+    const baseAmount = Number(rewardDef.baseAmount ?? rewardDef.amount) || 0;
+    const spinMult = Number(rewardDef.spinMultiplier) || 1;
+    const scaledBase = Number(rewardDef.amount) || baseAmount;
     const savvyMult = getSavvyMultiplier(user);
-    const amount = Math.round(baseAmount * savvyMult);
+    const amount = Math.round(scaledBase * savvyMult);
     const result = await grantSavvyReward(user, {
       rewardType: 'perk_machine',
       amount,
-      baseAmount,
+      baseAmount: scaledBase,
       multiplier: savvyMult,
-      idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${amount}`,
-      note: `Perk Machine — ${rewardDef.label}${savvyMult > 1 ? ' (1.5× boost)' : ''}`,
-      meta: { spinId, source: 'perk_machine', multiplier: savvyMult },
+      idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${amount}:${spinMult}`,
+      note: `Perk Machine — ${rewardDef.label}${savvyMult > 1 ? ' (1.5× boost)' : ''}${spinMult > 1 ? ` (${spinMult}× spin)` : ''}`,
+      meta: { spinId, source: 'perk_machine', multiplier: savvyMult, spinMultiplier: spinMult },
     });
     granted.savvyGranted = result.amount;
     granted.savvyBoosted = savvyMult > 1;
+    granted.spinMultiplierApplied = spinMult > 1 ? spinMult : null;
     granted.newBalance = result.newBalance;
+    if (rewardDef.baseAmount != null) {
+      granted.baseAmount = rewardDef.baseAmount;
+      granted.baseLabel = rewardDef.baseLabel || `+${rewardDef.baseAmount} Savvy`;
+    }
   } else if (rewardDef.type === 'egg') {
     const tier = rewardDef.eggTier;
     if (tier === 'extraFreeSpin') {
-      pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin) + 1;
-      pm.extraFreeSpins = Number(pm.extraFreeSpins) + 1;
+      pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin) + qty;
+      pm.extraFreeSpins = Number(pm.extraFreeSpins) + qty;
     } else if (tier && pm.eggInventory[tier] != null) {
-      pm.eggInventory[tier] = Number(pm.eggInventory[tier]) + 1;
+      pm.eggInventory[tier] = Number(pm.eggInventory[tier]) + qty;
     }
+    granted.eggsGranted = qty;
+    if (qty > 1) granted.spinMultiplierApplied = qty;
   } else if (rewardDef.type === 'token' && rewardDef.tokenKey) {
-    pm.tokens[rewardDef.tokenKey] = Number(pm.tokens[rewardDef.tokenKey] || 0) + 1;
+    pm.tokens[rewardDef.tokenKey] = Number(pm.tokens[rewardDef.tokenKey] || 0) + qty;
+    if (qty > 1) granted.spinMultiplierApplied = qty;
   } else if (rewardDef.type === 'streak_shield') {
     if (!user.dailyStreak) user.dailyStreak = {};
-    user.dailyStreak.scoutShields = Number(user.dailyStreak.scoutShields || 0) + 1;
+    user.dailyStreak.scoutShields = Number(user.dailyStreak.scoutShields || 0) + qty;
+    if (qty > 1) granted.spinMultiplierApplied = qty;
   } else if (rewardDef.type === 'calling_card') {
-    pm.callingCardDrops = Number(pm.callingCardDrops) + 1;
+    pm.callingCardDrops = Number(pm.callingCardDrops) + qty;
     if (!Array.isArray(user.badges)) user.badges = [];
     if (!user.badges.includes('perk_calling_card')) {
       user.badges.push('perk_calling_card');
     }
+    if (qty > 1) granted.spinMultiplierApplied = qty;
   } else if (rewardDef.type === 'scout_upgrade') {
     pm.scoutUpgrades = Number(pm.scoutUpgrades || 0) + 1;
     if (!Array.isArray(user.badges)) user.badges = [];
     if (!user.badges.includes('savvy_scout_upgrade')) {
       user.badges.push('savvy_scout_upgrade');
     }
+  } else if (rewardDef.type === 'scout_flight_ticket') {
+    const inv = ensureEventInventory(user);
+    inv.scoutFlightTicket = Number(inv.scoutFlightTicket) + qty;
+    granted.ticketsGranted = qty;
+    if (qty > 1) granted.spinMultiplierApplied = qty;
+    user.markModified('eventInventory');
+  } else if (rewardDef.type === 'supply_drop') {
+    const drop = await createSupplyDrop({
+      scope: 'user',
+      userId: user._id,
+      source: 'perk_machine',
+    });
+    granted.supplyDropId = drop.dropId;
+    granted.supplyDrop = drop;
+    granted.supplyDropLabel = drop.rewardLabel || rewardDef.label;
   }
 
   user.markModified('perkMachine');
@@ -247,9 +294,10 @@ async function applyReward(user, rewardDef, spinId) {
 }
 
 function highestRarity(rewards) {
-  const order = { common: 0, uncommon: 1, rare: 2, legendary: 3 };
+  const order = { common: 0, uncommon: 1, rare: 2, epic: 2, legendary: 3 };
   let max = 'common';
   for (const r of rewards) {
+    if (r.multiplierRole) continue;
     const rank = order[r.rarity] ?? 0;
     if (rank > (order[max] ?? 0)) max = r.rarity;
   }
@@ -345,15 +393,33 @@ async function spinPerkMachine(user, options = {}) {
 
     const pool = buildWeightedPool(tier, options.forceRewardId || null);
     const slots = config.slots;
-    const rewards = [];
+    const rawPicks = [];
 
     for (let i = 0; i < slots; i += 1) {
       const forceId = i === 0 ? options.forceRewardId : null;
       const slotPool = forceId ? buildWeightedPool(tier, forceId) : pool;
-      const picked = pickWeightedReward(slotPool);
-      const granted = await applyReward(user, picked, `${spinId}:${i}`);
-      rewards.push(granted);
+      rawPicks.push(pickWeightedReward(slotPool));
     }
+
+    const multiplierCount = countMultiplierTiles(rawPicks);
+    const { factor: multiplierFactor, isJackpot } = computeSpinMultiplier(multiplierCount);
+    const rewards = [];
+    let grantIndex = 0;
+
+    for (const pick of rawPicks) {
+      if (pick.type === MULTIPLIER_TYPE) {
+        rewards.push(await applyReward(user, pick, `${spinId}:${grantIndex}`));
+        grantIndex += 1;
+        continue;
+      }
+
+      const scaled = multiplierFactor > 1 ? scaleRewardForMultiplier(pick, multiplierFactor) : pick;
+      rewards.push(await applyReward(user, scaled, `${spinId}:${grantIndex}`));
+      grantIndex += 1;
+    }
+
+    const multiplierBreakdown = buildMultiplierBreakdown(rawPicks, multiplierFactor);
+    const rawRewards = rawPicks.map((r) => rewardToPayload(r));
 
     const finalCost = mode === SPIN_MODES.FREE ? 0 : savvyCost;
     const savvyWon = rewards.reduce((sum, r) => sum + (Number(r.savvyGranted) || 0), 0);
@@ -389,11 +455,20 @@ async function spinPerkMachine(user, options = {}) {
     await user.save();
 
     const topRarity = highestRarity(rewards);
-    const resultMessage = pickResultMessage(topRarity);
+    let resultMessage = pickResultMessage(topRarity);
+    if (isJackpot) {
+      resultMessage = '8× JACKPOT! Every reward just multiplied to the max!';
+    } else if (multiplierFactor > 1 && multiplierBreakdown?.expression) {
+      resultMessage = `${multiplierFactor}× multiplier activated!`;
+    }
 
     const eggsWon = rewards
-      .filter((r) => r.type === 'egg')
+      .filter((r) => r.type === 'egg' && !r.multiplierRole)
       .map((r) => r.label);
+
+    const directTicketsWon = rewards
+      .filter((r) => r.type === 'scout_flight_ticket')
+      .reduce((sum, r) => sum + (Number(r.ticketsGranted) || 0), 0);
 
     return {
       spinId,
@@ -407,8 +482,16 @@ async function spinPerkMachine(user, options = {}) {
         savvyWon,
         net: netSavvy,
         eggs: eggsWon,
+        directTicketsWon,
       },
       savvyBalance: Math.round(Number(user.savvyPoints) || 0),
+      rawRewards,
+      multiplier: {
+        count: multiplierCount,
+        factor: multiplierFactor,
+        isJackpot,
+        breakdown: multiplierBreakdown,
+      },
       rewards,
       resultMessage,
       topRarity,
