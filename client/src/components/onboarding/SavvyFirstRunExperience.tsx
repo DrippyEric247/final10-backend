@@ -14,8 +14,8 @@ type Stage = "idle" | "post_boot" | "cards" | "done";
 const CARD_CONTENT = [
   {
     id: "deals",
-    title: "Start your run with undervalued deals",
-    body: "Scan and browse auctions to spot high-value opportunities quickly.",
+    title: "Final10 finds it — or you hunt it",
+    body: "Set Alerts and Savvy Scout watches 24/7. Or jump into Quick Snipes and strike live deals yourself.",
     visual: "🔎",
   },
   {

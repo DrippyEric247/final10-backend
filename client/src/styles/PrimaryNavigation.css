@@ -1,0 +1,123 @@
+/* Philosophy-driven primary navigation */
+
+.main-navigation {
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+}
+
+.nav-primary-items,
+.nav-secondary-items {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.nav-primary-items {
+  gap: 10px;
+  flex: 1 1 auto;
+}
+
+.nav-secondary-items {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-item--primary {
+  min-width: 72px;
+  padding: 8px 10px 10px;
+}
+
+.nav-item--primary .nav-label {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.nav-item--primary .nav-philosophy {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: #a78bfa;
+  max-width: 92px;
+  white-space: normal;
+  text-align: center;
+}
+
+.nav-item--primary.active .nav-philosophy {
+  color: #fde68a;
+}
+
+.nav-more-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.65);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-more-toggle:hover,
+.nav-more-toggle[aria-expanded='true'] {
+  color: #fff;
+  border-color: rgba(167, 139, 250, 0.45);
+  background: rgba(88, 28, 135, 0.35);
+}
+
+.nav-secondary-panel {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-secondary-panel .nav-item .nav-label {
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .nav-primary-items {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  .nav-item--primary {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-width: 64px;
+  }
+
+  .nav-item--primary .nav-philosophy {
+    display: none;
+  }
+
+  .nav-secondary-items {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .nav-secondary-panel {
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 769px) {
+  .nav-item--primary[title] {
+    cursor: help;
+  }
+}

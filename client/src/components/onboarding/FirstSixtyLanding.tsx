@@ -11,6 +11,7 @@ import {
   markFirstSixtyVisited,
 } from "../../lib/firstRunState";
 import { hasCompletedOnboarding } from "../../lib/onboardingPreferences";
+import { DEFAULT_DISCOVERY_PATH } from "../../lib/primaryNavigation";
 import "../../styles/FirstSixtyLanding.css";
 
 type Step = {
@@ -116,7 +117,7 @@ export default function FirstSixtyLanding({ force, onDismiss }: FirstSixtyLandin
     // Anonymous visitors asking to see their Best Move first still flow
     // through the preference picker so the first result feels personal,
     // not generic. Already-personalized returning visitors skip ahead.
-    navigate(hasCompletedOnboarding() ? "/auctions" : "/onboarding/preferences");
+    navigate(hasCompletedOnboarding() ? DEFAULT_DISCOVERY_PATH : "/onboarding/preferences");
   };
 
   const step = STEPS_BASE[stepIdx];

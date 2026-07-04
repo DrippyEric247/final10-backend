@@ -1,0 +1,58 @@
+.deal-philosophy-banner {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(196, 181, 253, 0.28);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(49, 46, 129, 0.42));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.deal-philosophy-banner--alerts {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(120, 53, 15, 0.28));
+}
+
+.deal-philosophy-banner--quickSnipes {
+  border-color: rgba(168, 85, 247, 0.38);
+}
+
+.deal-philosophy-banner--auctions {
+  border-color: rgba(56, 189, 248, 0.32);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(12, 74, 110, 0.28));
+}
+
+.deal-philosophy-banner__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.deal-philosophy-banner__step {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fcd34d;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(252, 211, 77, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.deal-philosophy-banner__philosophy {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e9d5ff;
+}
+
+.deal-philosophy-banner__helper {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+  font-weight: 500;
+}

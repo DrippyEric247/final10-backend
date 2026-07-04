@@ -10,6 +10,7 @@ import { SAVVY_SCOUT, SCOUT_LABELS, SCOUT_COPY } from "../config/savvyScoutBrand
 import LoadingState from "../components/ui/states/LoadingState";
 import ErrorState from "../components/ui/states/ErrorState";
 import EmptyState from "../components/ui/states/EmptyState";
+import DealPhilosophyBanner from "../components/navigation/DealPhilosophyBanner";
 import "../styles/AlertsCommandCenter.css";
 
 const SIGNAL_LINES = [
@@ -112,12 +113,13 @@ export default function AlertsCommandCenter() {
       <div className="alerts-cc-scan" aria-hidden />
       <div className="alerts-cc-grid" aria-hidden />
       <div className="max-w-6xl mx-auto px-4 py-10 pb-20 relative z-10">
+        <DealPhilosophyBanner lane="alerts" />
         {toast ? <div className="mb-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-emerald-100 text-sm">{toast}</div> : null}
         <header className="mb-10 alerts-hero-wrap rounded-3xl p-6 md:p-8 relative overflow-hidden">
           <div className="alerts-radar" /><div className="alerts-radar-ring" /><div className="alerts-signal-wave" />
-          <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-amber-300/95 mb-2">Deal Targeting Command Center</p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-amber-300/95 mb-2">Final10 Finds It For You</p>
           <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-3">LET SAVVY HUNT THIS FOR YOU</h1>
-          <p className="text-lg text-slate-300 max-w-2xl leading-relaxed mb-4">Set your target once. Savvy scans the market until the perfect move appears.</p>
+          <p className="text-lg text-slate-300 max-w-2xl leading-relaxed mb-4">Set your target once. Savvy Scout watches the market 24/7 until the perfect move appears.</p>
           <AnimatePresence mode="wait">
             <motion.div key={stateIndex} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-sm text-sky-200">
               {HUNTER_STATES[stateIndex]}

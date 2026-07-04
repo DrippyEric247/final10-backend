@@ -40,6 +40,7 @@ import { useAuth } from "../context/AuthContext";
 import { fetchEbaySearch, fetchEbayFinal10, ebayFriendlyMessage } from "../lib/ebayClient";
 import { cacheKeyForAuctions, readAuctionSearchCache, writeAuctionSearchCache } from "../lib/ebaySearchCache";
 import { ANALYTICS_EVENTS, trackEvent, trackUpgradeClicked } from "../lib/analytics";
+import DealPhilosophyBanner from "../components/navigation/DealPhilosophyBanner";
 
 const pageWrap = {
   maxWidth: "900px",
@@ -77,6 +78,16 @@ const AUCTIONS_CATEGORY_DEFAULT_QUERY = {
   sneakers: "sneakers",
   other: "electronics",
 };
+
+function AuctionsPageLead({ subtitle }) {
+  return (
+    <>
+      <DealPhilosophyBanner lane="auctions" />
+      <h1 style={{ color: "#fafafa", marginBottom: 8 }}>Final10 Auctions</h1>
+      <p style={{ color: "#888", marginBottom: 16, maxWidth: 640, lineHeight: 1.5 }}>{subtitle}</p>
+    </>
+  );
+}
 
 const isSniperItem = (item) => {
   const t = Number(item.timeRemaining);
@@ -1268,8 +1279,7 @@ export default function Auctions() {
   if (sniperItems.length === 0) {
     return (
       <div style={pageWrap}>
-        <h1 style={{ color: "#fafafa", marginBottom: 8 }}>Final10 Auctions</h1>
-        <p style={{ color: "#888", marginBottom: 16 }}>Sniper view — low competition, ending soon</p>
+        <AuctionsPageLead subtitle="Sniper view — low competition, ending soon" />
         {marketBanner ? (
           <div
             role="status"
@@ -1421,11 +1431,7 @@ export default function Auctions() {
 
   return (
     <div style={pageWrap}>
-      <h1 style={{ color: "#fafafa", marginBottom: 8 }}>Final10 Auctions</h1>
-      <p style={{ color: "#a8a8b8", marginBottom: 6, maxWidth: 640, lineHeight: 1.5 }}>
-        Full eBay market access — sniper view for what&apos;s ending soon. Powerful and live; Savvy+
-        adds the optimization layer (trust, competition, deal ranking).
-      </p>
+      <AuctionsPageLead subtitle="Full eBay market access — sniper view for what's ending soon. Savvy+ adds trust, competition, and deal ranking." />
       {marketBanner ? (
         <div
           role="status"

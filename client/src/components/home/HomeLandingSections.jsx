@@ -95,8 +95,8 @@ export default function HomeLandingSections({ user }) {
             </>
           ) : (
             <>
-              <Link to="/auctions" className="home-cta home-cta--primary">Hunt Deals</Link>
-              <Link to="/events" className="home-cta home-cta--ghost">Events Hub</Link>
+              <Link to="/alerts" className="home-cta home-cta--primary">Let Savvy Hunt</Link>
+              <Link to="/local-deals" className="home-cta home-cta--ghost">Hunt Live Deals</Link>
             </>
           )}
         </div>

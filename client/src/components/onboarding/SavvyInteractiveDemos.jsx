@@ -10,6 +10,12 @@ const DEMO_SEEN_KEY = "f10_interactive_demo_seen_v1";
 
 const DEMOS = [
   {
+    id: "alerts",
+    title: "Alert System",
+    durationMs: 8200,
+    summary: "Savvy waits and strikes at the right window.",
+  },
+  {
     id: "quick-snipes",
     title: "Quick Snipes",
     durationMs: 8600,
@@ -20,12 +26,6 @@ const DEMOS = [
     title: "Smart Cart",
     durationMs: 8200,
     summary: "Savvy optimized your cart automatically.",
-  },
-  {
-    id: "alerts",
-    title: "Alert System",
-    durationMs: 8200,
-    summary: "Savvy waits and strikes at the right window.",
   },
   {
     id: "scanner",
@@ -48,8 +48,9 @@ const DEMOS = [
 ];
 
 const GUIDE_BY_ROUTE = [
-  { pattern: /^\/local-deals\b/, label: "Quick Snipes", selector: ".qscc-live-hero, #video-url, h1" },
   { pattern: /^\/alerts\b/, label: "Alerts", selector: "#alerts-quick-topic, h1" },
+  { pattern: /^\/local-deals\b/, label: "Quick Snipes", selector: ".qscc-live-hero, #video-url, h1" },
+  { pattern: /^\/auctions\b/, label: "Auctions", selector: "h1, [data-tour='auctions-search']" },
   { pattern: /^\/scanner\b/, label: "Video Scanner", selector: "#video-url, .scanner-dock" },
   { pattern: /^\/seller-trends\b/, label: "Seller Signals", selector: "h1, [class*='seller-trends']" },
   { pattern: /^\/feed\b/, label: "Smart Cart", selector: ".smart-cart-wrap, [data-tour='feed-categories']" },
@@ -57,8 +58,9 @@ const GUIDE_BY_ROUTE = [
 ];
 
 const GUIDE_STORIES = {
+  Alerts: ["Reading your target...", "Monitoring market weakness...", "Deal found — Savvy will notify you."],
   "Quick Snipes": ["Scanning live listings...", "Locking on under-market move...", "Best Move Found. Execute now."],
-  Alerts: ["Reading your target...", "Monitoring market weakness...", "Deal found window opening."],
+  Auctions: ["Scanning ending auctions...", "Checking bid pressure...", "Final-minute window opening."],
   "Video Scanner": ["Parsing video frames...", "Matching hidden products...", "Under-market listing surfaced."],
   "Seller Signals": ["Tracking demand velocity...", "Checking inventory pressure...", "Profit opportunity detected."],
   "Smart Cart": ["Expanding your setup...", "Finding bundle savings...", "Cart optimized automatically."],

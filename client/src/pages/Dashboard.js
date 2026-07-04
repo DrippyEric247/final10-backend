@@ -42,10 +42,10 @@ const Dashboard = () => {
   ]), []);
 
   const quickActions = useMemo(() => ([
-    { title: "Hunt Ending Auctions", helper: "Deploy instantly.", href: "/auctions", icon: <Target className="w-5 h-5" /> },
-    { title: "Lock New Alert", helper: "Fastest route to opportunity.", href: "/alerts", icon: <Bell className="w-5 h-5" /> },
+    { title: "Set a Savvy Alert", helper: "Final10 finds the deal for you.", href: "/alerts", icon: <Bell className="w-5 h-5" /> },
+    { title: "Enter Quick Snipes", helper: "Hunt live deals yourself.", href: "/local-deals", icon: <Zap className="w-5 h-5" /> },
+    { title: "Hunt Ending Auctions", helper: "Master the final minutes.", href: "/auctions", icon: <Target className="w-5 h-5" /> },
     { title: "Scan a Video", helper: "AI already prepped this lane.", href: "/scanner", icon: <Radar className="w-5 h-5" /> },
-    { title: "Enter Quick Snipes", helper: "Strike under-market windows now.", href: "/local-deals", icon: <Zap className="w-5 h-5" /> },
     { title: "Build a Bundle", helper: "Compound savings + Savvy rewards.", href: "/feed", icon: <Sparkles className="w-5 h-5" /> },
     { title: "Launch Seller Signals", helper: "Read pressure before everyone else.", href: "/seller-trends", icon: <Gauge className="w-5 h-5" /> },
   ]), []);

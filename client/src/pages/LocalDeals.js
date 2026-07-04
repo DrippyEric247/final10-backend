@@ -51,6 +51,7 @@ import {
 import { isBestMoveDisplayable } from '../lib/bestMoveListingValidation';
 import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
 import DealSearchModeSelector from '../components/deals/DealSearchModeSelector';
+import DealPhilosophyBanner from '../components/navigation/DealPhilosophyBanner';
 import { listingModeForSearchMode, readPersistedSearchMode, writePersistedSearchMode } from '../lib/dealSearchMode';
 import '../styles/QuickSnipesCommandCenter.css';
 
@@ -692,9 +693,10 @@ const LocalDeals = () => {
     <div className="min-h-screen pt-20 qscc-page">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <motion.header initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+          <DealPhilosophyBanner lane="quickSnipes" className="text-left max-w-3xl mx-auto mb-4" />
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">Deal Command Center</h1>
           <p className="text-gray-300 mt-2 max-w-3xl mx-auto">
-            Live AI-powered deal battlefield. One more scroll could surface your next insane snipe.
+            You find it yourself — live AI-scored opportunities, ranked by Best Move.
           </p>
         </motion.header>
 
