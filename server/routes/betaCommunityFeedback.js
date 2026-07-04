@@ -8,6 +8,8 @@ const {
   submitReview,
   adminUpdateConfig,
   adminAddTopic,
+  submitMembershipFeedback,
+  listMembershipFeedback,
 } = require('../services/betaCommunityFeedbackService');
 
 const router = express.Router();
@@ -51,6 +53,29 @@ router.post('/review', auth, async (req, res) => {
   } catch (err) {
     console.error('[betaCommunity] review failed:', err?.message);
     res.status(500).json({ success: false, message: 'Failed to submit review' });
+  }
+});
+
+router.post('/membership-feedback', auth, async (req, res) => {
+  try {
+    const { type, message } = req.body || {};
+    const result = await submitMembershipFeedback(req.user, { type, message });
+    if (!result.ok) {
+      return res.status(result.code === 'DAILY_LIMIT' ? 409 : 400).json(result);
+    }
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[betaCommunity] membership feedback failed:', err?.message);
+    res.status(500).json({ success: false, message: 'Failed to save membership feedback' });
+  }
+});
+
+router.get('/admin/membership-feedback', auth, requireAdminAccess(), async (req, res) => {
+  try {
+    const items = await listMembershipFeedback({ limit: Number(req.query?.limit) || 50 });
+    res.json({ success: true, items });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err?.message || 'Failed to load feedback' });
   }
 });
 

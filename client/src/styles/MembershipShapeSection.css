@@ -1,0 +1,325 @@
+/* Help Shape Final10 Memberships — beta home section */
+
+.mship-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.mship-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.mship-title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.mship-subtitle {
+  margin: 0;
+  max-width: 44rem;
+  line-height: 1.55;
+  color: #cbd5e1;
+  font-size: 0.94rem;
+}
+
+.mship-header {
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 300px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.mship-beta-banner {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  border: 1px solid rgba(129, 140, 248, 0.42);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.97), rgba(49, 46, 129, 0.45));
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+}
+
+.mship-beta-banner__icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.mship-beta-banner__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #e9d5ff;
+}
+
+.mship-beta-banner__body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #cbd5e1;
+}
+
+.mship-scout {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(252, 211, 77, 0.32);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.94), rgba(120, 53, 15, 0.22));
+}
+
+.mship-scout__img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.mship-scout__line {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+}
+
+.mship-scout__line strong {
+  color: #fde68a;
+}
+
+.mship-table-wrap {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(168, 85, 247, 0.32);
+}
+
+.mship-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mship-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.mship-table thead th {
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mship-table tbody th,
+.mship-table tbody td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: top;
+}
+
+.mship-table tbody th {
+  font-weight: 700;
+  color: #e2e8f0;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.mship-table tbody td {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.mship-table tbody tr:hover td,
+.mship-table tbody tr:hover th {
+  background: rgba(88, 28, 135, 0.14);
+}
+
+.mship-col-free {
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.mship-col-premium {
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.mship-col-pro {
+  background: rgba(252, 211, 77, 0.07);
+}
+
+.mship-table-note {
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-style: italic;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mship-philosophy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.mship-tier-card__title {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.mship-tier-card__body {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.mship-tier-card--free {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.mship-tier-card--premium {
+  border-color: rgba(168, 85, 247, 0.38);
+}
+
+.mship-tier-card--pro {
+  border-color: rgba(252, 211, 77, 0.38);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(120, 53, 15, 0.18));
+}
+
+.mship-beta-notice {
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(88, 28, 135, 0.22));
+}
+
+.mship-beta-notice__title {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.mship-beta-notice__body {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.mship-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.mship-btn {
+  font-size: 0.86rem;
+}
+
+.mship-suggest-form {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mship-suggest-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.mship-suggest-form textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  padding: 0.65rem;
+  font-size: 0.86rem;
+  resize: vertical;
+  margin-bottom: 0.65rem;
+}
+
+.mship-login-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.mship-login-hint a {
+  color: #c4b5fd;
+  font-weight: 700;
+}
+
+.mship-status {
+  margin: 0.65rem 0 0;
+  font-size: 0.84rem;
+  color: #86efac;
+  font-weight: 600;
+}
+
+.mship-footer {
+  text-align: center;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.mship-footer__lines {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.mship-footer__lines li {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e9d5ff;
+}
+
+.mship-footer__cta {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  background: linear-gradient(90deg, #fcd34d, #c4b5fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (max-width: 900px) {
+  .mship-header {
+    grid-template-columns: 1fr;
+  }
+
+  .mship-philosophy-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .mship-actions {
+    flex-direction: column;
+  }
+
+  .mship-btn {
+    width: 100%;
+    text-align: center;
+  }
+}

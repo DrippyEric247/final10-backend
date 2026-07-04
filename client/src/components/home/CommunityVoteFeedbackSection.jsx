@@ -198,7 +198,7 @@ export default function CommunityVoteFeedbackSection() {
   const reviewReward = data.rewards?.reviewSavvy ?? 25;
 
   return (
-    <section className="cvf-section" aria-labelledby="cvf-title">
+    <section className="cvf-section" id="help-shape-final10" aria-labelledby="cvf-title">
       <div className="cvf-you-asked home-card">
         <div className="cvf-you-asked__head">
           <span className="cvf-you-asked__icon" aria-hidden>🛠</span>

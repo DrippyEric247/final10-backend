@@ -5,6 +5,7 @@ import { getDonationLinks, hasAnyDonationLink } from '../../config/donationConfi
 import { isBetaModeActive } from '../../lib/betaModeAccess';
 import { useAppConfig } from '../../lib/useAppConfig';
 import CommunityVoteFeedbackSection from './CommunityVoteFeedbackSection';
+import MembershipShapeSection from './MembershipShapeSection';
 import {
   HOME_HERO,
   HOME_MISSION,
@@ -122,7 +123,12 @@ export default function HomeLandingSections({ user }) {
         </section>
       </div>
 
-      {showBetaCommunity ? <CommunityVoteFeedbackSection /> : null}
+      {showBetaCommunity ? (
+        <>
+          <MembershipShapeSection />
+          <CommunityVoteFeedbackSection />
+        </>
+      ) : null}
 
       <SavvyUniverseRoadmap />
 

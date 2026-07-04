@@ -1,6 +1,7 @@
 const BetaCommunityConfig = require('../models/BetaCommunityConfig');
 const BetaCommunityVote = require('../models/BetaCommunityVote');
 const BetaCommunityReview = require('../models/BetaCommunityReview');
+const BetaCommunityMembershipFeedback = require('../models/BetaCommunityMembershipFeedback');
 const User = require('../models/User');
 const { isBetaMode } = require('../config/betaMode');
 const { grantSavvyReward } = require('./savvyRewardService');
@@ -17,6 +18,9 @@ const DEFAULT_TOPICS = [
   { id: 'savvy_trip_preview', label: 'SavvyTrip Preview', emoji: '🌍', active: true, sortOrder: 8 },
   { id: 'new_calling_cards', label: 'New Calling Cards', emoji: '🎴', active: true, sortOrder: 9 },
   { id: 'profile_customization', label: 'Profile Customization', emoji: '👤', active: true, sortOrder: 10 },
+  { id: 'membership_tier_design', label: 'Membership Tier Design', emoji: '🚀', active: true, sortOrder: 11 },
+  { id: 'membership_pricing', label: 'Membership Pricing & Value', emoji: '💎', active: true, sortOrder: 12 },
+  { id: 'membership_pro_features', label: 'Pro-Exclusive Features', emoji: '👑', active: true, sortOrder: 13 },
 ];
 
 const DEFAULT_SHIPPED = [
@@ -270,11 +274,60 @@ async function adminAddTopic({ id, label, emoji = '✨' }) {
   return getPublicSnapshot();
 }
 
+async function submitMembershipFeedback(user, { type = 'suggestion', message = '' } = {}) {
+  if (!isBetaMode()) {
+    return { ok: false, code: 'BETA_INACTIVE', message: 'Membership feedback is only available during beta.' };
+  }
+  const text = String(message || '').trim();
+  if (text.length < 8) {
+    return { ok: false, code: 'TOO_SHORT', message: 'Please share at least a sentence of feedback.' };
+  }
+  const dayKey = utcDayKey();
+  const feedbackType = type === 'vote_intent' ? 'vote_intent' : 'suggestion';
+
+  if (feedbackType === 'suggestion') {
+    const todayCount = await BetaCommunityMembershipFeedback.countDocuments({
+      userId: user._id,
+      type: 'suggestion',
+      dayKey,
+    });
+    if (todayCount >= 5) {
+      return { ok: false, code: 'DAILY_LIMIT', message: 'Daily suggestion limit reached. Thanks for all your input!' };
+    }
+  }
+
+  await BetaCommunityMembershipFeedback.create({
+    userId: user._id,
+    username: user.username || user.firstName || '',
+    type: feedbackType,
+    message: text.slice(0, 4000),
+    dayKey,
+  });
+
+  return { ok: true, message: 'Thanks — the team will review your membership feedback.' };
+}
+
+async function listMembershipFeedback({ limit = 50 } = {}) {
+  const rows = await BetaCommunityMembershipFeedback.find()
+    .sort({ createdAt: -1 })
+    .limit(Math.min(200, Math.max(1, limit)))
+    .lean();
+  return rows.map((r) => ({
+    id: String(r._id),
+    username: r.username || 'Tester',
+    type: r.type,
+    message: r.message,
+    createdAt: r.createdAt,
+  }));
+}
+
 module.exports = {
   getOrSeedConfig,
   getPublicSnapshot,
   castVote,
   submitReview,
+  submitMembershipFeedback,
+  listMembershipFeedback,
   adminUpdateConfig,
   adminAddTopic,
   DEFAULT_TOPICS,

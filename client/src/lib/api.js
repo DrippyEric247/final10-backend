@@ -956,6 +956,16 @@ export async function submitBetaCommunityReview(payload) {
   return data;
 }
 
+export async function submitBetaMembershipFeedback(payload) {
+  const { data } = await api.post("/beta-community/membership-feedback", payload);
+  return data;
+}
+
+export async function getAdminMembershipFeedback(limit = 50) {
+  const { data } = await api.get("/beta-community/admin/membership-feedback", { params: { limit } });
+  return data;
+}
+
 export async function adminUpdateBetaCommunityConfig(patch) {
   const { data } = await api.put("/beta-community/admin/config", patch);
   return data;
