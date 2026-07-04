@@ -2,6 +2,7 @@
 const helmet = require('helmet');
 const {
   createCorsMiddleware,
+  createOptionsPreflightMiddleware,
   ensureCorsHeaders,
   buildAllowedOrigins,
   isOriginAllowed,
@@ -117,6 +118,7 @@ module.exports = {
   cacheControl,
   cookieSecurity,
   createCorsMiddleware,
+  createOptionsPreflightMiddleware,
   ensureCorsHeaders,
   buildAllowedOrigins,
   isOriginAllowed,

@@ -5,6 +5,8 @@ const {
   isVercelAppOrigin,
   isLocalDevOrigin,
   useCorsCredentials,
+  createOptionsPreflightMiddleware,
+  FINAL10_PRODUCTION_ORIGINS,
 } = require('../middleware/cors');
 
 describe('CORS middleware', () => {
@@ -37,13 +39,48 @@ describe('CORS middleware', () => {
     expect(resolveCorsOrigin('https://evil.example.com')).toBeNull();
   });
 
-  it('parses ALLOWED_ORIGINS and expands www/apex from CLIENT_URL', () => {
+  it('parses ALLOWED_ORIGINS with both apex and www while CLIENT_URL stays apex', () => {
     process.env.CLIENT_URL = 'https://final10.app';
-    process.env.ALLOWED_ORIGINS = 'https://custom.example.com';
+    process.env.ALLOWED_ORIGINS = 'https://final10.app,https://www.final10.app';
     const allowed = buildAllowedOrigins();
     expect(allowed.has('https://final10.app')).toBe(true);
     expect(allowed.has('https://www.final10.app')).toBe(true);
-    expect(allowed.has('https://custom.example.com')).toBe(true);
+    FINAL10_PRODUCTION_ORIGINS.forEach((o) => expect(allowed.has(o)).toBe(true));
+  });
+
+  it('OPTIONS preflight returns 204 for allowed final10.app API paths', () => {
+    const preflight = createOptionsPreflightMiddleware();
+    const headers = {};
+    const res = {
+      statusCode: 200,
+      setHeader(key, value) {
+        headers[key] = value;
+      },
+      sendStatus(code) {
+        this.statusCode = code;
+        return this;
+      },
+    };
+    const req = {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://www.final10.app',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+      path: '/api/auth/login',
+    };
+
+    let nextCalled = false;
+    preflight(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(false);
+    expect(res.statusCode).toBe(204);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://www.final10.app');
+    expect(headers['Access-Control-Allow-Methods']).toContain('POST');
+    expect(headers['Access-Control-Allow-Headers']).toContain('Authorization');
   });
 
   it('does not enable credentials by default', () => {

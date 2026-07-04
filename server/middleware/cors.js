@@ -8,13 +8,18 @@
  */
 const cors = require('cors');
 
+/** Production browser origins — also accepted when listed in ALLOWED_ORIGINS. */
+const FINAL10_PRODUCTION_ORIGINS = Object.freeze([
+  'https://final10.app',
+  'https://www.final10.app',
+]);
+
 const DEFAULT_ORIGINS = Object.freeze([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'https://final10.app',
-  'https://www.final10.app',
+  ...FINAL10_PRODUCTION_ORIGINS,
 ]);
 
 const CORS_METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'];
@@ -49,21 +54,31 @@ function expandWwwApexVariants(origin) {
   return out;
 }
 
+function splitOriginCsv(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((s) => normalizeOrigin(s))
+    .filter(Boolean);
+}
+
 function parseEnvOriginList() {
   const out = [];
-  for (const key of ['ALLOWED_ORIGINS', 'CORS_ORIGINS']) {
-    const raw = String(process.env[key] || '').trim();
-    if (!raw) continue;
-    raw
-      .split(',')
-      .map((s) => normalizeOrigin(s))
-      .filter(Boolean)
-      .forEach((o) => out.push(o));
+  const allowedRaw = String(process.env.ALLOWED_ORIGINS || '').trim();
+  const corsOriginsRaw = String(process.env.CORS_ORIGINS || '').trim();
+
+  if (allowedRaw) {
+    splitOriginCsv(allowedRaw).forEach((o) => out.push(o));
   }
+  if (corsOriginsRaw) {
+    splitOriginCsv(corsOriginsRaw).forEach((o) => out.push(o));
+  }
+
+  // CLIENT_URL is the canonical app URL (apex). CORS may still allow www via ALLOWED_ORIGINS.
   for (const key of ['FRONTEND_URL', 'CLIENT_URL', 'REACT_APP_CLIENT_URL', 'CORS_ORIGIN']) {
     const value = normalizeOrigin(process.env[key]);
     if (value) out.push(value);
   }
+
   return out;
 }
 
@@ -110,10 +125,58 @@ function useCorsCredentials() {
   return String(process.env.CORS_CREDENTIALS || '').toLowerCase() === 'true';
 }
 
+function applyPreflightHeaders(req, res, resolvedOrigin) {
+  res.setHeader('Access-Control-Allow-Origin', resolvedOrigin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', CORS_METHODS.join(', '));
+  res.setHeader('Access-Control-Allow-Headers', CORS_ALLOWED_HEADERS.join(', '));
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if (useCorsCredentials()) {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  const requestedMethod = String(req.headers['access-control-request-method'] || '').trim();
+  if (requestedMethod) {
+    res.setHeader('Access-Control-Allow-Methods', CORS_METHODS.join(', '));
+  }
+  const requestedHeaders = String(req.headers['access-control-request-headers'] || '').trim();
+  if (requestedHeaders) {
+    res.setHeader('Access-Control-Allow-Headers', CORS_ALLOWED_HEADERS.join(', '));
+  }
+}
+
+/**
+ * Handle OPTIONS preflight for every route (including /api/*) before rate limits and handlers.
+ */
+function createOptionsPreflightMiddleware() {
+  return function optionsPreflight(req, res, next) {
+    if (req.method !== 'OPTIONS') {
+      return next();
+    }
+
+    const resolved = resolveCorsOrigin(req.headers.origin);
+    if (!resolved) {
+      if (req.headers.origin) {
+        console.warn(`[cors] blocked OPTIONS preflight from: ${req.headers.origin}`);
+      }
+      return res.sendStatus(403);
+    }
+
+    applyPreflightHeaders(req, res, resolved);
+    return res.sendStatus(204);
+  };
+}
+
 function logCorsStartup() {
   const explicit = buildAllowedOrigins();
+  const clientUrl = normalizeOrigin(process.env.CLIENT_URL) || '(unset)';
+  const allowedEnv = splitOriginCsv(process.env.ALLOWED_ORIGINS);
+  const final10Listed = FINAL10_PRODUCTION_ORIGINS.every((o) => explicit.has(o));
   console.log(
-    `[cors] ready credentials=${useCorsCredentials()} explicitOrigins=${explicit.size} vercelPreviews=*.vercel.app localhost=any-port`
+    `[cors] ready clientUrl=${clientUrl} credentials=${useCorsCredentials()} ` +
+      `allowedOriginsEnv=${allowedEnv.length ? allowedEnv.join('|') : '(defaults)'} ` +
+      `explicitOrigins=${explicit.size} final10ApexAndWww=${final10Listed} ` +
+      `vercelPreviews=*.vercel.app localhost=any-port`
   );
 }
 
@@ -162,6 +225,7 @@ function ensureCorsHeaders(req, res) {
 
 module.exports = {
   DEFAULT_ORIGINS,
+  FINAL10_PRODUCTION_ORIGINS,
   CORS_METHODS,
   CORS_ALLOWED_HEADERS,
   buildAllowedOrigins,
@@ -169,9 +233,12 @@ module.exports = {
   resolveCorsOrigin,
   useCorsCredentials,
   createCorsMiddleware,
+  createOptionsPreflightMiddleware,
   ensureCorsHeaders,
+  applyPreflightHeaders,
   logCorsStartup,
   isVercelAppOrigin,
   isLocalDevOrigin,
   isFinal10AppOrigin,
+  splitOriginCsv,
 };

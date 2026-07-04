@@ -37,6 +37,7 @@ const {
   cacheControl,
   cookieSecurity,
   createCorsMiddleware,
+  createOptionsPreflightMiddleware,
   logCorsStartup,
   rateLimitConfig,
   cspConfig,
@@ -55,10 +56,12 @@ let lastBootAlertE2e = null;
 // --- Trust Proxy (for rate limiting behind reverse proxies) ---
 app.set('trust proxy', 1);
 
-// --- CORS (before rate limits, security headers, and all /api routes) ---
+// --- CORS + OPTIONS preflight (before rate limits, security headers, and all /api routes) ---
+const optionsPreflight = createOptionsPreflightMiddleware();
 const corsMiddleware = createCorsMiddleware();
+app.use(optionsPreflight);
 app.use(corsMiddleware);
-app.options('*', corsMiddleware);
+app.options(/.*/, optionsPreflight);
 logCorsStartup();
 
 // --- Compression Middleware (apply early) ---
