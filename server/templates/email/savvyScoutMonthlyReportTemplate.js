@@ -1,6 +1,6 @@
 /**
  * Savvy Scout — Monthly Report email (HTML + plain text).
- * Visual reference: dark tactical / neon-green Savvy Scout monthly recap.
+ * Visual: Final10 dark app theme — #0B0B0F / #111218 / #171A22 with purple accents.
  */
 
 const {
@@ -22,19 +22,59 @@ const { FINAL10_TAGLINE, FINAL10_EMAIL_SOCIALS } = require('../../config/final10
 const { generateMonthlyScoutGoals, getMonthKey, monthLabelFromKey } = require('../../services/monthlyScoutGoalsService');
 
 const COLORS = {
-  bg: '#050806',
-  card: '#0c1210',
-  cardAlt: '#101a14',
-  border: '#1f3d2e',
+  bg: '#0B0B0F',
+  container: '#111218',
+  card: '#171A22',
+  cardAlt: '#171A22',
+  border: 'rgba(168, 85, 247, 0.32)',
+  borderSoft: 'rgba(168, 85, 247, 0.16)',
+  track: '#0B0B0F',
   green: '#4ade80',
-  greenDeep: '#16a34a',
+  greenDeep: '#22c55e',
   gold: '#f5b942',
+  goldGlow: 'rgba(245, 185, 66, 0.42)',
   purple: '#c084fc',
-  purpleDeep: '#9333ea',
+  purpleMid: '#a855f7',
+  purpleDeep: '#7c3aed',
+  purpleGlow: 'rgba(168, 85, 247, 0.35)',
   text: '#f8fafc',
-  muted: '#94a3b8',
-  dim: '#64748b',
+  muted: '#cbd5e1',
+  dim: '#94a3b8',
 };
+
+const GRADIENT_BTN = 'linear-gradient(90deg,#6d28d9,#a855f7)';
+const GRADIENT_BTN_SHADOW = '0 4px 24px rgba(168,85,247,0.42)';
+
+function purpleGlowSeparatorHtml(marginTop = '24px', marginBottom = '8px') {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:${marginTop};margin-bottom:${marginBottom};">
+      <tr>
+        <td style="height:1px;background:linear-gradient(90deg,transparent 0%,${COLORS.purpleDeep} 22%,${COLORS.purpleMid} 50%,${COLORS.purpleDeep} 78%,transparent 100%);font-size:0;line-height:0;">&nbsp;</td>
+      </tr>
+      <tr>
+        <td style="padding:0;height:10px;font-size:0;line-height:0;background:linear-gradient(180deg,${COLORS.purpleGlow} 0%,transparent 100%);opacity:0.65;">&nbsp;</td>
+      </tr>
+    </table>`;
+}
+
+function final10GradientButton(label, href, padding = '16px 32px') {
+  return `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+      <tr>
+        <td align="center" style="border-radius:12px;background:${GRADIENT_BTN};box-shadow:${GRADIENT_BTN_SHADOW};">
+          <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${escapeHtml(href)}" style="height:48px;v-text-anchor:middle;width:220px;" arcsize="18%" fillcolor="#7c3aed" stroke="f"><w:anchorlock/><center style="color:#ffffff;font-family:Arial Black,Arial,sans-serif;font-size:13px;font-weight:900;">${escapeHtml(label)}</center></v:roundrect><![endif]-->
+          <a href="${escapeHtml(href)}" target="_blank" style="display:inline-block;padding:${padding};background:${GRADIENT_BTN};border-radius:12px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;color:#ffffff;text-decoration:none;letter-spacing:0.08em;text-transform:uppercase;mso-hide:all;">${escapeHtml(label)}</a>
+        </td>
+      </tr>
+    </table>`;
+}
+
+function sectionHeading(label) {
+  return `
+    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;color:${COLORS.green};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;padding-left:2px;">
+      ${label}
+    </div>`;
+}
 
 const DEFAULT_STATS = Object.freeze([
   { key: 'savvyEarned', icon: '💰', label: 'Savvy Earned', format: 'savvy' },
@@ -252,18 +292,18 @@ function normalizeMonthlyReportData(input = {}) {
 
 function statCell(stat) {
   return `
-    <td class="stat-cell" width="50%" valign="top" style="padding:6px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border:1px solid ${COLORS.border};border-radius:12px;">
+    <td class="stat-cell" width="50%" valign="top" style="padding:8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:14px;box-shadow:0 0 18px ${COLORS.borderSoft};">
         <tr>
-          <td style="padding:12px 10px 4px;font-size:20px;line-height:1;text-align:center;">${stat.icon}</td>
+          <td style="padding:14px 10px 6px;font-size:22px;line-height:1;text-align:center;">${stat.icon}</td>
         </tr>
         <tr>
-          <td style="padding:0 10px 4px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:16px;font-weight:900;color:${COLORS.gold};text-align:center;line-height:1.2;">
+          <td style="padding:0 10px 6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:17px;font-weight:900;color:${COLORS.gold};text-align:center;line-height:1.2;text-shadow:0 0 14px ${COLORS.goldGlow};">
             ${escapeHtml(stat.value)}
           </td>
         </tr>
         <tr>
-          <td style="padding:0 10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;color:${COLORS.muted};text-align:center;letter-spacing:0.04em;text-transform:uppercase;">
+          <td style="padding:0 10px 14px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;color:${COLORS.muted};text-align:center;letter-spacing:0.05em;text-transform:uppercase;">
             ${escapeHtml(stat.label)}
           </td>
         </tr>
@@ -287,18 +327,18 @@ function statsGridHtml(stats) {
 
 function achievementCard(a) {
   return `
-    <td class="stack" width="33%" valign="top" style="padding:6px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border:1px solid ${COLORS.border};border-radius:12px;">
+    <td class="stack" width="33%" valign="top" style="padding:8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:14px;box-shadow:0 0 16px ${COLORS.borderSoft};">
         <tr>
-          <td align="center" style="padding:14px 8px 6px;font-size:28px;line-height:1;">${a.icon}</td>
+          <td align="center" style="padding:16px 8px 8px;font-size:28px;line-height:1;">${a.icon}</td>
         </tr>
         <tr>
-          <td align="center" style="padding:0 10px 4px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};text-transform:uppercase;">
+          <td align="center" style="padding:0 10px 6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};text-transform:uppercase;">
             ${escapeHtml(a.title)}
           </td>
         </tr>
         <tr>
-          <td align="center" style="padding:0 10px 14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};line-height:1.45;">
+          <td align="center" style="padding:0 10px 16px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};line-height:1.5;">
             ${escapeHtml(a.description)}
           </td>
         </tr>
@@ -308,9 +348,9 @@ function achievementCard(a) {
 
 function comingSoonCell(item) {
   return `
-    <td class="stack" width="25%" align="center" valign="top" style="padding:6px;">
-      <div style="font-size:24px;line-height:1;margin-bottom:6px;">${item.icon}</div>
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;color:${COLORS.muted};text-transform:uppercase;letter-spacing:0.03em;line-height:1.35;">
+    <td class="stack" width="25%" align="center" valign="top" style="padding:8px;">
+      <div style="font-size:24px;line-height:1;margin-bottom:8px;">${item.icon}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;color:${COLORS.muted};text-transform:uppercase;letter-spacing:0.04em;line-height:1.4;">
         ${escapeHtml(item.label)}
       </div>
     </td>`;
@@ -322,10 +362,10 @@ function goalRowHtml(goal) {
   const statusColor = goal.completed ? COLORS.green : COLORS.muted;
   return `
     <tr>
-      <td style="padding:10px 0;border-bottom:1px solid ${COLORS.border};">
+      <td style="padding:12px 0;border-bottom:1px solid ${COLORS.borderSoft};">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${COLORS.text};line-height:1.35;">
+            <td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${COLORS.text};line-height:1.4;">
               ${escapeHtml(goal.title)}
             </td>
             <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${statusColor};text-transform:uppercase;white-space:nowrap;">
@@ -333,14 +373,14 @@ function goalRowHtml(goal) {
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${COLORS.muted};">
+            <td colspan="2" style="padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${COLORS.muted};">
               Progress: <strong style="color:${COLORS.text};">${escapeHtml(goal.progressLabel)}</strong>
               &nbsp;·&nbsp; Reward: <strong style="color:${COLORS.gold};">+${escapeHtml(formatSavvy(goal.rewardSavvy))} Savvy</strong>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding-top:8px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#050806;border-radius:999px;height:8px;">
+            <td colspan="2" style="padding-top:10px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.track};border:1px solid ${COLORS.borderSoft};border-radius:999px;height:8px;">
                 <tr>
                   <td width="${goal.progressPercent}%" style="background:${barColor};border-radius:999px;font-size:0;line-height:0;">&nbsp;</td>
                   <td style="font-size:0;line-height:0;">&nbsp;</td>
@@ -358,34 +398,34 @@ function scoutGoalsSectionHtml(d) {
   if (!g || !Array.isArray(g.goals) || !g.goals.length) return '';
 
   const bonusClaimedNote = g.completionBonusClaimed
-    ? `<div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.green};">✓ Monthly Completion Bonus already claimed for ${escapeHtml(d.monthLabel)}.</div>`
+    ? `<div style="margin-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.green};">✓ Monthly Completion Bonus already claimed for ${escapeHtml(d.monthLabel)}.</div>`
     : g.allComplete
-      ? `<div style="margin-top:12px;"><a href="${escapeHtml(d.goalsClaimUrl)}" style="display:inline-block;padding:12px 22px;background:${COLORS.green};color:#052e16;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;text-decoration:none;border-radius:10px;text-transform:uppercase;">Claim +${escapeHtml(formatSavvy(g.completionBonusSavvy))} Bonus</a></div>`
+      ? `<div style="margin-top:14px;">${final10GradientButton(`Claim +${formatSavvy(g.completionBonusSavvy)} Bonus`, d.goalsClaimUrl, '14px 24px')}</div>`
       : '';
 
   return `
           <!-- Savvy Scout Goals -->
           <tr>
-            <td style="padding:8px 20px 12px;" class="pad-sm">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border:1px solid ${COLORS.border};border-radius:14px;">
+            <td style="padding:12px 24px 20px;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:16px;box-shadow:0 0 22px ${COLORS.borderSoft};">
                 <tr>
-                  <td style="padding:18px 16px;">
-                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;">🎯 Savvy Scout Goals</div>
-                    <div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${COLORS.muted};line-height:1.55;font-style:italic;">
+                  <td style="padding:22px 18px;">
+                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.1em;text-transform:uppercase;">🎯 Savvy Scout Goals</div>
+                    <div style="margin-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${COLORS.muted};line-height:1.6;font-style:italic;">
                       ${escapeHtml(d.scoutGoalsMessage)}
                     </div>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
                       ${g.goals.map(goalRowHtml).join('')}
                     </table>
-                    <div style="margin-top:16px;padding:14px;background:linear-gradient(135deg,#0f1a12 0%,#14532d 100%);border:1px solid ${COLORS.green};border-radius:12px;">
-                      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${COLORS.text};line-height:1.45;">
+                    <div style="margin-top:18px;padding:16px;background:${COLORS.container};border:1px solid ${COLORS.border};border-radius:14px;box-shadow:inset 0 0 24px ${COLORS.borderSoft};">
+                      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${COLORS.text};line-height:1.5;">
                         ${escapeHtml(d.completionBonusPanelTitle)}
                       </div>
-                      <div style="margin-top:8px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:24px;font-weight:900;color:${COLORS.gold};">
+                      <div style="margin-top:10px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:30px;font-weight:900;color:${COLORS.gold};line-height:1;text-shadow:0 0 22px ${COLORS.goldGlow};">
                         +${escapeHtml(formatSavvy(g.completionBonusSavvy))} Savvy
                         <span style="font-size:12px;color:${COLORS.muted};font-weight:bold;"> (${escapeHtml(g.tierLabel)} tier)</span>
                       </div>
-                      <div style="margin-top:6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};">
+                      <div style="margin-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};">
                         ${g.completedCount} / ${g.totalGoals} goals complete
                       </div>
                       ${bonusClaimedNote}
@@ -400,7 +440,7 @@ function scoutGoalsSectionHtml(d) {
 function endReportStatRow(icon, labelHtml) {
   return `
     <tr>
-      <td style="padding:10px 14px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:${COLORS.text};border-bottom:1px solid rgba(31,61,46,0.65);">
+      <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:${COLORS.text};border-bottom:1px solid ${COLORS.borderSoft};">
         <span style="font-size:18px;line-height:1;vertical-align:middle;margin-right:8px;">${icon}</span>
         ${labelHtml}
       </td>
@@ -412,7 +452,7 @@ function endOfReportSectionHtml(d) {
     .map(
       (s) => `
       <td align="center" valign="middle" style="padding:6px 4px;">
-        <a href="${escapeHtml(s.url)}" title="${escapeHtml(s.label)}" style="display:inline-block;padding:10px 12px;background:linear-gradient(180deg,#141c18 0%,#0a100d 100%);border:1px solid ${COLORS.border};border-radius:999px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.text};text-decoration:none;letter-spacing:0.04em;box-shadow:0 0 12px rgba(74,222,128,0.12);">
+        <a href="${escapeHtml(s.url)}" title="${escapeHtml(s.label)}" style="display:inline-block;padding:10px 12px;background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:999px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.text};text-decoration:none;letter-spacing:0.04em;box-shadow:0 0 14px ${COLORS.borderSoft};">
           <span style="font-size:14px;margin-right:4px;">${s.icon}</span>${escapeHtml(s.label)}
         </a>
       </td>`
@@ -422,13 +462,15 @@ function endOfReportSectionHtml(d) {
   return `
           <!-- End of Report -->
           <tr>
-            <td style="padding:4px 20px 0;" class="pad-sm">
+            <td style="padding:8px 24px 0;" class="pad-sm">
+              ${purpleGlowSeparatorHtml('8px', '4px')}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:4px 24px 0;" class="pad-sm">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="padding:0;height:2px;background:linear-gradient(90deg, transparent 0%, ${COLORS.purpleDeep} 20%, ${COLORS.green} 50%, ${COLORS.gold} 80%, transparent 100%);font-size:0;line-height:0;box-shadow:0 0 18px rgba(192,132,252,0.35);">&nbsp;</td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding:14px 0 6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.purple};letter-spacing:0.28em;text-transform:uppercase;">
+                  <td align="center" style="padding:8px 0 10px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.purple};letter-spacing:0.28em;text-transform:uppercase;">
                     🏁 End of Report
                   </td>
                 </tr>
@@ -436,8 +478,8 @@ function endOfReportSectionHtml(d) {
             </td>
           </tr>
           <tr>
-            <td style="padding:8px 20px 20px;" class="pad-sm">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(180deg,#120a1f 0%,#0c1210 35%,#050806 100%);border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;box-shadow:0 0 32px rgba(147,51,234,0.18), inset 0 1px 0 rgba(245,185,66,0.08);">
+            <td style="padding:12px 24px 24px;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(180deg,#1a1228 0%,${COLORS.container} 40%,${COLORS.bg} 100%);border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;box-shadow:0 0 36px ${COLORS.purpleGlow}, inset 0 1px 0 rgba(245,185,66,0.1);">
                 <tr>
                   <td style="padding:22px 18px 8px;text-align:center;">
                     <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:18px;font-weight:900;color:${COLORS.gold};letter-spacing:0.06em;text-transform:uppercase;text-shadow:0 0 20px rgba(245,185,66,0.35);">
@@ -447,7 +489,7 @@ function endOfReportSectionHtml(d) {
                 </tr>
                 <tr>
                   <td style="padding:0 12px 8px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(5,8,6,0.55);border:1px solid rgba(31,61,46,0.8);border-radius:14px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;">
                       ${endReportStatRow('💰', `Saved <strong style="color:${COLORS.gold};">${escapeHtml(d.endReportEstimatedSavings)}</strong>`)}
                       ${endReportStatRow('🪙', `Earned <strong style="color:${COLORS.gold};">${escapeHtml(d.endReportSavvyEarned)} Savvy</strong>`)}
                       ${endReportStatRow('🎯', `Completed <strong style="color:${COLORS.green};">${d.endReportCompletedGoals}/${d.endReportTotalGoals}</strong> Scout Goals`)}
@@ -504,7 +546,7 @@ function endOfReportSectionHtml(d) {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:0;height:2px;background:linear-gradient(90deg, transparent 0%, ${COLORS.gold} 30%, ${COLORS.purple} 70%, transparent 100%);font-size:0;line-height:0;opacity:0.75;">&nbsp;</td>
+                  <td style="padding:0;height:1px;background:linear-gradient(90deg, transparent 0%, ${COLORS.gold} 30%, ${COLORS.purpleMid} 70%, transparent 100%);font-size:0;line-height:0;opacity:0.8;">&nbsp;</td>
                 </tr>
               </table>
             </td>
@@ -532,23 +574,23 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background:${COLORS.bg};-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background:${COLORS.bg};-webkit-text-size-adjust:100%;color:${COLORS.text};">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(d.preheader)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.bg};">
     <tr>
-      <td align="center" style="padding:20px 10px;">
-        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;">
+      <td align="center" style="padding:24px 12px;background:${COLORS.bg};">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:${COLORS.container};border:1px solid ${COLORS.border};border-radius:20px;overflow:hidden;box-shadow:0 0 40px ${COLORS.borderSoft};">
 
           <!-- Header -->
           <tr>
-            <td style="padding:18px 20px 8px;background:linear-gradient(180deg,#0f1a12 0%,${COLORS.card} 100%);" class="pad-sm">
+            <td style="padding:22px 24px 12px;background:linear-gradient(180deg,#1a1228 0%,${COLORS.container} 100%);border-bottom:1px solid ${COLORS.borderSoft};" class="pad-sm">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td valign="middle">
-                    <img src="${escapeHtml(d.logoImageUrl)}" alt="Savvy Scout" width="120" style="display:block;width:120px;max-width:100%;height:auto;border:0;" />
+                    <img src="${escapeHtml(d.logoImageUrl)}" alt="Final10" width="120" style="display:block;width:120px;max-width:100%;height:auto;border:0;" />
                   </td>
                   <td align="right" valign="middle">
-                    <span style="display:inline-block;padding:6px 12px;border-radius:999px;background:#14532d;border:1px solid ${COLORS.green};font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;">🛩️ MONTHLY REPORT</span>
+                    <span style="display:inline-block;padding:7px 14px;border-radius:999px;background:${COLORS.card};border:1px solid ${COLORS.border};font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;color:${COLORS.purple};letter-spacing:0.1em;box-shadow:0 0 16px ${COLORS.borderSoft};">🛩️ MONTHLY REPORT</span>
                   </td>
                 </tr>
               </table>
@@ -557,11 +599,11 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Title + ribbon -->
           <tr>
-            <td align="center" style="padding:8px 20px 0;" class="pad-sm">
-              <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:28px;line-height:1.1;font-weight:900;color:${COLORS.text};text-transform:uppercase;text-align:center;">
-                SAVVY SCOUT <span style="color:${COLORS.green};">REPORT</span>
+            <td align="center" style="padding:16px 24px 0;" class="pad-sm">
+              <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:28px;line-height:1.15;font-weight:900;color:${COLORS.text};text-transform:uppercase;text-align:center;letter-spacing:0.02em;">
+                SAVVY SCOUT <span style="color:${COLORS.purple};">REPORT</span>
               </div>
-              <div style="display:inline-block;margin-top:12px;padding:8px 18px;background:linear-gradient(90deg,#14532d,#166534);border:1px solid ${COLORS.green};border-radius:6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.green};letter-spacing:0.12em;text-transform:uppercase;">
+              <div style="display:inline-block;margin-top:14px;padding:9px 20px;background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:8px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.green};letter-spacing:0.12em;text-transform:uppercase;box-shadow:0 0 18px ${COLORS.borderSoft};">
                 ★ ${escapeHtml(d.monthLabel)} MONTHLY REPORT ★
               </div>
             </td>
@@ -569,15 +611,15 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Hero -->
           <tr>
-            <td align="center" style="padding:16px 20px 0;" class="pad-sm">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="hero-wrap" style="max-width:600px;border:1px solid ${COLORS.border};border-radius:14px;overflow:hidden;background:${COLORS.card};">
+            <td align="center" style="padding:20px 24px 0;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="hero-wrap" style="max-width:600px;border:1px solid ${COLORS.border};border-radius:16px;overflow:hidden;background:${COLORS.card};box-shadow:0 0 24px ${COLORS.borderSoft};">
                 <tr>
                   <td style="padding:0;margin:0;line-height:0;font-size:0;">
-                    <img src="${escapeHtml(d.heroImageUrl)}" alt="Savvy Scout — mission complete. Your monthly intelligence report is ready." width="600" class="hero-img" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:14px 14px 0 0;" />
+                    <img src="${escapeHtml(d.heroImageUrl)}" alt="Savvy Scout — mission complete. Your monthly intelligence report is ready." width="600" class="hero-img" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:16px 16px 0 0;" />
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:0;margin:0;height:32px;background:linear-gradient(180deg, rgba(12,18,16,0) 0%, ${COLORS.card} 55%, ${COLORS.card} 100%);font-size:0;line-height:0;">&nbsp;</td>
+                  <td style="padding:0;margin:0;height:28px;background:linear-gradient(180deg, rgba(23,26,34,0) 0%, ${COLORS.card} 60%, ${COLORS.card} 100%);font-size:0;line-height:0;">&nbsp;</td>
                 </tr>
               </table>
             </td>
@@ -585,11 +627,11 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Greeting -->
           <tr>
-            <td style="padding:8px 24px 16px;" class="pad-sm">
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:${COLORS.text};">
-                Hello <strong>${escapeHtml(d.userName)}</strong>,
+            <td style="padding:20px 24px 8px;" class="pad-sm">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:${COLORS.text};">
+                Hello <strong style="color:#ffffff;">${escapeHtml(d.userName)}</strong>,
               </div>
-              <div style="margin-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:${COLORS.muted};">
+              <div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${COLORS.muted};">
                 Savvy Scout has finished reviewing your month.<br/>
                 Here's how you performed across the Savvy Universe.
               </div>
@@ -598,37 +640,50 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Stats -->
           <tr>
-            <td style="padding:0 14px 8px;" class="pad-sm">
-              <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-left:6px;">
-                📊 Your Monthly Stats
-              </div>
+            <td style="padding:16px 20px 12px;" class="pad-sm">
+              ${sectionHeading('📊 Your Monthly Stats')}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 ${statsGridHtml(d.stats)}
               </table>
             </td>
           </tr>
 
+          <tr>
+            <td style="padding:0 24px;" class="pad-sm">
+              ${purpleGlowSeparatorHtml('4px', '4px')}
+            </td>
+          </tr>
+
           <!-- Monthly bonus -->
           <tr>
-            <td style="padding:12px 20px;" class="pad-sm">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(135deg,#0f1a12 0%,#14532d 100%);border:2px solid ${COLORS.green};border-radius:16px;">
+            <td style="padding:16px 24px 20px;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:2px solid ${COLORS.border};border-radius:18px;box-shadow:0 0 28px ${COLORS.purpleGlow};">
                 <tr>
-                  <td style="padding:20px 18px;">
-                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;">🎁 Monthly Scout Bonus</div>
-                    <div style="margin-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${COLORS.muted};line-height:1.5;">
+                  <td style="padding:24px 20px;">
+                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.1em;text-transform:uppercase;">🎁 Monthly Scout Bonus</div>
+                    <div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${COLORS.muted};line-height:1.55;">
                       Thanks for being part of the Savvy Universe.
                     </div>
-                    <div style="margin-top:14px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:32px;font-weight:900;color:${COLORS.gold};line-height:1;">
-                      +${escapeHtml(d.monthlyBonusSavvy)} <span style="font-size:16px;color:${COLORS.text};">SAVVY</span>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;">
+                      <tr>
+                        <td valign="middle">
+                          <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:44px;font-weight:900;color:${COLORS.gold};line-height:1;text-shadow:0 0 28px ${COLORS.goldGlow};">
+                            +${escapeHtml(d.monthlyBonusSavvy)}
+                          </div>
+                          <div style="margin-top:6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;color:${COLORS.text};letter-spacing:0.18em;text-transform:uppercase;">
+                            Savvy Reward
+                          </div>
+                        </td>
+                        <td align="center" valign="middle" style="padding-left:16px;font-size:56px;line-height:1;">🪙</td>
+                      </tr>
+                    </table>
+                    <div style="margin-top:20px;">
+                      ${final10GradientButton('Claim Reward', d.claimRewardUrl)}
                     </div>
-                    <div style="margin-top:16px;">
-                      <a href="${escapeHtml(d.claimRewardUrl)}" style="display:inline-block;padding:14px 28px;background:${COLORS.green};color:#052e16;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;text-decoration:none;border-radius:10px;letter-spacing:0.06em;text-transform:uppercase;">CLAIM REWARD</a>
-                    </div>
-                    <div style="margin-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.dim};">
+                    <div style="margin-top:14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.dim};">
                       🔒 ${escapeHtml(d.bonusExpiresLabel)}
                     </div>
                   </td>
-                  <td align="center" width="90" valign="middle" style="padding:12px;font-size:48px;line-height:1;">🪙</td>
                 </tr>
               </table>
             </td>
@@ -637,10 +692,8 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
           <!-- Achievements -->
           ${d.achievements.length ? `
           <tr>
-            <td style="padding:8px 14px;" class="pad-sm">
-              <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-left:6px;">
-                🏆 Monthly Achievements
-              </div>
+            <td style="padding:12px 20px;" class="pad-sm">
+              ${sectionHeading('🏆 Monthly Achievements')}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   ${d.achievements.map(achievementCard).join('')}
@@ -649,23 +702,29 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
             </td>
           </tr>` : ''}
 
+          <tr>
+            <td style="padding:0 24px;" class="pad-sm">
+              ${purpleGlowSeparatorHtml('4px', '4px')}
+            </td>
+          </tr>
+
           <!-- Recommendations -->
           <tr>
-            <td style="padding:12px 20px;" class="pad-sm">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border:1px solid ${COLORS.border};border-radius:14px;">
+            <td style="padding:16px 24px 20px;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:16px;box-shadow:0 0 22px ${COLORS.borderSoft};">
                 <tr>
-                  <td style="padding:18px 16px;">
-                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;">🛩️ Scout Recommendations</div>
-                    <div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${COLORS.muted};line-height:1.55;">
+                  <td style="padding:22px 18px;">
+                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.1em;text-transform:uppercase;">🛩️ Scout Recommendations</div>
+                    <div style="margin-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${COLORS.muted};line-height:1.6;">
                       <strong style="color:${COLORS.text};">${escapeHtml(d.recommendationLead)}</strong><br/><br/>
                       ${escapeHtml(d.recommendationBody)}
                     </div>
-                    <div style="margin-top:14px;padding:12px;background:#0a140f;border-radius:10px;border:1px dashed ${COLORS.border};">
-                      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};text-transform:uppercase;letter-spacing:0.05em;">Potential Extra Savvy Earned</div>
-                      <div style="margin-top:4px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:22px;font-weight:900;color:${COLORS.gold};">+${escapeHtml(d.potentialExtraSavvy)} 🪙</div>
+                    <div style="margin-top:18px;padding:16px;background:${COLORS.container};border-radius:12px;border:1px solid ${COLORS.border};box-shadow:inset 0 0 20px ${COLORS.borderSoft};">
+                      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};text-transform:uppercase;letter-spacing:0.06em;">Potential Extra Savvy Earned</div>
+                      <div style="margin-top:6px;font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:28px;font-weight:900;color:${COLORS.gold};line-height:1.1;text-shadow:0 0 20px ${COLORS.goldGlow};">+${escapeHtml(d.potentialExtraSavvy)} <span style="font-size:22px;">🪙</span></div>
                     </div>
-                    <div style="margin-top:14px;">
-                      <a href="${escapeHtml(d.upgradeUrl)}" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${COLORS.green};text-decoration:underline;">Upgrade to Pro →</a>
+                    <div style="margin-top:16px;">
+                      <a href="${escapeHtml(d.upgradeUrl)}" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${COLORS.purple};text-decoration:underline;">Upgrade to Pro →</a>
                     </div>
                   </td>
                 </tr>
@@ -677,20 +736,20 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Next goal -->
           <tr>
-            <td style="padding:8px 20px 12px;" class="pad-sm">
-              <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">🎯 Next Goal</div>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border:1px solid ${COLORS.border};border-radius:14px;">
+            <td style="padding:12px 24px 20px;" class="pad-sm">
+              ${sectionHeading('🎯 Next Goal')}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:16px;box-shadow:0 0 20px ${COLORS.borderSoft};">
                 <tr>
-                  <td style="padding:16px;">
+                  <td style="padding:20px 18px;">
                     <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:16px;font-weight:900;color:${COLORS.text};text-transform:uppercase;">
                       ${escapeHtml(d.nextGoalTitle)}
                     </div>
-                    <div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${COLORS.muted};">
+                    <div style="margin-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${COLORS.muted};">
                       Progress: <strong style="color:${COLORS.text};">${d.streakCurrent} / ${d.streakGoal} Days</strong>
                     </div>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;background:#050806;border-radius:999px;height:12px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;background:${COLORS.track};border:1px solid ${COLORS.borderSoft};border-radius:999px;height:12px;">
                       <tr>
-                        <td width="${d.streakProgress}%" style="background:linear-gradient(90deg,${COLORS.greenDeep},${COLORS.green});border-radius:999px;font-size:0;line-height:0;">&nbsp;</td>
+                        <td width="${d.streakProgress}%" style="background:linear-gradient(90deg,${COLORS.purpleDeep},${COLORS.green});border-radius:999px;font-size:0;line-height:0;">&nbsp;</td>
                         <td style="font-size:0;line-height:0;">&nbsp;</td>
                       </tr>
                     </table>
@@ -719,9 +778,9 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Coming soon -->
           <tr>
-            <td style="padding:8px 14px 12px;" class="pad-sm">
-              <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:12px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-left:6px;">🚀 What's Coming Next</div>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border:1px solid ${COLORS.border};border-radius:14px;">
+            <td style="padding:12px 20px 20px;" class="pad-sm">
+              ${sectionHeading('🚀 What\u2019s Coming Next')}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-radius:16px;box-shadow:0 0 20px ${COLORS.borderSoft};">
                 <tr>
                   ${d.comingSoon.map(comingSoonCell).join('')}
                 </tr>
@@ -731,16 +790,16 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Scout message -->
           <tr>
-            <td style="padding:8px 20px 16px;" class="pad-sm">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.cardAlt};border-left:4px solid ${COLORS.green};border-radius:0 14px 14px 0;">
+            <td style="padding:8px 24px 20px;" class="pad-sm">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLORS.card};border:1px solid ${COLORS.border};border-left:4px solid ${COLORS.purpleMid};border-radius:0 16px 16px 0;box-shadow:0 0 18px ${COLORS.borderSoft};">
                 <tr>
-                  <td width="64" valign="top" style="padding:16px 8px 16px 16px;">
-                    <img src="${escapeHtml(d.heroImageUrl)}" alt="" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:50%;border:2px solid ${COLORS.green};object-fit:cover;" />
+                  <td width="64" valign="top" style="padding:18px 8px 18px 18px;">
+                    <img src="${escapeHtml(d.heroImageUrl)}" alt="" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:50%;border:2px solid ${COLORS.purpleMid};object-fit:cover;" />
                   </td>
-                  <td style="padding:16px 16px 16px 4px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${COLORS.muted};line-height:1.6;">
-                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.green};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">🛩️ Message From Savvy Scout</div>
+                  <td style="padding:18px 18px 18px 4px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${COLORS.muted};line-height:1.65;">
+                    <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;color:${COLORS.green};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">🛩️ Message From Savvy Scout</div>
                     ${escapeHtml(d.scoutMessage)}
-                    <div style="margin-top:10px;font-size:12px;color:${COLORS.dim};">— Savvy Scout</div>
+                    <div style="margin-top:12px;font-size:12px;color:${COLORS.dim};">— Savvy Scout</div>
                   </td>
                 </tr>
               </table>
@@ -751,15 +810,18 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
 
           <!-- Footer -->
           <tr>
-            <td style="padding:8px 20px 24px;border-top:1px solid ${COLORS.border};background:#030504;" class="pad-sm">
-              ${emailBrandingFooterHtml({ prominent: true, marginTop: 0 })}
-              <div style="margin-top:14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.dim};line-height:1.6;text-align:center;">
+            <td style="padding:20px 24px 28px;border-top:1px solid ${COLORS.border};background:${COLORS.bg};" class="pad-sm">
+              ${purpleGlowSeparatorHtml('0', '16px')}
+              <div style="padding:14px 12px;border:1px solid ${COLORS.borderSoft};border-radius:12px;background:${COLORS.container};text-align:center;">
+                ${emailBrandingFooterHtml({ prominent: true, marginTop: 0 })}
+              </div>
+              <div style="margin-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};line-height:1.7;text-align:center;">
                 Thank you for being part of the Savvy Universe!<br/>
                 <a href="${escapeHtml(d.preferencesUrl)}" style="color:${COLORS.green};text-decoration:underline;">Manage preferences</a>
                 &nbsp;·&nbsp;
                 <a href="${escapeHtml(d.unsubscribeUrl)}" style="color:${COLORS.green};text-decoration:underline;">Unsubscribe</a>
                 <br/><br/>
-                © ${d.reportYear} Final10 · Savvy Universe
+                <span style="color:${COLORS.dim};">© ${d.reportYear} Final10 · Savvy Universe</span>
               </div>
             </td>
           </tr>
