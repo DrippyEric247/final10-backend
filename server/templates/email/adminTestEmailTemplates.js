@@ -5,7 +5,7 @@
 const { buildPasswordResetEmail } = require('./passwordResetTemplate');
 const { buildSavvyScoutDealFoundEmail } = require('./savvyScoutDealFoundTemplate');
 const { buildSavvyScoutMonthlyReportEmail } = require('./savvyScoutMonthlyReportTemplate');
-const { buildMonthlyScoutReportData } = require('./monthlyScoutReportDataService');
+const { buildMonthlyScoutReportData } = require('../../services/monthlyScoutReportDataService');
 const {
   escapeHtml,
   pick,

@@ -15,6 +15,13 @@ const { requestPasswordReset, resetPasswordWithToken } = require('../services/pa
 const { getClientIp, getClientUa } = require('../services/referralGuard');
 const { processReferralOnSignup, resolveReferrer } = require('../services/referralService');
 
+const {
+  respondOAuthDisabled,
+  wrapOAuthHandler,
+  wantsJsonOAuthResponse,
+  OAUTH_EXTERNAL_TIMEOUT_MS,
+} = require('../lib/oauthRouteHelpers');
+const { withAsyncTimeout } = require('../lib/asyncTimeout');
 const { googleEnabled, appleEnabled } = require('../config/socialAuthConfig');
 const socialAuth = require('../services/socialAuthService');
 
@@ -356,47 +363,81 @@ async function completeSocialLogin(profile, provider, res) {
   return res.redirect(socialAuth.buildClientSuccessRedirect(token, provider));
 }
 
-/** GET /api/auth/google → redirect to Google consent screen. */
+/** GET /api/auth/google → redirect to Google consent screen (or JSON when disabled). */
 router.get('/google', (req, res) => {
   if (!googleEnabled()) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('google_not_configured', 'google'));
+    return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect);
   }
   try {
-    return res.redirect(socialAuth.getGoogleAuthUrl());
+    const url = socialAuth.getGoogleAuthUrl();
+    if (wantsJsonOAuthResponse(req)) {
+      return res.json({ ok: true, configured: true, provider: 'google', url });
+    }
+    return res.redirect(url);
   } catch (err) {
     console.error('[auth/google] start failed', err);
+    if (wantsJsonOAuthResponse(req)) {
+      return res.status(500).json({
+        ok: false,
+        code: 'GOOGLE_OAUTH_START_FAILED',
+        message: 'Could not start Google sign-in. Use email and password to log in.',
+        provider: 'google',
+      });
+    }
     return res.redirect(socialAuth.buildClientErrorRedirect('google_start_failed', 'google'));
   }
 });
 
 /** GET /api/auth/google/callback → exchange code, verify, sign JWT, redirect. */
-router.get('/google/callback', async (req, res) => {
-  const { code, state, error } = req.query || {};
-  if (error) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'google'));
-  }
-  if (!code || !state) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'google'));
-  }
-  try {
-    const verifiedState = socialAuth.verifyState(String(state), 'google');
-    const profile = await socialAuth.exchangeGoogleCode(String(code), verifiedState.nonce);
-    return await completeSocialLogin(profile, 'google', res);
-  } catch (err) {
-    console.error('[auth/google/callback] failed', err.message);
-    return res.redirect(socialAuth.buildClientErrorRedirect('google_auth_failed', 'google'));
-  }
-});
+router.get(
+  '/google/callback',
+  wrapOAuthHandler(async (req, res) => {
+    const { code, state, error } = req.query || {};
+    if (error) {
+      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'google'));
+    }
+    if (!code || !state) {
+      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'google'));
+    }
+    if (!googleEnabled()) {
+      return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect);
+    }
+    try {
+      const verifiedState = socialAuth.verifyState(String(state), 'google');
+      const profile = await withAsyncTimeout(
+        socialAuth.exchangeGoogleCode(String(code), verifiedState.nonce),
+        OAUTH_EXTERNAL_TIMEOUT_MS,
+        'google_token_exchange'
+      );
+      return await completeSocialLogin(profile, 'google', res);
+    } catch (err) {
+      console.error('[auth/google/callback] failed', err.message);
+      return res.redirect(socialAuth.buildClientErrorRedirect('google_auth_failed', 'google'));
+    }
+  }, { label: 'auth/google/callback' })
+);
 
-/** GET /api/auth/apple → redirect to Apple sign-in. */
+/** GET /api/auth/apple → redirect to Apple sign-in (or JSON when disabled). */
 router.get('/apple', (req, res) => {
   if (!appleEnabled()) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('apple_not_configured', 'apple'));
+    return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
   }
   try {
-    return res.redirect(socialAuth.getAppleAuthUrl());
+    const url = socialAuth.getAppleAuthUrl();
+    if (wantsJsonOAuthResponse(req)) {
+      return res.json({ ok: true, configured: true, provider: 'apple', url });
+    }
+    return res.redirect(url);
   } catch (err) {
     console.error('[auth/apple] start failed', err);
+    if (wantsJsonOAuthResponse(req)) {
+      return res.status(500).json({
+        ok: false,
+        code: 'APPLE_OAUTH_START_FAILED',
+        message: 'Could not start Apple sign-in. Use email and password to log in.',
+        provider: 'apple',
+      });
+    }
     return res.redirect(socialAuth.buildClientErrorRedirect('apple_start_failed', 'apple'));
   }
 });
@@ -407,42 +448,62 @@ router.get('/apple', (req, res) => {
  * because we request name/email scope. We parse the body locally so the global
  * JSON parser doesn't need to change.
  */
-router.post('/apple/callback', express.urlencoded({ extended: false }), async (req, res) => {
-  const { code, state, error, user: appleUser } = req.body || {};
-  if (error) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
-  }
-  if (!code || !state) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
-  }
-  try {
-    const verifiedState = socialAuth.verifyState(String(state), 'apple');
-    const profile = await socialAuth.exchangeAppleCode(String(code), verifiedState.nonce, appleUser);
-    return await completeSocialLogin(profile, 'apple', res);
-  } catch (err) {
-    console.error('[auth/apple/callback] failed', err.message);
-    return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
-  }
-});
+router.post(
+  '/apple/callback',
+  express.urlencoded({ extended: false }),
+  wrapOAuthHandler(async (req, res) => {
+    const { code, state, error, user: appleUser } = req.body || {};
+    if (error) {
+      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
+    }
+    if (!code || !state) {
+      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
+    }
+    if (!appleEnabled()) {
+      return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
+    }
+    try {
+      const verifiedState = socialAuth.verifyState(String(state), 'apple');
+      const profile = await withAsyncTimeout(
+        socialAuth.exchangeAppleCode(String(code), verifiedState.nonce, appleUser),
+        OAUTH_EXTERNAL_TIMEOUT_MS,
+        'apple_token_exchange'
+      );
+      return await completeSocialLogin(profile, 'apple', res);
+    } catch (err) {
+      console.error('[auth/apple/callback] failed', err.message);
+      return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
+    }
+  }, { label: 'auth/apple/callback' })
+);
 
-/* Some Apple configurations return to the callback via GET (no name/email scope). */
-router.get('/apple/callback', async (req, res) => {
-  const { code, state, error } = req.query || {};
-  if (error) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
-  }
-  if (!code || !state) {
-    return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
-  }
-  try {
-    const verifiedState = socialAuth.verifyState(String(state), 'apple');
-    const profile = await socialAuth.exchangeAppleCode(String(code), verifiedState.nonce, null);
-    return await completeSocialLogin(profile, 'apple', res);
-  } catch (err) {
-    console.error('[auth/apple/callback GET] failed', err.message);
-    return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
-  }
-});
+router.get(
+  '/apple/callback',
+  wrapOAuthHandler(async (req, res) => {
+    const { code, state, error } = req.query || {};
+    if (error) {
+      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
+    }
+    if (!code || !state) {
+      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
+    }
+    if (!appleEnabled()) {
+      return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
+    }
+    try {
+      const verifiedState = socialAuth.verifyState(String(state), 'apple');
+      const profile = await withAsyncTimeout(
+        socialAuth.exchangeAppleCode(String(code), verifiedState.nonce, null),
+        OAUTH_EXTERNAL_TIMEOUT_MS,
+        'apple_token_exchange'
+      );
+      return await completeSocialLogin(profile, 'apple', res);
+    } catch (err) {
+      console.error('[auth/apple/callback GET] failed', err.message);
+      return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
+    }
+  }, { label: 'auth/apple/callback_get' })
+);
 
 /**
  * POST /api/auth/forgot-password
