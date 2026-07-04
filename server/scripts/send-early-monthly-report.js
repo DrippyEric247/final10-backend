@@ -9,21 +9,36 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 
 const mongoose = require('mongoose');
+const User = require('../models/User');
 const { sendEarlyMonthlyReportTest, getEmailConfigStatus, logEmailStartup } = require('../services/emailService');
 const { FOUNDER_ADMIN_EMAIL } = require('../lib/founderAdminAccess');
 
 async function main() {
   const to = String(process.argv[2] || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
+  const explicitUserId = process.argv[3] ? String(process.argv[3]).trim() : null;
   logEmailStartup();
   const config = getEmailConfigStatus();
   console.log('[early-monthly-report] email config', JSON.stringify(config, null, 2));
 
+  let userId = explicitUserId;
   if (process.env.MONGODB_URI) {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('[early-monthly-report] MongoDB connected');
+    if (!userId) {
+      const user = await User.findOne({ email: to }).select('_id email username').lean();
+      userId = user?._id ? String(user._id) : null;
+      if (user) {
+        console.log('[early-monthly-report] resolved user', { userId, email: user.email, username: user.username });
+      }
+    }
   }
 
-  const result = await sendEarlyMonthlyReportTest({ to });
+  if (!userId) {
+    console.error('[early-monthly-report] FAILED — userId required (pass as 3rd arg or use a registered recipient email)');
+    process.exit(1);
+  }
+
+  const result = await sendEarlyMonthlyReportTest({ to, userId });
   console.log('[early-monthly-report] result', JSON.stringify(result, null, 2));
 
   if (mongoose.connection.readyState === 1) {

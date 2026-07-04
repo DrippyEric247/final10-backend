@@ -4,7 +4,8 @@
 
 const { buildPasswordResetEmail } = require('./passwordResetTemplate');
 const { buildSavvyScoutDealFoundEmail } = require('./savvyScoutDealFoundTemplate');
-const { buildSavvyScoutMonthlyReportEmail, sampleMonthlyReportData } = require('./savvyScoutMonthlyReportTemplate');
+const { buildSavvyScoutMonthlyReportEmail } = require('./savvyScoutMonthlyReportTemplate');
+const { buildMonthlyScoutReportData } = require('./monthlyScoutReportDataService');
 const {
   escapeHtml,
   pick,
@@ -155,11 +156,8 @@ function buildDealVariantEmail(user, { subject, preheader }) {
   return wrapAsTestEmail({ subject, html: built.html, text: built.text });
 }
 
-function buildMonthlyReportTestEmail(user) {
-  const data = {
-    ...sampleMonthlyReportData(),
-    userName: pick(user.firstName || user.username, 'Operator'),
-  };
+async function buildMonthlyReportTestEmail(user) {
+  const data = await buildMonthlyScoutReportData(user._id, { logMetrics: true });
   const built = buildSavvyScoutMonthlyReportEmail(data);
   return wrapAsTestEmail({
     subject: built.subject || 'Your Savvy Scout Monthly Report',
@@ -223,7 +221,7 @@ function buildCustomTestEmail({ subject, message, buttonText, buttonUrl, imageUr
   return wrapAsTestEmail({ subject: safeSubject, html, text });
 }
 
-function buildAdminTestEmail(templateKey, user = {}, custom = {}) {
+async function buildAdminTestEmail(templateKey, user = {}, custom = {}) {
   switch (templateKey) {
     case 'welcome_email':
       return buildWelcomeEmail(user);

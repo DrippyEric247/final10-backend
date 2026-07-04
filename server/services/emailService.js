@@ -6,7 +6,7 @@ const {
   buildSavvyScoutMonthlyReportEmail,
   sampleMonthlyReportData,
 } = require('../templates/email/savvyScoutMonthlyReportTemplate');
-const { buildEarlyMonthlyReportTestPayload } = require('./monthlyReportService');
+const { buildMonthlyScoutReportData } = require('./monthlyScoutReportDataService');
 const { FOUNDER_ADMIN_EMAIL } = require('../lib/founderAdminAccess');
 const { buildPasswordResetEmail } = require('../templates/email/passwordResetTemplate');
 
@@ -745,9 +745,24 @@ async function sendAlertMatchEmail({ to, alertName, listingTitle, listingUrl, de
   });
 }
 
+function shouldLogMonthlyReportMetrics() {
+  return process.env.NODE_ENV !== 'production' || process.env.ADMIN_DEV_MODE === 'true';
+}
+
+async function resolveMonthlyReportPayload(data = {}, userId = null) {
+  const resolvedUserId = userId || data.userId;
+  if (!resolvedUserId) return data;
+  const live = await buildMonthlyScoutReportData(resolvedUserId, {
+    logMetrics: shouldLogMonthlyReportMetrics(),
+    monthKey: data.monthKey,
+  });
+  return { ...live, ...data, userId: resolvedUserId };
+}
+
 async function sendSavvyScoutMonthlyReportEmail({
   to,
   data = {},
+  userId = null,
   subject: subjectOverride,
   forceSend = false,
   trace = null,
@@ -772,7 +787,10 @@ async function sendSavvyScoutMonthlyReportEmail({
     })
   );
 
-  const payload = subjectOverride ? { ...data, subject: subjectOverride } : data;
+  const payload = await resolveMonthlyReportPayload(
+    subjectOverride ? { ...data, subject: subjectOverride } : data,
+    userId
+  );
   let subject;
   let html;
   let text;
@@ -780,6 +798,8 @@ async function sendSavvyScoutMonthlyReportEmail({
     trace?.step('monthly_report_render_start', {
       monthLabel: payload.monthLabel || null,
       userName: payload.userName || null,
+      userId: payload.userId || userId || data.userId || null,
+      lightActivity: Boolean(payload.lightActivity),
     });
     const built = buildSavvyScoutMonthlyReportEmail(payload);
     subject = built.subject;
@@ -873,11 +893,13 @@ async function sendPasswordResetEmail({ to, resetToken, firstName } = {}) {
  * Admin/test — early Monthly Scout Report with dynamic goals.
  * Uses the same sendOperationalEmail() path as Admin Email Test Center.
  */
-async function sendEarlyMonthlyReportTest({ to = FOUNDER_ADMIN_EMAIL, data = {}, trace = null } = {}) {
+async function sendEarlyMonthlyReportTest({ to = FOUNDER_ADMIN_EMAIL, userId = null, data = {}, trace = null } = {}) {
   const recipient = String(to || FOUNDER_ADMIN_EMAIL).trim().toLowerCase();
+  const resolvedUserId = userId || data.userId;
 
   trace?.step('early_monthly_report_enter', {
     recipient: recipient ? `${recipient.slice(0, 3)}***@${recipient.split('@')[1] || ''}` : null,
+    userId: resolvedUserId ? String(resolvedUserId) : null,
     resendApiKeyPresent: Boolean(readResendApiKey()),
     emailFromPresent: Boolean(getEmailFrom()),
     emailConfigured: isEmailConfigured(),
@@ -890,15 +912,27 @@ async function sendEarlyMonthlyReportTest({ to = FOUNDER_ADMIN_EMAIL, data = {},
     return result;
   }
 
-  trace?.step('early_monthly_report_payload_start', {});
+  if (!resolvedUserId) {
+    const result = { sent: false, logOnly: false, reason: 'missing_user_id' };
+    trace?.step('early_monthly_report_stop', { ok: false, ...result });
+    return result;
+  }
+
+  trace?.step('early_monthly_report_payload_start', { userId: String(resolvedUserId) });
   let payload;
   try {
-    payload = buildEarlyMonthlyReportTestPayload(data);
+    payload = await buildMonthlyScoutReportData(resolvedUserId, {
+      logMetrics: true,
+      monthKey: data.monthKey,
+    });
+    payload = { ...payload, ...data };
     trace?.step('early_monthly_report_payload_done', {
       ok: true,
       monthLabel: payload.monthLabel || null,
       userName: payload.userName || null,
       goalsCount: Array.isArray(payload.scoutGoals?.goals) ? payload.scoutGoals.goals.length : 0,
+      lightActivity: Boolean(payload.lightActivity),
+      savvyEarned: payload.savvyEarned ?? 0,
     });
   } catch (err) {
     trace?.step('early_monthly_report_payload_failed', {
@@ -961,9 +995,9 @@ async function sendEarlyMonthlyReportTest({ to = FOUNDER_ADMIN_EMAIL, data = {},
   return { ...result, subject: built.subject };
 }
 
-async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) {
+async function sendTestEmail({ to, useDealTemplate = true, template = 'deal', userId = null }) {
   if (template === 'monthly_report_early' || template === 'early_monthly_report') {
-    const result = await sendEarlyMonthlyReportTest({ to });
+    const result = await sendEarlyMonthlyReportTest({ to, userId });
     if (result.sent) {
       console.log(`[email] Early monthly report test sent via ${result.provider || getEmailProvider()} to ${to}`);
     }
@@ -971,10 +1005,19 @@ async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) 
   }
 
   if (template === 'monthly_report' || template === 'monthly') {
+    if (!userId) {
+      return {
+        sent: false,
+        logOnly: false,
+        reason: 'missing_user_id',
+        config: getEmailConfigStatus(),
+      };
+    }
     const result = await sendSavvyScoutMonthlyReportEmail({
       to,
-      data: sampleMonthlyReportData(),
-      subject: '🛩️ Savvy Scout Monthly Report — April 2025 (test)',
+      userId,
+      data: {},
+      subject: '🛩️ Savvy Scout Monthly Report (test)',
       forceSend: true,
     });
     if (result.sent) {

@@ -200,6 +200,7 @@ router.post('/test/monthly-report-early', auth, requireAdminAccess(), async (req
     trace.step('monthly_report_send_invoke', { recipientEmail: maskEmail(recipientEmail) });
     const result = await sendEarlyMonthlyReportTest({
       to: recipientEmail,
+      userId: req.body?.userId || authenticatedUserId,
       data: req.body?.data || {},
       trace,
     });
@@ -255,7 +256,11 @@ router.post('/test', async (req, res) => {
           message: 'Body field "to" is required',
         });
       }
-      const result = await sendTestEmail({ to: bodyTo, template });
+      const result = await sendTestEmail({
+        to: bodyTo,
+        template,
+        userId: req.body?.userId,
+      });
       return jsonEmailTestResult(res, result, {
         recipient: bodyTo,
         via: 'owner-grant-secret',
@@ -289,7 +294,11 @@ router.post('/test', async (req, res) => {
           });
         }
 
-        const result = await sendTestEmail({ to: recipient, template });
+        const result = await sendTestEmail({
+          to: recipient,
+          template,
+          userId: req.user._id || req.user.id,
+        });
         return jsonEmailTestResult(res, result, {
           recipient,
           via: 'jwt',

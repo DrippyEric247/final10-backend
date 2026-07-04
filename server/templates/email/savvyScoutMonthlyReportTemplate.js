@@ -19,7 +19,7 @@ const {
   monthlyReportHeroImageUrl,
 } = require('./emailTemplateUtils');
 const { FINAL10_TAGLINE, FINAL10_EMAIL_SOCIALS } = require('../../config/final10Branding');
-const { generateMonthlyScoutGoals } = require('../../services/monthlyScoutGoalsService');
+const { generateMonthlyScoutGoals, getMonthKey, monthLabelFromKey } = require('../../services/monthlyScoutGoalsService');
 
 const COLORS = {
   bg: '#050806',
@@ -49,6 +49,16 @@ const DEFAULT_STATS = Object.freeze([
   { key: 'membershipTier', icon: '⭐', label: 'Membership', format: 'text' },
 ]);
 
+function buildDefaultBonusExpiresLabel() {
+  const now = new Date();
+  const expires = new Date(now.getFullYear(), now.getMonth() + 1, 15);
+  return `Reward available until ${expires.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })}`;
+}
+
 function formatStatValue(stat, raw) {
   const format = stat.format || 'text';
   if (format === 'savvy') return formatSavvy(raw);
@@ -68,12 +78,7 @@ function formatStatValue(stat, raw) {
 }
 
 function normalizeAchievements(input) {
-  const defaults = [
-    { icon: '🔥', title: 'Streak Champion', description: 'Maintained a 30+ Day Streak' },
-    { icon: '🥚', title: 'Egg Collector', description: 'Collected multiple Eggs this month' },
-    { icon: '🎟️', title: 'Battle Pass Veteran', description: 'Reached Tier 18' },
-  ];
-  if (!Array.isArray(input) || !input.length) return defaults;
+  if (!Array.isArray(input) || !input.length) return [];
   return input
     .filter(Boolean)
     .slice(0, 6)
@@ -104,11 +109,12 @@ function normalizeComingSoon(input) {
 function normalizeMonthlyReportData(input = {}) {
   const clientUrl = getClientBaseUrl();
   const stats = { ...input.stats, ...input };
-  const monthLabel = pick(input.monthLabel, 'April 2025');
+  const monthLabel = pick(input.monthLabel, monthLabelFromKey(getMonthKey()));
   const reportYear = pickNumber(input.reportYear) || new Date().getFullYear();
-  const streakCurrent = pickNumber(input.currentStreak ?? stats.currentStreak, 34) || 0;
+  const streakCurrent = pickNumber(input.currentStreak ?? stats.currentStreak, 0) || 0;
   const streakGoal = pickNumber(input.nextGoalTarget ?? input.streakGoal, 60) || 60;
   const streakProgress = Math.max(0, Math.min(100, Math.round((streakCurrent / Math.max(1, streakGoal)) * 100)));
+  const lightActivity = Boolean(input.lightActivity);
 
   const mockUser = {
     firstName: input.userName,
@@ -117,41 +123,45 @@ function normalizeMonthlyReportData(input = {}) {
     scoutMonthlyGoals: input.scoutMonthlyGoals || { completionBonusClaimedMonths: [] },
     loginStreakDays: streakCurrent,
     monthlyActivity: {
-      alertsCreated: pickNumber(input.alertsCreated, stats.alertsCreated),
-      bestMovesUsed: pickNumber(input.bestMovesUsed, stats.bestMovesUsed),
-      bestMoveActiveDays: pickNumber(input.bestMoveActiveDays, stats.bestMoveActiveDays),
-      savvyEarned: pickNumber(input.savvyEarned, stats.savvyEarned),
-      battlePassTier: pickNumber(input.battlePassTier, stats.battlePassTier),
+      alertsCreated: pickNumber(input.alertsCreated, stats.alertsCreated, 0),
+      bestMovesUsed: pickNumber(input.bestMovesUsed, stats.bestMovesUsed, 0),
+      bestMoveActiveDays: pickNumber(input.bestMoveActiveDays, stats.bestMoveActiveDays, 0),
+      savvyEarned: pickNumber(input.savvyEarned, stats.savvyEarned, 0),
+      battlePassTier: pickNumber(input.battlePassTier, stats.battlePassTier, 0),
       streakDaysClaimed: pickNumber(input.streakDaysClaimedThisMonth, streakCurrent),
-      eggsActivated: pickNumber(input.eggsActivated, stats.eggsActivated),
-      loginDays: pickNumber(input.loginDaysThisMonth, 20),
+      eggsActivated: pickNumber(input.eggsActivated, stats.eggsActivated, 0),
+      loginDays: pickNumber(input.loginDaysThisMonth, 0),
       reportOpened: Boolean(input.monthlyReportOpened),
     },
   };
 
   const activity = {
-    alertsCreated: pickNumber(input.alertsCreated, stats.alertsCreated),
-    bestMovesUsed: pickNumber(input.bestMovesUsed, stats.bestMovesUsed),
-    bestMoveActiveDays: pickNumber(input.bestMoveActiveDays, stats.bestMoveActiveDays, 8),
-    savvyEarned: pickNumber(input.savvyEarned, stats.savvyEarned),
-    battlePassTier: pickNumber(input.battlePassTier, stats.battlePassTier),
+    alertsCreated: pickNumber(input.alertsCreated, stats.alertsCreated, 0),
+    bestMovesUsed: pickNumber(input.bestMovesUsed, stats.bestMovesUsed, 0),
+    bestMoveActiveDays: pickNumber(input.bestMoveActiveDays, stats.bestMoveActiveDays, 0),
+    savvyEarned: pickNumber(input.savvyEarned, stats.savvyEarned, 0),
+    battlePassTier: pickNumber(input.battlePassTier, stats.battlePassTier, 0),
     currentStreak: streakCurrent,
     streakDaysClaimedThisMonth: pickNumber(input.streakDaysClaimedThisMonth, streakCurrent),
-    eggsActivated: pickNumber(input.eggsActivated, stats.eggsActivated, 2),
-    eggsCollected: pickNumber(input.eggsCollected, stats.eggsCollected),
-    loginDaysThisMonth: pickNumber(input.loginDaysThisMonth, 22),
-    monthlyReportOpened: input.monthlyReportOpened !== false,
-    daysSinceLastActive: pickNumber(input.daysSinceLastActive, 1),
-    accountAgeDays: pickNumber(input.accountAgeDays, 120),
+    eggsActivated: pickNumber(input.eggsActivated, stats.eggsActivated, 0),
+    eggsCollected: pickNumber(input.eggsCollected, stats.eggsCollected, 0),
+    loginDaysThisMonth: pickNumber(input.loginDaysThisMonth, 0),
+    monthlyReportOpened: Boolean(input.monthlyReportOpened),
+    daysSinceLastActive: pickNumber(input.daysSinceLastActive, 0),
+    accountAgeDays: pickNumber(input.accountAgeDays, 0),
     subscriptionTier: input.subscriptionTier || mockUser.subscription.tier,
   };
 
   const scoutGoals = input.scoutGoals || generateMonthlyScoutGoals(mockUser, activity);
-  const estimatedSavingsRaw = pickNumber(input.estimatedSavings ?? stats.estimatedSavings, 327);
-  const savvyEarnedRaw = pickNumber(input.savvyEarned ?? stats.savvyEarned, 2485);
-  const eggsCollectedRaw = pickNumber(input.eggsCollected ?? stats.eggsCollected, 3);
+  const estimatedSavingsRaw = pickNumber(input.estimatedSavings ?? stats.estimatedSavings, 0) || 0;
+  const savvyEarnedRaw = pickNumber(input.savvyEarned ?? stats.savvyEarned, 0) || 0;
+  const eggsCollectedRaw = pickNumber(input.eggsCollected ?? stats.eggsCollected, 0) || 0;
   const completedGoals = pickNumber(scoutGoals?.completedCount, 0) || 0;
   const totalGoals = pickNumber(scoutGoals?.totalGoals, scoutGoals?.goals?.length || 0) || 0;
+  const lightActivityMessage = pick(
+    input.lightActivityMessage,
+    'Savvy Scout is still gathering your monthly data. Keep hunting to build next month\u2019s report.'
+  );
 
   return {
     userName: pick(input.userName, 'Operator'),
@@ -165,8 +175,8 @@ function normalizeMonthlyReportData(input = {}) {
       ...def,
       value: formatStatValue(def, stats[def.key] ?? input[def.key]),
     })),
-    monthlyBonusSavvy: formatSavvy(pickNumber(input.monthlyBonusSavvy, 100)),
-    bonusExpiresLabel: pick(input.bonusExpiresLabel, 'Reward available until May 15, 2025'),
+    monthlyBonusSavvy: formatSavvy(pickNumber(input.monthlyBonusSavvy, scoutGoals?.completionBonusSavvy, 0)),
+    bonusExpiresLabel: pick(input.bonusExpiresLabel, buildDefaultBonusExpiresLabel()),
     claimRewardUrl: pick(input.claimRewardUrl, `${clientUrl}/monthly-report`),
     achievements: normalizeAchievements(input.achievements),
     recommendationLead: pick(
@@ -175,13 +185,18 @@ function normalizeMonthlyReportData(input = {}) {
     ),
     recommendationBody: pick(
       input.recommendationBody,
-      'You used all 10 Premium Best Moves on multiple days. Upgrading to Pro would have unlocked unlimited Best Moves and increased your event earnings.'
+      lightActivity
+        ? lightActivityMessage
+        : 'Log in daily, run Best Moves, and complete Scout Goals to maximize next month\u2019s report.'
     ),
-    potentialExtraSavvy: formatSavvy(pickNumber(input.potentialExtraSavvy, 420)),
+    potentialExtraSavvy: formatSavvy(pickNumber(input.potentialExtraSavvy, 0)),
     upgradeUrl: pick(input.upgradeUrl, `${clientUrl}/premium?tier=pro`),
     scoutGoals,
     goalsClaimUrl: pick(input.goalsClaimUrl, `${clientUrl}/profile?tab=rewards&scoutGoals=1`),
-    scoutGoalsMessage: pick(input.scoutGoalsMessage, scoutGoals.scoutGoalsMessage),
+    scoutGoalsMessage: pick(
+      input.scoutGoalsMessage,
+      lightActivity ? lightActivityMessage : scoutGoals.scoutGoalsMessage
+    ),
     completionBonusPanelTitle: pick(
       input.completionBonusPanelTitle,
       scoutGoals.completionBonusPanelTitle
@@ -190,25 +205,32 @@ function normalizeMonthlyReportData(input = {}) {
     streakCurrent,
     streakGoal,
     streakProgress,
-    nextGoalRewards: Array.isArray(input.nextGoalRewards)
+    nextGoalRewards: Array.isArray(input.nextGoalRewards) && input.nextGoalRewards.length
       ? input.nextGoalRewards.slice(0, 4).map((r) => ({
           icon: pick(r.icon, '🎁'),
           label: pick(r.label, 'Reward'),
         }))
-      : [
-          { icon: '🥚', label: 'Legendary Egg' },
-          { icon: '💰', label: '+500 Savvy' },
-          { icon: '🎖️', label: 'Exclusive Calling Card' },
-        ],
+      : lightActivity
+        ? []
+        : [
+            { icon: '🥚', label: 'Legendary Egg' },
+            { icon: '💰', label: '+500 Savvy' },
+            { icon: '🎖️', label: 'Exclusive Calling Card' },
+          ],
     comingSoon: normalizeComingSoon(input.comingSoon),
     scoutMessage: pick(
       input.scoutMessage,
-      [
-        'Not bad, Operator.',
-        `You earned ${formatSavvy(input.savvyEarned ?? stats.savvyEarned)} Savvy, saved an estimated ${formatStatValue({ format: 'money' }, input.estimatedSavings ?? stats.estimatedSavings)}, and kept your streak alive for ${streakCurrent} days.`,
-        "Let's beat those numbers next month.",
-        'Stay focused. See you on the next patrol.',
-      ].join(' ')
+      lightActivity
+        ? lightActivityMessage
+        : [
+            'Not bad, Operator.',
+            savvyEarnedRaw > 0
+              ? `You earned ${formatSavvy(savvyEarnedRaw)} Savvy${estimatedSavingsRaw > 0 ? ` and saved an estimated ${formatStatValue({ format: 'money' }, estimatedSavingsRaw)}` : ''}${streakCurrent > 0 ? `, and kept your streak alive for ${streakCurrent} days` : ''}.`
+              : 'Keep hunting to build next month\u2019s report.',
+            savvyEarnedRaw > 0 ? 'Stay focused. See you on the next patrol.' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
     ),
     preferencesUrl: pick(input.preferencesUrl, `${clientUrl}/profile?tab=notifications`),
     unsubscribeUrl: pick(input.unsubscribeUrl, `${clientUrl}/profile?tab=notifications`),
@@ -613,6 +635,7 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
           </tr>
 
           <!-- Achievements -->
+          ${d.achievements.length ? `
           <tr>
             <td style="padding:8px 14px;" class="pad-sm">
               <div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:13px;font-weight:900;color:${COLORS.green};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-left:6px;">
@@ -624,7 +647,7 @@ function buildSavvyScoutMonthlyReportHtml(raw = {}) {
                 </tr>
               </table>
             </td>
-          </tr>
+          </tr>` : ''}
 
           <!-- Recommendations -->
           <tr>
@@ -840,10 +863,35 @@ function buildSavvyScoutMonthlyReportEmail(raw = {}) {
   };
 }
 
-/** Sample payload with dynamic Scout Goals (Premium-tier realistic stats). */
+/** Dev/preview-only empty payload — production sends must use buildMonthlyScoutReportData(userId). */
 function sampleMonthlyReportData(overrides = {}) {
-  const { buildEarlyMonthlyReportTestPayload } = require('../../services/monthlyReportService');
-  return buildEarlyMonthlyReportTestPayload(overrides);
+  const monthKey = getMonthKey();
+  const { LIGHT_ACTIVITY_MESSAGE } = require('../../services/monthlyScoutReportDataService');
+  return {
+    userName: 'Operator',
+    monthLabel: monthLabelFromKey(monthKey),
+    monthKey,
+    reportYear: new Date().getFullYear(),
+    savvyEarned: 0,
+    bestMovesUsed: 0,
+    alertsCreated: 0,
+    alertClicks: 0,
+    currentStreak: 0,
+    battlePassTier: 0,
+    eggsCollected: 0,
+    callingCardsEarned: 0,
+    estimatedSavings: 0,
+    membershipTier: 'Free',
+    achievements: [],
+    lightActivity: true,
+    lightActivityMessage: LIGHT_ACTIVITY_MESSAGE,
+    scoutMessage: LIGHT_ACTIVITY_MESSAGE,
+    scoutGoalsMessage: LIGHT_ACTIVITY_MESSAGE,
+    recommendationBody: LIGHT_ACTIVITY_MESSAGE,
+    monthlyBonusSavvy: 0,
+    potentialExtraSavvy: 0,
+    ...overrides,
+  };
 }
 
 module.exports = {

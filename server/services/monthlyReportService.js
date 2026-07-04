@@ -1,17 +1,18 @@
 const {
   generateMonthlyScoutGoals,
   activitySnapshotFromUser,
-  realisticPremiumTestActivity,
   monthLabelFromKey,
   getMonthKey,
 } = require('./monthlyScoutGoalsService');
+const { buildMonthlyScoutReportData } = require('./monthlyScoutReportDataService');
 
 /**
- * Build full monthly report email payload for a user (or test overrides).
+ * Build full monthly report email payload from a user doc + optional overrides.
+ * Prefer buildMonthlyScoutReportData(userId) for live per-user stats.
  */
 function buildMonthlyReportPayload(user = {}, overrides = {}) {
   const activity = activitySnapshotFromUser(user, overrides);
-  const scoutGoals = generateMonthlyScoutGoals(user, activity);
+  const scoutGoals = overrides.scoutGoals || generateMonthlyScoutGoals(user, activity);
   const monthKey = overrides.monthKey || scoutGoals.monthKey || getMonthKey();
   const monthLabel = overrides.monthLabel || monthLabelFromKey(monthKey);
 
@@ -40,43 +41,30 @@ function buildMonthlyReportPayload(user = {}, overrides = {}) {
     battlePassTier: activity.battlePassTier,
     eggsCollected: activity.eggsCollected ?? overrides.eggsCollected ?? 0,
     callingCardsEarned: overrides.callingCardsEarned ?? 0,
-    estimatedSavings: overrides.estimatedSavings ?? 327,
+    estimatedSavings: overrides.estimatedSavings ?? 0,
     membershipTier,
     scoutGoals,
     ...overrides,
   };
 }
 
-/** Early test report — realistic Premium stats + dynamic goals for Eric. */
-function buildEarlyMonthlyReportTestPayload(overrides = {}) {
-  const activity = realisticPremiumTestActivity(overrides);
-  const mockUser = {
-    firstName: 'Eric',
-    membershipTier: 'premium',
-    subscription: { tier: 'core' },
-    scoutMonthlyGoals: { completionBonusClaimedMonths: [] },
-  };
-  return buildMonthlyReportPayload(mockUser, {
-    userName: 'Eric',
-    monthLabel: monthLabelFromKey(getMonthKey()),
-    alertClicks: 31,
-    callingCardsEarned: 2,
-    estimatedSavings: 327,
-    monthlyBonusSavvy: 100,
-    bonusExpiresLabel: `Reward available until ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 15).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
-    potentialExtraSavvy: 420,
-    achievements: [
-      { icon: '🔥', title: 'Streak Champion', description: 'Maintained a 30+ Day Streak' },
-      { icon: '🥚', title: 'Egg Collector', description: 'Collected multiple Eggs this month' },
-      { icon: '🎟️', title: 'Battle Pass Veteran', description: 'Reached Tier 18' },
-      { icon: '🏆', title: 'Top 10% User', description: "You're in the Top 10% of Savvy Earners!" },
-    ],
-    ...activity,
-    ...overrides,
+/**
+ * @deprecated Use buildMonthlyScoutReportData(userId) for real user stats.
+ * Kept for backwards-compatible imports; requires userId.
+ */
+async function buildEarlyMonthlyReportTestPayload(overrides = {}) {
+  const userId = overrides.userId;
+  if (!userId) {
+    throw new Error('buildEarlyMonthlyReportTestPayload requires overrides.userId — use buildMonthlyScoutReportData');
+  }
+  return buildMonthlyScoutReportData(userId, {
+    logMetrics: Boolean(overrides.logMetrics),
+    monthKey: overrides.monthKey,
   });
 }
 
 module.exports = {
   buildMonthlyReportPayload,
   buildEarlyMonthlyReportTestPayload,
+  buildMonthlyScoutReportData,
 };

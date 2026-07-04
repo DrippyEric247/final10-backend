@@ -169,7 +169,7 @@ async function sendAdminTestEmail({ userId, templateKey, custom = {}, adminUser,
   let built;
   try {
     trace?.step('admin_email_test_template_build_start', { templateKey });
-    built = buildAdminTestEmail(templateKey, user, custom);
+    built = await buildAdminTestEmail(templateKey, user, custom);
     trace?.step('admin_email_test_template_build_done', {
       ok: true,
       subjectLen: String(built.subject || '').length,
