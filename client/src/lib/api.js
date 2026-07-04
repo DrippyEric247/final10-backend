@@ -940,6 +940,32 @@ export async function getCommunityMilestones(limit = 12) {
   return data;
 }
 
+/** ---- Beta community vote & feedback ---- **/
+export async function getBetaCommunitySnapshot() {
+  const { data } = await api.get("/beta-community");
+  return data;
+}
+
+export async function castBetaCommunityVote(topicId) {
+  const { data } = await api.post("/beta-community/vote", { topicId });
+  return data;
+}
+
+export async function submitBetaCommunityReview(payload) {
+  const { data } = await api.post("/beta-community/review", payload);
+  return data;
+}
+
+export async function adminUpdateBetaCommunityConfig(patch) {
+  const { data } = await api.put("/beta-community/admin/config", patch);
+  return data;
+}
+
+export async function adminAddBetaCommunityTopic(topic) {
+  const { data } = await api.post("/beta-community/admin/topics", topic);
+  return data;
+}
+
 /** ---- eBay API ---- **/
 export async function searchEbayItems(searchParams = {}) {
   const { data } = await api.get("/ebay/search", { params: searchParams });

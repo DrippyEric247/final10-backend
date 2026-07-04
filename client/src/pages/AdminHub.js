@@ -5,6 +5,7 @@ import { hasAdminRole, FOUNDER_ADMIN_EMAIL } from "../lib/adminAccess";
 import { ADMIN_TEST_ALERT, fireAdminTestAlert } from "../lib/adminTestAlert";
 import { sendEarlyMonthlyReportTest } from "../lib/api";
 import SavvyMark from "../components/SavvyMark";
+import BetaCommunityAdminPanel from "../components/admin/BetaCommunityAdminPanel";
 
 const ADMIN_LINKS = [
   { label: "Cosmetics grants", path: "/admin/cosmetics", description: "Exclusive calling cards and emblems" },
@@ -191,6 +192,8 @@ export default function AdminHub() {
           </div>
         ) : null}
       </section>
+
+      <BetaCommunityAdminPanel />
 
       <ul className="space-y-3">
         {ADMIN_LINKS.map((item) => (

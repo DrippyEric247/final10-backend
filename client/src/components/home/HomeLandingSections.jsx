@@ -2,6 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Final10Slogan from '../branding/Final10Slogan';
 import { getDonationLinks, hasAnyDonationLink } from '../../config/donationConfig';
+import { isBetaModeActive } from '../../lib/betaModeAccess';
+import { useAppConfig } from '../../lib/useAppConfig';
+import CommunityVoteFeedbackSection from './CommunityVoteFeedbackSection';
 import {
   HOME_HERO,
   HOME_MISSION,
@@ -27,6 +30,11 @@ const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
  * @param {{ user?: { firstName?: string } | null }} props
  */
 export default function HomeLandingSections({ user }) {
+  const { cfg } = useAppConfig();
+  const showBetaCommunity = useMemo(
+    () => isBetaModeActive() || cfg?.betaMode === true,
+    [cfg?.betaMode]
+  );
   const links = useMemo(() => getDonationLinks(), []);
   const donationsEnabled = hasAnyDonationLink(links);
   const showSuccessPreview = process.env.NODE_ENV !== 'production';
@@ -113,6 +121,8 @@ export default function HomeLandingSections({ user }) {
           <p className="home-card__body">{HOME_VISION.body}</p>
         </section>
       </div>
+
+      {showBetaCommunity ? <CommunityVoteFeedbackSection /> : null}
 
       <SavvyUniverseRoadmap />
 
