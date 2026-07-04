@@ -13,7 +13,8 @@ export type BPRewardType =
   | "token"
   | "calling_card"
   | "cosmetic"
-  | "mythic_chance";
+  | "mythic_chance"
+  | "soundtrack";
 
 export type BPReward = {
   type: BPRewardType;
@@ -28,6 +29,10 @@ export type BPReward = {
   cosmeticType?: string;
   chance?: number;
   consolationEggTier?: string;
+  trackId?: string;
+  trackIds?: string[];
+  packKey?: string;
+  description?: string;
 };
 
 export type BPTier = { level: number; free: BPReward; premium: BPReward };
@@ -44,6 +49,11 @@ export type BPClaimGrant = {
   cosmeticId?: string | null;
   cosmeticType?: string | null;
   mythicWon?: boolean;
+  trackId?: string | null;
+  trackTitle?: string;
+  newlyUnlocked?: string[];
+  alreadyOwned?: string[];
+  isPack?: boolean;
 };
 
 /** Hex palette for rarity glow/borders. */
@@ -74,6 +84,7 @@ const REWARD_KIND_LABELS: Record<BPRewardType, string> = {
   calling_card: "Calling Card",
   cosmetic: "Cosmetic",
   mythic_chance: "Mystery",
+  soundtrack: "Soundtrack",
 };
 
 export function rewardKindLabel(reward: BPReward): string {
@@ -81,7 +92,7 @@ export function rewardKindLabel(reward: BPReward): string {
 }
 
 export function isMilestoneTier(level: number): boolean {
-  return level === 10 || level === 15 || level === 20 || level === 25;
+  return level === 10 || level === 15 || level === 20 || level === 25 || level === 30 || level === 40 || level === 50 || level === 60;
 }
 
 export function tierClaimKey(track: "free" | "premium", level: number): string {
@@ -116,6 +127,10 @@ export function claimSuccessMessage(reward: BPReward, grant?: BPClaimGrant): str
     case "mythic_chance":
       if (grant?.mythicWon) return "MYTHIC EGG secured! Added to your Perk Machine inventory.";
       return "Egg added to your Perk Machine inventory.";
+    case "soundtrack": {
+      const title = grant?.trackTitle || reward.label;
+      return `${title} has been added to your Music Library.`;
+    }
     default:
       return "Reward claimed.";
   }

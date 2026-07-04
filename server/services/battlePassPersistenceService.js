@@ -545,6 +545,10 @@ async function buildProgressionPayload(userId) {
         titleId: user.equippedCosmetics?.titleId || null,
       },
     },
+    soundtracks: {
+      unlockedTrackIds: user.unlockedSoundtrackIds || [],
+      menuMusicTrackId: user.menuMusicTrackId || null,
+    },
   };
 }
 

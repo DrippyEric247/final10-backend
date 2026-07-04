@@ -2,7 +2,7 @@
  * Orchestrates menu ↔ Perk Machine ↔ Scout Flight crossfades and unified ducking.
  */
 
-import { isMenuMusicRoute } from './menuMusicLibrary';
+import { isMenuMusicRoute, isDedicatedMusicOverrideRoute } from './menuMusicLibrary';
 import { isMenuMusicEnabled, menuMusicEngine } from './menuMusicEngine';
 import { isPerkMachineRoute } from './perkMachineMusicLibrary';
 import { perkMachineMusicEngine } from './perkMachineMusicEngine';
@@ -10,6 +10,11 @@ import { isScoutFlightGameplayRoute } from './scoutFlightMusicLibrary';
 import { scoutFlightMusicEngine } from './scoutFlightMusicEngine';
 
 export const CROSSFADE_MS = 1500;
+
+/** Menu duck during live-event activation stingers (~20% of user volume). */
+export const EVENT_ACTIVATION_DUCK_LEVEL = 0.2;
+export const EVENT_DUCK_DOWN_MS = 400;
+export const EVENT_DUCK_UP_MS = 1000;
 
 export function isScoutFlightMusicActive() {
   return scoutFlightMusicEngine.isActive();
@@ -19,20 +24,22 @@ export function isPerkMusicActive() {
   return perkMachineMusicEngine.isActive();
 }
 
-export function duckAppMusic(reason, level) {
+export function duckAppMusic(reason, level, opts = {}) {
+  const fadeMs = opts.fadeMs;
   if (scoutFlightMusicEngine.isActive()) {
-    scoutFlightMusicEngine.duck(reason, level);
+    scoutFlightMusicEngine.duck(reason, level, fadeMs);
   } else if (perkMachineMusicEngine.isActive()) {
-    perkMachineMusicEngine.duck(reason, level);
-  } else if (menuMusicEngine.isPlaying()) {
-    menuMusicEngine.duck(reason, level);
+    perkMachineMusicEngine.duck(reason, level, fadeMs);
+  } else {
+    menuMusicEngine.duck(reason, level, fadeMs);
   }
 }
 
-export function unduckAppMusic(reason) {
-  scoutFlightMusicEngine.unduck(reason);
-  perkMachineMusicEngine.unduck(reason);
-  menuMusicEngine.unduck(reason);
+export function unduckAppMusic(reason, opts = {}) {
+  const fadeMs = opts.fadeMs;
+  scoutFlightMusicEngine.unduck(reason, fadeMs);
+  perkMachineMusicEngine.unduck(reason, fadeMs);
+  menuMusicEngine.unduck(reason, fadeMs);
 }
 
 export function duckAppMusicForDuration(reason, ms, level) {
@@ -46,6 +53,50 @@ export async function preloadAppMusic() {
     perkMachineMusicEngine.preload(),
     scoutFlightMusicEngine.preload('practice'),
   ]);
+}
+
+/**
+ * Initialize app audio after sign-in — preload themes and attempt menu music.
+ * @param {{ pathname?: string, fromLogin?: boolean }} [opts]
+ */
+export async function initializeAppAudioAfterAuth(opts = {}) {
+  const pathname = opts.pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+  await preloadAppMusic();
+
+  if (
+    isMenuMusicRoute(pathname) &&
+    !isDedicatedMusicOverrideRoute(pathname) &&
+    !scoutFlightMusicEngine.isActive() &&
+    isMenuMusicEnabled()
+  ) {
+    if (!menuMusicEngine.isPlaying()) {
+      await menuMusicEngine.play({
+        fadeMs: opts.fromLogin ? 1400 : 900,
+        fromStart: Boolean(opts.fromLogin),
+      });
+    }
+  }
+}
+
+/**
+ * Start menu music when route + auth allow it (idempotent).
+ * @param {{ pathname?: string, fadeMs?: number, fromStart?: boolean }} [opts]
+ */
+export async function tryStartMenuMusic(opts = {}) {
+  const pathname = opts.pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+  if (
+    !isMenuMusicRoute(pathname) ||
+    isDedicatedMusicOverrideRoute(pathname) ||
+    scoutFlightMusicEngine.isActive() ||
+    !isMenuMusicEnabled()
+  ) {
+    return false;
+  }
+  if (menuMusicEngine.isPlaying()) return true;
+  return menuMusicEngine.play({
+    fadeMs: opts.fadeMs ?? (menuMusicEngine.pausedForRoute ? 900 : 1600),
+    fromStart: Boolean(opts.fromStart),
+  });
 }
 
 /**
@@ -209,4 +260,4 @@ export async function exitScoutFlightGameplayMusic(opts = {}) {
 }
 
 export { isPerkMachineRoute, isMenuMusicRoute, isScoutFlightGameplayRoute };
-export { isDedicatedMusicOverrideRoute } from './menuMusicLibrary';
+export { isDedicatedMusicOverrideRoute };

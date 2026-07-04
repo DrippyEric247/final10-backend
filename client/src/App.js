@@ -58,6 +58,7 @@ import AdminEmailTestCenter from "./pages/AdminEmailTestCenter";
 import Customization from "./pages/Customization"; // protected
 import Premium from "./pages/Premium";            // protected
 import BattlePassPage from "./pages/BattlePassPage"; // protected
+import MusicLibraryPage from "./pages/MusicLibraryPage"; // protected
 import Pricing from "./pages/Pricing";            // public
 import LocalDeals from "./pages/LocalDeals";      // protected
 import PromoteListing from "./pages/PromoteListing"; // protected
@@ -522,6 +523,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <BattlePassPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/music-library"
+            element={
+              <ProtectedRoute>
+                <MusicLibraryPage />
               </ProtectedRoute>
             }
           />

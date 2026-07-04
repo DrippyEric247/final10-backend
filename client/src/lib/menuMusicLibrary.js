@@ -68,6 +68,7 @@ export const MENU_MUSIC_ALLOW_PREFIXES = Object.freeze([
   '/events',
   '/daily-streak',
   '/battle-pass',
+  '/music-library',
   '/scout-flight',
   '/monthly-report',
   '/party',

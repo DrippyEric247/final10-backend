@@ -590,6 +590,49 @@ export async function claimBattlePassTier(level, track) {
   return data;
 }
 
+/** GET /api/soundtracks/library — unlocked + catalog metadata (no private URLs). */
+export async function fetchSoundtrackLibrary() {
+  const { data } = await api.get("/soundtracks/library");
+  return data;
+}
+
+const previewObjectUrlCache = new Map();
+
+/** Authenticated preview stream as object URL (revoke when done). */
+export async function getSoundtrackPreviewObjectUrl(trackId) {
+  const id = String(trackId || "").trim();
+  if (!id) throw new Error("Missing track id");
+  if (previewObjectUrlCache.has(id)) {
+    URL.revokeObjectURL(previewObjectUrlCache.get(id));
+    previewObjectUrlCache.delete(id);
+  }
+  const { data } = await api.get(`/soundtracks/${id}/preview`, { responseType: "blob" });
+  const url = URL.createObjectURL(data);
+  previewObjectUrlCache.set(id, url);
+  return url;
+}
+
+/** Protected download — only works for unlocked tracks. */
+export async function downloadSoundtrack(trackId, title = "soundtrack") {
+  const id = String(trackId || "").trim();
+  const { data } = await api.get(`/soundtracks/${id}/download`, { responseType: "blob" });
+  const safeName = String(title || "soundtrack").replace(/[^\w\s-]/g, "").trim() || "soundtrack";
+  const url = URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${safeName}.mp3`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** POST /api/soundtracks/menu-music — reserve menu theme selection. */
+export async function setMenuMusicTrack(trackId) {
+  const { data } = await api.post("/soundtracks/menu-music", { trackId });
+  return data;
+}
+
 /** GET /api/progression/admin/ping — returns 200 only for admins. */
 export async function checkBattlePassAdminAccess() {
   try {

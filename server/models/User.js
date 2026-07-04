@@ -417,6 +417,10 @@ const userSchema = new mongoose.Schema({
   currentStreak: { type: Number, default: 0 },
   /** Season-style power multiplier (1 = baseline). */
   powerMultiplier: { type: Number, default: 1 },
+  /** Battle Pass / event soundtrack ownership — server-authoritative. */
+  unlockedSoundtrackIds: [{ type: String }],
+  /** Selected menu music track (must be in unlockedSoundtrackIds). */
+  menuMusicTrackId: { type: String, default: null },
   equippedCosmetics: {
     emblemId: { type: String, default: 'sigil_starter' },
     callingCardId: { type: String, default: 'card_default' },

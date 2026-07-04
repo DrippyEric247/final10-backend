@@ -279,19 +279,21 @@ class PerkMachineMusicEngine {
     });
   }
 
-  duck(reason, level) {
+  duck(reason, level, fadeMs) {
     if (!reason) return;
     this.duckReasons.set(reason, typeof level === 'number' ? level : (DUCK_LEVELS[reason] ?? 0.3));
     if (this.audio && this.playing) {
-      this.fadeVolumeTo(this.getTargetVolume(), 350);
+      const downMs = typeof fadeMs === 'number' ? fadeMs : 350;
+      this.fadeVolumeTo(this.getTargetVolume(), downMs);
     }
   }
 
-  unduck(reason) {
+  unduck(reason, fadeMs) {
     if (!reason) return;
     this.duckReasons.delete(reason);
     if (this.audio && this.playing) {
-      this.fadeVolumeTo(this.getTargetVolume(), 500);
+      const upMs = typeof fadeMs === 'number' ? fadeMs : 500;
+      this.fadeVolumeTo(this.getTargetVolume(), upMs);
     }
   }
 

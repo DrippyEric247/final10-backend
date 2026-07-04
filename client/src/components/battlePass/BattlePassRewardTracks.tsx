@@ -83,6 +83,13 @@ function RewardCell({
       </div>
       <div className="f10-bp2-cell-kind">{rewardKindLabel(reward)}</div>
       <div className="f10-bp2-cell-label">{reward.label}</div>
+      {reward.type === "soundtrack" && state !== "claimed" && state !== "claimable" ? (
+        <div className="f10-bp2-cell-teaser">
+          {state === "tier-locked" || state === "premium-locked"
+            ? "🔒 Preview after unlock"
+            : null}
+        </div>
+      ) : null}
 
       <div className="f10-bp2-cell-action">
         {state === "claimed" ? (
@@ -262,24 +269,51 @@ export default function BattlePassRewardTracks({
               onClick={(e) => e.stopPropagation()}
             >
               {popup.kind === "success" ? (
-                <>
-                  <div className="f10-bp2-modal-kicker">Tier {popup.level} reward claimed</div>
-                  <motion.div
-                    className="f10-bp2-modal-art"
-                    initial={{ scale: 0.6, rotate: -8 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", damping: 12, stiffness: 220 }}
-                    aria-hidden
-                  >
-                    <span>{popup.reward.icon}</span>
-                  </motion.div>
-                  <div className="f10-bp2-modal-rarity">{RARITY_LABELS[popup.reward.rarity as BPRarity]}</div>
-                  <h3 className="f10-bp2-modal-title">{popup.reward.label}</h3>
-                  <p className="f10-bp2-modal-msg">{claimSuccessMessage(popup.reward, popup.grant)}</p>
-                  <button type="button" className="f10-bp2-btn f10-bp2-btn--claim w-full" onClick={() => setPopup(null)}>
-                    Nice!
-                  </button>
-                </>
+                popup.reward.type === "soundtrack" ? (
+                  <>
+                    <div className="f10-bp2-modal-kicker">🎵 Soundtrack Unlocked</div>
+                    <motion.div
+                      className="f10-bp2-modal-art"
+                      initial={{ scale: 0.6, rotate: -8 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", damping: 12, stiffness: 220 }}
+                      aria-hidden
+                    >
+                      <span>{popup.reward.icon}</span>
+                    </motion.div>
+                    <div className="f10-bp2-modal-rarity">{RARITY_LABELS[popup.reward.rarity as BPRarity]}</div>
+                    <h3 className="f10-bp2-modal-title">{popup.grant?.trackTitle || popup.reward.label}</h3>
+                    <p className="f10-bp2-modal-msg">{claimSuccessMessage(popup.reward, popup.grant)}</p>
+                    <p className="f10-bp2-modal-scout">
+                      Operator, soundtrack acquired. Your Savvy Universe collection is growing.
+                    </p>
+                    <Link to="/music-library" className="f10-bp2-btn f10-bp2-btn--ghost w-full" onClick={() => setPopup(null)}>
+                      Open Music Library
+                    </Link>
+                    <button type="button" className="f10-bp2-btn f10-bp2-btn--claim w-full" onClick={() => setPopup(null)}>
+                      Nice!
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="f10-bp2-modal-kicker">Tier {popup.level} reward claimed</div>
+                    <motion.div
+                      className="f10-bp2-modal-art"
+                      initial={{ scale: 0.6, rotate: -8 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", damping: 12, stiffness: 220 }}
+                      aria-hidden
+                    >
+                      <span>{popup.reward.icon}</span>
+                    </motion.div>
+                    <div className="f10-bp2-modal-rarity">{RARITY_LABELS[popup.reward.rarity as BPRarity]}</div>
+                    <h3 className="f10-bp2-modal-title">{popup.reward.label}</h3>
+                    <p className="f10-bp2-modal-msg">{claimSuccessMessage(popup.reward, popup.grant)}</p>
+                    <button type="button" className="f10-bp2-btn f10-bp2-btn--claim w-full" onClick={() => setPopup(null)}>
+                      Nice!
+                    </button>
+                  </>
+                )
               ) : (
                 <>
                   <div className="f10-bp2-modal-kicker">Premium reward</div>

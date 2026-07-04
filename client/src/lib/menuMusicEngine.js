@@ -6,6 +6,7 @@ import {
   DEFAULT_MENU_TRACK_ID,
   getMenuTrack,
 } from './menuMusicLibrary';
+import { requestAudioPlayback } from './audioUnlockManager';
 
 const STORAGE_ENABLED = 'f10_menu_music_enabled';
 const STORAGE_VOLUME = 'f10_menu_music_volume';
@@ -25,10 +26,18 @@ const DEFAULT_VOLUME = 0.55;
 const FADE_TICK_MS = 32;
 
 const DUCK_LEVELS = Object.freeze({
-  [MENU_MUSIC_DUCK.EVENT_ACTIVATION]: 0.18,
+  [MENU_MUSIC_DUCK.EVENT_ACTIVATION]: 0.2,
   [MENU_MUSIC_DUCK.VOICE_LINE]: 0.28,
   [MENU_MUSIC_DUCK.REWARD]: 0.32,
   [MENU_MUSIC_DUCK.TUTORIAL]: 0.28,
+});
+
+const DUCK_FADE_DOWN_MS = Object.freeze({
+  [MENU_MUSIC_DUCK.EVENT_ACTIVATION]: 400,
+});
+
+const DUCK_FADE_UP_MS = Object.freeze({
+  [MENU_MUSIC_DUCK.EVENT_ACTIVATION]: 1000,
 });
 
 function clamp01(n) {
@@ -283,53 +292,57 @@ class MenuMusicEngine {
     const audio = this.ensureAudio();
     if (!audio) return Promise.resolve(false);
 
-    let freshSession = false;
-    if (typeof window !== 'undefined') {
-      try {
-        freshSession = !window.sessionStorage.getItem(SESSION_KEY);
-      } catch {
-        freshSession = false;
-      }
-    }
-
-    const shouldRestart = fromStart && freshSession;
-
-    if (shouldRestart) {
-      try {
-        audio.currentTime = 0;
-      } catch {
-        /* ignore */
-      }
+    const runPlay = () => {
+      let freshSession = false;
       if (typeof window !== 'undefined') {
         try {
-          window.sessionStorage.setItem(SESSION_KEY, '1');
+          freshSession = !window.sessionStorage.getItem(SESSION_KEY);
+        } catch {
+          freshSession = false;
+        }
+      }
+
+      const shouldRestart = fromStart && freshSession;
+
+      if (shouldRestart) {
+        try {
+          audio.currentTime = 0;
         } catch {
           /* ignore */
         }
-      }
-      this.sessionStarted = true;
-    }
-
-    const startVol = shouldRestart ? 0 : audio.volume;
-    this.applyVolume(startVol, this.getTargetVolume(), fadeMs);
-
-    return new Promise((resolve) => {
-      try {
-        const p = audio.play();
-        this.playing = true;
-        if (p && typeof p.then === 'function') {
-          p.then(() => resolve(true)).catch(() => {
-            this.playing = false;
-            resolve(false);
-          });
-        } else {
-          resolve(true);
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(SESSION_KEY, '1');
+          } catch {
+            /* ignore */
+          }
         }
-      } catch {
-        this.playing = false;
-        resolve(false);
+        this.sessionStarted = true;
       }
-    });
+
+      const startVol = shouldRestart ? 0 : audio.volume;
+      this.applyVolume(startVol, this.getTargetVolume(), fadeMs);
+
+      return new Promise((resolve) => {
+        try {
+          const p = audio.play();
+          this.playing = true;
+          if (p && typeof p.then === 'function') {
+            p.then(() => resolve(true)).catch(() => {
+              this.playing = false;
+              resolve(false);
+            });
+          } else {
+            resolve(true);
+          }
+        } catch {
+          this.playing = false;
+          resolve(false);
+        }
+      });
+    };
+
+    return requestAudioPlayback(runPlay);
   }
 
   pause({ fadeMs = 900 } = {}) {
@@ -374,19 +387,23 @@ class MenuMusicEngine {
     });
   }
 
-  duck(reason, level) {
+  duck(reason, level, fadeMs) {
     if (!reason) return;
     this.duckReasons.set(reason, typeof level === 'number' ? level : (DUCK_LEVELS[reason] ?? 0.3));
     if (this.audio && this.playing) {
-      this.applyVolume(this.audio.volume, this.getTargetVolume(), 350);
+      const downMs =
+        typeof fadeMs === 'number' ? fadeMs : (DUCK_FADE_DOWN_MS[reason] ?? 350);
+      this.applyVolume(this.audio.volume, this.getTargetVolume(), downMs);
     }
   }
 
-  unduck(reason) {
+  unduck(reason, fadeMs) {
     if (!reason) return;
     this.duckReasons.delete(reason);
     if (this.audio && this.playing) {
-      this.applyVolume(this.audio.volume, this.getTargetVolume(), 500);
+      const upMs =
+        typeof fadeMs === 'number' ? fadeMs : (DUCK_FADE_UP_MS[reason] ?? 500);
+      this.applyVolume(this.audio.volume, this.getTargetVolume(), upMs);
     }
   }
 
@@ -398,12 +415,12 @@ class MenuMusicEngine {
 
 export const menuMusicEngine = new MenuMusicEngine();
 
-export function duckMenuMusic(reason, level) {
-  menuMusicEngine.duck(reason, level);
+export function duckMenuMusic(reason, level, fadeMs) {
+  menuMusicEngine.duck(reason, level, fadeMs);
 }
 
-export function unduckMenuMusic(reason) {
-  menuMusicEngine.unduck(reason);
+export function unduckMenuMusic(reason, fadeMs) {
+  menuMusicEngine.unduck(reason, fadeMs);
 }
 
 export function isMenuMusicEnabled() {

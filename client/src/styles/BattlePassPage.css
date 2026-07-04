@@ -979,6 +979,22 @@
   color: #cbd5e1;
   line-height: 1.5;
 }
+.f10-bp2-modal-scout {
+  margin: -8px 0 12px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.55rem;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  color: #e9d5ff;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.f10-bp2-cell-teaser {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-style: italic;
+  margin-top: 0.2rem;
+}
 .f10-bp2-modal-card .f10-bp2-btn + .f10-bp2-btn {
   margin-top: 8px;
 }

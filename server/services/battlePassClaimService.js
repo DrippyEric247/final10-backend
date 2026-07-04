@@ -31,6 +31,8 @@ const {
 } = require('./battlePassPersistenceService');
 const { ensurePerkMachineDoc, getPerkMachineStatus } = require('./perkMachineService');
 const { grantSavvyReward } = require('./savvyRewardService');
+const { grantFromBattlePassReward } = require('./soundtrackService');
+const { getTrackById } = require('../config/soundtrackCatalog');
 
 class ClaimError extends Error {
   constructor(status, code, message) {
@@ -141,6 +143,20 @@ async function applyClaimReward(user, inventory, reward, idemKey) {
       }
       user.markModified('perkMachine');
       return { kind: 'mythic_chance', eggTier: tier, mythicWon: won };
+    }
+    case 'soundtrack': {
+      const { newlyUnlocked, alreadyOwned } = grantFromBattlePassReward(user, reward);
+      const primaryId = reward.trackId || newlyUnlocked[0] || alreadyOwned[0] || null;
+      const primary = primaryId ? getTrackById(primaryId) : null;
+      user.markModified('unlockedSoundtrackIds');
+      return {
+        kind: 'soundtrack',
+        trackId: primaryId,
+        trackTitle: primary?.title || reward.label,
+        newlyUnlocked,
+        alreadyOwned,
+        isPack: Boolean(reward.packKey || (reward.trackIds && reward.trackIds.length > 1)),
+      };
     }
     default:
       return { kind: 'unknown' };

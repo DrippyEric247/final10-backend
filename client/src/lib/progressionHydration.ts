@@ -21,9 +21,27 @@ export type ProgressionApiState = {
       titleId?: string | null;
     };
   };
+  soundtracks?: {
+    unlockedTrackIds: string[];
+    menuMusicTrackId?: string | null;
+  };
 };
 
 const TITLE_LS = "f10_equipped_title";
+const SOUNDTRACKS_LS = "f10_unlocked_soundtracks";
+const MENU_MUSIC_TRACK_LS = "f10_menu_music_track_server";
+
+export function hydrateSoundtracksFromServer(soundtracks?: ProgressionApiState["soundtracks"]) {
+  if (typeof window === "undefined" || !soundtracks) return;
+  try {
+    localStorage.setItem(SOUNDTRACKS_LS, JSON.stringify(soundtracks.unlockedTrackIds || []));
+    if (soundtracks.menuMusicTrackId) {
+      localStorage.setItem(MENU_MUSIC_TRACK_LS, soundtracks.menuMusicTrackId);
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 export function hydrateProgressionClientCache(
   state: ProgressionApiState | null | undefined,
@@ -45,5 +63,8 @@ export function hydrateProgressionClientCache(
     } catch {
       /* ignore */
     }
+  }
+  if (state.soundtracks) {
+    hydrateSoundtracksFromServer(state.soundtracks);
   }
 }

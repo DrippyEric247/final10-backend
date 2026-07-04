@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { FileText, LifeBuoy, Shield, Trash2, User } from "lucide-react";
+import { FileText, LifeBuoy, Music, Shield, Trash2, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Final10Slogan from "../components/branding/Final10Slogan";
 import MenuMusicSettings from "../components/audio/MenuMusicSettings";
@@ -37,6 +37,23 @@ export default function Settings() {
               <span>
                 <span className={linkLabelClass}>Profile &amp; Savvy wallet</span>
                 <span className={`block ${linkHintClass}`}>Rewards, customization, and membership</span>
+              </span>
+            </Link>
+          </section>
+        ) : null}
+
+        {user ? (
+          <section className="mb-8">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--f10-text-dim)] mb-3">
+              Savvy Universe audio
+            </h2>
+            <Link to="/music-library" className={linkClass}>
+              <Music className="h-5 w-5 shrink-0 text-purple-300" aria-hidden />
+              <span>
+                <span className={linkLabelClass}>Music Library</span>
+                <span className={`block ${linkHintClass}`}>
+                  Battle Pass soundtracks — preview, download, menu music
+                </span>
               </span>
             </Link>
           </section>

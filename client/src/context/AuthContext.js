@@ -37,6 +37,19 @@ const defaultAuthValue = {
 const AuthContext = createContext(defaultAuthValue);
 export const useAuth = () => useContext(AuthContext);
 
+const AUTH_SESSION_EVENT = "f10:auth-session-started";
+
+function emitAuthSessionStarted(source) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(AUTH_SESSION_EVENT, { detail: { source: String(source || "session") } })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -107,6 +120,7 @@ export function AuthProvider({ children }) {
             console.debug("Auth hydration successful");
           }
           setUser(await hydrateSessionUser(user));
+          emitAuthSessionStarted("hydrate");
         })
         .catch((err) => {
           if (process.env.NODE_ENV !== "production") {
@@ -135,6 +149,7 @@ export function AuthProvider({ children }) {
       const fresh = await getMe({ force: true });
       const hydrated = await hydrateSessionUser(fresh);
       setUser(hydrated);
+      emitAuthSessionStarted("login");
       return hydrated;
     } catch (err) {
       setError(userSafeErrorMessage(err, "Login failed. Please try again."));
@@ -150,6 +165,7 @@ export function AuthProvider({ children }) {
       const fresh = await getMe({ force: true });
       const hydrated = await hydrateSessionUser(fresh);
       setUser(hydrated);
+      emitAuthSessionStarted("register");
       return hydrated;
     } catch (err) {
       setError(userSafeErrorMessage(err, "Signup failed. Please try again."));
@@ -171,6 +187,7 @@ export function AuthProvider({ children }) {
       const fresh = await getMe({ force: true });
       const hydrated = await hydrateSessionUser(fresh);
       setUser(hydrated);
+      emitAuthSessionStarted("social");
       return hydrated;
     } catch (err) {
       setAuthToken(null);

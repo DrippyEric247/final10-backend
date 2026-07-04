@@ -1,17 +1,23 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   enterPerkMachineMusic,
   exitPerkMachineMusic,
+  initializeAppAudioAfterAuth,
   isMenuMusicRoute,
   isPerkMachineRoute,
   preloadAppMusic,
+  tryStartMenuMusic,
 } from '../../lib/appMusicCoordinator';
+import { AUDIO_UNLOCKED_EVENT, clearPendingAudioResume } from '../../lib/audioUnlockManager';
 import { isDedicatedMusicOverrideRoute } from '../../lib/menuMusicLibrary';
 import { menuMusicEngine } from '../../lib/menuMusicEngine';
 import { perkMachineMusicEngine } from '../../lib/perkMachineMusicEngine';
 import { scoutFlightMusicEngine } from '../../lib/scoutFlightMusicEngine';
+import AudioUnlockPrompt from './AudioUnlockPrompt';
+
+const AUTH_SESSION_EVENT = 'f10:auth-session-started';
 
 function shouldPlayMenuMusic(pathname = '') {
   return (
@@ -23,56 +29,78 @@ function shouldPlayMenuMusic(pathname = '') {
 
 /**
  * Global audio sync — one shared menu engine instance across all routes.
- * Mounted above the router so navigation never unmounts the audio singleton.
+ * Mounted inside the router so navigation never unmounts the audio singleton.
  */
 export function useAppAudioSync() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const wasPerkRef = useRef(false);
-  const bootReadyRef = useRef(false);
+  const authPrimedRef = useRef(false);
+
+  const pathname = location.pathname;
+
+  const startMenuIfAllowed = useCallback(
+    (opts = {}) => {
+      if (!user || loading) return;
+      if (!shouldPlayMenuMusic(pathname)) return;
+      void tryStartMenuMusic({
+        pathname,
+        fadeMs: opts.fadeMs,
+        fromStart: Boolean(opts.fromStart),
+      });
+    },
+    [user, loading, pathname]
+  );
 
   useEffect(() => {
-    if (!user || loading) return undefined;
+    if (!user || loading) {
+      authPrimedRef.current = false;
+      return undefined;
+    }
     void preloadAppMusic();
+    return undefined;
   }, [user, loading]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || !user || loading) return undefined;
 
-    const markBootReady = () => {
-      bootReadyRef.current = true;
+    const onAuthSession = (event) => {
+      authPrimedRef.current = true;
+      const fromLogin =
+        event?.detail?.source === 'login' ||
+        event?.detail?.source === 'register' ||
+        event?.detail?.source === 'social';
+      void initializeAppAudioAfterAuth({
+        pathname: window.location.pathname,
+        fromLogin,
+      });
     };
 
-    window.addEventListener('f10:startup-boot-complete', markBootReady);
-    const fallback = window.setTimeout(markBootReady, 2400);
-
-    return () => {
-      window.removeEventListener('f10:startup-boot-complete', markBootReady);
-      window.clearTimeout(fallback);
+    const onAudioUnlocked = () => {
+      startMenuIfAllowed({ fadeMs: 900 });
     };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
 
     const onScoutFlightEnded = () => {
-      const pathname = window.location.pathname;
-      if (shouldPlayMenuMusic(pathname) && !menuMusicEngine.isPlaying()) {
-        void menuMusicEngine.play({ fadeMs: 900, fromStart: false });
-      }
+      startMenuIfAllowed({ fadeMs: 900 });
     };
 
+    window.addEventListener(AUTH_SESSION_EVENT, onAuthSession);
+    window.addEventListener(AUDIO_UNLOCKED_EVENT, onAudioUnlocked);
     window.addEventListener('f10:scout-flight-music-ended', onScoutFlightEnded);
-    return () => window.removeEventListener('f10:scout-flight-music-ended', onScoutFlightEnded);
-  }, []);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EVENT, onAuthSession);
+      window.removeEventListener(AUDIO_UNLOCKED_EVENT, onAudioUnlocked);
+      window.removeEventListener('f10:scout-flight-music-ended', onScoutFlightEnded);
+    };
+  }, [user, loading, startMenuIfAllowed]);
 
   useEffect(() => {
     if (loading) return undefined;
 
-    const pathname = location.pathname;
-
     if (!user) {
       wasPerkRef.current = false;
+      authPrimedRef.current = false;
+      clearPendingAudioResume();
       void menuMusicEngine.stop({ fadeMs: 400 });
       void perkMachineMusicEngine.stop({ fadeMs: 400 });
       void scoutFlightMusicEngine.stop({ fadeMs: 400 });
@@ -83,63 +111,40 @@ export function useAppAudioSync() {
     const wasPerk = wasPerkRef.current;
     const wantMenu = shouldPlayMenuMusic(pathname);
 
-    const ensureMenuMusic = () => {
-      if (!shouldPlayMenuMusic(pathname)) return;
-      if (menuMusicEngine.isPlaying()) return;
-      void menuMusicEngine.play({
-        fadeMs: menuMusicEngine.pausedForRoute ? 900 : 2000,
-        fromStart: true,
-      });
-    };
-
-    const pauseMenuMusic = () => {
-      if (!menuMusicEngine.isPlaying()) return;
-      void menuMusicEngine.pause({ fadeMs: 900 });
-    };
-
     if (onPerkRoute && !wasPerk) {
-      const startPerkMusic = () => {
-        if (!isPerkMachineRoute(pathname)) return;
-        void enterPerkMachineMusic();
-      };
-
-      if (bootReadyRef.current) {
-        startPerkMusic();
-      } else {
-        const onBoot = () => startPerkMusic();
-        window.addEventListener('f10:startup-boot-complete', onBoot, { once: true });
-        const timer = window.setTimeout(startPerkMusic, 2600);
-        wasPerkRef.current = onPerkRoute;
-        return () => {
-          window.removeEventListener('f10:startup-boot-complete', onBoot);
-          window.clearTimeout(timer);
-        };
-      }
+      void enterPerkMachineMusic();
     } else if (!onPerkRoute && wasPerk) {
       void exitPerkMachineMusic(pathname);
-    } else if (wantMenu) {
-      if (bootReadyRef.current) {
-        ensureMenuMusic();
-      } else {
-        const onBoot = () => ensureMenuMusic();
-        window.addEventListener('f10:startup-boot-complete', onBoot, { once: true });
-        const timer = window.setTimeout(ensureMenuMusic, 2600);
-        wasPerkRef.current = onPerkRoute;
-        return () => {
-          window.removeEventListener('f10:startup-boot-complete', onBoot);
-          window.clearTimeout(timer);
-        };
-      }
+    } else if (wantMenu && !onPerkRoute) {
+      startMenuIfAllowed({
+        fadeMs: menuMusicEngine.pausedForRoute ? 900 : 1600,
+        fromStart: false,
+      });
     } else if (!wantMenu && !onPerkRoute && !scoutFlightMusicEngine.isActive()) {
-      pauseMenuMusic();
+      if (menuMusicEngine.isPlaying()) {
+        void menuMusicEngine.pause({ fadeMs: 900 });
+      }
     }
 
     wasPerkRef.current = onPerkRoute;
     return undefined;
-  }, [user, loading, location.pathname]);
+  }, [user, loading, pathname, startMenuIfAllowed]);
+
+  /** Session restore on refresh — auth event may have fired before this hook mounted. */
+  useEffect(() => {
+    if (!user || loading || authPrimedRef.current) return undefined;
+    authPrimedRef.current = true;
+    void initializeAppAudioAfterAuth({ pathname, fromLogin: false });
+    return undefined;
+  }, [user, loading, pathname]);
 }
 
 export default function AppAudioProvider({ children }) {
   useAppAudioSync();
-  return children ?? null;
+  return (
+    <>
+      {children ?? null}
+      <AudioUnlockPrompt />
+    </>
+  );
 }

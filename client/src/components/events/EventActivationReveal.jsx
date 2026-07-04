@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, startTransition, useState } from 'react';
 import { EventIconVisual } from './EventIconVisual';
 import { EventActivationParticles } from './EventActivationParticles';
-import { playEventAudio } from '../../lib/eventActivationAudio';
+import { playEventActivationWithDuck } from '../../lib/eventActivationAudio';
 import {
-  duckMenuMusic,
-  MENU_MUSIC_DUCK,
-  unduckMenuMusic,
-} from '../../lib/menuMusicEngine';
+  unduckAppMusic,
+  EVENT_DUCK_UP_MS,
+} from '../../lib/appMusicCoordinator';
+import { MENU_MUSIC_DUCK } from '../../lib/menuMusicEngine';
 import {
   getEventActivationProfile,
   triggerActivationHaptic,
@@ -35,7 +35,7 @@ export function EventActivationReveal({ event, onFlyComplete }) {
     tapLockRef.current = false;
     return () => {
       clearTimers();
-      unduckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
+      unduckAppMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION, { fadeMs: EVENT_DUCK_UP_MS });
     };
   }, [event?.activationId, clearTimers]);
 
@@ -56,7 +56,6 @@ export function EventActivationReveal({ event, onFlyComplete }) {
     }
     startTransition(() => setPhase('fly'));
     const flyTimer = window.setTimeout(() => {
-      unduckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
       startTransition(() => setPhase('done'));
       if (typeof onFlyComplete === 'function') onFlyComplete(event);
     }, FLY_MS);
@@ -68,10 +67,11 @@ export function EventActivationReveal({ event, onFlyComplete }) {
     tapLockRef.current = true;
     setPhase('playing');
 
-    duckMenuMusic(MENU_MUSIC_DUCK.EVENT_ACTIVATION);
     triggerActivationHaptic(profile.vibrationPattern);
 
-    void playEventAudio(profile.audioKey, { fallbackMs: profile.audioFallbackMs }).then(() => {
+    void playEventActivationWithDuck(profile.audioKey, {
+      fallbackMs: profile.audioFallbackMs,
+    }).then(() => {
       startTransition(() => setPhase('activated'));
       const holdTimer = window.setTimeout(() => {
         startFlyAnimation();

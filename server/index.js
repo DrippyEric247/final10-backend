@@ -279,6 +279,7 @@ app.post('/api/owner/verify-alert-e2e', requireOwnerGrantAccess, async (req, res
 
 app.use('/api/owner', ownerControlRoutes);
 app.use('/api/progression', progressionRoutes);
+app.use('/api/soundtracks', require('./routes/soundtrackRoutes'));
 app.use('/api/cosmetics', cosmeticRoutes);
 app.use('/api/entitlements', entitlementRoutes);
 app.use('/api/offers', offersRoutes);
