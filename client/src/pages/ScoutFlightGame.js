@@ -30,6 +30,7 @@ import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAud
 import {
   enterScoutFlightGameplayMusic,
   exitScoutFlightGameplayMusic,
+  isMenuMusicRoute,
 } from '../lib/appMusicCoordinator';
 import {
   duckScoutFlightMusicForDuration,
@@ -355,13 +356,19 @@ export default function ScoutFlightGame() {
         duckScoutFlightMusicForDuration(SCOUT_FLIGHT_MUSIC_DUCK.TOURNAMENT_START, 2400);
       }
     } else if (menuMode === null && scoutFlightMusicEngine.isActive()) {
-      void exitScoutFlightGameplayMusic({ resumeMenu: false });
+      void exitScoutFlightGameplayMusic({
+        resumeMenu: isMenuMusicRoute(window.location.pathname),
+        pathname: window.location.pathname,
+      });
     }
   }, [menuMode]);
 
   useEffect(
     () => () => {
-      void exitScoutFlightGameplayMusic({ resumeMenu: false });
+      void exitScoutFlightGameplayMusic({
+        resumeMenu: isMenuMusicRoute(window.location.pathname),
+        pathname: window.location.pathname,
+      });
     },
     []
   );

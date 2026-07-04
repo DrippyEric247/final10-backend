@@ -18,12 +18,13 @@ export const MENU_MUSIC_TRACKS = Object.freeze({
 
 export const DEFAULT_MENU_TRACK_ID = 'final10_beta_theme';
 
-/** Routes where dedicated gameplay / feature music takes over. */
+/**
+ * Routes where dedicated gameplay / feature music takes over.
+ * Scout Flight lobby uses menu music — gameplay crossfade is session-based.
+ */
 export const MENU_MUSIC_BLOCKLIST_PREFIXES = Object.freeze([
   '/perk-machine',
-  '/scout-flight',
   '/egg-exchange',
-  '/build-wars',
   '/onboarding',
   '/login',
   '/register',
@@ -33,7 +34,7 @@ export const MENU_MUSIC_BLOCKLIST_PREFIXES = Object.freeze([
 ]);
 
 /**
- * Menu zones — background music plays while browsing these areas.
+ * Menu zones — background music plays continuously while browsing these areas.
  * Prefix match except `/` which is exact home only.
  */
 export const MENU_MUSIC_ALLOW_PREFIXES = Object.freeze([
@@ -46,8 +47,15 @@ export const MENU_MUSIC_ALLOW_PREFIXES = Object.freeze([
   '/trending',
   '/scanner',
   '/seller-trends',
+  '/seller-dashboard',
+  '/savvy-shop',
+  '/savvy-offers',
+  '/savvy-programs',
+  '/business-offers',
+  '/build-wars',
   '/win-feed',
   '/profile',
+  '/points',
   '/leaderboard',
   '/mission-log',
   '/customization',
@@ -58,9 +66,12 @@ export const MENU_MUSIC_ALLOW_PREFIXES = Object.freeze([
   '/pricing',
   '/settings',
   '/events',
-  '/points',
   '/daily-streak',
   '/battle-pass',
+  '/scout-flight',
+  '/monthly-report',
+  '/party',
+  '/create-auction',
 ]);
 
 export function getMenuTrack(trackId = DEFAULT_MENU_TRACK_ID) {
@@ -79,6 +90,12 @@ export function isMenuMusicRoute(pathname = '') {
   if (!path || isMenuMusicBlocked(path)) return false;
   if (path === '/') return true;
   return MENU_MUSIC_ALLOW_PREFIXES.some(
-    (prefix) => prefix !== '/' && (path === prefix || path.startsWith(prefix))
+    (prefix) => prefix !== '/' && (path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(prefix))
   );
+}
+
+/** Routes that intentionally override menu music with dedicated soundtracks. */
+export function isDedicatedMusicOverrideRoute(pathname = '') {
+  const path = String(pathname || '').split('?')[0].split('#')[0];
+  return path === '/perk-machine' || path.startsWith('/perk-machine/');
 }

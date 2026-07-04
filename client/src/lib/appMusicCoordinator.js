@@ -201,7 +201,12 @@ export async function exitScoutFlightGameplayMusic(opts = {}) {
       }
       menuMusicEngine.fadeVolumeTo(menuMusicEngine.getTargetVolume(), CROSSFADE_MS);
     }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('f10:scout-flight-music-ended'));
+    }
   }, CROSSFADE_MS);
 }
 
 export { isPerkMachineRoute, isMenuMusicRoute, isScoutFlightGameplayRoute };
+export { isDedicatedMusicOverrideRoute } from './menuMusicLibrary';
