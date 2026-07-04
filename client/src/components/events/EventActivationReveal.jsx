@@ -78,7 +78,13 @@ export function EventActivationReveal({ event, onActivated }) {
 
   return (
     <div
-      className="f10-event-reveal"
+      className={[
+        'f10-event-reveal',
+        profile.rarity === 'premium' ? 'f10-event-reveal--premium' : '',
+        `f10-event-reveal--${profile.theme}`,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       role="dialog"
       aria-modal="true"
       aria-label={`Activate ${event.title}`}
@@ -88,7 +94,15 @@ export function EventActivationReveal({ event, onActivated }) {
 
       <div className="f10-event-reveal__content">
         {phase === 'idle' ? (
-          <p className="f10-event-reveal__headline" style={{ color: profile.color }}>
+          <p
+            className={[
+              'f10-event-reveal__headline',
+              profile.rarity === 'premium' ? 'f10-event-reveal__headline--premium' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={{ color: profile.color }}
+          >
             {profile.headline}
           </p>
         ) : null}
@@ -96,7 +110,14 @@ export function EventActivationReveal({ event, onActivated }) {
         <div className="f10-event-reveal__icon-stage">
           {showGlowPulse ? (
             <div
-              className={`f10-event-reveal__glow f10-event-reveal__glow--${profile.theme} f10-event-reveal__glow--pulse`}
+              className={[
+                'f10-event-reveal__glow',
+                `f10-event-reveal__glow--${profile.theme}`,
+                'f10-event-reveal__glow--pulse',
+                profile.glowIntensity === 'strong' ? 'f10-event-reveal__glow--strong' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               style={{ '--f10-event-glow': profile.glowColor }}
               aria-hidden
             />
@@ -108,6 +129,13 @@ export function EventActivationReveal({ event, onActivated }) {
               'f10-event-reveal__card',
               `f10-event-reveal__card--${profile.theme}`,
               `f10-event-reveal__card--${phase}`,
+              phase === 'playing' && profile.impactAnimation === 'shake'
+                ? 'f10-event-reveal__card--impact-shake'
+                : '',
+              phase === 'playing' && profile.impactAnimation === 'bounce'
+                ? 'f10-event-reveal__card--impact-bounce'
+                : '',
+              profile.rarity === 'premium' ? 'f10-event-reveal__card--premium' : '',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -120,7 +148,11 @@ export function EventActivationReveal({ event, onActivated }) {
             disabled={!isInteractive}
             aria-disabled={!isInteractive}
           >
-            <EventActivationParticles active={showParticles} particleClass={profile.particleClass} />
+            <EventActivationParticles
+              active={showParticles}
+              particleClass={profile.particleClass}
+              effect={profile.particleEffect || 'coin'}
+            />
             <EventIconVisual
               theme={profile.theme}
               iconKey={event.iconKey}
