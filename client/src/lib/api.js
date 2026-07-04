@@ -621,6 +621,55 @@ export async function sendEarlyMonthlyReportTest() {
   return data;
 }
 
+/** ---- Admin Email Test Center ---- **/
+export async function searchAdminEmailTestUsers(q) {
+  const { data } = await api.get("/admin/email-test/users", { params: { q } });
+  return data;
+}
+
+export async function getAdminEmailTestHistory(userId) {
+  const { data } = await api.get(`/admin/email-test/users/${userId}/history`);
+  return data;
+}
+
+export async function sendAdminTestEmail({
+  userId,
+  templateKey,
+  customSubject,
+  customMessage,
+  buttonText,
+  buttonUrl,
+  image,
+  imageUrl,
+}) {
+  const hasFile = image instanceof File;
+  if (hasFile) {
+    const form = new FormData();
+    form.append("userId", userId);
+    form.append("templateKey", templateKey);
+    if (customSubject) form.append("customSubject", customSubject);
+    if (customMessage) form.append("customMessage", customMessage);
+    if (buttonText) form.append("buttonText", buttonText);
+    if (buttonUrl) form.append("buttonUrl", buttonUrl);
+    form.append("image", image);
+    const { data } = await api.post("/admin/email-test/send", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  }
+
+  const { data } = await api.post("/admin/email-test/send", {
+    userId,
+    templateKey,
+    customSubject,
+    customMessage,
+    buttonText,
+    buttonUrl,
+    imageUrl,
+  });
+  return data;
+}
+
 /** POST /api/scout-missions/claim — persist Savvy Scout mission reward to wallet. */
 export async function claimScoutMissionReward({ missionId, periodKey }) {
   const { data } = await api.post("/scout-missions/claim", { missionId, periodKey });

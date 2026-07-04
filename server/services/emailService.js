@@ -820,6 +820,17 @@ async function sendTestEmail({ to, useDealTemplate = true, template = 'deal' }) 
   return { ...result, config: getEmailConfigStatus() };
 }
 
+async function sendOperationalEmail({ to, subject, text, html, trace = null }) {
+  return sendMailMessage({
+    to,
+    subject,
+    text,
+    html,
+    verifyFirst: getEmailProvider() === 'smtp',
+    trace,
+  });
+}
+
 module.exports = {
   sendAlertMatchEmail,
   sendSavvyScoutDealFoundEmail,
@@ -827,6 +838,7 @@ module.exports = {
   sendPasswordResetEmail,
   sendEarlyMonthlyReportTest,
   sendTestEmail,
+  sendOperationalEmail,
   buildSavvyScoutDealFoundEmail,
   buildSavvyScoutMonthlyReportEmail,
   auditEmailFrom,

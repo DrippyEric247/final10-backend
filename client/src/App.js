@@ -54,6 +54,7 @@ import Profile from "./pages/Profile";            // protected
 import LeaderboardPage from "./pages/LeaderboardPage"; // protected
 import WinFeed from "./pages/WinFeed";            // public — Savvy Wins social feed
 import AdminCosmeticsPanel from "./pages/AdminCosmeticsPanel"; // owner-only grants
+import AdminEmailTestCenter from "./pages/AdminEmailTestCenter";
 import Customization from "./pages/Customization"; // protected
 import Premium from "./pages/Premium";            // protected
 import BattlePassPage from "./pages/BattlePassPage"; // protected
@@ -644,6 +645,14 @@ export default function App() {
           element={
             <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
               <AdminCosmeticsPanel />
+            </InternalRoute>
+          }
+        />
+        <Route
+          path="/admin/email-test"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <AdminEmailTestCenter />
             </InternalRoute>
           }
         />

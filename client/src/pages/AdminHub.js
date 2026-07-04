@@ -8,6 +8,7 @@ import SavvyMark from "../components/SavvyMark";
 import BetaCommunityAdminPanel from "../components/admin/BetaCommunityAdminPanel";
 
 const ADMIN_LINKS = [
+  { label: "Email Test Center", path: "/admin/email-test", description: "Send TEST emails to any user — no rewards or alerts" },
   { label: "Cosmetics grants", path: "/admin/cosmetics", description: "Exclusive calling cards and emblems" },
   { label: "SavvyShield", path: "/shield-dashboard", description: "Fraud prevention and enforcement" },
   { label: "Founder control", path: "/owner-control", description: "User search, grants, founding access" },

@@ -1,0 +1,135 @@
+.admin-email-test__input,
+.admin-email-test__textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  background: rgba(8, 5, 15, 0.85);
+  color: #f8fafc;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+}
+
+.admin-email-test__textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+.admin-email-test__btn {
+  border-radius: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  background: rgba(20, 12, 34, 0.9);
+  color: #f8fafc;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.admin-email-test__btn:hover:not(:disabled) {
+  border-color: rgba(168, 85, 247, 0.65);
+}
+
+.admin-email-test__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-email-test__btn--primary {
+  background: linear-gradient(90deg, #6d28d9, #a855f7);
+  border-color: transparent;
+}
+
+.admin-email-test__results {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.admin-email-test__result {
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: rgba(8, 5, 15, 0.65);
+  padding: 0.75rem 0.9rem;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.admin-email-test__result--active {
+  border-color: rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25);
+}
+
+.admin-email-test__meta {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-email-test__meta dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #a89bb8;
+}
+
+.admin-email-test__meta dd {
+  margin: 0.15rem 0 0;
+  color: #f8fafc;
+  font-size: 0.95rem;
+}
+
+.admin-email-test__grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.admin-email-test__template-btn {
+  border-radius: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(20, 12, 34, 0.85);
+  color: #f8fafc;
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-email-test__template-btn:hover:not(:disabled) {
+  border-color: rgba(168, 85, 247, 0.65);
+}
+
+.admin-email-test__template-btn:disabled {
+  opacity: 0.55;
+}
+
+.admin-email-test__field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #d1c4e9;
+}
+
+.admin-email-test__history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-email-test__history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  padding: 0.65rem 0.75rem;
+  background: rgba(8, 5, 15, 0.55);
+}
