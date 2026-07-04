@@ -1,0 +1,395 @@
+/* My Savvy Shop — beta vision page */
+
+.ssv-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 0 2rem;
+}
+
+.ssv-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.ssv-hero {
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 280px);
+  gap: 1rem;
+  align-items: start;
+  border: 1px solid rgba(168, 85, 247, 0.38);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.97), rgba(49, 46, 129, 0.42));
+}
+
+.ssv-hero__title {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.35rem, 3.2vw, 1.95rem);
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.ssv-hero__subtitle {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #e9d5ff;
+}
+
+.ssv-hero__body {
+  margin: 0;
+  max-width: 42rem;
+  line-height: 1.55;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.ssv-scout {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(252, 211, 77, 0.32);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.94), rgba(120, 53, 15, 0.22));
+}
+
+.ssv-scout__img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.ssv-scout__line {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+}
+
+.ssv-scout__line strong {
+  color: #fde68a;
+}
+
+.ssv-section-title {
+  margin: 0 0 0.85rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+  font-weight: 900;
+  color: #f8fafc;
+  text-align: center;
+}
+
+.ssv-vision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.ssv-vision-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.98rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.ssv-vision-card__body,
+.ssv-vision-card__intro,
+.ssv-vision-card__outro {
+  margin: 0 0 0.45rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.ssv-vision-card__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #cbd5e1;
+}
+
+.ssv-vision-card--emerald {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.ssv-vision-card--violet {
+  border-color: rgba(168, 85, 247, 0.38);
+}
+
+.ssv-vision-card--gold {
+  border-color: rgba(252, 211, 77, 0.38);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(120, 53, 15, 0.15));
+}
+
+.ssv-vision-card--sky {
+  border-color: rgba(56, 189, 248, 0.32);
+}
+
+.ssv-where-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.ssv-where-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.ssv-where-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.ssv-where-card__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.ssv-where-card__intro,
+.ssv-where-card__outro {
+  margin: 0 0 0.45rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.ssv-where-card__list {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  flex: 1;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.ssv-where-card__cta {
+  margin-top: auto;
+  width: 100%;
+  text-align: center;
+  font-size: 0.84rem;
+}
+
+.ssv-where-card--final10 {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.ssv-where-card--shop {
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.ssv-where-card--optimizer {
+  border-color: rgba(252, 211, 77, 0.38);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(88, 28, 135, 0.2));
+}
+
+.ssv-partners-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+}
+
+.ssv-partner-card {
+  text-align: center;
+  padding: 1rem 0.75rem;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.ssv-partner-card__emoji {
+  display: block;
+  font-size: 1.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.ssv-partner-card__label {
+  margin: 0 0 0.25rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.ssv-partner-card__soon {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a78bfa;
+}
+
+.ssv-studio-hint {
+  margin: 0.85rem 0 0;
+  text-align: center;
+  font-size: 0.84rem;
+  color: #94a3b8;
+}
+
+.ssv-studio-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  color: #c4b5fd;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.ssv-beta-notice {
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(88, 28, 135, 0.22));
+}
+
+.ssv-beta-notice__title {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.ssv-beta-notice__body {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.ssv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.ssv-btn {
+  font-size: 0.86rem;
+}
+
+.ssv-suggest-form {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ssv-suggest-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.ssv-suggest-form textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  padding: 0.65rem;
+  font-size: 0.86rem;
+  resize: vertical;
+  margin-bottom: 0.65rem;
+}
+
+.ssv-login-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.ssv-login-hint a {
+  color: #c4b5fd;
+  font-weight: 700;
+}
+
+.ssv-status {
+  margin: 0.65rem 0 0;
+  font-size: 0.84rem;
+  color: #86efac;
+  font-weight: 600;
+}
+
+.ssv-footer {
+  text-align: center;
+  padding: 0.75rem 0 0.25rem;
+}
+
+.ssv-footer__lines {
+  margin-bottom: 1rem;
+}
+
+.ssv-footer__line {
+  margin: 0.2rem 0;
+  font-size: clamp(0.92rem, 2vw, 1.08rem);
+  font-weight: 700;
+  color: #e9d5ff;
+}
+
+.ssv-footer__slogan {
+  margin: 0;
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  font-weight: 900;
+  background: linear-gradient(90deg, #fcd34d, #c4b5fd, #34d399);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.savvy-shop-studio--beta .savvy-shop-studio-tools {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(129, 140, 248, 0.28);
+}
+
+.savvy-shop-studio--beta .savvy-shop-studio-tools > h1 {
+  font-size: 1.2rem;
+}
+
+@media (max-width: 960px) {
+  .ssv-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .ssv-where-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ssv-vision-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ssv-partners-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ssv-partners-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ssv-actions {
+    flex-direction: column;
+  }
+
+  .ssv-btn {
+    width: 100%;
+    text-align: center;
+  }
+}

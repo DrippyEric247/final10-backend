@@ -966,6 +966,16 @@ export async function getAdminMembershipFeedback(limit = 50) {
   return data;
 }
 
+export async function submitBetaSavvyShopFeedback(payload) {
+  const { data } = await api.post("/beta-community/savvy-shop-feedback", payload);
+  return data;
+}
+
+export async function getAdminSavvyShopFeedback(limit = 50) {
+  const { data } = await api.get("/beta-community/admin/savvy-shop-feedback", { params: { limit } });
+  return data;
+}
+
 export async function adminUpdateBetaCommunityConfig(patch) {
   const { data } = await api.put("/beta-community/admin/config", patch);
   return data;

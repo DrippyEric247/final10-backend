@@ -3,12 +3,14 @@ import {
   adminAddBetaCommunityTopic,
   adminUpdateBetaCommunityConfig,
   getAdminMembershipFeedback,
+  getAdminSavvyShopFeedback,
   getBetaCommunitySnapshot,
 } from '../../lib/api';
 
 export default function BetaCommunityAdminPanel() {
   const [snapshot, setSnapshot] = useState(null);
   const [membershipFeedback, setMembershipFeedback] = useState([]);
+  const [savvyShopFeedback, setSavvyShopFeedback] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [newTopicLabel, setNewTopicLabel] = useState('');
@@ -20,12 +22,14 @@ export default function BetaCommunityAdminPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [data, feedback] = await Promise.all([
+      const [data, membership, savvyShop] = await Promise.all([
         getBetaCommunitySnapshot(),
         getAdminMembershipFeedback(40),
+        getAdminSavvyShopFeedback(40),
       ]);
       setSnapshot(data);
-      setMembershipFeedback(feedback?.items || []);
+      setMembershipFeedback(membership?.items || []);
+      setSavvyShopFeedback(savvyShop?.items || []);
       setVoteSavvy(data?.rewards?.voteSavvy ?? 15);
       setReviewSavvy(data?.rewards?.reviewSavvy ?? 25);
       setBugsFixed(data?.stats?.bugsFixed ?? 47);
@@ -230,6 +234,38 @@ export default function BetaCommunityAdminPanel() {
           </ul>
         ) : (
           <p className="text-xs text-gray-500">No membership suggestions yet.</p>
+        )}
+      </div>
+
+      <div className="border-t border-white/10 pt-4 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-bold text-white">Savvy Shop feedback (recent)</p>
+          <button
+            type="button"
+            className="text-xs font-bold text-violet-300 hover:text-violet-100"
+            onClick={() => void load()}
+          >
+            Refresh
+          </button>
+        </div>
+        {savvyShopFeedback.length ? (
+          <ul className="max-h-64 overflow-y-auto space-y-2 text-sm">
+            {savvyShopFeedback.map((item) => (
+              <li
+                key={item.id}
+                className="rounded-lg border border-white/10 bg-black/35 px-3 py-2 text-gray-200"
+              >
+                <p className="text-xs text-gray-400">
+                  {item.type === 'vote_intent' ? '🗳 Vote intent' : '💬 Suggestion'} ·{' '}
+                  {item.username || 'Tester'} ·{' '}
+                  {item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap">{item.message}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-gray-500">No Savvy Shop suggestions yet.</p>
         )}
       </div>
 

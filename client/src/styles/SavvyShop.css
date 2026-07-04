@@ -246,6 +246,10 @@
   color: #e2e8f0;
 }
 
+.savvy-shop-studio--beta {
+  max-width: 1080px;
+}
+
 .savvy-shop-studio h1 {
   margin: 0 0 8px;
   font-size: 1.5rem;

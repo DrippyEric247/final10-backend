@@ -5,6 +5,7 @@ const betaCommunityMembershipFeedbackSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     username: { type: String, default: '' },
     type: { type: String, enum: ['suggestion', 'vote_intent'], default: 'suggestion' },
+    section: { type: String, enum: ['membership', 'savvy_shop'], default: 'membership', index: true },
     message: { type: String, required: true, maxlength: 4000 },
     dayKey: { type: String, index: true },
   },

@@ -274,9 +274,14 @@ async function adminAddTopic({ id, label, emoji = '✨' }) {
   return getPublicSnapshot();
 }
 
-async function submitMembershipFeedback(user, { type = 'suggestion', message = '' } = {}) {
+async function submitSectionFeedback(user, { section = 'membership', type = 'suggestion', message = '' } = {}) {
+  const validSection = section === 'savvy_shop' ? 'savvy_shop' : 'membership';
   if (!isBetaMode()) {
-    return { ok: false, code: 'BETA_INACTIVE', message: 'Membership feedback is only available during beta.' };
+    return {
+      ok: false,
+      code: 'BETA_INACTIVE',
+      message: 'Feedback is only available during beta.',
+    };
   }
   const text = String(message || '').trim();
   if (text.length < 8) {
@@ -288,6 +293,7 @@ async function submitMembershipFeedback(user, { type = 'suggestion', message = '
   if (feedbackType === 'suggestion') {
     const todayCount = await BetaCommunityMembershipFeedback.countDocuments({
       userId: user._id,
+      section: validSection,
       type: 'suggestion',
       dayKey,
     });
@@ -299,16 +305,30 @@ async function submitMembershipFeedback(user, { type = 'suggestion', message = '
   await BetaCommunityMembershipFeedback.create({
     userId: user._id,
     username: user.username || user.firstName || '',
+    section: validSection,
     type: feedbackType,
     message: text.slice(0, 4000),
     dayKey,
   });
 
-  return { ok: true, message: 'Thanks — the team will review your membership feedback.' };
+  const thanks =
+    validSection === 'savvy_shop'
+      ? 'Thanks — the team will review your Savvy Shop feedback.'
+      : 'Thanks — the team will review your membership feedback.';
+  return { ok: true, message: thanks };
 }
 
-async function listMembershipFeedback({ limit = 50 } = {}) {
-  const rows = await BetaCommunityMembershipFeedback.find()
+async function submitMembershipFeedback(user, payload = {}) {
+  return submitSectionFeedback(user, { ...payload, section: 'membership' });
+}
+
+async function submitSavvyShopFeedback(user, payload = {}) {
+  return submitSectionFeedback(user, { ...payload, section: 'savvy_shop' });
+}
+
+async function listSectionFeedback({ section = 'membership', limit = 50 } = {}) {
+  const validSection = section === 'savvy_shop' ? 'savvy_shop' : 'membership';
+  const rows = await BetaCommunityMembershipFeedback.find({ section: validSection })
     .sort({ createdAt: -1 })
     .limit(Math.min(200, Math.max(1, limit)))
     .lean();
@@ -316,9 +336,14 @@ async function listMembershipFeedback({ limit = 50 } = {}) {
     id: String(r._id),
     username: r.username || 'Tester',
     type: r.type,
+    section: r.section || 'membership',
     message: r.message,
     createdAt: r.createdAt,
   }));
+}
+
+async function listMembershipFeedback(opts = {}) {
+  return listSectionFeedback({ ...opts, section: 'membership' });
 }
 
 module.exports = {
@@ -327,7 +352,9 @@ module.exports = {
   castVote,
   submitReview,
   submitMembershipFeedback,
+  submitSavvyShopFeedback,
   listMembershipFeedback,
+  listSectionFeedback,
   adminUpdateConfig,
   adminAddTopic,
   DEFAULT_TOPICS,

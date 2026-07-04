@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   getMySavvyShop,
@@ -9,7 +9,11 @@ import {
   createSavvyShopPost,
 } from "../lib/api";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
+import { isBetaModeActive } from "../lib/betaModeAccess";
+import { useAppConfig } from "../lib/useAppConfig";
+import SavvyShopVisionPage from "../components/savvyShop/SavvyShopVisionPage";
 import "../styles/SavvyShop.css";
+import "../styles/SavvyShopVision.css";
 
 const emptyPostForm = {
   caption: "",
@@ -32,6 +36,12 @@ const emptyProduct = {
 };
 
 export default function SavvyShopStudio() {
+  const { cfg } = useAppConfig();
+  const showVision = useMemo(
+    () => isBetaModeActive() || cfg?.betaMode === true,
+    [cfg?.betaMode]
+  );
+  const [studioOpen, setStudioOpen] = useState(false);
   const [shop, setShop] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -225,7 +235,13 @@ export default function SavvyShopStudio() {
 
   if (loading) {
     return (
-      <div className="savvy-shop-studio">
+      <div className={`savvy-shop-studio${showVision ? " savvy-shop-studio--beta" : ""}`}>
+        {showVision ? (
+          <SavvyShopVisionPage
+            onOpenStudio={() => setStudioOpen((v) => !v)}
+            studioOpen={studioOpen}
+          />
+        ) : null}
         <p className="savvy-shop-empty">Opening your studio…</p>
       </div>
     );
@@ -235,8 +251,8 @@ export default function SavvyShopStudio() {
   const atProductCap =
     mon?.maxProducts != null && products.length >= mon.maxProducts;
 
-  return (
-    <div className="savvy-shop-studio">
+  const studioTools = (
+    <div className="savvy-shop-studio-tools">
       <h1>My Savvy Shop</h1>
       <p className="savvy-shop-studio-lead">
         Drop deals and links you believe in — no inventory, no shipping stack. You earn Savvy when you post,
@@ -642,6 +658,18 @@ export default function SavvyShopStudio() {
       )}
         </>
       ) : null}
+    </div>
+  );
+
+  return (
+    <div className={`savvy-shop-studio${showVision ? " savvy-shop-studio--beta" : ""}`}>
+      {showVision ? (
+        <SavvyShopVisionPage
+          onOpenStudio={() => setStudioOpen((v) => !v)}
+          studioOpen={studioOpen}
+        />
+      ) : null}
+      {!showVision || studioOpen ? studioTools : null}
     </div>
   );
 }
