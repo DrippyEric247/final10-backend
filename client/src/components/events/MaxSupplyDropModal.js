@@ -47,7 +47,7 @@ export default function MaxSupplyDropModal({
     setPhase(resolveInitialPhase(drop));
     setRewardLabel(drop?.rewardPreview?.label || '');
     setErrorMsg('');
-  }, [drop?.dropId, drop?.alreadyClaimed, drop?.expired, drop?.rewardPreview?.label]);
+  }, [drop]);
 
   useEffect(() => {
     if (phase !== 'success') return undefined;
