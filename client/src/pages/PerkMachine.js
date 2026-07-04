@@ -19,8 +19,15 @@ import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import EggHatchery from '../components/perk/EggHatchery';
 import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournamentProgress';
 import PerkRewardIndexModal from '../components/perk/PerkRewardIndexModal';
-import { playTournamentTicketUnlockSound } from '../lib/tournamentTicketSound';
-import { playMultiplierSound } from '../lib/perkMultiplierSound';
+import {
+  playPerkLegendaryRewardSound,
+  playPerkMachineSpinSound,
+  playPerkMultiplierActivationSound,
+  playPerkReelStopSound,
+  playPerkRewardRevealSound,
+  playPerkScoutFlightTicketSound,
+  stopPerkMachineSfx,
+} from '../lib/perkMachineSfx';
 import {
   duckPerkMusicForDuration,
   PERK_MUSIC_DUCK,
@@ -185,8 +192,7 @@ export default function PerkMachine() {
   const showDirectTicketAward = useCallback((ticketResult, statusAfter) => {
     const granted = Number(ticketResult?.ticketsGranted) || 0;
     if (granted < 1) return;
-    duckPerkMusicForDuration(PERK_MUSIC_DUCK.JACKPOT, 4200);
-    playTournamentTicketUnlockSound();
+    void playPerkScoutFlightTicketSound();
     setDirectTicketAward({
       id: Date.now(),
       ticketsGranted: granted,
@@ -196,8 +202,7 @@ export default function PerkMachine() {
   }, []);
   const showTicketUnlock = useCallback((ticketResult) => {
     if (!ticketResult?.ticketEarned) return;
-    duckPerkMusicForDuration(PERK_MUSIC_DUCK.JACKPOT, 4200);
-    playTournamentTicketUnlockSound();
+    void playPerkScoutFlightTicketSound();
     setTicketUnlock({
       id: Date.now(),
       ticketsEarned: ticketResult.ticketsEarned || 1,
@@ -333,6 +338,7 @@ export default function PerkMachine() {
       const step = () => {
         i += 1;
         setRevealedCount(i);
+        void playPerkReelStopSound();
         if (i < rewards.length) {
           window.setTimeout(step, 900);
         } else {
@@ -341,6 +347,7 @@ export default function PerkMachine() {
             setResultMessage(message);
             setSpinning(false);
             spinLock.current = false;
+            void playPerkRewardRevealSound();
             duckPerkMusicForDuration(PERK_MUSIC_DUCK.SPIN_COMPLETE, 2600);
             if (typeof onComplete === 'function') onComplete();
           }, 600);
@@ -355,6 +362,7 @@ export default function PerkMachine() {
       if (spinLock.current || spinning) return;
       spinLock.current = true;
       setSpinning(true);
+      void playPerkMachineSpinSound();
       setError('');
       setResultMessage('');
       setResolvedRewards([]);
@@ -421,14 +429,13 @@ export default function PerkMachine() {
               (r) => r.rarity === 'legendary' || r.eggTier === 'legendary'
             );
             if (isLegendary) {
-              duckPerkMusicForDuration(PERK_MUSIC_DUCK.LEGENDARY, 3600);
+              void playPerkLegendaryRewardSound();
             }
             if (result.multiplier?.isJackpot) {
               duckPerkMusicForDuration(PERK_MUSIC_DUCK.JACKPOT, 4200);
             }
             if (multFactor > 1) {
-              duckPerkMusicForDuration(PERK_MUSIC_DUCK.MULTIPLIER, 900);
-              playMultiplierSound(multFactor);
+              void playPerkMultiplierActivationSound(multFactor);
               setMultiplierPulse(true);
               window.setTimeout(() => setMultiplierPulse(false), 2200);
             }
@@ -452,6 +459,7 @@ export default function PerkMachine() {
         );
       } catch (e) {
         const msg = e?.response?.data?.message || e?.message || 'Spin failed.';
+        stopPerkMachineSfx();
         setError(msg);
         setSpinning(false);
         setReelPhase('idle');

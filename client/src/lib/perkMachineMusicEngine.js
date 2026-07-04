@@ -20,6 +20,7 @@ export const PERK_MUSIC_DUCK = Object.freeze({
   LEGENDARY: 'legendary',
   VOICE_LINE: 'voice_line',
   SPIN_COMPLETE: 'spin_complete',
+  SPIN: 'spin_sfx',
   JACKPOT: 'jackpot',
   MULTIPLIER: 'multiplier',
 });
@@ -31,6 +32,7 @@ const DUCK_LEVELS = Object.freeze({
   [PERK_MUSIC_DUCK.LEGENDARY]: 0.22,
   [PERK_MUSIC_DUCK.VOICE_LINE]: 0.28,
   [PERK_MUSIC_DUCK.SPIN_COMPLETE]: 0.32,
+  [PERK_MUSIC_DUCK.SPIN]: 0.38,
   [PERK_MUSIC_DUCK.JACKPOT]: 0.2,
   [PERK_MUSIC_DUCK.MULTIPLIER]: 0.26,
 });
