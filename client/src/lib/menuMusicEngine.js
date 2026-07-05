@@ -139,6 +139,8 @@ class MenuMusicEngine {
         /* ignore */
       }
     }
+    // eslint-disable-next-line no-console
+    console.log('[MUSIC_MUTED]', !this.enabled);
     emitSettingsChange();
     if (!this.enabled) {
       this.stop({ fadeMs: 500 });
@@ -327,6 +329,9 @@ class MenuMusicEngine {
         try {
           const p = audio.play();
           this.playing = true;
+          const track = getMenuTrack(this.trackId);
+          // eslint-disable-next-line no-console
+          console.log('[MUSIC_STARTED]', track.label || track.id);
           if (p && typeof p.then === 'function') {
             p.then(() => resolve(true)).catch(() => {
               this.playing = false;

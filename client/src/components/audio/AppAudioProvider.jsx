@@ -5,13 +5,16 @@ import {
   enterPerkMachineMusic,
   exitPerkMachineMusic,
   initializeAppAudioAfterAuth,
-  isMenuMusicRoute,
   isPerkMachineRoute,
   preloadAppMusic,
   tryStartMenuMusic,
 } from '../../lib/appMusicCoordinator';
 import { AUDIO_UNLOCKED_EVENT, clearPendingAudioResume } from '../../lib/audioUnlockManager';
-import { isDedicatedMusicOverrideRoute } from '../../lib/menuMusicLibrary';
+import {
+  getMusicRoutePolicy,
+  MUSIC_ROUTE_POLICY,
+  shouldKeepMenuMusic,
+} from '../../lib/menuMusicLibrary';
 import { isScoutFlightGameplayFocusActive } from '../../lib/scoutFlightGameplayFocus';
 import { menuMusicEngine } from '../../lib/menuMusicEngine';
 import { perkMachineMusicEngine } from '../../lib/perkMachineMusicEngine';
@@ -22,11 +25,11 @@ const AUTH_SESSION_EVENT = 'f10:auth-session-started';
 
 function shouldPlayMenuMusic(pathname = '') {
   if (isScoutFlightGameplayFocusActive()) return false;
-  return (
-    isMenuMusicRoute(pathname) &&
-    !isDedicatedMusicOverrideRoute(pathname) &&
-    !scoutFlightMusicEngine.isActive()
-  );
+  if (!shouldKeepMenuMusic(pathname)) return false;
+  if (scoutFlightMusicEngine.isActive()) return false;
+  // eslint-disable-next-line no-console
+  console.log('[MUSIC_ROUTE_KEEP_PLAYING]', pathname);
+  return true;
 }
 
 /**
@@ -111,6 +114,7 @@ export function useAppAudioSync() {
 
     const onPerkRoute = isPerkMachineRoute(pathname);
     const wasPerk = wasPerkRef.current;
+    const routePolicy = getMusicRoutePolicy(pathname);
     const wantMenu = shouldPlayMenuMusic(pathname);
 
     if (onPerkRoute && !wasPerk) {
@@ -118,11 +122,19 @@ export function useAppAudioSync() {
     } else if (!onPerkRoute && wasPerk) {
       void exitPerkMachineMusic(pathname);
     } else if (wantMenu && !onPerkRoute) {
-      startMenuIfAllowed({
-        fadeMs: menuMusicEngine.pausedForRoute ? 900 : 1600,
-        fromStart: false,
-      });
-    } else if (!wantMenu && !onPerkRoute && !scoutFlightMusicEngine.isActive()) {
+      if (menuMusicEngine.isPlaying()) {
+        menuMusicEngine.pausedForRoute = false;
+      } else {
+        startMenuIfAllowed({
+          fadeMs: menuMusicEngine.pausedForRoute ? 900 : 1600,
+          fromStart: false,
+        });
+      }
+    } else if (
+      routePolicy === MUSIC_ROUTE_POLICY.SILENT &&
+      !onPerkRoute &&
+      !scoutFlightMusicEngine.isActive()
+    ) {
       if (menuMusicEngine.isPlaying()) {
         void menuMusicEngine.pause({ fadeMs: 900 });
       }

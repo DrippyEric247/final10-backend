@@ -23,8 +23,6 @@ export const DEFAULT_MENU_TRACK_ID = 'final10_beta_theme';
  * Scout Flight lobby uses menu music — gameplay crossfade is session-based.
  */
 export const MENU_MUSIC_BLOCKLIST_PREFIXES = Object.freeze([
-  '/perk-machine',
-  '/egg-exchange',
   '/onboarding',
   '/login',
   '/register',
@@ -69,6 +67,7 @@ export const MENU_MUSIC_ALLOW_PREFIXES = Object.freeze([
   '/daily-streak',
   '/battle-pass',
   '/music-library',
+  '/egg-exchange',
   '/scout-flight',
   '/monthly-report',
   '/party',
@@ -99,4 +98,37 @@ export function isMenuMusicRoute(pathname = '') {
 export function isDedicatedMusicOverrideRoute(pathname = '') {
   const path = String(pathname || '').split('?')[0].split('#')[0];
   return path === '/perk-machine' || path.startsWith('/perk-machine/');
+}
+
+/** Route music policies — menu keeps playing unless explicitly overridden or silent. */
+export const MUSIC_ROUTE_POLICY = Object.freeze({
+  KEEP_MENU: 'keep_menu',
+  DEDICATED_OVERRIDE: 'dedicated_override',
+  SILENT: 'silent',
+});
+
+function normalizeMusicPath(pathname = '') {
+  return String(pathname || '').split('?')[0].split('#')[0];
+}
+
+/**
+ * Resolve how background music should behave for a route.
+ * Main app / profile / rewards / egg exchange → keep menu music playing.
+ */
+export function getMusicRoutePolicy(pathname = '') {
+  const path = normalizeMusicPath(pathname);
+  if (isDedicatedMusicOverrideRoute(path)) {
+    return MUSIC_ROUTE_POLICY.DEDICATED_OVERRIDE;
+  }
+  if (!path || isMenuMusicBlocked(path)) {
+    return MUSIC_ROUTE_POLICY.SILENT;
+  }
+  if (path === '/' || isMenuMusicRoute(path)) {
+    return MUSIC_ROUTE_POLICY.KEEP_MENU;
+  }
+  return MUSIC_ROUTE_POLICY.SILENT;
+}
+
+export function shouldKeepMenuMusic(pathname = '') {
+  return getMusicRoutePolicy(pathname) === MUSIC_ROUTE_POLICY.KEEP_MENU;
 }
