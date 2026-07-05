@@ -12,7 +12,7 @@ import { recordBattlePassXp } from '../lib/battlePassEngine';
 import { triggerDailyLoginReward, triggerStreakReward } from '../lib/rewardEngine';
 import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
-import { buildSignupAttributionPayload, getAttribution } from '../lib/attribution';
+import { buildSignupAttributionPayload, getAttribution, captureAttributionFromLocation, recordCreatorClick, recordReferralLinkVisit, getPersistedReferralCode } from '../lib/attribution';
 import { resetOnboardingForNewAccount, onboardingUserId } from '../lib/onboardingPreferences';
 import { ANALYTICS_EVENTS, trackEvent } from '../lib/analytics';
 import { parseApiError } from '../lib/apiErrorParsing';
@@ -57,6 +57,7 @@ export default function Register() {
       stored?.creatorCode ||
       refFromUrl ||
       stored?.referralCode ||
+      getPersistedReferralCode() ||
       '';
     if (code) setForm(f => ({ ...f, referralCode: code }));
   }, [qs]);

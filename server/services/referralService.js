@@ -14,6 +14,10 @@ const {
   WELCOME_REFERRAL_CODE,
 } = require('../config/referralRewards');
 
+function getReferralTracking() {
+  return require('./referralTrackingService');
+}
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -204,7 +208,43 @@ async function processReferralOnSignup({
     throw err;
   }
 
-  const grants = await grantReferralSavvy(referrerId, refereeId, referee.username);
+  try {
+    await getReferralTracking().trackPointGrantAttempt(req, { referralCode, referrer, referee });
+  } catch (trackErr) {
+    console.error('[REFERRAL_TRACK] grant_attempt failed:', trackErr?.message || trackErr);
+  }
+
+  let grants;
+  try {
+    grants = await grantReferralSavvy(referrerId, refereeId, referee.username);
+
+    try {
+      await getReferralTracking().trackPointGrantSuccess(req, {
+        referralCode,
+        referrer,
+        referee,
+        savvyAmount: grants.referrerSavvy,
+      });
+    } catch (trackErr) {
+      console.error('[REFERRAL_TRACK] grant_success failed:', trackErr?.message || trackErr);
+    }
+  } catch (grantErr) {
+    try {
+      await getReferralTracking().trackPointGrantFailed(req, grantErr, {
+        referralCode,
+        referrer,
+        referee,
+      });
+    } catch (trackErr) {
+      console.error('[REFERRAL_TRACK] grant_failed log failed:', trackErr?.message || trackErr);
+    }
+    console.error('[REFERRAL_GRANT_FAILED]', grantErr?.message || grantErr, {
+      referrerId: String(referrerId),
+      refereeId: String(refereeId),
+      referralCode: referralCode || null,
+    });
+    throw grantErr;
+  }
 
   referee.referredBy = referrerId;
   if (referralCode) referee.referralCodeUsed = referralCode;

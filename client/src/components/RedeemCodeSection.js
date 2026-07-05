@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Gift,
   Key,
@@ -8,18 +9,91 @@ import {
   Star,
   Sparkles,
   Trophy,
-  Zap,
   Crown,
+  Zap,
 } from 'lucide-react';
 import api from '../services/authService';
 import easterEggService from '../services/easterEggService';
+import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
 import Final10SocialLinks from './Final10SocialLinks';
+import { SAVVY_SCOUT } from '../config/savvyScoutBranding';
+
+function TrailerPromoSuccessCard({ payload }) {
+  const { title, code, rewards, footer, message, scoutMessage, ctaLabel, ctaPath } = payload;
+  const rewardLines = rewards?.lines || [];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      className="mb-4 overflow-hidden rounded-xl border border-purple-300/40 bg-gradient-to-br from-[#1a1228] via-[#111218] to-[#0b0b0f] p-5 text-center shadow-lg shadow-purple-900/30"
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.08, type: 'spring', stiffness: 260, damping: 18 }}
+        className="text-3xl"
+        aria-hidden
+      >
+        🎉
+      </motion.div>
+      <h4 className="mt-2 text-lg font-black uppercase tracking-wide text-white">
+        {title || 'Hidden Trailer Code Redeemed!'}
+      </h4>
+      {message ? (
+        <p className="mt-2 text-sm font-semibold text-purple-200">{message}</p>
+      ) : null}
+      <div className="mx-auto mt-4 max-w-sm rounded-lg border border-purple-500/25 bg-black/30 px-4 py-3 text-left">
+        <div className="text-xs font-bold uppercase tracking-wider text-purple-300">Code</div>
+        <div className="mt-1 font-mono text-base font-bold text-amber-300">{code}</div>
+        <div className="mt-3 text-xs font-bold uppercase tracking-wider text-purple-300">Rewards</div>
+        <ul className="mt-2 space-y-1 text-sm text-gray-100">
+          {rewardLines.length > 0 ? (
+            rewardLines.map((line) => (
+              <li key={line} className="font-semibold text-amber-200">
+                {line}
+              </li>
+            ))
+          ) : (
+            <>
+              {rewards?.savvy ? <li className="font-semibold text-amber-200">+{rewards.savvy} Savvy</li> : null}
+              {rewards?.supplyDrop ? (
+                <li className="font-semibold text-amber-200">+1 {rewards.supplyDrop}</li>
+              ) : null}
+              {rewards?.callingCardLabel ? (
+                <li className="font-semibold text-amber-200">+{rewards.callingCardLabel}</li>
+              ) : null}
+            </>
+          )}
+        </ul>
+      </div>
+      {footer ? (
+        <p className="mt-4 whitespace-pre-line text-xs leading-relaxed text-gray-400">{footer}</p>
+      ) : null}
+      {scoutMessage ? (
+        <p className="mt-4 text-sm leading-relaxed text-cyan-100/90">
+          <span className="font-bold text-cyan-300">{SAVVY_SCOUT.shortTitle} says:</span>{' '}
+          &ldquo;{scoutMessage}&rdquo;
+        </p>
+      ) : null}
+      {ctaLabel && ctaPath ? (
+        <Link
+          to={ctaPath}
+          className="mt-4 inline-flex items-center justify-center rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-purple-500"
+        >
+          {ctaLabel}
+        </Link>
+      ) : null}
+    </motion.div>
+  );
+}
 
 const RedeemCodeSection = ({ onPointsEarned }) => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [trailerSuccess, setTrailerSuccess] = useState(null);
   const [recentRedemptions, setRecentRedemptions] = useState([]);
   const [availableHints, setAvailableHints] = useState([]);
 
@@ -89,53 +163,69 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
     setLoading(true);
     setError('');
     setSuccess('');
+    setTrailerSuccess(null);
 
-    const upperCode = code.trim().toUpperCase();
+    const normalizedCode = code.trim();
 
     try {
-      const response = await easterEggService.redeemCode(upperCode);
+      const response = await easterEggService.redeemCode(normalizedCode);
+      const data = response.data || {};
 
-      setSuccess(response.data.message);
+      if (data.trailerPromo) {
+        setTrailerSuccess({
+          title: data.title,
+          code: data.code || normalizedCode.toUpperCase(),
+          rewards: data.rewards,
+          footer: data.footer,
+          message: data.message,
+          scoutMessage: data.scoutMessage,
+          ctaLabel: data.ctaLabel,
+          ctaPath: data.ctaPath,
+        });
+
+        if (data.rewards?.callingCard) {
+          showCallingCardUnlock({
+            cardId: data.rewards.callingCard,
+            unlockReason: 'You discovered a hidden trailer code.',
+            trigger: 'trailer_promo',
+          });
+        }
+      } else {
+        setSuccess(data.message);
+      }
+
+      const savvyEarned = data.savvyEarned ?? data.pointsEarned ?? 0;
 
       setRecentRedemptions((prev) => [
         {
-          code: upperCode,
-          points: response.data.savvyEarned ?? response.data.pointsEarned,
-          name: response.data.easterEgg?.name || 'Easter Egg',
+          code: data.code || normalizedCode.toUpperCase(),
+          points: savvyEarned,
+          name: data.easterEgg?.name || 'Easter Egg',
           timestamp: new Date(),
-          icon: response.data.easterEgg?.icon || '🎁',
+          icon: data.easterEgg?.icon || '🎁',
         },
         ...prev.slice(0, 4),
       ]);
 
-      setAvailableHints((prev) => prev.filter((h) => h.hintCode !== `${upperCode.slice(0, 2)}***`));
+      setAvailableHints((prev) =>
+        prev.filter((h) => h.hintCode !== `${normalizedCode.slice(0, 2).toUpperCase()}***`)
+      );
 
-      if (onPointsEarned) {
-        onPointsEarned(response.data.savvyEarned ?? response.data.pointsEarned);
+      if (onPointsEarned && savvyEarned > 0) {
+        onPointsEarned(savvyEarned);
       }
 
       setCode('');
     } catch (err) {
       if (err.response?.status === 400) {
-        try {
-          const promoResponse = await api.post('/promo-codes/validate', {
-            code: code.trim(),
-            orderValue: 0,
-          });
-
-          if (promoResponse.data.valid) {
-            setSuccess(
-              `✅ Promo code "${code}" is valid! ${promoResponse.data.promoCode.description}`
-            );
-            setCode('');
-            return;
-          }
-        } catch {
-          /* fall through */
+        const body = err.response?.data || {};
+        if (body.alreadyRedeemed) {
+          setError(body.message || "You've already claimed this trailer reward.");
+        } else {
+          setError(body.message || 'Invalid or expired promo code.');
         }
-        setError(err.response.data.message);
       } else {
-        setError('Invalid redeem code. Keep watching our trailers for easter eggs! 🎬');
+        setError('Invalid or expired promo code.');
       }
     } finally {
       setLoading(false);
@@ -176,6 +266,8 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
             placeholder="Enter redeem code..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             disabled={loading}
+            autoCapitalize="characters"
+            spellCheck={false}
           />
         </div>
         <button
@@ -187,18 +279,27 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
         </button>
       </div>
 
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4"
-        >
-          <XCircle className="h-5 w-5 text-red-500" />
-          <span className="text-red-700 text-sm">{error}</span>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {error ? (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4"
+          >
+            <XCircle className="h-5 w-5 text-red-500" />
+            <span className="text-red-700 text-sm">{error}</span>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-      {success && (
+      <AnimatePresence>
+        {trailerSuccess ? (
+          <TrailerPromoSuccessCard payload={trailerSuccess} />
+        ) : null}
+      </AnimatePresence>
+
+      {success && !trailerSuccess ? (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -207,7 +308,7 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
           <CheckCircle className="h-5 w-5 text-green-500" />
           <span className="text-green-700 text-sm">{success}</span>
         </motion.div>
-      )}
+      ) : null}
 
       {recentRedemptions.length > 0 && (
         <div className="mt-4">

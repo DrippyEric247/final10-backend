@@ -35,6 +35,8 @@ export type Attribution = {
 };
 
 const KEY = "f10_attribution_v1";
+const REFERRAL_PERSIST_KEY = "f10_referral_persist_v1";
+const REFERRAL_COOKIE = "f10_referral_code";
 const SHOWN_KEY = "f10_attribution_banner_dismissed_v1";
 
 function readStorage(): Attribution | null {
@@ -47,6 +49,57 @@ function readStorage(): Attribution | null {
     return parsed;
   } catch {
     return null;
+  }
+}
+
+function writeReferralPersist(code: string): void {
+  if (typeof window === "undefined") return;
+  const normalized = String(code || "").trim();
+  if (!normalized) return;
+  try {
+    window.localStorage.setItem(REFERRAL_PERSIST_KEY, normalized);
+  } catch {
+    /* ignore */
+  }
+  try {
+    const maxAge = 60 * 60 * 24 * 30;
+    document.cookie = `${REFERRAL_COOKIE}=${encodeURIComponent(normalized)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getPersistedReferralCode(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.localStorage.getItem(REFERRAL_PERSIST_KEY);
+    if (stored && stored.trim()) return stored.trim();
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
+ * Fire-and-forget referral link visit log for emergency audit trail.
+ */
+export async function recordReferralLinkVisit(
+  referralCode: string,
+  fetcher: (url: string, init?: RequestInit) => Promise<unknown> = fetch
+): Promise<void> {
+  const code = String(referralCode || "").trim();
+  if (!code) return;
+  writeReferralPersist(code);
+  try {
+    const visitUrl = buildApiUrl("/referrals/track-visit");
+    if (!visitUrl) return;
+    await fetcher(visitUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referralCode: code }),
+    });
+  } catch {
+    /* swallow */
   }
 }
 
@@ -128,6 +181,9 @@ export function captureAttributionFromLocation(): Attribution | null {
   };
 
   writeStorage(next);
+  if (referralCode) {
+    writeReferralPersist(referralCode);
+  }
   return next;
 }
 
@@ -168,15 +224,16 @@ export function markAttributionBannerDismissed(): void {
  */
 export function buildSignupAttributionPayload(): Record<string, unknown> | null {
   const a = getAttribution();
-  if (!a) return null;
+  const persistedRef = getPersistedReferralCode();
+  if (!a && !persistedRef) return null;
   return {
-    creatorHandle: a.creatorHandle,
-    creatorCode: a.creatorCode,
-    referralCode: a.referralCode,
-    campaign: a.campaign,
-    source: a.source,
-    capturedAt: a.capturedAt,
-    landingPath: a.landingPath,
+    creatorHandle: a?.creatorHandle ?? null,
+    creatorCode: a?.creatorCode ?? null,
+    referralCode: a?.referralCode || persistedRef,
+    campaign: a?.campaign ?? null,
+    source: a?.source ?? (persistedRef ? "referral" : "organic"),
+    capturedAt: a?.capturedAt ?? Date.now(),
+    landingPath: a?.landingPath ?? (typeof window !== "undefined" ? window.location.pathname + window.location.search : ""),
   };
 }
 

@@ -240,6 +240,8 @@ app.use('/api/auctions',    auctionRoutes);
 app.use('/api/scanner',     scannerRoutes);
 app.use('/api/feed',        feedRoutes);
 app.use('/api/users',       userRoutes);
+app.use('/api/referrals', require('./routes/referralTrackingRoutes'));
+app.use('/api/admin/referrals', require('./routes/adminReferralRoutes'));
 app.use('/api/levels',      levelRoutes);
 app.use('/api/payments',    paymentRoutes);
 app.use('/api/local-deals', localDealsRoutes);

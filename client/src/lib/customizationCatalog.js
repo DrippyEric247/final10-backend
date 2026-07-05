@@ -867,6 +867,17 @@ export const CALLING_CARDS = [
     check: () => userHasExclusive("card_founding_beta"),
   },
   {
+    id: "card_beta_hunter",
+    name: "Beta Hunter",
+    tagline: "You caught the hidden trailer code",
+    rarity: "exclusive",
+    group: "exclusive_founders",
+    stripe: "linear-gradient(90deg, #1e1b4b, #7c3aed 50%, #312e81)",
+    flare: "linear-gradient(90deg, transparent, rgba(192, 132, 252, 0.5), rgba(245, 158, 11, 0.35), transparent)",
+    requirement: "Redeem hidden trailer code BETA247",
+    check: () => userHasExclusive("card_beta_hunter"),
+  },
+  {
     id: "card_the_signal",
     name: "The Signal",
     tagline: "Others watch the market. You are the market.",

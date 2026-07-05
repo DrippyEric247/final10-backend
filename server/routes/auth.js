@@ -14,6 +14,11 @@ const { requestPasswordReset, resetPasswordWithToken } = require('../services/pa
 
 const { getClientIp, getClientUa } = require('../services/referralGuard');
 const { processReferralOnSignup, resolveReferrer } = require('../services/referralService');
+const {
+  resolveSignupReferralCode,
+  trackSignupStarted,
+  trackSignupCompleted,
+} = require('../services/referralTrackingService');
 
 const {
   respondOAuthDisabled,
@@ -179,7 +184,10 @@ function serializeAuthMePayload(user) {
  */
 async function handleSignup(req, res, next) {
   try {
-    const { firstName, lastName, username, email, password, referralCode } = req.body;
+    const { firstName, lastName, username, email, password } = req.body;
+    const bodyCode = String(req.body.referralCode || '').trim();
+    const referralCode =
+      bodyCode === 'welcome' ? 'welcome' : resolveSignupReferralCode(req) || bodyCode || null;
     // Phase B: client-supplied attribution payload (creator deep links, etc.).
     // We accept it loosely — schema validation is intentionally lenient so
     // we never block a signup on missing/extra attribution fields.
@@ -203,6 +211,14 @@ async function handleSignup(req, res, next) {
       signupBonus = 500;
       membershipTier = 'premium';
       subscriptionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    }
+
+    if (referralCode) {
+      try {
+        await trackSignupStarted(req, referralCode, { referredEmail: email });
+      } catch (trackErr) {
+        console.error('[REFERRAL_TRACK] signup_started failed:', trackErr?.message || trackErr);
+      }
     }
 
     const user = await User.create({
@@ -237,15 +253,31 @@ async function handleSignup(req, res, next) {
       await tryAssignFounderSlot(user);
     }
 
+    if (referralCode) {
+      try {
+        await trackSignupCompleted(req, referralCode, user);
+      } catch (trackErr) {
+        console.error('[REFERRAL_TRACK] signup_completed failed:', trackErr?.message || trackErr);
+      }
+    }
+
     if (referrer) {
-      await processReferralOnSignup({
-        referrer,
-        referee: user,
-        referralCode,
-        ip: getClientIp(req),
-        ua: getClientUa(req),
-        req,
-      });
+      try {
+        await processReferralOnSignup({
+          referrer,
+          referee: user,
+          referralCode,
+          ip: getClientIp(req),
+          ua: getClientUa(req),
+          req,
+        });
+      } catch (referralErr) {
+        console.error('[REFERRAL_GRANT_FAILED]', referralErr?.message || referralErr, {
+          referralCode,
+          refereeId: String(user._id),
+          referrerId: referrer?._id ? String(referrer._id) : null,
+        });
+      }
     }
 
     // Phase B: persist attribution and log a creator signup event.

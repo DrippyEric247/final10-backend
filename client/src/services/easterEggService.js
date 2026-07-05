@@ -1,43 +1,24 @@
 import api from './authService';
 
 export const easterEggService = {
-  // Redeem easter egg code
-  redeemCode: (code) => {
-    return api.post('/easter-eggs/redeem', { code });
-  },
+  redeemCode: (code) => api.post('/easter-eggs/redeem', { code }),
 
-  // Get available easter egg codes
-  getAvailableCodes: () => {
-    return api.get('/easter-eggs/available');
-  },
+  getAvailableCodes: () => api.get('/easter-eggs/available'),
 
-  // Get user's redemption history
-  getRedemptionHistory: () => {
-    return api.get('/easter-eggs/history');
-  },
+  getAvailable: () => api.get('/easter-eggs/available'),
 
-  // Get easter egg statistics (admin only)
-  getStats: () => {
-    return api.get('/easter-eggs/stats');
-  },
+  getRedemptionHistory: () => api.get('/easter-eggs/history'),
 
-  // Add new easter egg code (admin only)
-  addCode: (codeData) => {
-    return api.post('/easter-eggs/admin/add', codeData);
-  },
+  getHistory: () => api.get('/easter-eggs/history'),
 
-  // Remove easter egg code (admin only)
-  removeCode: (code) => {
-    return api.delete(`/easter-eggs/admin/${code}`);
-  }
+  getStats: () => api.get('/easter-eggs/stats'),
+
+  getTrailerRedemptions: (params = {}) =>
+    api.get('/easter-eggs/admin/trailer-redemptions', { params }),
+
+  addCode: (codeData) => api.post('/easter-eggs/admin/add', codeData),
+
+  removeCode: (code) => api.delete(`/easter-eggs/admin/${code}`),
 };
 
 export default easterEggService;
-
-
-
-
-
-
-
-

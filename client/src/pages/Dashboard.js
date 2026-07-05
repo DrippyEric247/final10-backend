@@ -1,7 +1,7 @@
 import CopyField from "../components/CopyField";
 import { getReferralUserId, makeReferralLink } from "../lib/referrals";
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
@@ -22,6 +22,7 @@ import "../styles/LiveSavvyNetwork.css";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const referralUserId = getReferralUserId(user);
   const referralLink = referralUserId ? makeReferralLink(referralUserId) : "";
   const [goalMetricIdx, setGoalMetricIdx] = useState(0);
@@ -30,6 +31,16 @@ const Dashboard = () => {
   const [marketTick, setMarketTick] = useState(0);
   const [alertIdx, setAlertIdx] = useState(0);
   const [tipIdx, setTipIdx] = useState(0);
+
+  useEffect(() => {
+    if (location.hash !== '#invite-friends') return undefined;
+    const el = document.getElementById('invite-friends');
+    if (!el) return undefined;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, location.pathname]);
 
   const goalMetrics = useMemo(() => ([
     { label: "Beta testers", value: "Early access", reward: "Help shape launch rewards together" },
@@ -224,6 +235,7 @@ const Dashboard = () => {
 
 {/* Invite & Earn */}
         <motion.div
+          id="invite-friends"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.25 }}

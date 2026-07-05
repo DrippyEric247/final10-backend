@@ -84,6 +84,7 @@ const CALLING_CARD_IDS = new Set([
   'card_legacy_loyalist',
   'card_founding_tester',
   'card_founding_beta',
+  'card_beta_hunter',
   // Scout Flight World Championship
   'card_scout_flight_beta_champion',
   'card_scout_flight_monthly_champion',

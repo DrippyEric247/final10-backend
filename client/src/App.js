@@ -37,7 +37,7 @@ import { hasCompletedOnboarding, onboardingUserId } from "./lib/onboardingPrefer
 import { auditOnboarding } from "./lib/auditLog";
 import { installRewardDevTools } from "./lib/rewardEngine";
 import { setCurrentUserForCosmetics } from "./lib/adminCosmetics";
-import { captureAttributionFromLocation, recordCreatorClick } from "./lib/attribution";
+import { captureAttributionFromLocation, recordCreatorClick, recordReferralLinkVisit } from "./lib/attribution";
 
 /* Pages (use real ones as you build them) */
 import Dashboard from "./pages/Dashboard";        // public (for now)
@@ -55,6 +55,7 @@ import LeaderboardPage from "./pages/LeaderboardPage"; // protected
 import WinFeed from "./pages/WinFeed";            // public — Savvy Wins social feed
 import AdminCosmeticsPanel from "./pages/AdminCosmeticsPanel"; // owner-only grants
 import AdminEmailTestCenter from "./pages/AdminEmailTestCenter";
+import EasterEggAdmin from "./components/EasterEggAdmin";
 import Customization from "./pages/Customization"; // protected
 import Premium from "./pages/Premium";            // protected
 import BattlePassPage from "./pages/BattlePassPage"; // protected
@@ -213,10 +214,13 @@ export default function App() {
   // Capture creator/referral attribution on first paint (Phase B foundation).
   useEffect(() => {
     const captured = captureAttributionFromLocation();
-    if (captured && captured.creatorHandle) {
+    if (captured?.creatorHandle) {
       // Fire-and-forget click telemetry. Uses native fetch so we don't
       // tangle attribution with the auth-aware axios instance.
       recordCreatorClick((url, init) => fetch(url, init));
+    }
+    if (captured?.referralCode) {
+      recordReferralLinkVisit(captured.referralCode, (url, init) => fetch(url, init));
     }
   }, []);
 
@@ -344,6 +348,10 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/" element={<Dashboard />} />
+          <Route
+            path="/invite-friends"
+            element={<Navigate to={{ pathname: '/', hash: '#invite-friends' }} replace />}
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -663,6 +671,14 @@ export default function App() {
           element={
             <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
               <AdminEmailTestCenter />
+            </InternalRoute>
+          }
+        />
+        <Route
+          path="/admin/trailer-codes"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <EasterEggAdmin />
             </InternalRoute>
           }
         />

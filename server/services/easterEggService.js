@@ -102,7 +102,7 @@ async function getUserRedemptionHistory(userId) {
 async function redeemEasterEggCode(userId, rawCode) {
   const def = getEasterEggDefinition(rawCode);
   if (!def) {
-    return { ok: false, status: 400, message: 'Invalid redeem code. Keep watching our trailers for easter eggs! 🎬' };
+    return { ok: false, status: 400, message: 'Invalid or expired promo code.' };
   }
 
   const idempotencyKey = `easter_egg:${userId}:${def.code}`;
