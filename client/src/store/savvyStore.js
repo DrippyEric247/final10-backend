@@ -106,6 +106,7 @@ export function SavvyPointsProvider({ children }) {
           const balance = Math.max(0, Math.round(Number(me?.pointsBalance) || 0));
           patchUser({
             savvyPoints: balance,
+            savvyPointsServerBase: balance,
             lifetimePointsEarned: me?.lifetimePointsEarned,
           });
           try {
@@ -234,6 +235,7 @@ export function SavvyPointsProvider({ children }) {
       const balance = Math.max(0, Math.round(Number(me?.pointsBalance) || 0));
       patchUser({
         savvyPoints: balance,
+        savvyPointsServerBase: balance,
         lifetimePointsEarned: me?.lifetimePointsEarned,
       });
       bumpWallet();

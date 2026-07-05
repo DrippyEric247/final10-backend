@@ -83,7 +83,15 @@ async function applyClaimReward(user, inventory, reward, idemKey) {
         note: `Battle Pass — ${reward.label}`,
         meta: { source: 'battle_pass', claimKey: idemKey },
       });
-      return { kind: 'savvy', savvyGranted: result.amount, newBalance: result.newBalance };
+      return {
+        kind: 'savvy',
+        granted: result.granted,
+        amount: result.amount,
+        savvyGranted: result.granted ? result.amount : 0,
+        duplicate: Boolean(result.duplicate),
+        newBalance: result.newBalance,
+        balanceBefore: result.balanceBefore,
+      };
     }
     case 'egg': {
       const pm = ensurePerkMachineDoc(user);
@@ -187,8 +195,21 @@ async function claimTierReward(userId, args, opts = {}) {
     throw new ClaimError(400, 'INVALID_REWARD', 'No reward defined for this track/tier');
   }
 
+  const rewardAmount =
+    reward.type === 'savvy' ? Math.max(0, Number(reward.amount) || 0) : 0;
+
+  console.log('[TIER_CLAIM_ATTEMPT]', {
+    userId: String(userId),
+    tierId: level,
+    track,
+    rewardType: reward.type,
+    rewardAmount,
+  });
+
   const user = await User.findById(userId);
   if (!user) throw new ClaimError(404, 'USER_NOT_FOUND', 'User not found');
+
+  const oldBalance = Math.max(0, Math.round(Number(user.savvyPoints) || 0));
 
   if (track === 'premium' && !opts.bypassPremium) {
     try {
@@ -224,14 +245,43 @@ async function claimTierReward(userId, args, opts = {}) {
     throw new ClaimError(409, 'ALREADY_CLAIMED', 'Reward already claimed');
   }
 
-  const grant = await applyClaimReward(user, inv, reward, claimKey);
+  let grant;
+  try {
+    grant = await applyClaimReward(user, inv, reward, claimKey);
 
-  bpLocked.tier = computeTierFromXp(bpLocked.xp || 0);
-  Object.assign(bp, bpLocked.toObject ? bpLocked.toObject() : bpLocked);
+    bpLocked.tier = computeTierFromXp(bpLocked.xp || 0);
+    Object.assign(bp, bpLocked.toObject ? bpLocked.toObject() : bpLocked);
 
-  await user.save();
-  await inv.save();
-  await bp.save();
+    await user.save();
+    await inv.save();
+    await bp.save();
+  } catch (err) {
+    console.error('[TIER_CLAIM_FAILED]', err?.message || err, {
+      userId: String(userId),
+      tierId: level,
+      track,
+      claimKey,
+    });
+    await BattlePassProgress.updateOne(
+      { _id: bpLocked._id },
+      { $pull: { claimedRewardIds: claimKey } }
+    );
+    throw err;
+  }
+
+  const refreshed = await User.findById(userId)
+    .select('savvyPoints pointsBalance lifetimePointsEarned')
+    .lean();
+  const newBalance = Math.max(0, Math.round(Number(refreshed?.savvyPoints) || 0));
+
+  console.log('[TIER_CLAIM_SUCCESS]', {
+    userId: String(userId),
+    tierId: level,
+    track,
+    oldBalance,
+    newBalance,
+    savvyGranted: grant?.savvyGranted ?? (reward.type === 'savvy' ? rewardAmount : 0),
+  });
 
   const state = await buildProgressionPayload(userId);
   return {
@@ -241,7 +291,23 @@ async function claimTierReward(userId, args, opts = {}) {
     claimKey,
     reward: { ...reward },
     grant,
-    savvyBalance: Number(user.savvyPoints) || 0,
+    savvyGranted: grant?.savvyGranted ?? 0,
+    oldBalance,
+    newBalance,
+    savvyBalance: newBalance,
+    pointsBalance: Math.max(0, Math.round(Number(refreshed?.pointsBalance) || 0)),
+    lifetimePointsEarned: Math.max(
+      0,
+      Math.round(Number(refreshed?.lifetimePointsEarned) || 0)
+    ),
+    user: {
+      savvyPoints: newBalance,
+      pointsBalance: Math.max(0, Math.round(Number(refreshed?.pointsBalance) || 0)),
+      lifetimePointsEarned: Math.max(
+        0,
+        Math.round(Number(refreshed?.lifetimePointsEarned) || 0)
+      ),
+    },
     perkMachine: getPerkMachineStatus(user),
     state,
   };

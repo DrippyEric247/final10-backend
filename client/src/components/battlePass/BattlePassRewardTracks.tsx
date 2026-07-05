@@ -18,6 +18,9 @@ import {
   type BPClaimGrant,
 } from "../../lib/battlePassRewards";
 import { claimBattlePassTier } from "../../lib/api";
+import { applyServerSavvyBalance } from "../../lib/applyServerSavvyBalance";
+import { useAuth } from "../../context/AuthContext";
+import { SAVVY_AUTH_REFRESH_REQUEST } from "../../store/savvyStore";
 
 const TIERS = BATTLE_PASS_TIERS as unknown as BPTier[];
 
@@ -127,6 +130,7 @@ export default function BattlePassRewardTracks({
   canClaim,
   onClaimed,
 }: BattlePassRewardTracksProps) {
+  const { patchUser, refreshProfile } = useAuth();
   const [popup, setPopup] = useState<PopupState>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,13 +166,40 @@ export default function BattlePassRewardTracks({
       setBusyKey(key);
       try {
         const res = await claimBattlePassTier(level, track);
-        setPopup({ kind: "success", reward, grant: res?.grant as BPClaimGrant, level, track });
-        // Refresh the canonical Savvy balance so the HUD updates immediately.
-        try {
-          window.dispatchEvent(new CustomEvent("f10:savvy-auth-refresh-request"));
-        } catch {
-          /* ignore */
+        const grant = (res?.grant || {}) as BPClaimGrant;
+        const newBalance =
+          res?.newBalance ??
+          grant?.newBalance ??
+          res?.savvyBalance ??
+          res?.user?.savvyPoints;
+
+        if (newBalance != null) {
+          applyServerSavvyBalance(patchUser, newBalance, {
+            lifetimePointsEarned: res?.lifetimePointsEarned ?? res?.user?.lifetimePointsEarned,
+          });
         }
+
+        if (grant?.savvyGranted && grant.savvyGranted > 0) {
+          try {
+            window.dispatchEvent(
+              new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST, {
+                detail: { source: "battle_pass_tier_claim", amount: grant.savvyGranted },
+              })
+            );
+          } catch {
+            /* ignore */
+          }
+        } else {
+          try {
+            window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+          } catch {
+            /* ignore */
+          }
+        }
+
+        void refreshProfile();
+
+        setPopup({ kind: "success", reward, grant, level, track });
         if (onClaimed) onClaimed(res?.state);
       } catch (e: unknown) {
         const ax = e as { response?: { status?: number; data?: { code?: string; message?: string } } };
@@ -187,7 +218,7 @@ export default function BattlePassRewardTracks({
         setBusyKey(null);
       }
     },
-    [canClaim, onClaimed, rewardState]
+    [canClaim, onClaimed, patchUser, refreshProfile, rewardState]
   );
 
   return (

@@ -28,6 +28,7 @@ export interface AuthContextValue {
   register: (form: unknown) => Promise<unknown>;
   logout: () => void;
   refreshProfile: () => Promise<unknown>;
+  patchUser: (partial: Partial<AuthUser>) => void;
 }
 
 export function AuthProvider(props: { children: ReactNode }): JSX.Element;

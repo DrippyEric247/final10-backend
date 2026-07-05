@@ -103,6 +103,11 @@ router.post('/claim-tier', auth, async (req, res, next) => {
     const out = await battlePassClaimService.claimTierReward(req.user._id, { level, track });
     return res.json(out);
   } catch (err) {
+    console.error('[TIER_CLAIM_FAILED]', err?.message || err, {
+      userId: String(req.user?._id || req.user?.id || ''),
+      tierId: req.body?.level,
+      track: req.body?.track,
+    });
     if (err && err.status && err.code) {
       return res.status(err.status).json({ code: err.code, message: err.message });
     }
