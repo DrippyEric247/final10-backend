@@ -12,7 +12,6 @@ import {
   Crown,
   Zap,
 } from 'lucide-react';
-import api from '../services/authService';
 import easterEggService from '../services/easterEggService';
 import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
 import Final10SocialLinks from './Final10SocialLinks';

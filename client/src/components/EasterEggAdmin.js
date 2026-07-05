@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -25,12 +25,7 @@ const EasterEggAdmin = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-    fetchTrailerRedemptions();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await easterEggService.getStats();
       setStats(response.data);
@@ -39,9 +34,9 @@ const EasterEggAdmin = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchTrailerRedemptions = async (code = trailerFilter) => {
+  const fetchTrailerRedemptions = useCallback(async (code) => {
     try {
       const response = await easterEggService.getTrailerRedemptions({
         code: code || undefined,
@@ -51,7 +46,12 @@ const EasterEggAdmin = () => {
     } catch (error) {
       console.error('Error fetching trailer redemptions:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    fetchTrailerRedemptions('BETA247');
+  }, [fetchStats, fetchTrailerRedemptions]);
 
   const handleAddCode = async (e) => {
     e.preventDefault();
