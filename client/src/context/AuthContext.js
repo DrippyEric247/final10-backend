@@ -80,12 +80,20 @@ export function AuthProvider({ children }) {
         : Number(u.savvyPoints);
     const pts = Number.isFinite(rawBase) ? rawBase : 0;
     const fake = isDev ? getDevSavvyPointsOffset() : 0;
+    const serverEmblem = u.equippedCosmetics?.emblemId;
+    const serverCard = u.equippedCosmetics?.callingCardId;
     return {
       ...u,
       savvyPointsServerBase: pts,
       savvyPoints: pts + fake,
-      equippedCallingCardId: u.equippedCallingCardId || getEquippedCallingCardId(),
-      equippedEmblemId: u.equippedEmblemId || getEquippedEmblemId(),
+      equippedCosmetics: u.equippedCosmetics || {
+        emblemId: serverEmblem || "sigil_starter",
+        callingCardId: serverCard || "card_default",
+        titleId: null,
+      },
+      equippedCallingCardId:
+        serverCard || u.equippedCallingCardId || getEquippedCallingCardId(),
+      equippedEmblemId: serverEmblem || u.equippedEmblemId || getEquippedEmblemId(),
     };
   }, []);
 

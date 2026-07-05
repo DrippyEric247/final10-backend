@@ -915,6 +915,14 @@ export async function getTopFlippersWeek(limit = 20) {
   return data;
 }
 
+/** Season leaderboard — real users sorted by leaderboard score (max 100). */
+export async function getSeasonLeaderboard(limit = 100) {
+  const { data } = await api.get("/leaderboard/players", {
+    params: { limit },
+  });
+  return data;
+}
+
 /** Savvy Shop — creator storefronts (V1). */
 export async function getSavvyShopPublic(slug) {
   const { data } = await api.get(`/savvy-shop/public/${encodeURIComponent(slug)}`);

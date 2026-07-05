@@ -4,7 +4,7 @@ import "../styles/Customization.css";
 import "../styles/CallingCard.css";
 import CallingCard from "../components/CallingCard";
 import { useAuth } from "../context/AuthContext";
-import { useCosmetics } from "../hooks/useCosmetics";
+import { useCosmeticsLoadout } from "../context/CosmeticsContext";
 import {
   CALLING_CARDS,
   EMBLEMS,
@@ -20,7 +20,7 @@ import {
 import { showCallingCardUnlock } from "../lib/callingCardUnlockBus";
 export default function Customization() {
   const auth = useAuth();
-  const cos = useCosmetics(Boolean(auth?.token));
+  const cos = useCosmeticsLoadout();
   const [syncTick, setSyncTick] = useState(0);
   const bumpSync = useCallback(() => setSyncTick((t) => t + 1), []);
 
@@ -31,11 +31,14 @@ export default function Customization() {
     const onVis = () => {
       if (document.visibilityState === "visible") bumpSync();
     };
+    const onLoadout = () => bumpSync();
     window.addEventListener("storage", onStorage);
+    window.addEventListener("f10:loadout-updated", onLoadout);
     document.addEventListener("visibilitychange", onVis);
     const id = window.setInterval(bumpSync, 4000);
     return () => {
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("f10:loadout-updated", onLoadout);
       document.removeEventListener("visibilitychange", onVis);
       clearInterval(id);
     };
@@ -61,11 +64,13 @@ export default function Customization() {
   }, [syncTick]);
 
   useEffect(() => {
+    if (cos.equippedEmblemId) setEquippedEmblem(cos.equippedEmblemId);
+    if (cos.equippedCallingCardId) setEquippedCard(cos.equippedCallingCardId);
     if (cos.useServer && cos.data?.equipped) {
       setEquippedEmblem(cos.data.equipped.emblemId || getEquippedEmblemId());
       setEquippedCard(cos.data.equipped.callingCardId || getEquippedCallingCardId());
     }
-  }, [cos.useServer, cos.data]);
+  }, [cos.useServer, cos.data, cos.equippedEmblemId, cos.equippedCallingCardId]);
 
   const serverUnlockReady = cos.useServer && !cos.loading && cos.data;
 

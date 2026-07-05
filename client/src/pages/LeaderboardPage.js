@@ -1,27 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useCosmeticsLoadout } from "../context/CosmeticsContext";
 import { useSavvyPoints } from "../store/savvyStore";
 import { FINAL10_DEV_OVERRIDE_EVENT } from "../lib/devOverride";
-import { buildRankedLeaderboard } from "../data/leaderboardMock";
+import { LEADERBOARD_BRACKETS } from "../lib/leaderboardRanks";
 import LeaderboardRow from "../components/LeaderboardRow";
 import PlayerShowcase from "../components/PlayerShowcase";
 import { getBattlePassProgress } from "../lib/battlePassEngine";
 import { BP_UPDATE_EVENT } from "../lib/battlePassConfig";
 import { getUniversalBoostState } from "../lib/universalBoostProgress";
-import { getTopFlippersWeek } from "../lib/api";
-import LoadingState from "../components/ui/states/LoadingState";
+import { getTopFlippersWeek, getSeasonLeaderboard } from "../lib/api";import LoadingState from "../components/ui/states/LoadingState";
 import EmptyState from "../components/ui/states/EmptyState";
 import ErrorState from "../components/ui/states/ErrorState";
 import { Link } from "react-router-dom";
 import "../styles/LeaderboardPage.css";
 
-const BRACKETS = [
-  { id: "bronze", label: "Bronze", min: 0, max: 4999 },
-  { id: "silver", label: "Silver", min: 5000, max: 9999 },
-  { id: "gold", label: "Gold", min: 10000, max: 14999 },
-  { id: "elite", label: "Elite", min: 15000, max: Number.POSITIVE_INFINITY },
-];
-
+const BRACKETS = LEADERBOARD_BRACKETS;
 const SEASON_REWARDS = [
   { id: "savvy", label: "Savvy Bonuses", detail: "+250 to +2500 Savvy" },
   { id: "discount", label: "Discount Drops", detail: "5% to 25% seasonal discounts" },
@@ -73,9 +67,13 @@ function getSeasonWindow() {
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
+  const { equippedEmblemId, equippedCallingCardId } = useCosmeticsLoadout();
   const savvyLive = useSavvyPoints();
   const [sync, setSync] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [lbLoading, setLbLoading] = useState(true);
+  const [lbError, setLbError] = useState(null);
   const [topFlippers, setTopFlippers] = useState(null);
   const [topFlippersErr, setTopFlippersErr] = useState(null);
   const [topFlippersLoading, setTopFlippersLoading] = useState(true);
@@ -88,11 +86,13 @@ export default function LeaderboardPage() {
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("f10-universal-progress-refresh", bump);
+    window.addEventListener("f10:loadout-updated", bump);
     window.addEventListener(BP_UPDATE_EVENT, bump);
     window.addEventListener(FINAL10_DEV_OVERRIDE_EVENT, bump);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("f10-universal-progress-refresh", bump);
+      window.removeEventListener("f10:loadout-updated", bump);
       window.removeEventListener(BP_UPDATE_EVENT, bump);
       window.removeEventListener(FINAL10_DEV_OVERRIDE_EVENT, bump);
     };
@@ -120,31 +120,69 @@ export default function LeaderboardPage() {
     };
   }, [sync]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLbError(null);
+    setLbLoading(true);
+    getSeasonLeaderboard(100)
+      .then((data) => {
+        if (!cancelled) setPlayers(Array.isArray(data?.players) ? data.players : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLbError(err?.message || "Could not load leaderboard.");
+          setPlayers([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLbLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sync]);
+
   const ranked = useMemo(() => {
     void sync;
-    const base = buildRankedLeaderboard(user) || [];
-    const seen = new Set();
-    return base.map((row) => {
-      if (!row.isCurrentUser) return row;
+    const currentUserId = user ? String(user.id ?? user._id ?? "") : "";
+    return (players || []).map((row) => {
+      const isCurrentUser =
+        Boolean(user) &&
+        (String(row.userId) === currentUserId ||
+          (user.username && row.username === user.username));
+
+      if (!isCurrentUser) {
+        return { ...row, isCurrentUser: false };
+      }
+
+      let enriched = {
+        ...row,
+        isCurrentUser: true,
+        emblemId: equippedEmblemId || row.emblemId,
+        callingCardId: equippedCallingCardId || row.callingCardId,
+        savvyPoints: Math.max(
+          Number(row.savvyPoints) || 0,
+          Math.round(Number(user.savvyPoints) || 0)
+        ),
+      };
+
       try {
         const bp = getBattlePassProgress();
         const ub = getUniversalBoostState();
-        return {
-          ...row,
+        enriched = {
+          ...enriched,
           bpTierCleared: bp.completedCount,
+          prestige: bp.completedCount,
           bpXp: bp.xp,
           powerTierLabel: ub.currentTier || "Active",
         };
       } catch {
-        return row;
+        /* optional local enrichment */
       }
-    }).filter((row) => {
-      const id = String(row.userId ?? row.username ?? "");
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
-      return true;
+
+      return enriched;
     });
-  }, [user, sync]);
+  }, [players, user, equippedEmblemId, equippedCallingCardId, sync]);
 
   const currentUserId = user ? String(user.id ?? user.username ?? "") : "";
 
@@ -167,7 +205,7 @@ export default function LeaderboardPage() {
         .forEach((row) => topPerformerIds.add(String(row.userId)));
     });
 
-    const activePool = ranked.filter((r) => (Number(r.streakWeeks || 0) + Number(r.taskStreakWeeks || 0)) > 0);
+    const activePool = ranked.filter((r) => Number(r.streakDays || r.streakWeeks || 0) > 0);
     const activeWinnerIds = new Set(seededPick(activePool.map((r) => String(r.userId)), 0.1));
 
     const me =
@@ -390,13 +428,25 @@ export default function LeaderboardPage() {
         </article>
       </section>
 
-      {ranked.length === 0 ? (
-        <EmptyState
-          className="f10-state--page"
-          title="No leaderboard rows yet"
-          description="Play a few rounds or check back after the next sync."
+      {lbLoading ? (
+        <LoadingState variant="inline" label="Loading leaderboard…" className="f10-flippers-loading" />
+      ) : null}
+      {lbError ? (
+        <ErrorState
+          className="f10-state--inline"
+          title="Couldn't load leaderboard"
+          description={lbError}
+          onRetry={() => bump()}
         />
       ) : null}
+      {!lbLoading && !lbError && ranked.length === 0 ? (
+        <EmptyState
+          className="f10-state--page"
+          title="No operators on the board yet"
+          description="Beta testers appear here as soon as accounts are created. Be the first to climb."
+        />
+      ) : null}
+      {!lbLoading && !lbError && ranked.length > 0 ? (
       <div className="f10-lb-list" role="list">
         {ranked.map((player, idx) => {
           const isYou =
@@ -415,6 +465,7 @@ export default function LeaderboardPage() {
           );
         })}
       </div>
+      ) : null}
 
       <PlayerShowcase
         open={Boolean(selected)}

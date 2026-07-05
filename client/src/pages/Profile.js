@@ -43,7 +43,7 @@ import { buildApiUrl } from '../lib/runtimeApi';
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
 import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import ProgramBadge from '../components/programs/ProgramBadge';
-import { getEquippedCallingCardId, getEquippedEmblemId } from '../lib/customizationCatalog';
+import { useCosmeticsLoadout } from '../context/CosmeticsContext';
 import FoundingLegacySection from '../components/founding/FoundingLegacySection';
 import {
   applyTierMultiplier,
@@ -98,6 +98,7 @@ const getDayKey = (timestampMs) => {
 
 const Profile = () => {
   const { user, refreshProfile } = useAuth();
+  const { equippedEmblemId, equippedCallingCardId } = useCosmeticsLoadout();
   const savvyLive = useSavvyPoints();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1140,8 +1141,8 @@ const Profile = () => {
         profileActivityItems={profileEngagement.activityItems}
         profileNextGoal={profileEngagement.nextGoal}
         onProfileGoalCta={handleProfileGoalCta}
-        equippedCallingCardId={user?.equippedCallingCardId || getEquippedCallingCardId()}
-        equippedEmblemId={user?.equippedEmblemId || getEquippedEmblemId()}
+        equippedCallingCardId={equippedCallingCardId}
+        equippedEmblemId={equippedEmblemId}
       />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
           <FoundingLegacySection username={user?.username} />

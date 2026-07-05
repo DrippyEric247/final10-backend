@@ -1,7 +1,6 @@
 import CallingCard from "./CallingCard";
 import "../styles/CallingCard.css";
 import { findEmblem, findCallingCard } from "../lib/customizationCatalog";
-import { VIP_LABELS } from "../data/leaderboardMock";
 
 export default function LeaderboardRow({
   player,
@@ -12,7 +11,10 @@ export default function LeaderboardRow({
 }) {
   const emblem = findEmblem(player.emblemId);
   const card = findCallingCard(player.callingCardId);
-  const vipLabel = VIP_LABELS[Math.min(VIP_LABELS.length - 1, Math.max(0, player.vipTier || 0))];
+  const savvy = Math.max(0, Number(player.savvyPoints ?? player.score) || 0);
+  const streakDays = Math.max(0, Number(player.streakDays ?? player.streakWeeks) || 0);
+  const prestige = Math.max(0, Number(player.prestige ?? player.bpTierCleared) || 0);
+  const rankBadge = player.rankBadge || (rank === 1 ? "Champion" : "Operator");
 
   return (
     <button
@@ -25,20 +27,30 @@ export default function LeaderboardRow({
         {isTopThree ? <span className="f10-lb-rank-glow" aria-hidden /> : null}
       </div>
 
-      <div className="f10-lb-identity">
-        <div
-          className="f10-lb-emblem"
-          style={{ background: emblem.accent }}
-          title={emblem.name}
-        >
-          {emblem.glyph}
+      <div className="f10-lb-main">
+        <div className="f10-lb-identity">
+          <div
+            className="f10-lb-emblem"
+            style={{ background: emblem.accent }}
+            title={emblem.name}
+          >
+            {emblem.glyph}
+          </div>
+          <div className="f10-lb-names">
+            <span className="f10-lb-username">
+              {player.displayName || player.username}
+              {isYou ? <span className="f10-lb-you-pill">You</span> : null}
+            </span>
+            <span className="f10-lb-handle">@{player.username}</span>
+          </div>
         </div>
-        <div className="f10-lb-names">
-          <span className="f10-lb-username">
-            {player.displayName || player.username}
-            {isYou ? <span className="f10-lb-you-pill">You</span> : null}
-          </span>
-          <span className="f10-lb-handle">@{player.username}</span>
+
+        <div className="f10-lb-stats" aria-label="Player progression stats">
+          <span className="f10-lb-stat">🏆 {rankBadge}</span>
+          <span className="f10-lb-stat">⭐ Prestige {prestige}</span>
+          <span className="f10-lb-stat">🔥 {streakDays}-Day Streak</span>
+          <span className="f10-lb-stat">💰 {savvy.toLocaleString()} Savvy</span>
+          <span className="f10-lb-stat">🥇 Rank #{rank}</span>
         </div>
       </div>
 
@@ -47,7 +59,7 @@ export default function LeaderboardRow({
           title={card.displayTitle || card.name}
           subtitle={card.displaySubtitle || card.tagline}
           rarity={card.rarity || "common"}
-          isEquipped={false}
+          isEquipped={Boolean(isYou)}
           isUnlocked
           stripe={card.stripe}
           flare={card.flare}
@@ -57,20 +69,6 @@ export default function LeaderboardRow({
           className="f10-lb-row-card"
           showEquippedBadge={false}
         />
-      </div>
-
-      <div className="f10-lb-score-block">
-        <span className="f10-lb-score">{player.score.toLocaleString()}</span>
-        <span className="f10-lb-score-label">score</span>
-      </div>
-
-      <div className="f10-lb-badges">
-        <span className={`f10-lb-rank-badge f10-lb-rank-badge--${String(player.rankBadge || "rank").toLowerCase().replace(/\s+/g, "-")}`}>
-          {player.rankBadge}
-        </span>
-        {player.vipTier > 0 && vipLabel ? (
-          <span className="f10-lb-vip">{vipLabel}</span>
-        ) : null}
       </div>
     </button>
   );
