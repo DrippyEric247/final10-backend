@@ -17,6 +17,21 @@ function addUnlocks(inventory, ids) {
   inventory.unlockedItemIds = [...set];
 }
 
+/** Flag freshly-unlocked cosmetics so the client can show a "NEW" ribbon. */
+function markNew(inventory, ids) {
+  const set = new Set(inventory.newItemIds || []);
+  for (const id of ids) {
+    if (id) set.add(id);
+  }
+  inventory.newItemIds = [...set];
+}
+
+/** Clear the "NEW" ribbon once the player has seen the item(s). */
+function clearNew(inventory, ids) {
+  const drop = new Set((ids || []).filter(Boolean));
+  inventory.newItemIds = (inventory.newItemIds || []).filter((id) => !drop.has(id));
+}
+
 function removeUnlock(inventory, itemId) {
   inventory.unlockedItemIds = (inventory.unlockedItemIds || []).filter((id) => id !== itemId);
   inventory.newItemIds = (inventory.newItemIds || []).filter((id) => id !== itemId);
@@ -204,6 +219,7 @@ async function grantSystemCosmeticUnlock(userId, itemId, source = 'system') {
   const { inv } = await ensureProgressDocuments(userId);
   const had = (inv.unlockedItemIds || []).includes(id);
   addUnlocks(inv, [id]);
+  if (!had) markNew(inv, [id]);
   await inv.save();
 
   if (!had) {
@@ -214,6 +230,21 @@ async function grantSystemCosmeticUnlock(userId, itemId, source = 'system') {
   }
 
   return !had;
+}
+
+/**
+ * Mark cosmetics as seen — clears their "NEW" ribbon.
+ * Pass no ids (or an empty array) to clear every current "new" flag.
+ */
+async function markCosmeticsSeen(userId, itemIds) {
+  const { inv } = await ensureProgressDocuments(userId);
+  if (Array.isArray(itemIds) && itemIds.length) {
+    clearNew(inv, itemIds.map((x) => String(x || '').trim()).filter(Boolean));
+  } else {
+    inv.newItemIds = [];
+  }
+  await inv.save();
+  return { newItemIds: inv.newItemIds || [] };
 }
 
 async function grantCosmeticUnlock(adminUserId, userKey, itemId, note = '') {
@@ -332,6 +363,7 @@ module.exports = {
   equipCosmetic,
   grantCosmeticUnlock,
   grantSystemCosmeticUnlock,
+  markCosmeticsSeen,
   revokeCosmeticUnlock,
   resolveUserByKey,
   inspectCosmeticUnlockState,

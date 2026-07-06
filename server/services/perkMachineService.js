@@ -41,6 +41,11 @@ const {
   recordSpinForTournamentTicket,
   ensureEventInventory,
 } = require('./scoutFlightTicketService');
+const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
+const {
+  PERK_CALLING_CARD_DUPLICATE_SAVVY,
+  pickPerkCallingCard,
+} = require('../config/perkCallingCards');
 
 function ensurePerkMachineDoc(user) {
   if (!user.perkMachine || typeof user.perkMachine !== 'object') {
@@ -266,6 +271,40 @@ async function applyReward(user, rewardDef, spinId) {
     if (!user.badges.includes('perk_calling_card')) {
       user.badges.push('perk_calling_card');
     }
+
+    // Award a specific calling card (server-authoritative) so the reveal can
+    // name it. Owning it already converts the drop into Savvy — never nothing.
+    const card = pickPerkCallingCard();
+    granted.label = 'Calling Card Drop';
+    granted.callingCardId = card.id;
+    granted.callingCardName = card.name;
+    granted.callingCardTagline = card.tagline;
+    granted.callingCardRarity = card.rarity;
+
+    let newlyUnlocked = false;
+    try {
+      newlyUnlocked = await grantSystemCosmeticUnlock(user._id, card.id, 'perk_machine_spin');
+    } catch (e) {
+      newlyUnlocked = false;
+    }
+
+    if (newlyUnlocked) {
+      granted.callingCardDuplicate = false;
+    } else {
+      granted.callingCardDuplicate = true;
+      const dupResult = await grantSavvyReward(user, {
+        rewardType: 'perk_machine',
+        amount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
+        baseAmount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
+        multiplier: 1,
+        idempotencyKey: `perk_card_dupe:${spinId}:${card.id}`,
+        note: `Perk Machine — duplicate ${card.name} converted to Savvy`,
+        meta: { spinId, source: 'perk_machine_calling_card_duplicate', cardId: card.id },
+      });
+      granted.duplicateSavvy = dupResult.amount;
+      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + Number(dupResult.amount || 0);
+      granted.newBalance = dupResult.newBalance;
+    }
     if (qty > 1) granted.spinMultiplierApplied = qty;
   } else if (rewardDef.type === 'scout_upgrade') {
     pm.scoutUpgrades = Number(pm.scoutUpgrades || 0) + 1;
@@ -453,6 +492,10 @@ async function spinPerkMachine(user, options = {}) {
         rarity: r.rarity,
         type: r.type,
         savvyGranted: Number(r.savvyGranted) || 0,
+        callingCardId: r.callingCardId || null,
+        callingCardName: r.callingCardName || null,
+        callingCardRarity: r.callingCardRarity || null,
+        callingCardDuplicate: r.callingCardDuplicate || false,
       })),
       createdAt: new Date(),
     };
@@ -586,6 +629,10 @@ async function hatchEgg(user, options = {}) {
         rarity: reward.rarity,
         type: reward.type,
         savvyGranted: hatchSavvyWon,
+        callingCardId: reward.callingCardId || null,
+        callingCardName: reward.callingCardName || null,
+        callingCardRarity: reward.callingCardRarity || null,
+        callingCardDuplicate: reward.callingCardDuplicate || false,
       },
     ],
     createdAt: new Date(),

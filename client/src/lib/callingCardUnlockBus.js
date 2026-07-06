@@ -19,6 +19,8 @@ export { CALLING_CARD_UNLOCK_EVENT };
  * @property {string} [unlockReason] — overrides default copy
  * @property {string} [trigger] — telemetry / source id
  * @property {string} [imageUrl] — optional art URL
+ * @property {boolean} [duplicate] — player already owns this card
+ * @property {number} [duplicateSavvy] — Savvy granted as duplicate compensation
  */
 
 /**
@@ -36,6 +38,8 @@ export function showCallingCardUnlock(payload) {
           unlockReason: payload?.unlockReason != null ? String(payload.unlockReason) : "",
           trigger: payload?.trigger != null ? String(payload.trigger) : "",
           imageUrl: payload?.imageUrl != null ? String(payload.imageUrl) : "",
+          duplicate: Boolean(payload?.duplicate),
+          duplicateSavvy: Number(payload?.duplicateSavvy) || 0,
         },
       })
     );

@@ -55,6 +55,24 @@ export function useCosmetics(enabled: boolean) {
   }, [load]);
 
   const unlockedSet = useMemo(() => new Set(data?.unlockedItemIds || []), [data]);
+  const newItemSet = useMemo(() => new Set(data?.newItemIds || []), [data]);
+
+  const markSeen = useCallback(
+    async (itemIds: string[]) => {
+      const ids = (itemIds || []).map((x) => String(x || "").trim()).filter(Boolean);
+      if (!ids.length) return;
+      // Optimistically drop the ribbons so the UI updates immediately.
+      setData((prev) =>
+        prev ? { ...prev, newItemIds: (prev.newItemIds || []).filter((id) => !ids.includes(id)) } : prev
+      );
+      try {
+        await api.post("/cosmetics/seen", { itemIds: ids });
+      } catch {
+        /* best-effort — ribbon already cleared locally */
+      }
+    },
+    []
+  );
 
   const equip = useCallback(
     async (type: "emblem" | "calling_card" | "title", itemId: string) => {
@@ -83,6 +101,8 @@ export function useCosmetics(enabled: boolean) {
     useServer: enabled,
     data,
     unlockedSet,
+    newItemSet,
+    markSeen,
     loading,
     error,
     reload: load,

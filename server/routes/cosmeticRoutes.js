@@ -7,6 +7,7 @@ const {
   grantCosmeticUnlock,
   revokeCosmeticUnlock,
   inspectCosmeticUnlockState,
+  markCosmeticsSeen,
 } = require('../services/cosmeticInventoryService');
 const { validateRequest } = require('../middleware/validateRequest');
 const schemas = require('../validation/schemas');
@@ -40,6 +41,16 @@ router.post('/equip', auth, validateRequest(schemas.cosmeticsEquipBody), async (
     if (err.status === 400 || err.status === 403 || err.status === 404) {
       return next(new HttpError(err.status, err.code || 'BAD_REQUEST', err.message || 'Request failed'));
     }
+    return next(err);
+  }
+});
+
+router.post('/seen', auth, async (req, res, next) => {
+  try {
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds.slice(0, 200) : [];
+    const data = await markCosmeticsSeen(req.user._id, itemIds);
+    return res.json(data);
+  } catch (err) {
     return next(err);
   }
 });

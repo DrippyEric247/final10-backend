@@ -18,6 +18,7 @@ import {
   unlockCallingCardForDev,
 } from "../lib/customizationCatalog";
 import { showCallingCardUnlock } from "../lib/callingCardUnlockBus";
+import PerkRewardReveal from "../components/perk/PerkRewardReveal";
 export default function Customization() {
   const auth = useAuth();
   const cos = useCosmeticsLoadout();
@@ -55,8 +56,29 @@ export default function Customization() {
   const [rarityFilter, setRarityFilter] = useState("all");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [cardDetailId, setCardDetailId] = useState(null);
+  const [seenLocal, setSeenLocal] = useState(() => new Set());
+  const [emblemReveal, setEmblemReveal] = useState(null);
   const previousCardUnlockedRef = useRef(null);
+  const previousEmblemUnlockedRef = useRef(null);
   const isDev = process.env.NODE_ENV !== "production";
+
+  const newItemSet = cos.newItemSet || new Set();
+  const isNewItem = useCallback(
+    (id) => newItemSet.has(id) && !seenLocal.has(id),
+    [newItemSet, seenLocal]
+  );
+  const markItemSeen = useCallback(
+    (id) => {
+      if (!id || !newItemSet.has(id) || seenLocal.has(id)) return;
+      setSeenLocal((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      void cos.markSeen?.([id]);
+    },
+    [cos, newItemSet, seenLocal]
+  );
 
   useEffect(() => {
     setEquippedEmblem(getEquippedEmblemId());
@@ -162,6 +184,32 @@ export default function Customization() {
   }, [cardUnlocked]);
 
   useEffect(() => {
+    // Wait until unlock state is stable (server loaded, or offline) before
+    // diffing, so the local→server hydration doesn't fake a "new" emblem.
+    if (cos.useServer && cos.loading) return;
+    const prev = previousEmblemUnlockedRef.current;
+    if (!prev) {
+      previousEmblemUnlockedRef.current = emblemUnlocked;
+      return;
+    }
+    const newlyUnlocked = EMBLEMS.find((e) => emblemUnlocked[e.id] && !prev[e.id]);
+    previousEmblemUnlockedRef.current = emblemUnlocked;
+    if (!newlyUnlocked) return;
+    // New emblems get the full cinematic reveal.
+    setEmblemReveal({
+      key: `emblem-${newlyUnlocked.id}`,
+      icon: newlyUnlocked.glyph,
+      eyebrow: "Emblem Unlocked",
+      title: newlyUnlocked.name,
+      subtitle: newlyUnlocked.subtitle || newlyUnlocked.requirement || "New emblem added to your locker.",
+      accent: "#c084fc",
+      tier: "epic",
+      mode: "cinematic",
+      id: Date.now(),
+    });
+  }, [emblemUnlocked, cos.useServer, cos.loading]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const onDebug = (e) => {
       const id = e?.detail?.cardId;
@@ -236,6 +284,7 @@ export default function Customization() {
 
   const equipCardById = async (cardId) => {
     if (!cardId || !cardUnlocked[cardId]) return;
+    markItemSeen(cardId);
     setPreviewCardId(cardId);
     if (cos.useServer) {
       try {
@@ -477,8 +526,12 @@ export default function Customization() {
                 key={e.id}
                 type="button"
                 className={`f10-emblem-tile ${equipped ? "f10-emblem-tile--equipped" : ""} ${previewing ? "f10-emblem-tile--preview" : ""} ${!unlocked ? "f10-emblem-tile--locked" : ""}`}
-                onClick={() => setPreviewEmblemId(e.id)}
+                onClick={() => {
+                  setPreviewEmblemId(e.id);
+                  markItemSeen(e.id);
+                }}
               >
+                {unlocked && isNewItem(e.id) ? <span className="f10-new-ribbon">NEW</span> : null}
                 {equipped ? <span className="f10-equipped-pill">Equipped</span> : null}
                 <div
                   className="f10-emblem-tile-glyph"
@@ -531,10 +584,14 @@ export default function Customization() {
                 key={c.id}
                 className={`f10-cc-row ${equipped ? "f10-cc-row--equipped" : ""} ${previewing ? "f10-cc-row--preview" : ""} ${!unlocked ? "f10-cc-row--locked" : ""}`}
               >
+                {unlocked && isNewItem(c.id) ? <span className="f10-new-ribbon f10-new-ribbon--card">NEW</span> : null}
                 <button
                   type="button"
                   className="f10-cc-row-preview-btn"
-                  onClick={() => setPreviewCardId(c.id)}
+                  onClick={() => {
+                    setPreviewCardId(c.id);
+                    markItemSeen(c.id);
+                  }}
                 >
                 <CallingCard
                   title={c.displayTitle || c.name}
@@ -599,6 +656,8 @@ export default function Customization() {
           <p className="f10-cc-unlock-name">"{newCardUnlock.name}"</p>
         </div>
       ) : null}
+
+      <PerkRewardReveal reveal={emblemReveal} onClose={() => setEmblemReveal(null)} />
 
       <p style={{ marginTop: 28, fontSize: 13, color: "rgba(148,163,184,0.9)" }}>
         Progress syncs from your watchlist, bundle streak, leaderboard score, promos, and

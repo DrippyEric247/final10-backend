@@ -89,6 +89,13 @@ const CALLING_CARD_IDS = new Set([
   'card_scout_flight_beta_champion',
   'card_scout_flight_monthly_champion',
   'card_scout_flight_seasonal_top10',
+  // Perk Machine calling card drops
+  'card_pm_signal_scout',
+  'card_pm_deal_runner',
+  'card_pm_neon_operator',
+  'card_pm_gold_standard',
+  'card_pm_apex_closer',
+  'card_pm_jackpot_royalty',
 ]);
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);

@@ -318,11 +318,121 @@
   }
 }
 
+/* Gold reveal beam behind the card */
+.f10-cc-unlock-beam {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  width: 240px;
+  height: 120%;
+  transform: translateX(-50%) rotate(0deg);
+  background: conic-gradient(
+    from 90deg at 50% 0%,
+    transparent 0deg,
+    rgba(253, 224, 71, 0.28) 12deg,
+    transparent 24deg,
+    transparent 336deg,
+    rgba(253, 224, 71, 0.28) 348deg,
+    transparent 360deg
+  );
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  animation: f10-cc-beam-in 0.6s ease-out 0.1s forwards, f10-cc-beam-spin 9s linear 0.7s infinite;
+  transform-origin: 50% 0%;
+}
+
+@keyframes f10-cc-beam-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1);
+  }
+}
+
+@keyframes f10-cc-beam-spin {
+  from {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  to {
+    transform: translateX(-50%) rotate(360deg);
+  }
+}
+
+.f10-cc-unlock-divider {
+  width: min(320px, 88%);
+  height: 2px;
+  margin: 12px auto;
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.55), transparent);
+}
+
+.f10-cc-unlock-rarity {
+  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.f10-cc-unlock-stars {
+  font-size: 0.95rem;
+  filter: drop-shadow(0 0 6px rgba(253, 224, 71, 0.6));
+}
+
+.f10-cc-unlock-rarity-label {
+  color: #e2e8f0;
+}
+
+.f10-cc-unlock-rarity--rare .f10-cc-unlock-rarity-label {
+  color: #a5b4fc;
+}
+.f10-cc-unlock-rarity--epic .f10-cc-unlock-rarity-label {
+  color: #d8b4fe;
+}
+.f10-cc-unlock-rarity--legendary .f10-cc-unlock-rarity-label {
+  color: #fde047;
+  text-shadow: 0 0 16px rgba(253, 224, 71, 0.5);
+}
+
+/* Duplicate variant — celebratory but clearly a "you already own it" state */
+.f10-cc-unlock--duplicate .f10-cc-unlock-eyebrow {
+  color: #fbbf24;
+  text-shadow: 0 0 18px rgba(251, 191, 36, 0.45);
+}
+
+.f10-cc-unlock--duplicate .f10-cc-unlock-reason {
+  color: #fcd34d;
+  font-weight: 800;
+}
+
+.f10-cc-unlock--duplicate .f10-cc-unlock-beam {
+  background: conic-gradient(
+    from 90deg at 50% 0%,
+    transparent 0deg,
+    rgba(56, 189, 248, 0.24) 12deg,
+    transparent 24deg,
+    transparent 336deg,
+    rgba(56, 189, 248, 0.24) 348deg,
+    transparent 360deg
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   .f10-cc-unlock-card-glow,
   .f10-cc-unlock-sweep,
   .f10-cc-unlock-dust,
-  .f10-cc-unlock-spark {
+  .f10-cc-unlock-spark,
+  .f10-cc-unlock-beam {
     animation: none !important;
+  }
+  .f10-cc-unlock-beam {
+    opacity: 0.6;
   }
 }

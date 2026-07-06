@@ -9,6 +9,7 @@ import {
   checkPerkMachineAdminAccess,
 } from '../lib/api';
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
+import { useCosmeticsLoadout } from '../context/CosmeticsContext';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import { isRateLimitError } from '../lib/apiErrorParsing';
 import { formatPerkMachineSpinError } from '../lib/perkMachineErrors';
@@ -21,6 +22,10 @@ import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import EggHatchery from '../components/perk/EggHatchery';
 import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournamentProgress';
 import PerkRewardIndexModal from '../components/perk/PerkRewardIndexModal';
+import PerkRewardReveal from '../components/perk/PerkRewardReveal';
+import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
+import { pickHeroReveal } from '../lib/rewardRevealThemes';
+import { isFirstRevealOfKey, markRevealKeySeen } from '../lib/perkRevealSeen';
 import {
   playPerkLegendaryRewardSound,
   playPerkMachineSpinSound,
@@ -146,6 +151,7 @@ function EggInventoryPanel({ inventory, pulseTier }) {
 
 export default function PerkMachine() {
   const { user, refreshProfile, patchUser } = useAuth();
+  const cosmetics = useCosmeticsLoadout();
   const savvy = useSavvyPoints();
   const liveEvents = useLiveEventsOptional();
   const showAdminDetail = shouldShowAdminNav(user) || process.env.NODE_ENV !== 'production';
@@ -179,6 +185,7 @@ export default function PerkMachine() {
   const [resolvedRewards, setResolvedRewards] = useState([]);
   const [lastMultiplier, setLastMultiplier] = useState(null);
   const [multiplierPulse, setMultiplierPulse] = useState(false);
+  const [heroReveal, setHeroReveal] = useState(null);
   const spinLock = useRef(false);
   const machinePanelRef = useRef(null);
   const toastTimer = useRef(null);
@@ -512,6 +519,38 @@ export default function PerkMachine() {
             } else if (!result.tournamentTicket?.ticketEarned && directTickets < 1) {
               showConfirm('Balance updated');
             }
+
+            // Calling card → full unlock ceremony (or duplicate → Savvy).
+            const cardReward = rewards.find(
+              (r) => r.type === 'calling_card' && r.callingCardId
+            );
+            if (cardReward) {
+              // Refresh the cosmetics cache so the collection + NEW ribbon reflect the grant.
+              if (typeof cosmetics?.reload === 'function') void cosmetics.reload();
+              window.setTimeout(() => {
+                showCallingCardUnlock({
+                  cardId: cardReward.callingCardId,
+                  trigger: 'perk_machine_spin',
+                  duplicate: Boolean(cardReward.callingCardDuplicate),
+                  duplicateSavvy: Number(cardReward.duplicateSavvy) || 0,
+                  unlockReason: cardReward.callingCardDuplicate
+                    ? ''
+                    : cardReward.callingCardTagline || '',
+                });
+              }, 450);
+            } else {
+              // Otherwise, give the top non-card reward its own themed reveal.
+              // Big rewards get the cinematic overlay; common rewards get a
+              // fast ~1s glow-and-fly chip. Any first-ever unlock is promoted
+              // to cinematic once, then stays quick after that.
+              const hero = pickHeroReveal(rewards);
+              if (hero) {
+                const firstEver = isFirstRevealOfKey(hero.key);
+                markRevealKeySeen(hero.key);
+                const mode = firstEver ? 'cinematic' : hero.mode || 'quick';
+                window.setTimeout(() => setHeroReveal({ ...hero, mode, id: Date.now() }), 400);
+              }
+            }
           }
         );
       } catch (e) {
@@ -527,7 +566,7 @@ export default function PerkMachine() {
         spinLock.current = false;
       }
     },
-    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock, showDirectTicketAward, showAdminDetail]
+    [refreshProfile, runRevealSequence, spinning, status, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, showTicketUnlock, showDirectTicketAward, showAdminDetail, cosmetics]
   );
 
   const handleHatch = useCallback(
@@ -954,7 +993,12 @@ export default function PerkMachine() {
                   const cost = Number(spin.savvyCost) || 0;
                   const won = Number(spin.savvyWon) || 0;
                   const net = spin.net != null ? Number(spin.net) : won - cost;
-                  const rewardLabels = (spin.rewards || []).map((r) => r.label).join(', ') || '—';
+                  const rewards = spin.rewards || [];
+                  const cardReward = rewards.find((r) => r.type === 'calling_card');
+                  const rewardLabels =
+                    rewards
+                      .map((r) => (r.type === 'calling_card' ? '🏆 Calling Card Drop' : r.label))
+                      .join(', ') || '—';
                   return (
                     <li key={spin.spinId} className="perk-history-item">
                       <span className="perk-history-item__mode">{prettyMode(spin.mode)}</span>
@@ -962,6 +1006,12 @@ export default function PerkMachine() {
                         Cost: <span className="perk-history-item__cost">{cost > 0 ? `-${cost}` : '0'}</span> ·
                         {' '}Rewards: <span className="perk-history-item__rewards">{rewardLabels}</span>
                       </span>
+                      {cardReward?.callingCardName ? (
+                        <span className="perk-history-item__unlocked">
+                          Unlocked: {cardReward.callingCardName}
+                          {cardReward.callingCardDuplicate ? ' (duplicate → +150 Savvy)' : ''}
+                        </span>
+                      ) : null}
                       <span className={`perk-history-item__net ${net >= 0 ? 'is-pos' : 'is-neg'}`}>
                         Net: {net >= 0 ? '+' : ''}{net} Savvy
                       </span>
@@ -1048,6 +1098,8 @@ export default function PerkMachine() {
           </div>
         </div>
       ) : null}
+
+      <PerkRewardReveal reveal={heroReveal} onClose={() => setHeroReveal(null)} />
 
       <PerkRewardIndexModal open={showRewardIndex} onClose={() => setShowRewardIndex(false)} />
 

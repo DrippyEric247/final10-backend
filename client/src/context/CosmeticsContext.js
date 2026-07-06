@@ -24,6 +24,8 @@ export function CosmeticsProvider({ children }) {
     loading,
     error,
     unlockedSet,
+    newItemSet,
+    markSeen,
   } = useCosmetics(enabled);
 
   const equippedEmblemId = data?.equipped?.emblemId || getEquippedEmblemId();
@@ -62,6 +64,8 @@ export function CosmeticsProvider({ children }) {
       data,
       useServer: enabled,
       unlockedSet,
+      newItemSet: newItemSet || new Set(),
+      markSeen: markSeen || (async () => {}),
       loading,
       error,
       reload,
@@ -72,6 +76,8 @@ export function CosmeticsProvider({ children }) {
       equippedCallingCardId,
       data,
       unlockedSet,
+      newItemSet,
+      markSeen,
       loading,
       error,
       reload,
@@ -99,6 +105,8 @@ export function useCosmeticsLoadout() {
       loading: false,
       error: null,
       unlockedSet: new Set(),
+      newItemSet: new Set(),
+      markSeen: async () => {},
     };
   }
   return ctx;

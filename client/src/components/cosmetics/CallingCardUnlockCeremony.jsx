@@ -17,6 +17,23 @@ function rarityTier(r) {
   return x;
 }
 
+/** Star count per rarity — drives the ⭐⭐⭐ EPIC line. */
+function rarityStars(r) {
+  switch (String(r || "common").toLowerCase()) {
+    case "exclusive":
+      return 5;
+    case "legendary":
+      return 4;
+    case "epic":
+    case "elite":
+      return 3;
+    case "rare":
+      return 2;
+    default:
+      return 1;
+  }
+}
+
 export default function CallingCardUnlockCeremony() {
   const navigate = useNavigate();
   const { refreshProfile } = useAuth();
@@ -35,6 +52,8 @@ export default function CallingCardUnlockCeremony() {
         unlockReason: String(d.unlockReason || ""),
         trigger: String(d.trigger || ""),
         imageUrl: String(d.imageUrl || ""),
+        duplicate: Boolean(d.duplicate),
+        duplicateSavvy: Number(d.duplicateSavvy) || 0,
         _ts: Date.now(),
       });
       playCallingCardUnlockIntro();
@@ -83,7 +102,7 @@ export default function CallingCardUnlockCeremony() {
     }
   };
 
-  const onViewLocker = () => {
+  const onViewCollection = () => {
     close();
     navigate("/customization");
   };
@@ -91,20 +110,27 @@ export default function CallingCardUnlockCeremony() {
   if (typeof document === "undefined") return null;
 
   const card = session ? findCallingCard(session.cardId) : null;
-  const reason =
-    session?.unlockReason?.trim() ||
-    (card?.requirement ? `Earned: ${card.requirement}` : "") ||
-    (card?.description ? String(card.description) : "You cleared the unlock condition for this card.");
+  const duplicate = Boolean(session?.duplicate);
+  const stars = card ? rarityStars(card.rarity) : 1;
+  const rarityLabel = String(card?.rarity || "common").toUpperCase();
+
+  const reason = duplicate
+    ? `+${(session?.duplicateSavvy || 0).toLocaleString()} Savvy added to your wallet`
+    : session?.unlockReason?.trim() ||
+      (card?.tagline ? String(card.tagline) : "") ||
+      (card?.requirement ? `Earned: ${card.requirement}` : "You unlocked this card.");
 
   const tier = card ? rarityTier(card.rarity) : "common";
-  const burst = tier === "legendary";
+  const burst = tier === "legendary" && !duplicate;
 
   return createPortal(
     <AnimatePresence>
       {session && card ? (
         <motion.div
           key={`${session.cardId}-${session._ts}`}
-          className={`f10-cc-unlock-root f10-cc-unlock--${tier} ${burst ? "f10-cc-unlock--burst" : ""}`}
+          className={`f10-cc-unlock-root f10-cc-unlock--${tier} ${burst ? "f10-cc-unlock--burst" : ""} ${
+            duplicate ? "f10-cc-unlock--duplicate" : ""
+          }`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="f10-cc-unlock-title"
@@ -124,6 +150,18 @@ export default function CallingCardUnlockCeremony() {
           />
 
           <div className="f10-cc-unlock-stage" onClick={(e) => e.stopPropagation()}>
+            <div className="f10-cc-unlock-beam" aria-hidden />
+
+            <motion.p
+              className="f10-cc-unlock-eyebrow"
+              id="f10-cc-unlock-title"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: reduceMotion ? 0 : 0.15, duration: 0.3 }}
+            >
+              {duplicate ? "Duplicate!" : "Calling Card Unlocked"}
+            </motion.p>
+
             <div className="f10-cc-unlock-particles" aria-hidden>
               {burst ? (
                 <>
@@ -146,9 +184,9 @@ export default function CallingCardUnlockCeremony() {
               initial={
                 reduceMotion
                   ? { opacity: 0, scale: 0.96 }
-                  : { x: "-38vw", opacity: 0, scale: 0.62, filter: "blur(14px)" }
+                  : { y: 26, opacity: 0, scale: 0.7, filter: "blur(14px)" }
               }
-              animate={{ x: 0, opacity: 1, scale: 1, filter: "blur(0px)" }}
+              animate={{ y: 0, opacity: 1, scale: 1, filter: "blur(0px)" }}
               transition={
                 reduceMotion
                   ? { duration: 0.2 }
@@ -183,11 +221,16 @@ export default function CallingCardUnlockCeremony() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduceMotion ? 0 : 0.35, duration: 0.4 }}
             >
-              <p className="f10-cc-unlock-eyebrow" id="f10-cc-unlock-title">
-                Calling card unlocked
-              </p>
+              <div className="f10-cc-unlock-divider" aria-hidden />
               <h2 className="f10-cc-unlock-name">{card.name}</h2>
               <p className="f10-cc-unlock-reason">{reason}</p>
+              <p className={`f10-cc-unlock-rarity f10-cc-unlock-rarity--${tier}`}>
+                <span className="f10-cc-unlock-stars" aria-hidden>
+                  {"\u2b50".repeat(stars)}
+                </span>
+                <span className="f10-cc-unlock-rarity-label">{rarityLabel}</span>
+              </p>
+              <div className="f10-cc-unlock-divider" aria-hidden />
             </motion.div>
 
             <motion.div
@@ -196,14 +239,19 @@ export default function CallingCardUnlockCeremony() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduceMotion ? 0 : 0.5, duration: 0.35 }}
             >
-              <button type="button" className="f10-cc-unlock-btn f10-cc-unlock-btn--primary" disabled={equipBusy} onClick={onEquip}>
-                {equipBusy ? "Equipping…" : "Equip now"}
+              <button
+                type="button"
+                className="f10-cc-unlock-btn f10-cc-unlock-btn--primary"
+                disabled={equipBusy}
+                onClick={onEquip}
+              >
+                {equipBusy ? "Equipping…" : "Equip Now"}
               </button>
-              <button type="button" className="f10-cc-unlock-btn" onClick={onViewLocker}>
-                View locker
+              <button type="button" className="f10-cc-unlock-btn" onClick={close}>
+                Keep Current
               </button>
-              <button type="button" className="f10-cc-unlock-btn f10-cc-unlock-btn--ghost" onClick={close}>
-                Continue
+              <button type="button" className="f10-cc-unlock-btn f10-cc-unlock-btn--ghost" onClick={onViewCollection}>
+                View Collection
               </button>
             </motion.div>
           </div>
