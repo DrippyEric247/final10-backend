@@ -17,7 +17,7 @@ async function debugPersistent500() {
   // Test 1: Check if backend is running
   console.log('\n1️⃣ Testing Backend Connectivity...');
   try {
-    const healthResponse = await fetch(buildApiUrl('/health');
+    const healthResponse = await fetch(buildApiUrl('/health'));
     console.log('Health check status:', healthResponse.status);
     if (healthResponse.ok) {
       console.log('✅ Backend is running');

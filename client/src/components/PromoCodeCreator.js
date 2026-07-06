@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Plus, 
   Save, 
   X, 
   Percent, 

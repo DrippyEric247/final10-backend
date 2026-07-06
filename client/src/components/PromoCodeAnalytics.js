@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  Tag, 
-  Calendar,
+import {
+  TrendingUp,
+  Users,
+  DollarSign,
+  Tag,
   BarChart3,
-  PieChart,
-  Download,
-  Filter
+  Download
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import promoCodeService from '../services/promoCodeService';
 
 const PromoCodeAnalytics = ({ isAdmin = false, creatorId = null }) => {
@@ -20,54 +17,52 @@ const PromoCodeAnalytics = ({ isAdmin = false, creatorId = null }) => {
   const [dateRange, setDateRange] = useState('30d');
   const [chartData, setChartData] = useState([]);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [dateRange, isAdmin, creatorId]);
-
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      
-      let response;
-      if (isAdmin) {
-        response = await promoCodeService.getAdminAnalytics();
-      } else {
-        response = await promoCodeService.getCreatorStats();
-      }
-      
-      setAnalytics(response.data);
-      
-      // Generate chart data based on date range
-      generateChartData(response.data);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateChartData = (data) => {
+  const generateChartData = useCallback(() => {
     // This would typically come from your API with proper date aggregation
     // For now, we'll generate sample data
     const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
-    const chartData = [];
-    
+    const nextChartData = [];
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      
-      chartData.push({
+
+      nextChartData.push({
         date: date.toISOString().split('T')[0],
         usage: Math.floor(Math.random() * 20) + 5,
         revenue: Math.floor(Math.random() * 1000) + 200,
         commissions: Math.floor(Math.random() * 100) + 50
       });
     }
-    
-    setChartData(chartData);
-  };
 
-  const COLORS = ['#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#3B82F6'];
+    setChartData(nextChartData);
+  }, [dateRange]);
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      let response;
+      if (isAdmin) {
+        response = await promoCodeService.getAdminAnalytics();
+      } else {
+        response = await promoCodeService.getCreatorStats(creatorId);
+      }
+
+      setAnalytics(response.data);
+
+      // Generate chart data based on date range
+      generateChartData();
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAdmin, creatorId, generateChartData]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   const exportData = () => {
     if (!analytics) return;

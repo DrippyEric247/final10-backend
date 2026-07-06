@@ -4,7 +4,6 @@ import {
   Plus, 
   Eye, 
   Edit, 
-  Trash2, 
   Copy, 
   ExternalLink,
   TrendingUp,
@@ -12,19 +11,15 @@ import {
   DollarSign,
   Calendar,
   Tag,
-  BarChart3,
-  Filter,
   Search
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import api from '../services/authService';
 import PromoCodeCreator from '../components/PromoCodeCreator';
 
 const PromoCodeDashboard = () => {
-  const { user } = useAuth();
   const [promoCodes, setPromoCodes] = useState([]);
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(true);
   const [showCreator, setShowCreator] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');

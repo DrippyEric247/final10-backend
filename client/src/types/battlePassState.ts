@@ -1,6 +1,5 @@
 import type { BattlePassActionEvent } from "./battlePassActionEvents";
 import type { BattlePassGrantPayload } from "./battlePassProgress";
-import type { BattlePassTaskViewModel } from "./battlePassTasks";
 
 export interface BattlePassRecentCompletion {
   taskId: string;

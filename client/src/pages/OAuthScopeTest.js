@@ -5,7 +5,6 @@ import ebayService from '../services/ebayService';
 import api from '../services/authService';
 
 const OAuthScopeTest = () => {
-  const [testResults, setTestResults] = useState({});
   const [loading, setLoading] = useState(false);
   const [tokenInfo, setTokenInfo] = useState(null);
 
@@ -120,7 +119,7 @@ const OAuthScopeTest = () => {
 
   const testApiConnectivity = async () => {
     try {
-      const response = await api.get('/health');
+      await api.get('/health');
       setResults(prev => ({ 
         ...prev, 
         apiConnectivity: { 
@@ -194,7 +193,7 @@ const OAuthScopeTest = () => {
   const testBuyPermission = async () => {
     try {
       // This will likely fail since we don't have a real auction ID, but we can test the endpoint
-      const response = await api.post('/ebay/bid', {
+      await api.post('/ebay/bid', {
         auctionId: 'test-auction-id',
         bidAmount: 1.00
       });
@@ -238,7 +237,7 @@ const OAuthScopeTest = () => {
     try {
       // Make multiple rapid requests to test rate limiting
       const promises = Array(5).fill().map(() => ebayService.searchItems({ limit: 1 }));
-      const responses = await Promise.all(promises);
+      await Promise.all(promises);
       
       setResults(prev => ({ 
         ...prev, 

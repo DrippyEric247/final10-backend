@@ -95,8 +95,7 @@ describe('sellerTrustEngine', () => {
       sellerFeedbackPercent: pct,
       sellerAccountAgeDays: 400,
     });
-    expect(r.sellerTrustScore).toBeGreaterThanOrEqual(8);
-    if (pct >= 98) expect(r.sellerTrustScore).toBeGreaterThanOrEqual(40);
+    expect(r.sellerTrustScore).toBeGreaterThanOrEqual(pct >= 98 ? 40 : 8);
   });
 
   test('mega eBay seller is Elite — never unverified', () => {

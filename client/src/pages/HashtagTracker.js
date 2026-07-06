@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Hash, 
@@ -6,7 +6,6 @@ import {
   Instagram, 
   MessageSquare, 
   CheckCircle, 
-  Clock, 
   TrendingUp,
   Users,
   Zap,
@@ -54,7 +53,7 @@ const HashtagTracker = () => {
   const [selectedPlatform, setSelectedPlatform] = useState('');
 
   // Fetch connections
-  const { data: connections, isLoading: connectionsLoading } = useQuery({
+  const { data: connections } = useQuery({
     queryKey: ['socialConnections'],
     queryFn: hashtagAPI.getConnections,
     enabled: !!user,
@@ -402,13 +401,6 @@ const HashtagTracker = () => {
 
 // Connect Modal Component
 const ConnectModal = ({ platform, onClose, onSubmit, isLoading }) => {
-  const [authData, setAuthData] = useState({});
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(authData);
-  };
-
   const getPlatformInstructions = (platform) => {
     switch (platform) {
       case 'twitter':

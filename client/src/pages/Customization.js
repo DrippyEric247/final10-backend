@@ -62,7 +62,7 @@ export default function Customization() {
   const previousEmblemUnlockedRef = useRef(null);
   const isDev = process.env.NODE_ENV !== "production";
 
-  const newItemSet = cos.newItemSet || new Set();
+  const newItemSet = useMemo(() => cos.newItemSet || new Set(), [cos.newItemSet]);
   const isNewItem = useCallback(
     (id) => newItemSet.has(id) && !seenLocal.has(id),
     [newItemSet, seenLocal]

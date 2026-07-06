@@ -6,7 +6,6 @@ import {
   TrendingUp, 
   Tag, 
   BarChart3,
-  Filter,
   Search,
   Eye,
   Edit,
@@ -14,14 +13,11 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Calendar,
   Award
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import api from '../services/authService';
 
 const AdminPromoCodeDashboard = () => {
-  const { user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
   const [promoCodes, setPromoCodes] = useState([]);
   const [commissions, setCommissions] = useState([]);
