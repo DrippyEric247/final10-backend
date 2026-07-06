@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
 import {
@@ -113,13 +113,157 @@ function resolveMoreItemIcon(item) {
   return MORE_ITEM_ICONS[item.key] || null;
 }
 
+/** Session-only persistence for the collapsed nav state (rule 11). */
+const NAV_COLLAPSE_STORAGE_KEY = 'f10_nav_collapsed';
+/** Min vertical gesture distance (px) to count as a nav swipe. */
+const NAV_SWIPE_THRESHOLD = 44;
+/** Scroll delta (px) before we react, and the top zone that always shows nav. */
+const NAV_SCROLL_DELTA = 8;
+const NAV_SCROLL_TOP_ZONE = 48;
+/** Top edge band (px) where a downward swipe pulls the nav back. */
+const NAV_TOP_EDGE_BAND = 56;
+
+function readInitialCollapsed() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(NAV_COLLAPSE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 const Navigation = () => {
   const location = useLocation();
   const [showBugReport, setShowBugReport] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [alertUnreadCount, setAlertUnreadCount] = useState(0);
+  const [collapsed, setCollapsed] = useState(readInitialCollapsed);
   const { user } = useAuth() || {};
   const showAdminNav = shouldShowAdminNav(user);
+
+  // Refs mirror state so passive scroll/touch listeners read fresh values
+  // without re-subscribing on every change.
+  const collapsedRef = useRef(collapsed);
+  const moreOpenRef = useRef(moreOpen);
+  const navTouchRef = useRef({ x: 0, y: 0, active: false });
+  useEffect(() => {
+    collapsedRef.current = collapsed;
+  }, [collapsed]);
+  useEffect(() => {
+    moreOpenRef.current = moreOpen;
+  }, [moreOpen]);
+
+  /** Single source of truth for collapse changes: logs + session persist. */
+  const applyCollapsed = useCallback((next) => {
+    setCollapsed((prev) => {
+      if (prev === next) return prev;
+      try {
+        window.sessionStorage.setItem(NAV_COLLAPSE_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore storage failures (private mode) */
+      }
+      if (next) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV_COLLAPSED]');
+        setMoreOpen(false);
+      } else {
+        // eslint-disable-next-line no-console
+        console.log('[NAV_EXPANDED]');
+      }
+      return next;
+    });
+  }, []);
+
+  // Reflect collapsed state on <html> so other chrome can react if needed.
+  useEffect(() => {
+    document.documentElement.classList.toggle('f10-nav-collapsed', collapsed);
+    return () => document.documentElement.classList.remove('f10-nav-collapsed');
+  }, [collapsed]);
+
+  // Scroll behavior: slide up when scrolling down, return when scrolling up.
+  useEffect(() => {
+    let lastY = window.scrollY || 0;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        ticking = false;
+        const y = window.scrollY || 0;
+        const dy = y - lastY;
+        lastY = y;
+        if (moreOpenRef.current) return;
+        if (y <= NAV_SCROLL_TOP_ZONE) {
+          applyCollapsed(false);
+          return;
+        }
+        if (dy > NAV_SCROLL_DELTA) applyCollapsed(true);
+        else if (dy < -NAV_SCROLL_DELTA) applyCollapsed(false);
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [applyCollapsed]);
+
+  // Swipe down from the very top edge brings the nav back when collapsed.
+  useEffect(() => {
+    const start = { x: 0, y: 0, active: false };
+    const onStart = (e) => {
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      start.active = collapsedRef.current && t.clientY <= NAV_TOP_EDGE_BAND;
+      start.x = t?.clientX || 0;
+      start.y = t?.clientY || 0;
+    };
+    const onEnd = (e) => {
+      if (!start.active) return;
+      start.active = false;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      const dy = t.clientY - start.y;
+      const dx = t.clientX - start.x;
+      if (dy > NAV_SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV_SWIPE]', 'down');
+        applyCollapsed(false);
+      }
+    };
+    window.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', onStart);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, [applyCollapsed]);
+
+  const handleNavTouchStart = useCallback((e) => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    navTouchRef.current = { x: t.clientX, y: t.clientY, active: true };
+  }, []);
+
+  const handleNavTouchEnd = useCallback(
+    (e) => {
+      if (!navTouchRef.current.active) return;
+      navTouchRef.current.active = false;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      const dy = t.clientY - navTouchRef.current.y;
+      const dx = t.clientX - navTouchRef.current.x;
+      // Only treat mostly-vertical, deliberate gestures as swipes (taps pass through).
+      if (Math.abs(dy) < NAV_SWIPE_THRESHOLD || Math.abs(dx) > Math.abs(dy)) return;
+      if (dy < 0) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV_SWIPE]', 'up');
+        applyCollapsed(true);
+      } else {
+        // eslint-disable-next-line no-console
+        console.log('[NAV_SWIPE]', 'down');
+        applyCollapsed(false);
+      }
+    },
+    [applyCollapsed]
+  );
 
   useEffect(() => {
     if (!user) {
@@ -162,6 +306,11 @@ const Navigation = () => {
     document.documentElement.classList.toggle('f10-nav-more-open', moreOpen);
     return () => document.documentElement.classList.remove('f10-nav-more-open');
   }, [moreOpen]);
+
+  // The More panel must be reachable, so opening it always expands the nav.
+  useEffect(() => {
+    if (moreOpen) applyCollapsed(false);
+  }, [moreOpen, applyCollapsed]);
 
   const profileNavItem = useMemo(
     () => ({
@@ -333,10 +482,25 @@ const Navigation = () => {
   );
 
   return (
-    <nav
-      className={`main-navigation ${moreOpen ? 'main-navigation--more-open' : ''}`}
-      aria-label="Final10 navigation"
-    >
+    <>
+      <button
+        type="button"
+        className={`f10-nav-pull-handle ${collapsed ? 'is-visible' : ''}`}
+        aria-label="Show navigation"
+        aria-hidden={!collapsed}
+        tabIndex={collapsed ? 0 : -1}
+        onClick={() => applyCollapsed(false)}
+      >
+        <span className="f10-nav-pull-handle__grabber" aria-hidden />
+        <ChevronDown size={16} strokeWidth={2.5} aria-hidden />
+      </button>
+
+      <nav
+        className={`main-navigation ${collapsed ? 'main-navigation--collapsed' : ''} ${moreOpen ? 'main-navigation--more-open' : ''}`}
+        aria-label="Final10 navigation"
+        onTouchStart={handleNavTouchStart}
+        onTouchEnd={handleNavTouchEnd}
+      >
       <div className="nav-brand-row">
         <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -412,8 +576,9 @@ const Navigation = () => {
         </div>
       ) : null}
 
-      <BugReportModal isOpen={showBugReport} onClose={() => setShowBugReport(false)} />
-    </nav>
+        <BugReportModal isOpen={showBugReport} onClose={() => setShowBugReport(false)} />
+      </nav>
+    </>
   );
 };
 

@@ -10,6 +10,96 @@
   z-index: 1200;
 }
 
+/* ---- Collapsible / swipe-dismissable nav (iPhone shade behavior) ---- */
+.main-navigation {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+/* Slides the whole nav up and out of the way; layout is unchanged when expanded. */
+.main-navigation--collapsed {
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+.main-navigation--collapsed .nav-more-panel {
+  display: none;
+}
+
+/* Small pull-down handle shown only while collapsed. */
+.f10-nav-pull-handle {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -140%);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 18px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  background: rgba(0, 0, 0, 0.9);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  padding-top: max(5px, env(safe-area-inset-top));
+}
+.f10-nav-pull-handle.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.f10-nav-pull-handle__grabber {
+  width: 34px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.f10-nav-pull-handle svg {
+  display: block;
+  animation: f10NavHandleBob 1.8s ease-in-out infinite;
+}
+
+@keyframes f10NavHandleBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+
+/* Slide the thin login/logout header away with the tab nav so content is
+   actually revealed (both are pinned at the top). Layout is untouched when
+   expanded — only a transform is applied while collapsed. */
+.app-auth-header {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+html.f10-nav-collapsed .app-auth-header {
+  transform: translateY(-100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-navigation,
+  .f10-nav-pull-handle,
+  .app-auth-header {
+    transition-duration: 140ms;
+  }
+  .f10-nav-pull-handle svg {
+    animation: none;
+  }
+}
+
 .nav-brand-row {
   display: flex;
   align-items: center;
