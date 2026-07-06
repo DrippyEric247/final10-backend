@@ -6,6 +6,9 @@ import {
   spinPerkMachine,
   hatchPerkEgg,
   activatePerkItem,
+  activatePerkEventToken,
+  activateMaxSupplyDropToken,
+  redeemBattlePassTierSkip,
   checkPerkMachineAdminAccess,
 } from '../lib/api';
 import { SAVVY_AUTH_REFRESH_REQUEST, useSavvyPoints } from '../store/savvyStore';
@@ -26,6 +29,7 @@ import PerkRewardReveal from '../components/perk/PerkRewardReveal';
 import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
 import { pickHeroReveal } from '../lib/rewardRevealThemes';
 import { isFirstRevealOfKey, markRevealKeySeen } from '../lib/perkRevealSeen';
+import { setPermanentPowerBonus } from '../lib/final10PowerEngine';
 import {
   playPerkLegendaryRewardSound,
   playPerkMachineSpinSound,
@@ -144,6 +148,115 @@ function EggInventoryPanel({ inventory, pulseTier }) {
             <span className="perk-egg-row__count">×{Number(inventory?.[row.key]) || 0}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function formatRemaining(ms) {
+  const total = Math.max(0, Math.round(Number(ms) / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m left`;
+  }
+  return `${m}m ${String(s).padStart(2, '0')}s left`;
+}
+
+/** Panel for hatch-earned usable rewards: timed tokens, supply drops, tier skips. */
+function HatchRewardsInventory({ status, onActivateEvent, onMaxSupplyDrop, onTierSkip, busy }) {
+  const tokens = status?.tokens || {};
+  const timedTokens = Array.isArray(status?.timedEventTokens) ? status.timedEventTokens : [];
+  const activeEvents = Array.isArray(status?.personalEvents) ? status.personalEvents : [];
+  const maxSupplyDrop = Number(tokens.maxSupplyDrop) || 0;
+  const tierSkips = Number(tokens.battlePassTierSkip) || 0;
+  const twoSlotSpins = Number(tokens.paid2Spin) || 0;
+  const guaranteed = Number(status?.nextSpinGuaranteedMultiplier) || 0;
+
+  const hasAnything =
+    timedTokens.length > 0 ||
+    activeEvents.length > 0 ||
+    maxSupplyDrop > 0 ||
+    tierSkips > 0 ||
+    twoSlotSpins > 0 ||
+    guaranteed > 0;
+
+  if (!hasAnything) return null;
+
+  return (
+    <div className="perk-hatch-inv">
+      <div className="perk-hatch-inv__title">🎁 Reward Inventory</div>
+
+      {guaranteed > 0 ? (
+        <div className="perk-hatch-inv__note">
+          ⭐ Guaranteed {guaranteed}× is armed for your next spin.
+        </div>
+      ) : null}
+      {twoSlotSpins > 0 ? (
+        <div className="perk-hatch-inv__note">
+          🎰 {twoSlotSpins} free two-slot spin{twoSlotSpins === 1 ? '' : 's'} — used automatically on 2-slot spins.
+        </div>
+      ) : null}
+
+      {activeEvents.length > 0 ? (
+        <div className="perk-hatch-inv__active">
+          {activeEvents.map((e) => (
+            <span key={e.kind} className="perk-hatch-inv__active-pill">
+              {e.icon} {e.label} · {formatRemaining(e.remainingMs)}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="perk-hatch-inv__grid">
+        {timedTokens.map((t) => (
+          <div key={t.id} className="perk-hatch-inv__item">
+            <span className="perk-hatch-inv__item-icon" aria-hidden>{t.icon}</span>
+            <span className="perk-hatch-inv__item-label">{t.label}</span>
+            <button
+              type="button"
+              className="perk-hatch-inv__use"
+              disabled={busy}
+              onClick={() => void onActivateEvent(t.id)}
+            >
+              Activate
+            </button>
+          </div>
+        ))}
+
+        {maxSupplyDrop > 0 ? (
+          <div className="perk-hatch-inv__item">
+            <span className="perk-hatch-inv__item-icon" aria-hidden>📦</span>
+            <span className="perk-hatch-inv__item-label">
+              Max Supply Drop Token ×{maxSupplyDrop}
+              {status?.nextSupplyDropDouble ? ' (next pays double)' : ''}
+            </span>
+            <button
+              type="button"
+              className="perk-hatch-inv__use"
+              disabled={busy}
+              onClick={() => void onMaxSupplyDrop()}
+            >
+              Deploy
+            </button>
+          </div>
+        ) : null}
+
+        {tierSkips > 0 ? (
+          <div className="perk-hatch-inv__item">
+            <span className="perk-hatch-inv__item-icon" aria-hidden>⏭️</span>
+            <span className="perk-hatch-inv__item-label">Battle Pass Tier Skip ×{tierSkips}</span>
+            <button
+              type="button"
+              className="perk-hatch-inv__use"
+              disabled={busy}
+              onClick={() => void onTierSkip()}
+            >
+              Skip Tier
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -305,6 +418,9 @@ export default function PerkMachine() {
     try {
       const data = await getPerkMachineStatus();
       setStatus(data);
+      if (data && typeof data.powerMultiplierBonus === 'number') {
+        setPermanentPowerBonus(data.powerMultiplierBonus);
+      }
       setError('');
       return data;
     } catch (e) {
@@ -574,10 +690,33 @@ export default function PerkMachine() {
       const balanceBefore = savvyBalance;
       const result = await hatchPerkEgg(eggTier);
       if (result?.status) setStatus(result.status);
-      const savvyGranted = Number(result?.reward?.savvyGranted) || 0;
+      const reward = result?.reward || {};
+      const savvyGranted = Number(reward.savvyGranted) || 0;
       if (savvyGranted > 0) {
         fireCoinBurst();
         showConfirm(`+${savvyGranted.toLocaleString()} Savvy added to wallet`);
+      }
+
+      // Permanent top-bar multiplier → reflect immediately.
+      if (
+        reward.type === 'permanent_multiplier' &&
+        typeof result?.status?.powerMultiplierBonus === 'number'
+      ) {
+        setPermanentPowerBonus(result.status.powerMultiplierBonus);
+      }
+
+      // Calling card → full unlock ceremony (shows the actual card name).
+      if (reward.type === 'calling_card' && reward.callingCardId) {
+        if (typeof cosmetics?.reload === 'function') void cosmetics.reload();
+        window.setTimeout(() => {
+          showCallingCardUnlock({
+            cardId: reward.callingCardId,
+            trigger: 'egg_hatch',
+            duplicate: Boolean(reward.callingCardDuplicate),
+            duplicateSavvy: Number(reward.duplicateSavvy) || 0,
+            unlockReason: reward.callingCardDuplicate ? '' : reward.callingCardTagline || '',
+          });
+        }, 500);
       }
 
       const nextBalance = Math.round(
@@ -602,7 +741,7 @@ export default function PerkMachine() {
       }
       return result;
     },
-    [refreshProfile, patchUser, user, savvyBalance, fireCoinBurst, showConfirm]
+    [refreshProfile, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, cosmetics]
   );
 
   const handleActivate = useCallback(
@@ -634,6 +773,70 @@ export default function PerkMachine() {
   const handleHatchStatusUpdate = useCallback((nextStatus) => {
     if (nextStatus) setStatus(nextStatus);
   }, []);
+
+  const applyUseResult = useCallback(
+    (result) => {
+      if (result?.status) {
+        setStatus(result.status);
+        if (typeof result.status.powerMultiplierBonus === 'number') {
+          setPermanentPowerBonus(result.status.powerMultiplierBonus);
+        }
+      }
+      if (typeof result?.savvyBalance === 'number' && typeof patchUser === 'function') {
+        patchUser({
+          savvyPointsServerBase: result.savvyBalance,
+          savvyPoints: result.savvyBalance,
+        });
+      }
+      window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+    },
+    [patchUser]
+  );
+
+  const handleActivateEvent = useCallback(
+    async (tokenId) => {
+      if (activating) return;
+      setActivating(true);
+      try {
+        const result = await activatePerkEventToken(tokenId);
+        applyUseResult(result);
+        showConfirm(result?.message || 'Event activated');
+      } catch (e) {
+        showConfirm(e?.response?.data?.message || e?.message || 'Activation failed.', 'error');
+      } finally {
+        setActivating(false);
+      }
+    },
+    [activating, applyUseResult, showConfirm]
+  );
+
+  const handleMaxSupplyDrop = useCallback(async () => {
+    if (activating) return;
+    setActivating(true);
+    try {
+      const result = await activateMaxSupplyDropToken();
+      applyUseResult(result);
+      showConfirm(result?.message || 'Max Supply Drop deployed');
+    } catch (e) {
+      showConfirm(e?.response?.data?.message || e?.message || 'Activation failed.', 'error');
+    } finally {
+      setActivating(false);
+    }
+  }, [activating, applyUseResult, showConfirm]);
+
+  const handleTierSkip = useCallback(async () => {
+    if (activating) return;
+    setActivating(true);
+    try {
+      const result = await redeemBattlePassTierSkip();
+      applyUseResult(result);
+      showConfirm(result?.message || 'Battle Pass tier skipped');
+    } catch (e) {
+      showConfirm(e?.response?.data?.message || e?.message || 'Tier skip failed.', 'error');
+    } finally {
+      setActivating(false);
+    }
+  }, [activating, applyUseResult, showConfirm]);
 
   const scrollToMachine = useCallback(() => {
     machinePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1029,6 +1232,14 @@ export default function PerkMachine() {
         onHatch={handleHatch}
         onStatusUpdate={handleHatchStatusUpdate}
         onSpinClick={scrollToMachine}
+      />
+
+      <HatchRewardsInventory
+        status={status}
+        onActivateEvent={handleActivateEvent}
+        onMaxSupplyDrop={handleMaxSupplyDrop}
+        onTierSkip={handleTierSkip}
+        busy={activating}
       />
 
       {showAdmin ? (

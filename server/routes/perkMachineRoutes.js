@@ -4,8 +4,15 @@ const User = require('../models/User');
 const { requireAdminAccess } = require('../middleware/requireRole');
 const { HttpError } = require('../middleware/apiErrors');
 const { perkMachineSpinLimiter } = require('../middleware/rateLimits');
-const { getPerkMachineStatus, getPerkMachineStatusWithEvents, spinPerkMachine, hatchEgg } = require('../services/perkMachineService');
-const { activatePerkItem } = require('../services/perkBoostService');
+const {
+  getPerkMachineStatus,
+  getPerkMachineStatusWithEvents,
+  spinPerkMachine,
+  hatchEgg,
+  useBattlePassTierSkip,
+} = require('../services/perkMachineService');
+const { activatePerkItem, activatePersonalEventToken } = require('../services/perkBoostService');
+const { activateMaxSupplyDrop } = require('../services/supplyDropService');
 const {
   adminResetFreeSpin,
   adminGrantSavvy,
@@ -127,6 +134,77 @@ router.post('/activate', auth, async (req, res, next) => {
       return res.status(err.status).json({ message: err.message, code: err.code });
     }
     console.error('[perk-machine/activate]', err);
+    next(err);
+  }
+});
+
+/** Activate a personal timed-event token (Double XP / Savvy Sale) by id. */
+router.post('/activate-event', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+
+    const tokenId = String(req.body?.tokenId || '').trim();
+    const result = activatePersonalEventToken(user, tokenId);
+    await user.save();
+
+    res.json({
+      activated: true,
+      item: result.item,
+      event: result.event,
+      message: `${result.item.label} activated.`,
+      status: getPerkMachineStatus(user),
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
+    console.error('[perk-machine/activate-event]', err);
+    next(err);
+  }
+});
+
+/** Spend a Max Supply Drop token to spawn a claimable drop (double if flagged). */
+router.post('/max-supply-drop', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+
+    const result = await activateMaxSupplyDrop(user);
+    res.json({
+      activated: true,
+      drop: result.drop,
+      doubleValue: result.doubleValue,
+      message: result.doubleValue
+        ? 'Max Supply Drop deployed — double value!'
+        : 'Max Supply Drop deployed.',
+      savvyBalance: result.savvyBalance,
+      status: result.perkMachine,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
+    console.error('[perk-machine/max-supply-drop]', err);
+    next(err);
+  }
+});
+
+/** Spend a Battle Pass Tier Skip token to advance one tier. */
+router.post('/tier-skip', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+
+    const result = await useBattlePassTierSkip(user);
+    res.json({
+      skipped: true,
+      fromTier: result.fromTier,
+      toTier: result.toTier,
+      xpGranted: result.xpGranted,
+      message: `Skipped to Battle Pass tier ${result.toTier}.`,
+      savvyBalance: result.savvyBalance,
+      status: result.status,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
+    console.error('[perk-machine/tier-skip]', err);
     next(err);
   }
 });

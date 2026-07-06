@@ -2,6 +2,38 @@ import { POWER, POWER_TIERS } from "./final10PowerConfig";
 
 const STORAGE_KEY = "final10_power_v1";
 const BP_POWER_LINT_KEY = "f10_bp_power_lint";
+/** Permanent top-bar multiplier bonus (server-authoritative, mirrored locally). */
+const PERM_POWER_BONUS_KEY = "f10_perm_power_bonus";
+
+/** Read the permanent multiplier bonus earned from egg hatches. */
+export function getPermanentPowerBonus() {
+  try {
+    const n = Number(localStorage.getItem(PERM_POWER_BONUS_KEY));
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.min(5, n);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Set/sync the permanent multiplier bonus from the server value and refresh
+ * the visible bar immediately. Returns true if the stored value changed.
+ */
+export function setPermanentPowerBonus(value) {
+  const next = Number.isFinite(Number(value)) ? Math.max(0, Math.min(5, Number(value))) : 0;
+  try {
+    const prev = getPermanentPowerBonus();
+    localStorage.setItem(PERM_POWER_BONUS_KEY, String(next));
+    if (Math.abs(prev - next) > 1e-9) {
+      emit();
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
 
 function battlePassPowerLint() {
   try {
@@ -204,6 +236,7 @@ export function getPowerSnapshot() {
 
   const base = 1;
   const bpLint = battlePassPowerLint();
+  const permanentBonus = getPermanentPowerBonus();
   const totalUncapped =
     base +
     activityBoost +
@@ -211,7 +244,8 @@ export function getPowerSnapshot() {
     skillBoost +
     promoBoost +
     syncBoost +
-    bpLint;
+    bpLint +
+    permanentBonus;
   const currentMultiplier = clamp(totalUncapped, base, POWER.MAX_MULTIPLIER);
 
   const tier = resolveTier(currentMultiplier);
@@ -234,6 +268,7 @@ export function getPowerSnapshot() {
     skillBoost,
     promoBoost,
     syncBoost,
+    permanentBonus,
     loginStreakDays: raw.loginStreakDays || 0,
     momentumHint: momentumMessage(raw),
   };

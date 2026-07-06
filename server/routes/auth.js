@@ -139,6 +139,7 @@ function serializeAuthMePayload(user) {
       legendary: 0,
     },
     powerMultiplier: user.powerMultiplier ?? 1,
+    powerMultiplierBonus: user.powerMultiplierBonus ?? 0,
     equippedCosmetics: user.equippedCosmetics || {
       emblemId: 'sigil_starter',
       callingCardId: 'card_default',

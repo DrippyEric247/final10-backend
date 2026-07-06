@@ -13,6 +13,7 @@ import { hydrateMembershipFromApi } from "../lib/membershipSync";
 import { parseApiError, userSafeErrorMessage } from "../lib/apiErrorParsing";
 import { getDevSavvyPointsOffset, isDev, FINAL10_DEV_OVERRIDE_EVENT } from "../lib/devOverride";
 import { getEquippedCallingCardId, getEquippedEmblemId } from "../lib/customizationCatalog";
+import { setPermanentPowerBonus } from "../lib/final10PowerEngine";
 
 /** Default shape so TS/JS consumers never destructure off `null` when Provider wraps the app. */
 const defaultAuthValue = {
@@ -113,6 +114,15 @@ export function AuthProvider({ children }) {
     window.addEventListener(FINAL10_DEV_OVERRIDE_EVENT, refreshPts);
     return () => window.removeEventListener(FINAL10_DEV_OVERRIDE_EVENT, refreshPts);
   }, [withLoadout]);
+
+  // Keep the app-wide top multiplier bar in sync with the server-authoritative
+  // permanent bonus so egg-hatch multiplier gains persist across refresh/login.
+  const powerMultiplierBonus = user?.powerMultiplierBonus;
+  useEffect(() => {
+    if (typeof powerMultiplierBonus === "number") {
+      setPermanentPowerBonus(powerMultiplierBonus);
+    }
+  }, [powerMultiplierBonus]);
 
   // Load token on mount + fetch user
   useEffect(() => {

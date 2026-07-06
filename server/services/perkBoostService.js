@@ -60,8 +60,119 @@ function getSavvyMultiplier(user) {
   return isBoostActive(user, 'savvyMultiplier15') ? ACTIVATABLE_ITEMS.savvyMultiplier15.multiplier : 1;
 }
 
+/** Labels + icons for personal timed events (activated from egg-hatch tokens). */
+const PERSONAL_EVENTS = Object.freeze({
+  doubleXp: { kind: 'doubleXp', label: 'Double XP', icon: '⚡', xpMultiplier: 2 },
+  savvySale: { kind: 'savvySale', label: 'Savvy Sale', icon: '🏷️' },
+});
+
+function isPersonalEventActive(user, kind) {
+  const e = user?.perkMachine?.personalEvents?.[kind];
+  if (!e || !e.expiresAt) return false;
+  return new Date(e.expiresAt).getTime() > Date.now();
+}
+
 function getBpXpMultiplier(user) {
-  return isBoostActive(user, 'battlePassXp15') ? ACTIVATABLE_ITEMS.battlePassXp15.multiplier : 1;
+  let mult = 1;
+  if (isBoostActive(user, 'battlePassXp15')) {
+    mult = Math.max(mult, ACTIVATABLE_ITEMS.battlePassXp15.multiplier);
+  }
+  if (isPersonalEventActive(user, 'doubleXp')) {
+    mult = Math.max(mult, PERSONAL_EVENTS.doubleXp.xpMultiplier);
+  }
+  return mult;
+}
+
+function formatDurationLabel(ms) {
+  const totalMin = Math.round((Number(ms) || 0) / 60000);
+  if (totalMin >= 60) {
+    const hours = Math.round(totalMin / 60);
+    return `${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+  return `${totalMin} min`;
+}
+
+/** Owned (not-yet-activated) personal timed event tokens. */
+function serializeTimedEventTokens(user) {
+  const list = Array.isArray(user?.perkMachine?.timedEventTokens)
+    ? user.perkMachine.timedEventTokens
+    : [];
+  return list.map((t) => ({
+    id: t.id,
+    kind: t.kind,
+    label: t.label || PERSONAL_EVENTS[t.kind]?.label || 'Event Token',
+    icon: t.icon || PERSONAL_EVENTS[t.kind]?.icon || '⏱️',
+    durationMs: Number(t.durationMs) || 0,
+    durationLabel: formatDurationLabel(t.durationMs),
+  }));
+}
+
+/** Currently-running personal timed events. */
+function serializePersonalEvents(user) {
+  const events = user?.perkMachine?.personalEvents || {};
+  const now = Date.now();
+  const out = [];
+  for (const [kind, val] of Object.entries(events)) {
+    if (!val?.expiresAt) continue;
+    const remainingMs = new Date(val.expiresAt).getTime() - now;
+    if (remainingMs <= 0) continue;
+    const def = PERSONAL_EVENTS[kind] || { label: kind, icon: '⏱️' };
+    out.push({
+      kind,
+      label: def.label,
+      icon: def.icon,
+      activatedAt: val.activatedAt || null,
+      expiresAt: val.expiresAt,
+      remainingMs,
+    });
+  }
+  return out.sort((a, b) => a.remainingMs - b.remainingMs);
+}
+
+/**
+ * Activate a personal timed-event token by id. Consumes the token and starts
+ * (or extends) the matching personal event window.
+ */
+function activatePersonalEventToken(user, tokenId) {
+  const pm = ensureBoostDoc(user);
+  if (!Array.isArray(pm.timedEventTokens)) pm.timedEventTokens = [];
+  const idx = pm.timedEventTokens.findIndex((t) => String(t.id) === String(tokenId));
+  if (idx === -1) {
+    const err = new Error('That event token is not in your inventory.');
+    err.status = 400;
+    err.code = 'NO_TOKEN';
+    throw err;
+  }
+  const token = pm.timedEventTokens[idx];
+  const kind = token.kind;
+  const durationMs = Number(token.durationMs) || 0;
+  pm.timedEventTokens.splice(idx, 1);
+
+  if (!pm.personalEvents || typeof pm.personalEvents !== 'object') pm.personalEvents = {};
+  const now = Date.now();
+  const existing = pm.personalEvents[kind];
+  const base =
+    existing && new Date(existing.expiresAt).getTime() > now
+      ? new Date(existing.expiresAt).getTime()
+      : now;
+  pm.personalEvents[kind] = {
+    activatedAt: existing?.activatedAt ? existing.activatedAt : new Date(now),
+    expiresAt: new Date(base + durationMs),
+  };
+  user.markModified('perkMachine');
+
+  const def = PERSONAL_EVENTS[kind] || { label: token.label || kind, icon: token.icon || '⏱️' };
+  return {
+    activated: true,
+    item: { key: kind, label: token.label || def.label, icon: token.icon || def.icon },
+    event: {
+      kind,
+      label: def.label,
+      icon: def.icon,
+      expiresAt: pm.personalEvents[kind].expiresAt,
+    },
+    user,
+  };
 }
 
 /** Serialize currently active timed boosts (for the Active Boosts panel). */
@@ -165,9 +276,14 @@ function activatePerkItem(user, itemKey) {
 module.exports = {
   BOOST_DURATION_MS,
   ACTIVATABLE_ITEMS,
+  PERSONAL_EVENTS,
   isBoostActive,
+  isPersonalEventActive,
   getSavvyMultiplier,
   getBpXpMultiplier,
   serializeActiveBoosts,
+  serializeTimedEventTokens,
+  serializePersonalEvents,
   activatePerkItem,
+  activatePersonalEventToken,
 };

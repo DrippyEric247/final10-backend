@@ -1458,3 +1458,73 @@
   color: #fff;
 }
 .perk-activate-modal__actions button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ---- Hatch reward inventory (timed tokens, supply drops, tier skips) ---- */
+.perk-hatch-inv {
+  max-width: 900px;
+  margin: 1.25rem auto 0;
+  padding: 1rem 1.1rem 1.15rem;
+  border-radius: 18px;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  background: linear-gradient(180deg, rgba(24, 16, 40, 0.9), rgba(12, 10, 22, 0.9));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.perk-hatch-inv__title {
+  font-weight: 900;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
+  margin-bottom: 0.6rem;
+}
+.perk-hatch-inv__note {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  margin: 0.2rem 0;
+}
+.perk-hatch-inv__active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.7rem;
+}
+.perk-hatch-inv__active-pill {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  color: #fde68a;
+  background: rgba(245, 185, 66, 0.12);
+  border: 1px solid rgba(245, 185, 66, 0.35);
+}
+.perk-hatch-inv__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.6rem;
+}
+.perk-hatch-inv__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.55);
+}
+.perk-hatch-inv__item-icon { font-size: 1.25rem; }
+.perk-hatch-inv__item-label {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.perk-hatch-inv__use {
+  padding: 0.4rem 0.75rem;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: linear-gradient(90deg, #7c3aed, #6d28d9);
+  color: #fff;
+}
+.perk-hatch-inv__use:disabled { opacity: 0.6; cursor: not-allowed; }

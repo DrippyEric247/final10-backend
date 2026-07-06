@@ -375,6 +375,21 @@ export async function activatePerkItem(itemKey) {
   return data;
 }
 
+export async function activatePerkEventToken(tokenId) {
+  const { data } = await api.post("/perk-machine/activate-event", { tokenId });
+  return data;
+}
+
+export async function activateMaxSupplyDropToken() {
+  const { data } = await api.post("/perk-machine/max-supply-drop");
+  return data;
+}
+
+export async function redeemBattlePassTierSkip() {
+  const { data } = await api.post("/perk-machine/tier-skip");
+  return data;
+}
+
 export async function checkPerkMachineAdminAccess() {
   const { data } = await api.get("/perk-machine/admin/ping");
   return data;

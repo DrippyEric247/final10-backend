@@ -91,9 +91,37 @@ const userSchema = new mongoose.Schema({
     tokens: {
       battlePassXp15: { type: Number, default: 0 },
       savvyMultiplier15: { type: Number, default: 0 },
+      /** Free 3-slot spin token (from supply drops). */
+      paid3Spin: { type: Number, default: 0 },
+      /** Free 2-slot spin tokens (from Epic egg hatches). */
+      paid2Spin: { type: Number, default: 0 },
+      /** Max Supply Drop activation tokens. */
+      maxSupplyDrop: { type: Number, default: 0 },
+      /** Battle Pass tier skip tokens. */
+      battlePassTierSkip: { type: Number, default: 0 },
     },
     /** Timed boosts activated from inventory tokens: { [key]: { activatedAt, expiresAt } } */
     activeBoosts: { type: mongoose.Schema.Types.Mixed, default: {} },
+    /** Guaranteed multiplier applied to the NEXT perk machine spin only (0 = none). */
+    nextSpinGuaranteedMultiplier: { type: Number, default: 0 },
+    /** When true, the next Max Supply Drop activation pays double. */
+    nextSupplyDropDouble: { type: Boolean, default: false },
+    /** Personal timed-event tokens the player owns but has not activated yet. */
+    timedEventTokens: {
+      type: [
+        {
+          id: String,
+          kind: String, // 'doubleXp' | 'savvySale'
+          label: String,
+          icon: String,
+          durationMs: Number,
+          acquiredAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    /** Active personal timed events: { [kind]: { activatedAt, expiresAt } } */
+    personalEvents: { type: mongoose.Schema.Types.Mixed, default: {} },
     callingCardDrops: { type: Number, default: 0 },
     spinHistory: {
       type: [
@@ -180,6 +208,9 @@ const userSchema = new mongoose.Schema({
     },
   ],
   lastActive: Date,
+
+  /** Permanent bonus added to the app-wide top multiplier bar (from egg hatches). */
+  powerMultiplierBonus: { type: Number, default: 0 },
 
   // ---- referrals ----
   referralCode: { type: String, unique: true },                 // the code they share (we set to their _id as string)

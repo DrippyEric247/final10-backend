@@ -184,9 +184,21 @@ export default function EggHatchModal({ tier, onHatch, onClose, onStatusUpdate }
                 {fx.label}
               </span>
               <span className="hatch-reward__icon">{reward.icon || '🎁'}</span>
-              <span className="hatch-reward__label">{reward.label}</span>
-              {reward.savvyGranted ? (
+              <span className="hatch-reward__label">
+                {reward.callingCardName || reward.label}
+              </span>
+              {reward.callingCardName && reward.callingCardTagline ? (
+                <span className="hatch-reward__sub">{reward.callingCardTagline}</span>
+              ) : reward.callingCardDuplicate && reward.duplicateSavvy ? (
+                <span className="hatch-reward__sub">Duplicate → +{reward.duplicateSavvy} Savvy</span>
+              ) : reward.savvyGranted ? (
                 <span className="hatch-reward__sub">+{reward.savvyGranted} Savvy added</span>
+              ) : reward.type === 'permanent_multiplier' && reward.permanentBonus ? (
+                <span className="hatch-reward__sub">Top multiplier boosted permanently</span>
+              ) : reward.type === 'guaranteed_multiplier' && reward.guaranteedMultiplier ? (
+                <span className="hatch-reward__sub">Applies to your next spin</span>
+              ) : reward.durationMs ? (
+                <span className="hatch-reward__sub">Ready to activate from inventory</span>
               ) : null}
             </div>
           </div>

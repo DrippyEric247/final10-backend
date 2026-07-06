@@ -6,7 +6,15 @@ const crypto = require('crypto');
 const { utcDayKey } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { grantSavvyReward, spendSavvyReward } = require('./savvyRewardService');
-const { getSavvyMultiplier, serializeActiveBoosts } = require('./perkBoostService');
+const {
+  getSavvyMultiplier,
+  serializeActiveBoosts,
+  serializeTimedEventTokens,
+  serializePersonalEvents,
+  isPersonalEventActive,
+} = require('./perkBoostService');
+const { applySavvySaleDiscountPercent } = require('../config/savvySaleConfig');
+const { buildEggHatchPool } = require('../config/eggHatchRewards');
 const { getActiveSavvySale, resolveSavvySaleSpinPricing } = require('./savvySaleService');
 const {
   acquirePerkSpinLock,
@@ -22,7 +30,6 @@ const {
   MAX_HISTORY,
   getSpinConfig,
   buildWeightedPool,
-  buildHatchPool,
   HATCHABLE_EGG_TIERS,
   pickWeightedReward,
   pickResultMessage,
@@ -59,9 +66,16 @@ function ensurePerkMachineDoc(user) {
     pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0, paid3Spin: 0 };
   }
   if (typeof pm.tokens.paid3Spin !== 'number') pm.tokens.paid3Spin = 0;
+  if (typeof pm.tokens.paid2Spin !== 'number') pm.tokens.paid2Spin = 0;
+  if (typeof pm.tokens.maxSupplyDrop !== 'number') pm.tokens.maxSupplyDrop = 0;
+  if (typeof pm.tokens.battlePassTierSkip !== 'number') pm.tokens.battlePassTierSkip = 0;
   if (typeof pm.callingCardDrops !== 'number') pm.callingCardDrops = 0;
   if (typeof pm.scoutUpgrades !== 'number') pm.scoutUpgrades = 0;
   if (typeof pm.ticketSpinProgress !== 'number') pm.ticketSpinProgress = 0;
+  if (typeof pm.nextSpinGuaranteedMultiplier !== 'number') pm.nextSpinGuaranteedMultiplier = 0;
+  if (typeof pm.nextSupplyDropDouble !== 'boolean') pm.nextSupplyDropDouble = false;
+  if (!Array.isArray(pm.timedEventTokens)) pm.timedEventTokens = [];
+  if (!pm.personalEvents || typeof pm.personalEvents !== 'object') pm.personalEvents = {};
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
   return pm;
 }
@@ -156,10 +170,18 @@ function getPerkMachineStatus(user) {
       battlePassXp15: Number(pm.tokens?.battlePassXp15) || 0,
       savvyMultiplier15: Number(pm.tokens?.savvyMultiplier15) || 0,
       paid3Spin: Number(pm.tokens?.paid3Spin) || 0,
+      paid2Spin: Number(pm.tokens?.paid2Spin) || 0,
+      maxSupplyDrop: Number(pm.tokens?.maxSupplyDrop) || 0,
+      battlePassTierSkip: Number(pm.tokens?.battlePassTierSkip) || 0,
     },
     streakShields: Number(user.dailyStreak?.scoutShields) || 0,
     callingCardDrops: Number(pm.callingCardDrops) || 0,
     scoutUpgrades: Number(pm.scoutUpgrades) || 0,
+    nextSpinGuaranteedMultiplier: Number(pm.nextSpinGuaranteedMultiplier) || 0,
+    nextSupplyDropDouble: Boolean(pm.nextSupplyDropDouble),
+    powerMultiplierBonus: Math.round((Number(user.powerMultiplierBonus) || 0) * 100) / 100,
+    timedEventTokens: serializeTimedEventTokens(user),
+    personalEvents: serializePersonalEvents(user),
     activeBoosts: serializeActiveBoosts(user),
     recentSpins: serializeHistory(pm).slice(0, 10),
     tournamentTicketProgress: buildTournamentTicketProgress(user, pm),
@@ -210,6 +232,10 @@ function rewardToPayload(rewardDef) {
     baseAmount: rewardDef.baseAmount || null,
     spinMultiplier: rewardDef.spinMultiplier || null,
     tooltip: rewardDef.tooltip || null,
+    multiplierValue: rewardDef.multiplierValue || null,
+    eventKind: rewardDef.eventKind || null,
+    durationMs: rewardDef.durationMs || null,
+    permanentBonus: rewardDef.permanentBonus || null,
   };
 }
 
@@ -318,6 +344,44 @@ async function applyReward(user, rewardDef, spinId) {
     granted.ticketsGranted = qty;
     if (qty > 1) granted.spinMultiplierApplied = qty;
     user.markModified('eventInventory');
+  } else if (rewardDef.type === 'guaranteed_multiplier') {
+    // Applies to the user's NEXT perk machine spin only (consumed on spin).
+    const value = Math.max(2, Number(rewardDef.multiplierValue) || 2);
+    pm.nextSpinGuaranteedMultiplier = value;
+    granted.guaranteedMultiplier = value;
+  } else if (rewardDef.type === 'permanent_multiplier') {
+    const bonus = Number(rewardDef.permanentBonus) || 0;
+    user.powerMultiplierBonus =
+      Math.round(((Number(user.powerMultiplierBonus) || 0) + bonus) * 100) / 100;
+    granted.permanentBonus = bonus;
+    granted.powerMultiplierBonus = user.powerMultiplierBonus;
+  } else if (rewardDef.type === 'timed_event_token') {
+    const token = {
+      id: crypto.randomUUID(),
+      kind: rewardDef.eventKind,
+      label: rewardDef.label,
+      icon: rewardDef.icon || (rewardDef.eventKind === 'savvySale' ? '🏷️' : '⚡'),
+      durationMs: Number(rewardDef.durationMs) || 0,
+      acquiredAt: new Date(),
+    };
+    pm.timedEventTokens.push(token);
+    granted.timedTokenId = token.id;
+    granted.eventKind = token.kind;
+    granted.durationMs = token.durationMs;
+  } else if (rewardDef.type === 'supply_drop_token') {
+    pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + qty;
+    granted.supplyDropTokensGranted = qty;
+  } else if (rewardDef.type === 'supply_drop_double') {
+    pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + 1;
+    pm.nextSupplyDropDouble = true;
+    granted.supplyDropTokensGranted = 1;
+    granted.nextSupplyDropDouble = true;
+  } else if (rewardDef.type === 'spin_token_2slot') {
+    pm.tokens.paid2Spin = Number(pm.tokens.paid2Spin || 0) + qty;
+    granted.spinTokensGranted = qty;
+  } else if (rewardDef.type === 'bp_tier_skip') {
+    pm.tokens.battlePassTierSkip = Number(pm.tokens.battlePassTierSkip || 0) + qty;
+    granted.tierSkipsGranted = qty;
   } else if (rewardDef.type === 'supply_drop') {
     const drop = await createSupplyDrop({
       scope: 'user',
@@ -369,6 +433,7 @@ async function spinPerkMachine(user, options = {}) {
     let savvySaleApplied = false;
     let savvySaleSavings = 0;
     let usedPaid3Token = false;
+    let usedPaid2Token = false;
     let usedExtraFreeSpin = false;
 
     const savvySale = await getActiveSavvySale();
@@ -394,6 +459,25 @@ async function spinPerkMachine(user, options = {}) {
         usedPaid3Token = true;
         savvySaleApplied = false;
         savvySaleSavings = 0;
+      } else if (mode === SPIN_MODES.PAID_2 && Number(pmTokens.paid2Spin) > 0 && !options.adminBypassCost) {
+        pm.tokens.paid2Spin = Number(pm.tokens.paid2Spin) - 1;
+        savvyCost = 0;
+        originalSavvyCost = config.savvy;
+        usedPaid2Token = true;
+        savvySaleApplied = false;
+        savvySaleSavings = 0;
+      } else if (
+        mode !== SPIN_MODES.FREE &&
+        isPersonalEventActive(user, 'savvySale') &&
+        !savvySaleApplied &&
+        !options.adminBypassCost
+      ) {
+        // Personal Savvy Sale token active → discount this spin.
+        const discounted = applySavvySaleDiscountPercent(config.savvy);
+        savvyCost = discounted;
+        originalSavvyCost = config.savvy;
+        savvySaleApplied = true;
+        savvySaleSavings = config.savvy - discounted;
       }
 
       const balance = Math.round(Number(user.savvyPoints) || 0);
@@ -454,7 +538,17 @@ async function spinPerkMachine(user, options = {}) {
     }
 
     const multiplierCount = countMultiplierTiles(rawPicks);
-    const { factor: multiplierFactor, isJackpot } = computeSpinMultiplier(multiplierCount);
+    const tileResult = computeSpinMultiplier(multiplierCount);
+    const isJackpot = tileResult.isJackpot;
+    // Guaranteed Nx from an egg hatch applies to THIS spin only, then clears.
+    const guaranteedMultiplier = Number(pm.nextSpinGuaranteedMultiplier) || 0;
+    let multiplierFactor = tileResult.factor;
+    let usedGuaranteedMultiplier = 0;
+    if (guaranteedMultiplier > 1) {
+      multiplierFactor = Math.max(multiplierFactor, guaranteedMultiplier);
+      usedGuaranteedMultiplier = guaranteedMultiplier;
+      pm.nextSpinGuaranteedMultiplier = 0;
+    }
     const rewards = [];
     let grantIndex = 0;
 
@@ -514,6 +608,8 @@ async function spinPerkMachine(user, options = {}) {
     let resultMessage = pickResultMessage(topRarity);
     if (isJackpot) {
       resultMessage = '8× JACKPOT! Every reward just multiplied to the max!';
+    } else if (usedGuaranteedMultiplier > 1) {
+      resultMessage = `Guaranteed ${usedGuaranteedMultiplier}× applied — every reward multiplied!`;
     } else if (multiplierFactor > 1 && multiplierBreakdown?.expression) {
       resultMessage = `${multiplierFactor}× multiplier activated!`;
     }
@@ -551,6 +647,7 @@ async function spinPerkMachine(user, options = {}) {
         count: multiplierCount,
         factor: multiplierFactor,
         isJackpot,
+        guaranteed: usedGuaranteedMultiplier || null,
         breakdown: multiplierBreakdown,
       },
       rewards,
@@ -609,11 +706,26 @@ async function hatchEgg(user, options = {}) {
   pm.eggInventory[eggTier] = owned - 1;
   pm.lastHatchAt = new Date();
 
-  const tier = readTier(user);
   const hatchId = crypto.randomUUID();
-  const pool = buildHatchPool(eggTier, tier);
+  const pool = buildEggHatchPool(eggTier);
   const picked = pickWeightedReward(pool);
-  const reward = await applyReward(user, picked, `hatch:${hatchId}`);
+
+  let reward;
+  try {
+    reward = await applyReward(user, picked, `hatch:${hatchId}`);
+    // eslint-disable-next-line no-console
+    console.log('[EGG_HATCH_REWARD]', String(user._id), eggTier, picked.label, reward);
+    // eslint-disable-next-line no-console
+    console.log('[EGG_REWARD_GRANTED]', String(user._id), picked.label);
+  } catch (error) {
+    // Refund the egg so a failed grant never consumes it.
+    pm.eggInventory[eggTier] = owned;
+    user.markModified('perkMachine');
+    await user.save().catch(() => {});
+    // eslint-disable-next-line no-console
+    console.error('[EGG_REWARD_FAILED]', error);
+    throw error;
+  }
 
   const hatchSavvyWon = Number(reward.savvyGranted) || 0;
   const historyEntry = {
@@ -663,12 +775,65 @@ async function hatchEgg(user, options = {}) {
   };
 }
 
+/**
+ * Consume a Battle Pass Tier Skip token and advance the user exactly one tier
+ * by crediting the XP needed to reach the next tier threshold.
+ */
+async function useBattlePassTierSkip(user) {
+  const pm = ensurePerkMachineDoc(user);
+  const have = Number(pm.tokens?.battlePassTierSkip) || 0;
+  if (have < 1) {
+    const err = new Error('You have no Battle Pass Tier Skip tokens.');
+    err.status = 400;
+    err.code = 'NO_TOKEN';
+    throw err;
+  }
+
+  // Lazy require to avoid circular load order between perk machine + battle pass.
+  const { ensureProgressDocuments } = require('./battlePassPersistenceService');
+  const { adminGrantXp } = require('./battlePassClaimService');
+  const {
+    BATTLE_PASS_CUMULATIVE_XP,
+    BATTLE_PASS_TIERS,
+    computeTierFromXp,
+  } = require('../lib/battlePassConfig');
+
+  const { bp } = await ensureProgressDocuments(user._id);
+  const currentXp = Number(bp.xp) || 0;
+  const currentTier = computeTierFromXp(currentXp);
+  if (currentTier >= BATTLE_PASS_TIERS.length) {
+    const err = new Error('You are already at the max Battle Pass tier.');
+    err.status = 400;
+    err.code = 'MAX_TIER';
+    throw err;
+  }
+
+  const target = Number(BATTLE_PASS_CUMULATIVE_XP[currentTier]) || currentXp + 1;
+  const delta = Math.max(1, target - currentXp);
+
+  await adminGrantXp(String(user._id), delta);
+
+  pm.tokens.battlePassTierSkip = have - 1;
+  user.markModified('perkMachine');
+  await user.save();
+
+  return {
+    skipped: true,
+    fromTier: currentTier,
+    toTier: currentTier + 1,
+    xpGranted: delta,
+    savvyBalance: Math.round(Number(user.savvyPoints) || 0),
+    status: getPerkMachineStatus(user),
+  };
+}
+
 module.exports = {
   ensurePerkMachineDoc,
   getPerkMachineStatus,
   getPerkMachineStatusWithEvents,
   spinPerkMachine,
   hatchEgg,
+  useBattlePassTierSkip,
   canUseFreeSpin,
   serializeEggInventory,
   serializeHistory,

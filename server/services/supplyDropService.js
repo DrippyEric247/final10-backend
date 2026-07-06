@@ -13,6 +13,18 @@ const {
 const { applyEventReward } = require('./eventRewardService');
 const { getPerkMachineStatus } = require('./perkMachineService');
 
+/** Double the numeric value of a supply drop reward (for "double" activations). */
+function doubleRewardValue(rewardDef) {
+  const doubled = { ...rewardDef };
+  if (Number(doubled.amount) > 0) doubled.amount = Number(doubled.amount) * 2;
+  if (Number(doubled.quantity) > 1) doubled.quantity = Number(doubled.quantity) * 2;
+  doubled.doubledValue = true;
+  if (doubled.label && !/^double/i.test(doubled.label)) {
+    doubled.label = `Double ${doubled.label}`;
+  }
+  return doubled;
+}
+
 class SupplyDropError extends Error {
   constructor(status, code, message) {
     super(message);
@@ -88,6 +100,7 @@ async function createSupplyDrop({
   source = 'admin',
   durationMs = DEFAULT_CLAIM_WINDOW_MS,
   forceRewardId = null,
+  doubleValue = false,
 }) {
   await expireStaleDrops();
 
@@ -95,7 +108,8 @@ async function createSupplyDrop({
     throw new SupplyDropError(400, 'USER_REQUIRED', 'User-scoped drops require userId');
   }
 
-  const rewardDef = pickSupplyDropReward(forceRewardId);
+  let rewardDef = pickSupplyDropReward(forceRewardId);
+  if (doubleValue) rewardDef = doubleRewardValue(rewardDef);
   const dropId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + durationMs);
 
@@ -228,6 +242,41 @@ async function claimSupplyDrop(user, dropId) {
   };
 }
 
+/**
+ * Consume a Max Supply Drop token and spawn a claimable drop for the user.
+ * If the user holds the "next drop pays double" flag, the drop's value doubles.
+ */
+async function activateMaxSupplyDrop(user) {
+  // Lazy require avoids the circular-dependency undefined-export race.
+  const { ensurePerkMachineDoc, getPerkMachineStatus: perkStatus } = require('./perkMachineService');
+  const pm = ensurePerkMachineDoc(user);
+  const have = Number(pm.tokens?.maxSupplyDrop) || 0;
+  if (have < 1) {
+    throw new SupplyDropError(400, 'NO_TOKEN', 'You have no Max Supply Drop tokens to activate.');
+  }
+  pm.tokens.maxSupplyDrop = have - 1;
+
+  const doubleValue = Boolean(pm.nextSupplyDropDouble);
+  if (doubleValue) pm.nextSupplyDropDouble = false;
+  user.markModified('perkMachine');
+
+  const drop = await createSupplyDrop({
+    scope: 'user',
+    userId: user._id,
+    source: 'egg_hatch_token',
+    doubleValue,
+  });
+
+  await user.save();
+
+  return {
+    drop,
+    doubleValue,
+    savvyBalance: Math.round(Number(user.savvyPoints) || 0),
+    perkMachine: perkStatus(user),
+  };
+}
+
 async function expireActiveDropsForUser(userId) {
   const result = await SupplyDrop.updateMany(
     {
@@ -266,6 +315,7 @@ module.exports = {
   SupplyDropError,
   getActiveDropForUser,
   createSupplyDrop,
+  activateMaxSupplyDrop,
   claimSupplyDrop,
   expireActiveDropsForUser,
   getRecentClaims,
