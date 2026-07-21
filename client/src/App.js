@@ -2,6 +2,8 @@ import ProductFeed from './pages/ProductFeed';
 import Trending from './pages/Trending';
 import VideoScanner from './components/VideoScanner';
 import Navigation from './components/Navigation';
+import MobileMoreMenuOverlay from './components/navigation/MobileMoreMenuOverlay';
+import { MoreMenuProvider } from './context/MoreMenuContext';
 import SavvyScoutUpdatingCard from './components/SavvyScoutUpdatingCard';
 import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
@@ -258,6 +260,7 @@ export default function App() {
       <PartyProvider>
       <LiveEventsProvider>
       <AppAudioProvider>
+      <MoreMenuProvider>
       <div className="bg-app min-h-screen text-white">
         {/* Faded brand layer (logo on every tab, aurora on /profile). */}
         <AppBackground />
@@ -271,6 +274,7 @@ export default function App() {
         
         {/* Use the new Navigation component */}
         <Navigation />
+        <MobileMoreMenuOverlay />
         <SavvyScoutUpdatingCard />
         {!isOnboardingRoute ? <UniversalBoostProgressBar /> : null}
         <Final10RewardHost />
@@ -741,6 +745,7 @@ export default function App() {
         </div>
       </footer>
     </div>
+      </MoreMenuProvider>
       </AppAudioProvider>
       </LiveEventsProvider>
       </PartyProvider>

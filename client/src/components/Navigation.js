@@ -1,39 +1,23 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import BugReportModal from './BugReportModal';
+import MoreMenuSections from './navigation/MoreMenuSections';
 import {
-  Award,
-  BarChart3,
   Bell,
-  Bookmark,
-  Bug,
-  Building2,
   ChevronDown,
-  Crown,
-  Dices,
   Gavel,
-  Gift,
   Grid3x3,
   Home,
-  Medal,
   Plane,
-  Settings,
-  Shield,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Target,
-  TestTube2,
-  Trophy,
   User,
-  Users,
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import MembershipStatusBadge from './membership/MembershipStatusBadge';
-import { shouldShowAdminNav } from '../lib/adminAccess';
+import { useMoreMenu } from '../context/MoreMenuContext';
 import { getNotificationSummary, markNotificationsRead } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
+import { isNavActive } from '../lib/navigationActive';
 import { DEAL_PHILOSOPHY_LANES, NAV_ITEM_KEYS, PROFILE_NAV_PATH } from '../lib/primaryNavigation';
 import {
   ADMIN_MORE_ITEMS,
@@ -41,77 +25,12 @@ import {
   NAV_SHORT_LABELS,
   SCOUT_FLIGHT_PATH,
 } from '../lib/navigationMenuConfig';
+import { shouldShowAdminNav } from '../lib/adminAccess';
 import '../styles/PrimaryNavigation.css';
 
 const NAV_ICON_SIZE = 18;
 const NAV_ICON_STROKE = 2.25;
-
-const MORE_ITEM_ICONS = {
-  scoutFlightFeatured: Plane,
-  bestMoves: Sparkles,
-  watchlist: Bookmark,
-  sellerDashboard: BarChart3,
-  savvyShop: ShoppingBag,
-  savvyOffers: Gift,
-  perkMachine: Dices,
-  battlePass: Target,
-  customization: Award,
-  savvyWins: Trophy,
-  leaderboards: Medal,
-  lifeOptimizer: Building2,
-  savvyPrograms: Shield,
-  foundingTester: TestTube2,
-  communityHub: Users,
-  settings: Settings,
-  admin: Settings,
-  shield: ShieldCheck,
-  founderAdmin: Crown,
-};
-
-function normalizeNavHash(hash) {
-  if (!hash) return '';
-  return hash.startsWith('#') ? hash : `#${hash}`;
-}
-
-function isNavActive(pathname, hash, search, item) {
-  const path = item.path;
-  const normalizedHash = normalizeNavHash(hash);
-  const itemSearch = item.search || '';
-
-  if (item.hash) {
-    return pathname === path && normalizedHash === normalizeNavHash(item.hash);
-  }
-
-  if (itemSearch) {
-    if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
-    const params = new URLSearchParams(search || '');
-    const expected = new URLSearchParams(itemSearch.startsWith('?') ? itemSearch.slice(1) : itemSearch);
-    for (const [key, value] of expected.entries()) {
-      if (params.get(key) !== value) return false;
-    }
-    return true;
-  }
-
-  if (path === '/') return pathname === '/';
-
-  const pathMatches = pathname === path || pathname.startsWith(`${path}/`);
-  if (!pathMatches) return false;
-
-  if (path === '/win-feed' && normalizedHash === '#community-hub') {
-    return false;
-  }
-
-  if (path === '/auctions' && (search || '').includes('watchlist=1')) {
-    return false;
-  }
-
-  return true;
-}
-
-function resolveMoreItemIcon(item) {
-  if (item.Icon) return item.Icon;
-  return MORE_ITEM_ICONS[item.key] || null;
-}
+const MOBILE_NAV_MQ = '(max-width: 768px)';
 
 /** Session-only persistence for the collapsed nav state (rule 11). */
 const NAV_COLLAPSE_STORAGE_KEY = 'f10_nav_collapsed';
@@ -132,61 +51,41 @@ function readInitialCollapsed() {
   }
 }
 
-/** iOS-safe scroll lock — keeps the page fixed while More is open. */
-function lockPageScroll() {
-  const y = window.scrollY || window.pageYOffset || 0;
-  const body = document.body;
-  const prev = {
-    overflow: body.style.overflow,
-    position: body.style.position,
-    top: body.style.top,
-    width: body.style.width,
-    scrollY: y,
-  };
-  body.style.overflow = 'hidden';
-  body.style.position = 'fixed';
-  body.style.top = `-${y}px`;
-  body.style.width = '100%';
-  return prev;
-}
+function useMobileNavLayout() {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(MOBILE_NAV_MQ).matches;
+  });
 
-function unlockPageScroll(prev) {
-  if (!prev) return;
-  const body = document.body;
-  body.style.overflow = prev.overflow;
-  body.style.position = prev.position;
-  body.style.top = prev.top;
-  body.style.width = prev.width;
-  window.scrollTo(0, prev.scrollY);
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_NAV_MQ);
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
 }
 
 const Navigation = () => {
   const location = useLocation();
   const [showBugReport, setShowBugReport] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [alertUnreadCount, setAlertUnreadCount] = useState(0);
   const [collapsed, setCollapsed] = useState(readInitialCollapsed);
   const { user } = useAuth() || {};
   const showAdminNav = shouldShowAdminNav(user);
+  const isMobile = useMobileNavLayout();
+  const { isOpen: moreOpen, isOpenRef: moreOpenRef, toggleMore: toggleMoreMenu } = useMoreMenu();
 
-  // Refs mirror state so passive scroll/touch listeners read fresh values
-  // without re-subscribing on every change.
   const collapsedRef = useRef(collapsed);
-  const moreOpenRef = useRef(moreOpen);
   const navTouchRef = useRef({ x: 0, y: 0, active: false });
-  const morePanelRef = useRef(null);
-  /** Session-only scroll position inside the More menu (requirement 3). */
-  const moreScrollTopRef = useRef(0);
+
   useEffect(() => {
     collapsedRef.current = collapsed;
   }, [collapsed]);
-  useEffect(() => {
-    moreOpenRef.current = moreOpen;
-  }, [moreOpen]);
 
-  /** Single source of truth for collapse changes: logs + session persist. */
   const applyCollapsed = useCallback((next) => {
-    // Never collapse the nav while More is open — page scroll is locked anyway.
     if (next && moreOpenRef.current) return;
     setCollapsed((prev) => {
       if (prev === next) return prev;
@@ -204,35 +103,20 @@ const Navigation = () => {
       }
       return next;
     });
-  }, []);
-
-  const closeMore = useCallback(() => {
-    if (morePanelRef.current) {
-      moreScrollTopRef.current = morePanelRef.current.scrollTop;
-    }
-    setMoreOpen(false);
-  }, []);
+  }, [moreOpenRef]);
 
   const toggleMore = useCallback(() => {
-    setMoreOpen((open) => {
-      if (open) {
-        if (morePanelRef.current) {
-          moreScrollTopRef.current = morePanelRef.current.scrollTop;
-        }
-        return false;
-      }
+    if (!moreOpenRef.current) {
       applyCollapsed(false);
-      return true;
-    });
-  }, [applyCollapsed]);
+    }
+    toggleMoreMenu();
+  }, [applyCollapsed, moreOpenRef, toggleMoreMenu]);
 
-  // Reflect collapsed state on <html> so other chrome can react if needed.
   useEffect(() => {
     document.documentElement.classList.toggle('f10-nav-collapsed', collapsed);
     return () => document.documentElement.classList.remove('f10-nav-collapsed');
   }, [collapsed]);
 
-  // Scroll behavior: slide up when scrolling down, return when scrolling up.
   useEffect(() => {
     let lastY = window.scrollY || 0;
     let ticking = false;
@@ -241,10 +125,10 @@ const Navigation = () => {
       ticking = true;
       window.requestAnimationFrame(() => {
         ticking = false;
+        if (moreOpenRef.current) return;
         const y = window.scrollY || 0;
         const dy = y - lastY;
         lastY = y;
-        if (moreOpenRef.current) return;
         if (y <= NAV_SCROLL_TOP_ZONE) {
           applyCollapsed(false);
           return;
@@ -255,9 +139,8 @@ const Navigation = () => {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [applyCollapsed]);
+  }, [applyCollapsed, moreOpenRef]);
 
-  // Swipe down from the very top edge brings the nav back when collapsed.
   useEffect(() => {
     const start = { x: 0, y: 0, active: false };
     const onStart = (e) => {
@@ -303,7 +186,6 @@ const Navigation = () => {
       if (!t) return;
       const dy = t.clientY - navTouchRef.current.y;
       const dx = t.clientX - navTouchRef.current.x;
-      // Only treat mostly-vertical, deliberate gestures as swipes (taps pass through).
       if (Math.abs(dy) < NAV_SWIPE_THRESHOLD || Math.abs(dx) > Math.abs(dy)) return;
       if (dy < 0) {
         // eslint-disable-next-line no-console
@@ -315,7 +197,7 @@ const Navigation = () => {
         applyCollapsed(false);
       }
     },
-    [applyCollapsed]
+    [applyCollapsed, moreOpenRef]
   );
 
   useEffect(() => {
@@ -350,34 +232,6 @@ const Navigation = () => {
       markNotificationsRead('alert_match').catch(() => {});
     }
   }, [location.pathname, user]);
-
-  useEffect(() => {
-    setMoreOpen(false);
-  }, [location.pathname, location.hash, location.search]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('f10-nav-more-open', moreOpen);
-    return () => document.documentElement.classList.remove('f10-nav-more-open');
-  }, [moreOpen]);
-
-  // Lock page scroll while More is open so only the menu scrolls.
-  useEffect(() => {
-    if (!moreOpen) return undefined;
-    const scrollState = lockPageScroll();
-    return () => unlockPageScroll(scrollState);
-  }, [moreOpen]);
-
-  // Restore the More menu scroll position when reopening in the same session.
-  useEffect(() => {
-    if (!moreOpen) return undefined;
-    const saved = moreScrollTopRef.current;
-    const id = window.requestAnimationFrame(() => {
-      if (morePanelRef.current) {
-        morePanelRef.current.scrollTop = saved;
-      }
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [moreOpen]);
 
   const profileNavItem = useMemo(
     () => ({
@@ -445,35 +299,16 @@ const Navigation = () => {
     []
   );
 
-  const moreMenuSections = useMemo(() => {
+  const flatMoreItems = useMemo(() => {
     const sections = MORE_MENU_SECTIONS.map((section) => ({
       ...section,
-      items: section.items
-        .filter((item) => !item.requiresAuth || user)
-        .map((item) => ({
-          ...item,
-          Icon: resolveMoreItemIcon(item),
-        })),
+      items: section.items.filter((item) => !item.requiresAuth || user),
     }));
-
     if (showAdminNav) {
-      sections.push({
-        id: 'admin',
-        title: 'Admin',
-        items: ADMIN_MORE_ITEMS.map((item) => ({
-          ...item,
-          Icon: resolveMoreItemIcon(item),
-        })),
-      });
+      sections.push({ id: 'admin', items: ADMIN_MORE_ITEMS });
     }
-
-    return sections;
+    return sections.flatMap((section) => section.items);
   }, [showAdminNav, user]);
-
-  const flatMoreItems = useMemo(
-    () => moreMenuSections.flatMap((section) => section.items),
-    [moreMenuSections]
-  );
 
   const isMoreActive = useMemo(
     () =>
@@ -488,7 +323,7 @@ const Navigation = () => {
 
   const renderNavLink = useCallback(
     (item, { variant = 'default' } = {}) => {
-      const Icon = item.Icon || resolveMoreItemIcon(item);
+      const Icon = item.Icon;
       const active = isNavActive(
         location.pathname,
         location.hash,
@@ -562,111 +397,72 @@ const Navigation = () => {
         <ChevronDown size={16} strokeWidth={2.5} aria-hidden />
       </button>
 
-      <button
-        type="button"
-        className={`nav-more-backdrop ${moreOpen ? 'nav-more-backdrop--visible' : ''}`}
-        aria-label="Close More menu"
-        aria-hidden={!moreOpen}
-        tabIndex={moreOpen ? 0 : -1}
-        onClick={closeMore}
-      />
-
       <nav
         className={`main-navigation ${collapsed ? 'main-navigation--collapsed' : ''} ${moreOpen ? 'main-navigation--more-open' : ''}`}
         aria-label="Final10 navigation"
       >
-      <div
-        className="nav-brand-row"
-        onTouchStart={handleNavTouchStart}
-        onTouchEnd={handleNavTouchEnd}
-      >
-        <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <h2>Final10</h2>
-          </Link>
-          {user ? <MembershipStatusBadge user={user} /> : null}
-        </div>
-      </div>
-
-      <div
-        className="nav-items nav-discovery-row"
-        aria-label="Primary"
-        onTouchStart={handleNavTouchStart}
-        onTouchEnd={handleNavTouchEnd}
-      >
-        {primaryNavItems.map((item) => renderNavLink(item, { variant: 'discovery' }))}
-      </div>
-
-      <div
-        className="nav-items nav-progression-row f10-nav-progression-enter"
-        aria-label="Featured and more"
-        onTouchStart={handleNavTouchStart}
-        onTouchEnd={handleNavTouchEnd}
-      >
-        {renderNavLink(scoutFlightNavItem, { variant: 'featured' })}
-        <button
-          type="button"
-          className={`nav-more-toggle ${isMoreActive ? 'nav-more-toggle--active' : ''} ${moreOpen ? 'nav-more-toggle--open' : ''}`}
-          aria-expanded={moreOpen}
-          aria-controls="nav-more-panel"
-          onClick={toggleMore}
+        <div
+          className="nav-brand-row"
+          onTouchStart={handleNavTouchStart}
+          onTouchEnd={handleNavTouchEnd}
         >
-          <span className="nav-more-toggle__icon" aria-hidden>
-            <Grid3x3 size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} />
-          </span>
-          <span className="nav-more-toggle__label nav-label--full">More</span>
-          <span className="nav-more-toggle__label nav-label--short">{NAV_SHORT_LABELS.more}</span>
-          <ChevronDown
-            size={14}
-            aria-hidden
-            className="nav-more-toggle__chevron"
-            style={{
-              transform: moreOpen ? 'rotate(180deg)' : undefined,
-              transition: 'transform 160ms ease',
-            }}
-          />
-        </button>
-      </div>
-
-      <div
-        id="nav-more-panel"
-        key="f10-nav-more-panel"
-        ref={morePanelRef}
-        className={`nav-more-panel ${moreOpen ? 'nav-more-panel--open' : ''}`}
-        aria-label="More tools and ecosystem"
-        aria-hidden={!moreOpen}
-      >
-          {moreMenuSections.map((section) => (
-            <div
-              key={section.id}
-              className={`nav-more-section ${section.id === 'featured' ? 'nav-more-section--featured' : ''}`}
-            >
-              <div className="nav-more-section__title">{section.title}</div>
-              <div className="nav-more-grid">
-                {section.items.map((item) => renderNavLink(item, { variant: 'more' }))}
-              </div>
-            </div>
-          ))}
-          <div className="nav-more-section nav-more-section--utility">
-            <button
-              onClick={() => setShowBugReport(true)}
-              className="nav-item nav-item--more nav-item--bug-report bug-report-btn"
-              title="Report a Bug"
-              type="button"
-            >
-              <Bug
-                className="nav-lucide-icon nav-lucide-icon--bug"
-                size={NAV_ICON_SIZE}
-                strokeWidth={NAV_ICON_STROKE}
-                aria-hidden
-              />
-              <span className="nav-label nav-label--full">Report Bug</span>
-              <span className="nav-label nav-label--short">Report Bug</span>
-            </button>
+          <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2>Final10</h2>
+            </Link>
+            {user ? <MembershipStatusBadge user={user} /> : null}
           </div>
-      </div>
+        </div>
 
-        <BugReportModal isOpen={showBugReport} onClose={() => setShowBugReport(false)} />
+        <div
+          className="nav-items nav-discovery-row"
+          aria-label="Primary"
+          onTouchStart={handleNavTouchStart}
+          onTouchEnd={handleNavTouchEnd}
+        >
+          {primaryNavItems.map((item) => renderNavLink(item, { variant: 'discovery' }))}
+        </div>
+
+        <div
+          className="nav-items nav-progression-row f10-nav-progression-enter"
+          aria-label="Featured and more"
+          onTouchStart={handleNavTouchStart}
+          onTouchEnd={handleNavTouchEnd}
+        >
+          {renderNavLink(scoutFlightNavItem, { variant: 'featured' })}
+          <button
+            type="button"
+            className={`nav-more-toggle ${isMoreActive ? 'nav-more-toggle--active' : ''} ${moreOpen ? 'nav-more-toggle--open' : ''}`}
+            aria-expanded={moreOpen}
+            aria-controls={isMobile ? 'f10-mobile-more-scroll' : 'nav-more-panel'}
+            onClick={toggleMore}
+          >
+            <span className="nav-more-toggle__icon" aria-hidden>
+              <Grid3x3 size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} />
+            </span>
+            <span className="nav-more-toggle__label nav-label--full">More</span>
+            <span className="nav-more-toggle__label nav-label--short">{NAV_SHORT_LABELS.more}</span>
+            <ChevronDown
+              size={14}
+              aria-hidden
+              className="nav-more-toggle__chevron"
+              style={{
+                transform: moreOpen ? 'rotate(180deg)' : undefined,
+                transition: 'transform 160ms ease',
+              }}
+            />
+          </button>
+        </div>
+
+        {!isMobile && moreOpen ? (
+          <div id="nav-more-panel" className="nav-more-panel" aria-label="More tools and ecosystem">
+            <MoreMenuSections onReportBug={() => setShowBugReport(true)} />
+          </div>
+        ) : null}
+
+        {!isMobile ? (
+          <BugReportModal isOpen={showBugReport} onClose={() => setShowBugReport(false)} />
+        ) : null}
       </nav>
     </>
   );
