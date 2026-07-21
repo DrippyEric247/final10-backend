@@ -22,8 +22,10 @@
   transform: translateY(-100%);
   pointer-events: none;
 }
-.main-navigation--collapsed .nav-more-panel {
-  display: none;
+
+/* More panel stays mounted; visibility is toggled via --open (never unmounted). */
+.nav-more-panel:not(.nav-more-panel--open) {
+  pointer-events: none;
 }
 
 /* Small pull-down handle shown only while collapsed. */
@@ -301,6 +303,24 @@ html.f10-nav-collapsed .app-auth-header {
   background: rgba(8, 10, 18, 0.96);
 }
 
+/* Dim backdrop — page stays fixed via JS scroll lock while open. */
+.nav-more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482180;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+.nav-more-backdrop--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .nav-more-section__title {
   margin: 0 4px 8px;
   font-size: 10px;
@@ -408,11 +428,30 @@ html.f10-nav-collapsed .app-auth-header {
   }
 
   .nav-more-panel {
-    max-height: min(52vh, calc(100dvh - 220px));
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2147482190;
+    width: 100%;
+    max-height: min(72vh, calc(100dvh - env(safe-area-inset-top, 0px) - 168px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: max(120px, calc(env(safe-area-inset-bottom, 0px) + 108px));
     overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding-bottom: max(120px, calc(env(safe-area-inset-bottom, 0px) + 108px));
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
+    transform: translateY(105%);
+    visibility: hidden;
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 320ms;
+  }
+
+  .nav-more-panel--open {
+    transform: translateY(0);
+    visibility: visible;
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
   }
 
   .nav-more-grid {
@@ -505,6 +544,14 @@ html.f10-nav-collapsed .app-auth-header {
 
   .nav-item--discovery[title] {
     cursor: help;
+  }
+
+  .nav-more-panel:not(.nav-more-panel--open) {
+    display: none;
+  }
+
+  .nav-more-backdrop {
+    display: none;
   }
 }
 

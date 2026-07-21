@@ -132,6 +132,34 @@ function readInitialCollapsed() {
   }
 }
 
+/** iOS-safe scroll lock — keeps the page fixed while More is open. */
+function lockPageScroll() {
+  const y = window.scrollY || window.pageYOffset || 0;
+  const body = document.body;
+  const prev = {
+    overflow: body.style.overflow,
+    position: body.style.position,
+    top: body.style.top,
+    width: body.style.width,
+    scrollY: y,
+  };
+  body.style.overflow = 'hidden';
+  body.style.position = 'fixed';
+  body.style.top = `-${y}px`;
+  body.style.width = '100%';
+  return prev;
+}
+
+function unlockPageScroll(prev) {
+  if (!prev) return;
+  const body = document.body;
+  body.style.overflow = prev.overflow;
+  body.style.position = prev.position;
+  body.style.top = prev.top;
+  body.style.width = prev.width;
+  window.scrollTo(0, prev.scrollY);
+}
+
 const Navigation = () => {
   const location = useLocation();
   const [showBugReport, setShowBugReport] = useState(false);
@@ -146,6 +174,9 @@ const Navigation = () => {
   const collapsedRef = useRef(collapsed);
   const moreOpenRef = useRef(moreOpen);
   const navTouchRef = useRef({ x: 0, y: 0, active: false });
+  const morePanelRef = useRef(null);
+  /** Session-only scroll position inside the More menu (requirement 3). */
+  const moreScrollTopRef = useRef(0);
   useEffect(() => {
     collapsedRef.current = collapsed;
   }, [collapsed]);
@@ -155,6 +186,8 @@ const Navigation = () => {
 
   /** Single source of truth for collapse changes: logs + session persist. */
   const applyCollapsed = useCallback((next) => {
+    // Never collapse the nav while More is open — page scroll is locked anyway.
+    if (next && moreOpenRef.current) return;
     setCollapsed((prev) => {
       if (prev === next) return prev;
       try {
@@ -165,7 +198,6 @@ const Navigation = () => {
       if (next) {
         // eslint-disable-next-line no-console
         console.log('[NAV_COLLAPSED]');
-        setMoreOpen(false);
       } else {
         // eslint-disable-next-line no-console
         console.log('[NAV_EXPANDED]');
@@ -173,6 +205,26 @@ const Navigation = () => {
       return next;
     });
   }, []);
+
+  const closeMore = useCallback(() => {
+    if (morePanelRef.current) {
+      moreScrollTopRef.current = morePanelRef.current.scrollTop;
+    }
+    setMoreOpen(false);
+  }, []);
+
+  const toggleMore = useCallback(() => {
+    setMoreOpen((open) => {
+      if (open) {
+        if (morePanelRef.current) {
+          moreScrollTopRef.current = morePanelRef.current.scrollTop;
+        }
+        return false;
+      }
+      applyCollapsed(false);
+      return true;
+    });
+  }, [applyCollapsed]);
 
   // Reflect collapsed state on <html> so other chrome can react if needed.
   useEffect(() => {
@@ -244,6 +296,7 @@ const Navigation = () => {
 
   const handleNavTouchEnd = useCallback(
     (e) => {
+      if (moreOpenRef.current) return;
       if (!navTouchRef.current.active) return;
       navTouchRef.current.active = false;
       const t = e.changedTouches && e.changedTouches[0];
@@ -307,10 +360,24 @@ const Navigation = () => {
     return () => document.documentElement.classList.remove('f10-nav-more-open');
   }, [moreOpen]);
 
-  // The More panel must be reachable, so opening it always expands the nav.
+  // Lock page scroll while More is open so only the menu scrolls.
   useEffect(() => {
-    if (moreOpen) applyCollapsed(false);
-  }, [moreOpen, applyCollapsed]);
+    if (!moreOpen) return undefined;
+    const scrollState = lockPageScroll();
+    return () => unlockPageScroll(scrollState);
+  }, [moreOpen]);
+
+  // Restore the More menu scroll position when reopening in the same session.
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const saved = moreScrollTopRef.current;
+    const id = window.requestAnimationFrame(() => {
+      if (morePanelRef.current) {
+        morePanelRef.current.scrollTop = saved;
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [moreOpen]);
 
   const profileNavItem = useMemo(
     () => ({
@@ -495,13 +562,24 @@ const Navigation = () => {
         <ChevronDown size={16} strokeWidth={2.5} aria-hidden />
       </button>
 
+      <button
+        type="button"
+        className={`nav-more-backdrop ${moreOpen ? 'nav-more-backdrop--visible' : ''}`}
+        aria-label="Close More menu"
+        aria-hidden={!moreOpen}
+        tabIndex={moreOpen ? 0 : -1}
+        onClick={closeMore}
+      />
+
       <nav
         className={`main-navigation ${collapsed ? 'main-navigation--collapsed' : ''} ${moreOpen ? 'main-navigation--more-open' : ''}`}
         aria-label="Final10 navigation"
+      >
+      <div
+        className="nav-brand-row"
         onTouchStart={handleNavTouchStart}
         onTouchEnd={handleNavTouchEnd}
       >
-      <div className="nav-brand-row">
         <div className="nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2>Final10</h2>
@@ -510,13 +588,20 @@ const Navigation = () => {
         </div>
       </div>
 
-      <div className="nav-items nav-discovery-row" aria-label="Primary">
+      <div
+        className="nav-items nav-discovery-row"
+        aria-label="Primary"
+        onTouchStart={handleNavTouchStart}
+        onTouchEnd={handleNavTouchEnd}
+      >
         {primaryNavItems.map((item) => renderNavLink(item, { variant: 'discovery' }))}
       </div>
 
       <div
         className="nav-items nav-progression-row f10-nav-progression-enter"
         aria-label="Featured and more"
+        onTouchStart={handleNavTouchStart}
+        onTouchEnd={handleNavTouchEnd}
       >
         {renderNavLink(scoutFlightNavItem, { variant: 'featured' })}
         <button
@@ -524,7 +609,7 @@ const Navigation = () => {
           className={`nav-more-toggle ${isMoreActive ? 'nav-more-toggle--active' : ''} ${moreOpen ? 'nav-more-toggle--open' : ''}`}
           aria-expanded={moreOpen}
           aria-controls="nav-more-panel"
-          onClick={() => setMoreOpen((v) => !v)}
+          onClick={toggleMore}
         >
           <span className="nav-more-toggle__icon" aria-hidden>
             <Grid3x3 size={NAV_ICON_SIZE} strokeWidth={NAV_ICON_STROKE} />
@@ -543,8 +628,14 @@ const Navigation = () => {
         </button>
       </div>
 
-      {moreOpen ? (
-        <div id="nav-more-panel" className="nav-more-panel" aria-label="More tools and ecosystem">
+      <div
+        id="nav-more-panel"
+        key="f10-nav-more-panel"
+        ref={morePanelRef}
+        className={`nav-more-panel ${moreOpen ? 'nav-more-panel--open' : ''}`}
+        aria-label="More tools and ecosystem"
+        aria-hidden={!moreOpen}
+      >
           {moreMenuSections.map((section) => (
             <div
               key={section.id}
@@ -573,8 +664,7 @@ const Navigation = () => {
               <span className="nav-label nav-label--short">Report Bug</span>
             </button>
           </div>
-        </div>
-      ) : null}
+      </div>
 
         <BugReportModal isOpen={showBugReport} onClose={() => setShowBugReport(false)} />
       </nav>
