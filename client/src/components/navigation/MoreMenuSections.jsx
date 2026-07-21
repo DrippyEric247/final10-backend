@@ -21,13 +21,13 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { shouldShowAdminNav } from '../lib/adminAccess';
-import { isNavActive } from '../lib/navigationActive';
+import { useAuth } from '../../context/AuthContext';
+import { shouldShowAdminNav } from '../../lib/adminAccess';
+import { isNavActive } from '../../lib/navigationActive';
 import {
   ADMIN_MORE_ITEMS,
   MORE_MENU_SECTIONS,
-} from '../lib/navigationMenuConfig';
+} from '../../lib/navigationMenuConfig';
 
 const NAV_ICON_SIZE = 18;
 const NAV_ICON_STROKE = 2.25;
