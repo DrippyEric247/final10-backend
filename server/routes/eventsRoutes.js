@@ -20,6 +20,11 @@ const { logLiveEventAdmin } = require('../services/liveEventsAdminService');
 const { DEFAULT_CLAIM_WINDOW_MS } = require('../config/supplyDropRewards');
 const { buildEventsHub } = require('../services/eventsHubService');
 const { buildActivationState, markEventActivated, markExplanationDismissed, resetActivationSeen } = require('../services/eventActivationService');
+const {
+  getPendingSummary,
+  getEventHistory,
+  markSummaryShown,
+} = require('../services/eventSummaryService');
 
 const router = express.Router();
 
@@ -76,6 +81,51 @@ router.get('/hub', auth, async (req, res, next) => {
     res.json(hub);
   } catch (err) {
     console.error('[events/hub]', err);
+    next(err);
+  }
+});
+
+router.get('/summary/pending', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const summary = await getPendingSummary(user);
+    if (user.isModified()) await user.save();
+    res.json({ summary });
+  } catch (err) {
+    console.error('[events/summary/pending]', err);
+    next(err);
+  }
+});
+
+router.get('/summary/history', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const limit = Math.min(80, Math.max(1, Number(req.query.limit) || 40));
+    const history = await getEventHistory(user, { limit });
+    if (user.isModified()) await user.save();
+    res.json({ history });
+  } catch (err) {
+    console.error('[events/summary/history]', err);
+    next(err);
+  }
+});
+
+router.post('/summary/dismiss', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const summaryId = String(req.body?.summaryId || '').trim();
+    const action = String(req.body?.action || 'dismiss').trim();
+    if (!summaryId) return next(new HttpError(400, 'SUMMARY_ID_REQUIRED', 'summaryId is required'));
+    const summary = await markSummaryShown(user, summaryId, { action });
+    res.json({ message: 'Event summary recorded.', summary });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message, code: err.code });
+    }
+    console.error('[events/summary/dismiss]', err);
     next(err);
   }
 });

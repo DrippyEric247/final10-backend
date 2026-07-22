@@ -1,0 +1,291 @@
+/* Profile XP Recap — universal progression celebration */
+
+.f10-profile-xp-recap {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.f10-profile-xp-recap__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 4, 10, 0.9);
+}
+
+.f10-profile-xp-recap__card {
+  position: relative;
+  width: min(100%, 440px);
+  max-height: min(92vh, 92dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 20px;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  background: linear-gradient(165deg, #0c0e18 0%, #07080f 48%, #05060b 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 24px 80px rgba(0, 0, 0, 0.65),
+    0 0 48px rgba(124, 58, 237, 0.25),
+    0 0 32px rgba(234, 179, 8, 0.12);
+  padding: 22px 18px 18px;
+}
+
+.f10-profile-xp-recap__card.is-level-up {
+  animation: f10-xp-level-pulse 0.65s ease-out;
+}
+
+@keyframes f10-xp-level-pulse {
+  0% { box-shadow: 0 0 0 rgba(234, 179, 8, 0); }
+  40% { box-shadow: 0 0 48px rgba(234, 179, 8, 0.45); }
+  100% { box-shadow: 0 0 32px rgba(234, 179, 8, 0.12); }
+}
+
+.f10-profile-xp-recap__glow {
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 55%;
+  background: radial-gradient(circle at 50% 0%, rgba(167, 139, 250, 0.35), transparent 68%);
+  pointer-events: none;
+}
+
+.f10-profile-xp-recap__header {
+  position: relative;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.f10-profile-xp-recap__kicker {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 900;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+}
+
+.f10-profile-xp-recap__subtitle,
+.f10-profile-xp-recap__event-bridge {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.f10-profile-xp-recap__level-block {
+  position: relative;
+  margin-bottom: 14px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.f10-profile-xp-recap__level-label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #e9d5ff;
+  text-align: center;
+}
+
+.f10-profile-xp-recap__bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.2) inset;
+}
+
+.f10-profile-xp-recap__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7c3aed, #c084fc, #fbbf24);
+  box-shadow: 0 0 16px rgba(192, 132, 252, 0.55);
+}
+
+.f10-profile-xp-recap__bar-meta,
+.f10-profile-xp-recap__earned {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.f10-profile-xp-recap__earned {
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.f10-profile-xp-recap__scout {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.f10-profile-xp-recap__section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a78bfa;
+}
+
+.f10-profile-xp-recap__breakdown ul,
+.f10-profile-xp-recap__unlocks ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.f10-profile-xp-recap__breakdown li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.f10-profile-xp-recap__breakdown li strong {
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.f10-profile-xp-recap__top-source,
+.f10-profile-xp-recap__breakdown,
+.f10-profile-xp-recap__unlocks {
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.f10-profile-xp-recap__education,
+.f10-profile-xp-recap__suggestion {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.f10-profile-xp-recap__suggestion {
+  color: #c4b5fd;
+}
+
+.f10-profile-xp-recap__milestone {
+  margin-top: 8px;
+}
+
+.f10-profile-xp-recap__milestone strong {
+  display: block;
+  color: #fbbf24;
+  margin-bottom: 4px;
+}
+
+.f10-profile-xp-recap__milestone li {
+  font-size: 13px;
+  color: #cbd5e1;
+  padding: 2px 0;
+}
+
+.f10-profile-xp-recap__totals {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.f10-profile-xp-recap__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.f10-profile-xp-recap__btn {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.f10-profile-xp-recap__btn--primary {
+  border-color: rgba(234, 179, 8, 0.45);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.55), rgba(234, 179, 8, 0.35));
+  color: #fff;
+}
+
+.f10-event-summary__stat--xp-bridge {
+  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.f10-event-history-list,
+.f10-progress-history-list {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+}
+
+.f10-event-history-item,
+.f10-progress-history-item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.f10-event-history-item__main,
+.f10-progress-history-item__main {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.f10-event-history-item__meta,
+.f10-progress-history-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.f10-profile-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(192, 132, 252, 0.35);
+  background: rgba(124, 58, 237, 0.15);
+  font-size: 12px;
+  font-weight: 700;
+  color: #e9d5ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-profile-xp-recap__card.is-level-up {
+    animation: none;
+  }
+}

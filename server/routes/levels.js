@@ -168,4 +168,79 @@ router.get('/stats', auth, async (req, res) => {
   }
 });
 
+// ---- Profile XP recap routes ----
+const {
+  getPendingRecap,
+  getRecapHistory,
+  markRecapShown,
+  getProfileProgress,
+  grantProfileXp,
+} = require('../services/profileXpService');
+const { XP_SOURCES } = require('../config/profileXpConfig');
+
+router.get('/recap/pending', auth, async (req, res) => {
+  try {
+    const recap = await getPendingRecap(req.user.id);
+    res.json({ recap });
+  } catch (error) {
+    console.error('Get pending profile recap error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/recap/history', auth, async (req, res) => {
+  try {
+    const limit = Math.min(80, Math.max(1, Number(req.query.limit) || 40));
+    const history = await getRecapHistory(req.user.id, { limit });
+    res.json({ history });
+  } catch (error) {
+    console.error('Get profile recap history error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/recap/dismiss', auth, async (req, res) => {
+  try {
+    const recapId = String(req.body?.recapId || '').trim();
+    const action = String(req.body?.action || 'dismiss').trim();
+    if (!recapId) return res.status(400).json({ message: 'recapId is required' });
+    const recap = await markRecapShown(req.user.id, recapId, { action });
+    res.json({ message: 'Profile recap recorded.', recap });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ message: error.message, code: error.code });
+    console.error('Dismiss profile recap error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/progress', auth, async (req, res) => {
+  try {
+    const progress = await getProfileProgress(req.user.id);
+    res.json({ progress });
+  } catch (error) {
+    console.error('Get profile progress error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/grant-xp', auth, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser || currentUser.membershipTier !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    const user = await User.findById(req.body?.userId || req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const amount = Number(req.body?.amount);
+    const source = String(req.body?.source || XP_SOURCES.ADMIN_GRANT);
+    const idempotencyKey = String(req.body?.idempotencyKey || `admin:${user._id}:${Date.now()}`);
+    const result = await grantProfileXp(user, { amount, source, idempotencyKey });
+    res.json({ message: 'Profile XP granted.', result });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ message: error.message, code: error.code });
+    console.error('Grant profile XP error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

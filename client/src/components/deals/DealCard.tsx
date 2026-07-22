@@ -6,6 +6,8 @@ import { evaluateTrustScore, getTrustSummary, trustScoreInputFromListing } from 
 import type { TrustScoreResult } from '../../types/trustScore';
 import SavvyTrustPanel from '../trust/SavvyTrustPanel';
 import SavvyDealRewardsIntegration from '../rewards/SavvyDealRewardsIntegration';
+import SavvyRewardCoinBadge from '../rewards/SavvyRewardCoinBadge';
+import { markDealRewardClickout } from '../../lib/api';
 import DualEarnChip from '../rewards/DualEarnChip';
 import { emitBuyerEarnToast } from '../../lib/dualEarn';
 import {
@@ -435,9 +437,33 @@ export function DealCardShell({
         <span className="absolute top-3 left-3 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-white/95 bg-black/60 border-black/20">
           {source}
         </span>
-        <span className={`absolute top-3 right-3 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${typeTone}`}>
+        <span className={`absolute bottom-3 right-3 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${typeTone}`}>
           {typeLabel}
         </span>
+        <SavvyRewardCoinBadge
+          listingId={String(item.itemId || title)}
+          listing={{
+            itemId: item.itemId,
+            price: item.buyNowPrice ?? item.currentBidPrice ?? item.price,
+            savings: effectiveSavings,
+            trustScore: trustResult.trustScore,
+            estimatedPointsEarned: basePoints,
+            pointsMultiplier: listingMultiplierOverride,
+          }}
+          trustScore={trustResult.trustScore}
+          onClickout={() => {
+            void markDealRewardClickout({
+              listingId: String(item.itemId || title),
+              listing: {
+                itemId: item.itemId,
+                price: item.buyNowPrice ?? item.currentBidPrice ?? item.price,
+                savings: effectiveSavings,
+                trustScore: trustResult.trustScore,
+                estimatedPointsEarned: basePoints,
+              },
+            });
+          }}
+        />
         <div className={`absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-extrabold tracking-tight shadow-lg backdrop-blur-sm ${chipTone} ${emphasize ? 'animate-pulse' : ''}`}>
           <Sparkles className="h-4 w-4" />
           {chipText}

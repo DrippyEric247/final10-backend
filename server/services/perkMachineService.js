@@ -599,6 +599,15 @@ async function spinPerkMachine(user, options = {}) {
       pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
     }
 
+    if (savvySaleSavings > 0 && !usedPaid3Token && !usedPaid2Token) {
+      try {
+        const { recordSavvySaleSavings } = require('./eventSummaryService');
+        await recordSavvySaleSavings(user, savvySaleSavings);
+      } catch (err) {
+        console.warn('[eventSummary] savvy sale savings track failed:', err?.message);
+      }
+    }
+
     const ticketResult = recordSpinForTournamentTicket(user, pm);
 
     user.markModified('perkMachine');

@@ -437,6 +437,51 @@ export async function getEventsHub() {
   return data;
 }
 
+export async function getPendingEventSummary() {
+  const { data } = await api.get("/events/summary/pending");
+  return data?.summary || null;
+}
+
+export async function getEventSummaryHistory(limit = 40) {
+  const { data } = await api.get("/events/summary/history", { params: { limit } });
+  return data?.history || [];
+}
+
+export async function dismissEventSummary({ summaryId, action = "dismiss" }) {
+  const { data } = await api.post("/events/summary/dismiss", { summaryId, action });
+  return data;
+}
+
+export async function getPendingProfileXpRecap() {
+  const { data } = await api.get("/levels/recap/pending");
+  return data?.recap || null;
+}
+
+export async function getProfileXpRecapHistory(limit = 40) {
+  const { data } = await api.get("/levels/recap/history", { params: { limit } });
+  return data?.history || [];
+}
+
+export async function dismissProfileXpRecap({ recapId, action = "dismiss" }) {
+  const { data } = await api.post("/levels/recap/dismiss", { recapId, action });
+  return data;
+}
+
+export async function getProfileProgress() {
+  const { data } = await api.get("/levels/progress");
+  return data?.progress || null;
+}
+
+export async function estimateDealRewards(listings = []) {
+  const { data } = await api.post("/deals/reward-estimate", { listings });
+  return data;
+}
+
+export async function markDealRewardClickout({ listingId, listing = {} }) {
+  const { data } = await api.post("/deals/reward-clickout", { listingId, listing });
+  return data;
+}
+
 export async function activateLiveEvent({ activationId, eventKey }) {
   const { data } = await api.post("/events/activation/activate", { activationId, eventKey });
   return data;

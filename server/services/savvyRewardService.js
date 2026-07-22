@@ -143,6 +143,8 @@ async function grantSavvyReward(user, {
     );
   }
 
+  void trackEventSummaryEarn(user, { amount: savvyAmount, multiplier, meta });
+
   return {
     granted: true,
     amount: savvyAmount,
@@ -152,6 +154,18 @@ async function grantSavvyReward(user, {
     balanceAfter: result.balanceAfter,
     transactionId: result.transactionId,
   };
+}
+
+async function trackEventSummaryEarn(user, { amount, multiplier, meta }) {
+  try {
+    const { recordSavvyEarnedForActiveEvents } = require('./eventSummaryService');
+    await recordSavvyEarnedForActiveEvents(user, { amount, multiplier, meta });
+    if (typeof user.markModified === 'function') {
+      user.markModified('activeEventSummarySessions');
+    }
+  } catch (err) {
+    console.warn('[eventSummary] track earn failed:', err?.message);
+  }
 }
 
 /**

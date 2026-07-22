@@ -4,6 +4,7 @@ import ListingCardImage from '../listings/ListingCardImage';
 import TrueMarketValueBlock from '../market/TrueMarketValueBlock';
 import DealBadges from '../market/DealBadges';
 import EbayDealCardSavvyRewards from './EbayDealCardSavvyRewards';
+import SavvyRewardCoinBadge from '../rewards/SavvyRewardCoinBadge';
 import { getMarketValue, getSavings, type ListingForMarket } from '../../lib/marketValue';
 
 type DealItem = ListingForMarket & {
@@ -20,6 +21,7 @@ type DealItem = ListingForMarket & {
   recommendationType?: string;
   recommendationReason?: string;
   savingsAmount?: number | string;
+  trustScore?: number;
 };
 
 type DealCardProps = {
@@ -100,7 +102,7 @@ export default function DealCard({ item, onMeaningfulView, hidePass = false }: D
 
   return (
     <article className={`f10-listing-surface rounded-2xl overflow-hidden border transition-all duration-200 ${glow}`}>
-      <div className="bg-gray-900">
+      <div className="relative bg-gray-900">
         <ListingCardImage
           item={item}
           alt={cardTitle}
@@ -108,6 +110,16 @@ export default function DealCard({ item, onMeaningfulView, hidePass = false }: D
           borderRadius="0"
           frameClassName="bg-gray-900"
           fallbackSrc={placeholder}
+        />
+        <SavvyRewardCoinBadge
+          listingId={String(item.itemId || cardTitle)}
+          listing={{
+            itemId: item.itemId,
+            price: item.buyNowPrice ?? item.currentBidPrice ?? item.price,
+            savings: savingsNumber,
+            trustScore: item.trustScore,
+          }}
+          trustScore={Number(item.trustScore) || 0}
         />
       </div>
 

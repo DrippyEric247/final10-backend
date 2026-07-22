@@ -9,6 +9,7 @@ import UniversalBoostProgressBar from './components/UniversalBoostProgressBar';
 import Final10RewardHost from './components/Final10RewardHost';
 import LiveEventsHost from './components/events/LiveEventsHost';
 import EventActivationHost from './components/events/EventActivationHost';
+import ProgressionRecapHost from './components/progression/ProgressionRecapHost';
 import AppAudioProvider from './components/audio/AppAudioProvider';
 import EventsFloatingTab from './components/events/EventsFloatingTab';
 import { LiveEventsProvider } from './context/LiveEventsContext';
@@ -280,6 +281,7 @@ export default function App() {
         <Final10RewardHost />
         <LiveEventsHost />
         <EventActivationHost />
+        <ProgressionRecapHost />
         <CallingCardUnlockCeremony />
         <SmartCoachHost enabled={Boolean(user)} />
         <Final10SideAssistant />

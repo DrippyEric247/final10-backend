@@ -9,6 +9,8 @@ import {
   getLevelInfo,
   getMilestones,
   getUserEbayStatus,
+  getEventSummaryHistory,
+  getProfileXpRecapHistory,
 } from '../lib/api';
 import { ApiCoolingDownError } from '../lib/apiRequestGate';
 import { isRateLimitError, userSafeErrorMessage } from '../lib/apiErrorParsing';
@@ -783,6 +785,30 @@ const Profile = () => {
       failureCount < 1,
   });
 
+  const { data: eventSummaryHistory = [], isLoading: eventHistoryLoading } = useQuery({
+    queryKey: ['eventSummaryHistory', user?.id],
+    queryFn: () => getEventSummaryHistory(40),
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiCoolingDownError) &&
+      error?.isCoolingDown !== true &&
+      failureCount < 1,
+  });
+
+  const { data: profileRecapHistory = [], isLoading: profileRecapHistoryLoading } = useQuery({
+    queryKey: ['profileRecapHistory', user?.id],
+    queryFn: () => getProfileXpRecapHistory(40),
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiCoolingDownError) &&
+      error?.isCoolingDown !== true &&
+      failureCount < 1,
+  });
+
   // Mutations for task actions
   const claimLoginMutation = useMutation({
     mutationFn: claimDailyLogin,
@@ -1141,6 +1167,10 @@ const Profile = () => {
         profileActivityItems={profileEngagement.activityItems}
         profileNextGoal={profileEngagement.nextGoal}
         onProfileGoalCta={handleProfileGoalCta}
+        eventSummaryHistory={eventSummaryHistory}
+        eventHistoryLoading={eventHistoryLoading}
+        profileRecapHistory={profileRecapHistory}
+        profileRecapHistoryLoading={profileRecapHistoryLoading}
         equippedCallingCardId={equippedCallingCardId}
         equippedEmblemId={equippedEmblemId}
       />

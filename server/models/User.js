@@ -207,6 +207,45 @@ const userSchema = new mongoose.Schema({
       explanationDismissedAt: { type: Date, default: null },
     },
   ],
+  /** In-progress timed event participation (earnings accumulate here). */
+  activeEventSummarySessions: [
+    {
+      sessionId: String,
+      eventKey: String,
+      eventTitle: String,
+      multiplier: { type: Number, default: 1 },
+      startedAt: { type: Date, default: Date.now },
+      expiresAt: { type: Date, default: null },
+      lastActivityAt: { type: Date, default: Date.now },
+      participated: { type: Boolean, default: false },
+      normalEarnings: { type: Number, default: 0 },
+      eventEarnings: { type: Number, default: 0 },
+      bonusEarned: { type: Number, default: 0 },
+      optionalStats: { type: mongoose.Schema.Types.Mixed, default: {} },
+    },
+  ],
+  /** Completed event summaries — shown once, then stored for Profile history. */
+  eventSummaries: [
+    {
+      summaryId: String,
+      eventKey: String,
+      eventTitle: String,
+      startedAt: Date,
+      endedAt: Date,
+      timeParticipatedMs: Number,
+      normalEarnings: { type: Number, default: 0 },
+      eventEarnings: { type: Number, default: 0 },
+      bonusEarned: { type: Number, default: 0 },
+      increasePercent: { type: Number, default: 0 },
+      optionalStats: { type: mongoose.Schema.Types.Mixed, default: {} },
+      summaryShownAt: { type: Date, default: null },
+      dismissedAt: { type: Date, default: null },
+      leaderboardClicked: { type: Boolean, default: false },
+      rewardsClicked: { type: Boolean, default: false },
+      upcomingEvent: { type: mongoose.Schema.Types.Mixed, default: null },
+      createdAt: { type: Date, default: Date.now },
+    },
+  ],
   lastActive: Date,
 
   /** Permanent bonus added to the app-wide top multiplier bar (from egg hatches). */
@@ -934,24 +973,44 @@ userSchema.methods.getReferralStats = async function() {
   };
 
   // Method to award XP for task completion
-  userSchema.methods.awardXP = async function(xpAmount, source = 'task_completion') {
-    const UserLevel = require('./UserLevel');
-    const userLevel = await UserLevel.getUserLevelInfo(this._id);
-    return await userLevel.awardXP(xpAmount, source);
+  userSchema.methods.awardXP = async function(xpAmount, source = 'task_completion', options = {}) {
+    const { grantProfileXp } = require('../services/profileXpService');
+    const { utcDayKey } = require('../config/savvyRewards');
+    const idempotencyKey =
+      options.idempotencyKey ||
+      `profile_xp:${this._id}:${source}:${options.sourceId || utcDayKey()}:${xpAmount}`;
+    return grantProfileXp(this, {
+      amount: xpAmount,
+      source,
+      idempotencyKey,
+      sourceId: options.sourceId,
+      metadata: options.metadata,
+      sessionId: options.sessionId,
+      eventId: options.eventId,
+      multiplier: options.multiplier,
+      sessionTitle: options.sessionTitle,
+      sessionTrigger: options.sessionTrigger,
+      eventSummaryId: options.eventSummaryId,
+    });
   };
 
   // Method to get level information
   userSchema.methods.getLevelInfo = async function() {
+    const { getProfileProgress } = require('../services/profileXpService');
+    const progress = await getProfileProgress(this._id);
     const UserLevel = require('./UserLevel');
     const userLevel = await UserLevel.getUserLevelInfo(this._id);
     return {
-      currentLevel: userLevel.currentLevel,
-      totalXP: userLevel.totalXP,
-      xpToNextLevel: userLevel.xpToNextLevel,
-      xpProgress: userLevel.xpProgress,
+      currentLevel: progress.profileLevel,
+      totalXP: progress.profileXp,
+      lifetimeProfileXp: progress.lifetimeProfileXp,
+      prestige: progress.prestige,
+      lastLevelUpAt: progress.lastLevelUpAt,
+      xpToNextLevel: progress.xpToNext,
+      xpProgress: progress.xpProgress,
       xpInfo: userLevel.getXPForCurrentLevel(),
-      milestones: userLevel.milestones,
-      stats: userLevel.stats
+      milestones: progress.milestones,
+      stats: userLevel.stats,
     };
   };
 

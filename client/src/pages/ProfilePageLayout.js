@@ -10,6 +10,8 @@ import { getUniversalBoostState } from "../lib/universalBoostProgress";
 import CallingCard from "../components/CallingCard";
 import { findCallingCard, findEmblem } from "../lib/customizationCatalog";
 import { useSavvyScoutMissionsOptional } from "../context/SavvyScoutMissionsContext";
+import EventHistorySection from "../components/profile/EventHistorySection";
+import ProgressHistorySection from "../components/profile/ProgressHistorySection";
 import "../styles/ProfilePageLayout.css";
 import "../styles/SavvyScoutMissions.css";
 
@@ -66,6 +68,10 @@ export default function ProfilePageLayout({
   profileActivityItems = [],
   profileNextGoal = null,
   onProfileGoalCta = () => {},
+  eventSummaryHistory = [],
+  eventHistoryLoading = false,
+  profileRecapHistory = [],
+  profileRecapHistoryLoading = false,
   equippedCallingCardId = "card_default",
   equippedEmblemId = "sigil_starter",
 }) {
@@ -121,6 +127,11 @@ export default function ProfilePageLayout({
           <div>
             <h1>Profile</h1>
             <p className="sub">{user?.firstName || user?.username || "Player"}</p>
+            <div className="f10-profile-level-badge" aria-label="Profile level">
+              <span>Level {levelInfo?.currentLevel || 1}</span>
+              <span aria-hidden>·</span>
+              <span>{xpPct}% to next</span>
+            </div>
             <div className="f10-profile-loadout-strip" aria-label="Equipped calling card">
               <span
                 className="f10-profile-loadout-emblem"
@@ -239,6 +250,9 @@ export default function ProfilePageLayout({
         <ProfileRecentActivity items={profileActivityItems} limit={6} />
         {profileNextGoal ? <ProfileNextGoal goal={profileNextGoal} onCta={onProfileGoalCta} /> : null}
 
+        <EventHistorySection history={eventSummaryHistory} loading={eventHistoryLoading} />
+        <ProgressHistorySection history={profileRecapHistory} loading={profileRecapHistoryLoading} />
+
         <RivalryComparisonCard
           rivalDisplayNameUpper={rivalryRivalDisplayNameUpper}
           themShortName={rivalryThemShortName}
@@ -347,10 +361,11 @@ export default function ProfilePageLayout({
         {/* 6 — Level / XP */}
         <section className="f10-profile-card" aria-labelledby="f10-lv-hd">
           <h2 id="f10-lv-hd" className="f10-profile-card-hd">
-            Level {levelInfo?.currentLevel || 1}
+            Profile Level {levelInfo?.currentLevel || 1}
           </h2>
           <p className="text-sm text-gray-300 m-0 tabular-nums">
-            {levelInfo?.totalXP ?? 0} XP · +{levelInfo?.xpToNextLevel ?? 100} to next
+            {levelInfo?.xpInfo?.xpProgress ?? 0} / {levelInfo?.xpInfo?.xpRange ?? 100} XP ·{" "}
+            {levelInfo?.totalXP ?? 0} lifetime
           </p>
           <div className="f10-profile-bar" aria-hidden>
             <div

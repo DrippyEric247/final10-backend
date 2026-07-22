@@ -233,6 +233,19 @@ async function claimSupplyDrop(user, dropId) {
   user.markModified('supplyDropClaimHistory');
   await user.save();
 
+  try {
+    const { recordSupplyDropReward } = require('./eventSummaryService');
+    const savvyAmt = Number(granted?.amount || granted?.savvyGranted || granted?.quantity || 0);
+    await recordSupplyDropReward(user, {
+      dropId: drop.dropId,
+      savvyAmount: savvyAmt,
+      label: granted.label,
+    });
+    await user.save();
+  } catch (err) {
+    console.warn('[eventSummary] supply drop track failed:', err?.message);
+  }
+
   return {
     dropId: drop.dropId,
     reward: granted,

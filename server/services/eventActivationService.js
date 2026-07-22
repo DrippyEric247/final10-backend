@@ -202,6 +202,14 @@ async function markEventActivated(user, { activationId, eventKey }) {
     await user.save();
   }
 
+  try {
+    const { ensureSessionFromActivation } = require('./eventSummaryService');
+    await ensureSessionFromActivation(user, { activationId: id, eventKey: key });
+    await user.save();
+  } catch (err) {
+    console.warn('[eventActivation] summary session start failed:', err?.message);
+  }
+
   return buildActivationState(user);
 }
 

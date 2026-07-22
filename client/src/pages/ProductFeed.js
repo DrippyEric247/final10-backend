@@ -6,7 +6,7 @@ import { reportDealsForAlerts } from "../lib/smartDealAlerts";
 import { trackCategoryView, trackItemClick } from "../lib/userBehavior";
 import { SCOUT_LABELS, SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import ListingIntentAnchor from "../components/ListingIntentAnchor";
-import SavvyRewardBadge from "../components/rewards/SavvyRewardBadge";
+import SavvyRewardCoinBadge from "../components/rewards/SavvyRewardCoinBadge";
 import { evaluateTrustScore, trustScoreInputFromListing } from "../lib/trustScoreEngine";
 import { groupByBestMove } from "../lib/listingSectionsEngine";
 import ListingSections, { MoveTierBadge } from "../components/listings/ListingSections";
@@ -870,6 +870,16 @@ export default function ProductFeed() {
                             score={entry.bestMoveScore}
                             className="chip chip-move-tier"
                           />
+                          <SavvyRewardCoinBadge
+                            listingId={idKey || it.title}
+                            listing={{
+                              itemId: idKey,
+                              feedPrice: it.feedPrice ?? it.currentPrice ?? it.price,
+                              feedSavings: it.feedSavings,
+                              trustScore: it.trustScore,
+                            }}
+                            trustScore={it.trustScore}
+                          />
                         </div>
 
                         <div className="meta">
@@ -891,14 +901,6 @@ export default function ProductFeed() {
                             </span>
                           </div>
                           <div className="trust-score">Trust: {trustDisplay}/100</div>
-                          <div className="row" style={{ marginTop: 6 }}>
-                            <SavvyRewardBadge
-                              trustScore={it.trustScore}
-                              price={it.feedPrice ?? undefined}
-                              savings={it.feedSavings || undefined}
-                              compact
-                            />
-                          </div>
                         </div>
 
                         <div className="deal-actions" style={{ padding: "0 14px 0" }}>

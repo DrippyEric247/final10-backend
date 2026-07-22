@@ -19,6 +19,13 @@ export const ANALYTICS_EVENTS = Object.freeze({
   DEMO_STARTED: "demo_started",
   DEMO_COMPLETED: "demo_completed",
   BETA_TESTER_ACTION: "beta_tester_action",
+  EVENT_SUMMARY_VIEWED: "event_summary_viewed",
+  EVENT_SUMMARY_DISMISSED: "event_summary_dismissed",
+  EVENT_SUMMARY_LEADERBOARD: "event_summary_leaderboard_clicked",
+  EVENT_SUMMARY_REWARDS: "event_summary_rewards_clicked",
+  PROFILE_XP_RECAP_VIEWED: "profile_xp_recap_viewed",
+  PROFILE_XP_RECAP_DISMISSED: "profile_xp_recap_dismissed",
+  PROFILE_XP_LEVEL_UP: "profile_xp_level_up",
 });
 
 const ANON_KEY = "f10_telemetry_anon_v1";
