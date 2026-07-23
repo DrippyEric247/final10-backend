@@ -3,6 +3,7 @@ import SavvyScoutButton from "./SavvyScoutButton";
 import SavvyScoutDealToast from "./SavvyScoutDealToast";
 import SavvyScoutMissionsPanel from "./scout/SavvyScoutMissionsPanel";
 import SavvyScoutMissionPopupHost from "./scout/SavvyScoutMissionPopup";
+import SavvyScoutWaveform from "./scout/SavvyScoutWaveform";
 import { useSavvyScoutMissionsOptional } from "../context/SavvyScoutMissionsContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -55,6 +56,15 @@ import { MENU_MUSIC_DUCK } from "../lib/menuMusicEngine";
 
 const SCOUT_GREETING =
   "Savvy Scout reporting. What opportunity are we hunting today?";
+
+const ASK_QUICK_CHIPS = Object.freeze([
+  { label: "Gaming", query: "find gaming deals under $100" },
+  { label: "Sneakers", query: "find sneaker deals" },
+  { label: "Cars", query: "find car accessory deals" },
+  { label: "Tech", query: "find tech deals under $200" },
+  { label: "PS5", query: "find PS5 deals" },
+  { label: "Earn Savvy", query: "how do I earn Savvy points?" },
+]);
 
 const DISMISS_KEY = "f10_assistant_dismissed_ids";
 const HISTORY_KEY = "f10_savvy_ai_history";
@@ -595,6 +605,7 @@ export default function Final10SideAssistant() {
   const [externalScoutState, setExternalScoutState] = useState(null);
   const [showGreeting, setShowGreeting] = useState(false);
   const [activeTab, setActiveTab] = useState("missions");
+  const [askConversationExpanded, setAskConversationExpanded] = useState(false);
   const [claimingMissionId, setClaimingMissionId] = useState(null);
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState(() => loadHistory());
@@ -618,6 +629,7 @@ export default function Final10SideAssistant() {
   const lastApiAtRef = useRef(0);
   const debounceRef = useRef(0);
   const inputRef = useRef(null);
+  const threadRef = useRef(null);
   const recognitionRef = useRef(null);
   const utteranceRef = useRef(null);
   const lastVoiceIntentRef = useRef(null);
@@ -805,23 +817,33 @@ export default function Final10SideAssistant() {
     [items]
   );
 
+  const expandAskConversation = useCallback(() => {
+    setAskConversationExpanded(true);
+    setActiveTab("ask");
+  }, []);
+
   const openPanel = useCallback(() => {
     setExpanded(true);
     setUnread(0);
     if (missionSnapshot?.shouldGlow) {
+      setAskConversationExpanded(false);
       setActiveTab("missions");
     } else {
       setShowGreeting(true);
       setActiveTab("ask");
+      setAskConversationExpanded(false);
       window.setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [missionSnapshot]);
+    void missionsCtx?.syncFromServer?.();
+  }, [missionSnapshot, missionsCtx]);
 
   const openMissionsPanel = useCallback(() => {
     setExpanded(true);
     setUnread(0);
+    setAskConversationExpanded(false);
     setActiveTab("missions");
-  }, []);
+    void missionsCtx?.syncFromServer?.();
+  }, [missionsCtx]);
 
   const handleClaimMission = useCallback(
     async (missionId) => {
@@ -831,7 +853,15 @@ export default function Final10SideAssistant() {
         const res = await missionsCtx.claimMission(missionId);
         if (res.ok && res.rewardSavvy) {
           emitPowerToast(res.rewardSavvy, res.message || `+${res.rewardSavvy} Savvy added to your wallet`);
+        } else if (!res.ok && res.message) {
+          setCoachToast({
+            eyebrow: "Savvy Scout",
+            title: "Mission not ready",
+            body: res.message,
+            tone: "info",
+          });
         }
+        missionsCtx.refresh?.();
       } finally {
         setClaimingMissionId(null);
       }
@@ -1293,6 +1323,8 @@ export default function Final10SideAssistant() {
     async (raw, opts = {}) => {
       const query = String(raw || "").trim();
       if (!query || aiBusy) return;
+      expandAskConversation();
+      setExpanded(true);
       stopSpeaking();
       setAiError("");
       setAiBusy(true);
@@ -1371,7 +1403,7 @@ export default function Final10SideAssistant() {
         setAiBusy(false);
       }
     },
-    [aiBusy, aiCaps.hasVoiceAutoAlert, aiCaps.hasVoiceInput, buildAnswer, buildVoiceSearchAnswer, speakAnswer, stopSpeaking]
+    [aiBusy, aiCaps.hasVoiceAutoAlert, aiCaps.hasVoiceInput, buildAnswer, buildVoiceSearchAnswer, speakAnswer, stopSpeaking, expandAskConversation]
   );
 
   const onSubmit = useCallback(
@@ -1580,6 +1612,8 @@ export default function Final10SideAssistant() {
     }
     setVoiceError("");
     stopSpeaking();
+    expandAskConversation();
+    setExpanded(true);
     const rec = new Ctor();
     rec.lang = "en-US";
     rec.interimResults = true;
@@ -1626,7 +1660,7 @@ export default function Final10SideAssistant() {
       setListening(false);
       setVoiceError("Couldn't start mic. Try again.");
     }
-  }, [listening, aiBusy, aiCaps.hasVoiceInput, stopSpeaking, submitQuery]);
+  }, [listening, aiBusy, aiCaps.hasVoiceInput, stopSpeaking, submitQuery, expandAskConversation]);
 
   const toggleAlerts = useCallback(async () => {
     if (alertsOn) {
@@ -1722,8 +1756,14 @@ export default function Final10SideAssistant() {
     if (!expanded) {
       stopListening();
       stopSpeaking();
+      setAskConversationExpanded(false);
     }
   }, [expanded, stopListening, stopSpeaking]);
+
+  useEffect(() => {
+    if (!askConversationExpanded || !threadRef.current) return;
+    threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [history, aiBusy, askConversationExpanded]);
 
   useEffect(
     () => () => {
@@ -1774,7 +1814,23 @@ export default function Final10SideAssistant() {
         </div>
       ) : null}
       {expanded ? (
-        <div className="f10-assistant-panel f10-assistant-panel--ai">
+        <>
+          {askConversationExpanded && activeTab === "ask" ? (
+            <button
+              type="button"
+              className="f10-assistant-ask-backdrop"
+              aria-label="Close conversation"
+              onClick={() => {
+                setAskConversationExpanded(false);
+                setExpanded(false);
+              }}
+            />
+          ) : null}
+        <div
+          className={`f10-assistant-panel f10-assistant-panel--ai ${
+            askConversationExpanded && activeTab === "ask" ? "f10-assistant-panel--ask-expanded" : ""
+          }`}
+        >
           <div className="f10-assistant-panel-hd">
             <h3>{SAVVY_SCOUT.winLane}</h3>
             <button
@@ -1792,7 +1848,10 @@ export default function Final10SideAssistant() {
               role="tab"
               aria-selected={activeTab === "missions"}
               className={`f10-assistant-tab ${activeTab === "missions" ? "f10-assistant-tab--active" : ""}`}
-              onClick={() => setActiveTab("missions")}
+              onClick={() => {
+                setAskConversationExpanded(false);
+                setActiveTab("missions");
+              }}
             >
               Missions
               {missionCount > 0 ? (
@@ -1804,7 +1863,10 @@ export default function Final10SideAssistant() {
               role="tab"
               aria-selected={activeTab === "ask"}
               className={`f10-assistant-tab ${activeTab === "ask" ? "f10-assistant-tab--active" : ""}`}
-              onClick={() => setActiveTab("ask")}
+              onClick={() => {
+                setActiveTab("ask");
+                expandAskConversation();
+              }}
             >
               {SAVVY_SCOUT.ask}
             </button>
@@ -1838,13 +1900,21 @@ export default function Final10SideAssistant() {
               )}
             </div>
           ) : activeTab === "ask" ? (
-            <div className="f10-assistant-panel-bd f10-assistant-ai-bd">
+            <div
+              className={`f10-assistant-panel-bd f10-assistant-ai-bd ${
+                askConversationExpanded ? "f10-assistant-ai-bd--expanded" : ""
+              }`}
+            >
+              <div className="f10-assistant-ai-conversation">
+                <div ref={threadRef} className="f10-assistant-ai-conversation-scroll">
               {showGreeting ? (
                 <div className="f10-assistant-scout-greeting" role="status">
                   <span className="f10-assistant-scout-greeting-tag">Savvy Scout</span>
                   <p>{SCOUT_GREETING}</p>
                 </div>
               ) : null}
+              {!askConversationExpanded ? (
+              <>
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
                   {SAVVY_SCOUT.shortTitle} Active
@@ -1912,6 +1982,101 @@ export default function Final10SideAssistant() {
                   )}
                 </section>
               ) : null}
+              </>
+              ) : null}
+
+              {history.length === 0 && !aiBusy ? (
+                <div className="f10-assistant-ai-empty">
+                  <div className="f10-assistant-ai-empty-title">Try asking:</div>
+                  <ul className="f10-assistant-ai-suggest">
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => submitQuery("find PS5 deals")}
+                      >
+                        "find PS5 deals"
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => submitQuery("how do I earn points?")}
+                      >
+                        "how do I earn points?"
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => submitQuery("how do I win more auctions?")}
+                      >
+                        "how do I win more auctions?"
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              ) : null}
+
+              <div className={`f10-assistant-ai-thread ${askConversationExpanded ? "f10-assistant-ai-thread--expanded" : ""}`}>
+                {history.map((row) => (
+                  <div key={row.id} className="f10-assistant-ai-turn">
+                    <div className="f10-assistant-ai-q">
+                      <span className="f10-assistant-ai-q-tag">You</span>
+                      <span className="f10-assistant-ai-q-text">{row.query}</span>
+                    </div>
+                    {row.pending ? (
+                      <div className="f10-assistant-ai-a f10-assistant-ai-a--pending">
+                        <span className="f10-assistant-ai-typing" aria-hidden>
+                          <span /><span /><span />
+                        </span>
+                        {SCOUT_COPY.assistant.thinking}
+                      </div>
+                    ) : row.answer ? (
+                      <AnswerBubble
+                        turnId={row.id}
+                        answer={row.answer}
+                        onNav={handleNav}
+                        onSpeak={supportsTTS ? speakAnswer : null}
+                        voiceOn={voiceOn}
+                        onNotifyMe={handleNotifyMe}
+                        onShowBest={handleShowBest}
+                        onTryAnother={handleTryAnother}
+                        onCategoryJump={handleCategoryJump}
+                      onVoiceCreateAlert={handleVoiceCreateAlert}
+                      onVoiceExpandRange={handleVoiceExpandRange}
+                      onVoiceShowMore={handleVoiceShowMore}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+                </div>
+
+              <div className="f10-assistant-ai-composer">
+              {listening ? (
+                <div className="f10-assistant-ai-listening-row">
+                  <SavvyScoutWaveform active />
+                  <span className="f10-assistant-ai-voicebar-status f10-assistant-ai-voicebar-status--live">
+                    Listening…
+                  </span>
+                </div>
+              ) : null}
+
+              {askConversationExpanded ? (
+                <div className="f10-assistant-ai-quick-chips" role="group" aria-label="Quick suggestions">
+                  {ASK_QUICK_CHIPS.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      className="f10-assistant-ai-quick-chip"
+                      onClick={() => submitQuery(chip.query)}
+                      disabled={aiBusy}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               <form className="f10-assistant-ai-form" onSubmit={onSubmit}>
                 {supportsSR ? (
@@ -1942,6 +2107,7 @@ export default function Final10SideAssistant() {
                   placeholder={listening ? "Listening…" : SAVVY_SCOUT.askPlaceholder}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
+                  onFocus={expandAskConversation}
                   disabled={aiBusy}
                   aria-label="Ask Savvy Scout"
                   autoComplete="off"
@@ -1998,11 +2164,7 @@ export default function Final10SideAssistant() {
                     ) : null}
                   </button>
                 </div>
-                {listening ? (
-                  <span className="f10-assistant-ai-voicebar-status f10-assistant-ai-voicebar-status--live">
-                    ● Listening
-                  </span>
-                ) : speaking ? (
+                {!listening && speaking ? (
                   <button
                     type="button"
                     className="f10-assistant-ai-voicebar-status f10-assistant-ai-voicebar-status--speaking"
@@ -2024,68 +2186,7 @@ export default function Final10SideAssistant() {
                 <div className="f10-assistant-ai-error">{voiceError}</div>
               ) : null}
               {aiError ? <div className="f10-assistant-ai-error">{aiError}</div> : null}
-
-              {history.length === 0 && !aiBusy ? (
-                <div className="f10-assistant-ai-empty">
-                  <div className="f10-assistant-ai-empty-title">Try asking:</div>
-                  <ul className="f10-assistant-ai-suggest">
-                    <li>
-                      <button
-                        type="button"
-                        onClick={() => submitQuery("find PS5 deals")}
-                      >
-                        "find PS5 deals"
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        type="button"
-                        onClick={() => submitQuery("how do I earn points?")}
-                      >
-                        "how do I earn points?"
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        type="button"
-                        onClick={() => submitQuery("how do I win more auctions?")}
-                      >
-                        "how do I win more auctions?"
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              ) : null}
-
-              <div className="f10-assistant-ai-thread">
-                {history.map((row) => (
-                  <div key={row.id} className="f10-assistant-ai-turn">
-                    <div className="f10-assistant-ai-q">
-                      <span className="f10-assistant-ai-q-tag">You</span>
-                      <span className="f10-assistant-ai-q-text">{row.query}</span>
-                    </div>
-                    {row.pending ? (
-                      <div className="f10-assistant-ai-a f10-assistant-ai-a--pending">
-                        {SCOUT_COPY.assistant.thinking}
-                      </div>
-                    ) : row.answer ? (
-                      <AnswerBubble
-                        turnId={row.id}
-                        answer={row.answer}
-                        onNav={handleNav}
-                        onSpeak={supportsTTS ? speakAnswer : null}
-                        voiceOn={voiceOn}
-                        onNotifyMe={handleNotifyMe}
-                        onShowBest={handleShowBest}
-                        onTryAnother={handleTryAnother}
-                        onCategoryJump={handleCategoryJump}
-                      onVoiceCreateAlert={handleVoiceCreateAlert}
-                      onVoiceExpandRange={handleVoiceExpandRange}
-                      onVoiceShowMore={handleVoiceShowMore}
-                      />
-                    ) : null}
-                  </div>
-                ))}
+              </div>
               </div>
             </div>
           ) : (
@@ -2136,6 +2237,7 @@ export default function Final10SideAssistant() {
             </div>
           )}
         </div>
+        </>
       ) : null}
 
       <div id="f10-event-hud-anchor" className="f10-event-hud-anchor" aria-hidden />

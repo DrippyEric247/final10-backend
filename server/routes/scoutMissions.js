@@ -18,6 +18,25 @@ router.get('/progress', auth, async (req, res) => {
   }
 });
 
+/** POST /api/scout-missions/record-action — trusted client action sync to server progress. */
+router.post('/record-action', auth, scoutMissionClaimLimiter, async (req, res) => {
+  try {
+    const trigger = String(req.body?.trigger || '').trim();
+    const increment = Math.max(1, Math.round(Number(req.body?.increment) || 1));
+    if (!trigger) {
+      return res.status(400).json({ ok: false, message: 'trigger is required.' });
+    }
+
+    const { recordScoutMissionTrigger } = require('../services/scoutMissionProgressService');
+    const completed = await recordScoutMissionTrigger(req.user.id, trigger, { increment });
+    const progress = await getMissionProgressSnapshot(req.user.id);
+    return res.json({ ok: true, completed, progress });
+  } catch (err) {
+    console.error('[scoutMissions] record-action error:', err?.message || err);
+    return res.status(500).json({ ok: false, message: 'Could not record mission action.' });
+  }
+});
+
 /** POST /api/scout-missions/claim — grant Savvy for a completed mission (idempotent). */
 router.post('/claim', auth, scoutMissionClaimLimiter, async (req, res) => {
   try {

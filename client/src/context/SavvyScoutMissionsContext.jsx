@@ -31,6 +31,20 @@ export function SavvyScoutMissionsProvider({ children }) {
   }, [user?.id, user?._id]);
 
   useEffect(() => {
+    if (!user?.id && !user?._id) return undefined;
+    const onFocus = () => {
+      void syncScoutMissionProgressFromServer().then(() => setTick((n) => n + 1));
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onFocus();
+    });
+    return () => {
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user?.id, user?._id]);
+
+  useEffect(() => {
     const bump = () => setTick((n) => n + 1);
     window.addEventListener(SCOUT_MISSION_SYNC_EVENT, bump);
     return () => window.removeEventListener(SCOUT_MISSION_SYNC_EVENT, bump);
@@ -72,10 +86,17 @@ export function SavvyScoutMissionsProvider({ children }) {
           /* ignore */
         }
       }
+      await syncScoutMissionProgressFromServer();
+      setTick((n) => n + 1);
       return res;
     },
     [patchUser]
   );
+
+  const syncFromServer = useCallback(async () => {
+    await syncScoutMissionProgressFromServer();
+    setTick((n) => n + 1);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -83,8 +104,9 @@ export function SavvyScoutMissionsProvider({ children }) {
       trackAction,
       claimMission,
       refresh: () => setTick((n) => n + 1),
+      syncFromServer,
     }),
-    [snapshot, trackAction, claimMission]
+    [snapshot, trackAction, claimMission, syncFromServer]
   );
 
   return (

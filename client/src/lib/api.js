@@ -784,9 +784,15 @@ export async function claimScoutMissionReward({ missionId, periodKey }) {
   return data;
 }
 
-/** GET /api/scout-missions/progress — server-authoritative mission completion + claim state. */
+/** GET /api/scout-missions/progress — server-authoritative completion + claim state. */
 export async function getScoutMissionProgress() {
   const { data } = await api.get("/scout-missions/progress");
+  return data;
+}
+
+/** POST /api/scout-missions/record-action — sync trusted mission trigger to server. */
+export async function recordScoutMissionAction({ trigger, increment = 1 }) {
+  const { data } = await api.post("/scout-missions/record-action", { trigger, increment });
   return data;
 }
 

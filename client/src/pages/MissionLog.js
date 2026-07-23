@@ -30,6 +30,8 @@ export default function MissionLog() {
       const res = await claimMission(id);
       if (res.ok && res.rewardSavvy) {
         emitPowerToast(res.rewardSavvy, res.message || `+${res.rewardSavvy} Savvy added to your wallet`);
+      } else if (!res.ok && res.message) {
+        window.alert(res.message);
       }
     } finally {
       setClaimingId(null);

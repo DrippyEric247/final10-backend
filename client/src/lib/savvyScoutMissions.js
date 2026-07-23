@@ -3,7 +3,7 @@
  * Tagline: Savvy Scout discovers Savvy Point earning opportunities while you use the Savvy Universe.
  */
 
-import { claimScoutMissionReward as apiClaimScoutMissionReward, getScoutMissionProgress } from "./api";
+import { claimScoutMissionReward as apiClaimScoutMissionReward, getScoutMissionProgress, recordScoutMissionAction as apiRecordScoutMissionAction } from "./api";
 import { awardPoints } from "./pointsEngine";
 import {
   SCOUT_MISSION_ACTION_EVENT,
@@ -236,9 +236,12 @@ const ROUTE_CONTEXT_MAP = [
   { prefix: "/onboarding/best-move", context: "best_move" },
 ];
 
+function utcDayKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
 function todayKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return utcDayKey();
 }
 
 function weekKey() {
@@ -255,6 +258,7 @@ function defaultState() {
     completed: {},
     claimed: {},
     onceDone: {},
+    serverRows: {},
     savvyEarnedToday: 0,
     savvyEarnedDay: todayKey(),
     lastPopupAt: 0,
@@ -321,6 +325,23 @@ function isComplete(state, mission) {
   return getProgress(state, mission) >= target;
 }
 
+function getServerRow(state, mission) {
+  const periodKey = cadenceKey(mission.cadence);
+  return state.serverRows?.[`${mission.id}:${periodKey}`] || null;
+}
+
+function isServerComplete(state, mission) {
+  const row = getServerRow(state, mission);
+  if (!row) return false;
+  return Boolean(row.complete || row.claimed);
+}
+
+function isServerClaimable(state, mission) {
+  const row = getServerRow(state, mission);
+  if (!row) return false;
+  return Boolean(row.complete && !row.claimed);
+}
+
 export function resolveContextFromPath(pathname = "") {
   const path = String(pathname || "");
   for (const row of ROUTE_CONTEXT_MAP) {
@@ -345,14 +366,18 @@ export function getScoutMissionSnapshot(pathname = "") {
     const target = def.target || 1;
     const complete = isComplete(state, def);
     const claimed = isClaimed(state, def);
+    const serverRow = getServerRow(state, def);
+    const serverComplete = isServerComplete(state, def);
     const contextual = def.contexts.includes(context) || def.contexts.includes("general");
     return {
       ...def,
       progress,
       target,
-      complete,
-      claimed,
-      claimable: complete && !claimed,
+      complete: complete || serverComplete,
+      claimed: claimed || Boolean(serverRow?.claimed),
+      claimable: isServerClaimable(state, def) && !isClaimed(state, def),
+      serverComplete,
+      serverPending: complete && !serverComplete && !claimed,
       contextual,
       progressPct: Math.min(100, Math.round((progress / target) * 100)),
     };
@@ -473,6 +498,7 @@ export function recordScoutMissionAction(trigger, meta = {}) {
       // eslint-disable-next-line no-console
       console.info("[ScoutMissions] action", { trigger, context, increment });
     }
+    void syncMissionActionToServer(trigger, increment);
   }
 
   try {
@@ -488,8 +514,97 @@ function markMissionClaimedLocally(state, def) {
   const key = progressKey(def);
   state.claimed[key] = Date.now();
   if (def.once) state.onceDone[def.id] = Date.now();
+  const periodKey = cadenceKey(def.cadence);
+  const serverKey = `${def.id}:${periodKey}`;
+  state.serverRows = state.serverRows || {};
+  state.serverRows[serverKey] = {
+    ...(state.serverRows[serverKey] || {}),
+    complete: true,
+    claimed: true,
+    periodKey,
+  };
   saveState(state);
   dispatchScoutMissionSync();
+}
+
+async function syncMissionActionToServer(trigger, increment = 1) {
+  try {
+    await apiRecordScoutMissionAction({ trigger, increment });
+    await syncScoutMissionProgressFromServer();
+  } catch {
+    /* offline or unauthenticated */
+  }
+}
+
+function applyServerProgressRows(state, rows) {
+  let changed = false;
+  state.serverRows = state.serverRows || {};
+
+  for (const row of rows) {
+    const def = missionDef(row.missionId);
+    if (!def) continue;
+
+    const serverKey = `${row.missionId}:${row.periodKey}`;
+    state.serverRows[serverKey] = {
+      progress: Math.max(0, Number(row.progress) || 0),
+      complete: Boolean(row.complete),
+      claimed: Boolean(row.claimed || row.claimedAt),
+      periodKey: row.periodKey,
+    };
+
+    const currentPeriod = cadenceKey(def.cadence);
+    if (row.periodKey !== currentPeriod) continue;
+
+    const key = progressKey(def);
+    const target = def.target || 1;
+    const serverProgress = Math.max(0, Number(row.progress) || 0);
+
+    if (row.complete || serverProgress >= target) {
+      const local = getProgress(state, def);
+      const next = Math.min(target, Math.max(local, serverProgress));
+      if (next !== local) {
+        state.progress[key] = next;
+        changed = true;
+      }
+    } else if (serverProgress < target) {
+      const local = getProgress(state, def);
+      if (local >= target && !row.complete) {
+        state.progress[key] = Math.min(local, serverProgress);
+        changed = true;
+      }
+    }
+
+    if (row.claimed || row.claimedAt) {
+      if (!state.claimed[key]) {
+        state.claimed[key] = Date.now();
+        changed = true;
+      }
+      if (def.once && !state.onceDone[def.id]) {
+        state.onceDone[def.id] = Date.now();
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
+}
+
+export async function reconcileMissionAfterFailedClaim(missionId) {
+  await syncScoutMissionProgressFromServer();
+  const def = missionDef(missionId);
+  if (!def) return;
+  const state = loadState();
+  if (!isServerComplete(state, def)) {
+    const key = progressKey(def);
+    const row = getServerRow(state, def);
+    const target = def.target || 1;
+    const serverProgress = Math.min(target, Math.max(0, Number(row?.progress) || 0));
+    if (serverProgress !== getProgress(state, def)) {
+      state.progress[key] = serverProgress;
+      saveState(state);
+      dispatchScoutMissionSync();
+    }
+  }
 }
 
 /**
@@ -499,40 +614,10 @@ export async function syncScoutMissionProgressFromServer() {
   try {
     const data = await getScoutMissionProgress();
     const rows = Array.isArray(data?.progress) ? data.progress : [];
-    if (!rows.length) return;
-
     const state = loadState();
-    let changed = false;
+    const changed = applyServerProgressRows(state, rows);
 
-    for (const row of rows) {
-      const def = missionDef(row.missionId);
-      if (!def) continue;
-      const key = progressKey(def);
-      const serverProgress = Math.max(0, Number(row.progress) || 0);
-      const target = def.target || 1;
-
-      if (row.complete || serverProgress >= target) {
-        const local = getProgress(state, def);
-        const next = Math.min(target, Math.max(local, serverProgress));
-        if (next !== local) {
-          state.progress[key] = next;
-          changed = true;
-        }
-      }
-
-      if (row.claimed || row.claimedAt) {
-        if (!state.claimed[key]) {
-          state.claimed[key] = Date.now();
-          changed = true;
-        }
-        if (def.once && !state.onceDone[def.id]) {
-          state.onceDone[def.id] = Date.now();
-          changed = true;
-        }
-      }
-    }
-
-    if (changed) {
+    if (changed || rows.length) {
       saveState(state);
       dispatchScoutMissionSync();
     }
@@ -551,7 +636,19 @@ export async function claimScoutMission(missionId) {
   if (!def) return { ok: false, message: "Mission not found." };
 
   const state = loadState();
-  if (isClaimed(state, def)) return { ok: false, message: "Already claimed." };
+  if (isClaimed(state, def) || getServerRow(state, def)?.claimed) {
+    markMissionClaimedLocally(state, def);
+    return { ok: false, message: "Already claimed." };
+  }
+
+  if (!isServerClaimable(state, def)) {
+    await reconcileMissionAfterFailedClaim(def.id);
+    return {
+      ok: false,
+      message: "Complete this mission before claiming.",
+      code: "mission_not_complete",
+    };
+  }
 
   const periodKey = progressKey(def);
   claimInFlight = true;
@@ -590,13 +687,15 @@ export async function claimScoutMission(missionId) {
     const status = err?.response?.status;
     const body = err?.response?.data;
     if (status === 409 || body?.alreadyClaimed) {
-      markMissionClaimedLocally(state, def);
+      markMissionClaimedLocally(loadState(), def);
       return { ok: false, message: "Already claimed." };
     }
     if (status === 403 || body?.error === "mission_not_complete") {
+      await reconcileMissionAfterFailedClaim(def.id);
       return {
         ok: false,
         message: body?.message || "Complete this mission before claiming.",
+        code: "mission_not_complete",
       };
     }
     if (status === 401) {
