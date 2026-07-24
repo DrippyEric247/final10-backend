@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   getPerkMachineStatus,
   spinPerkMachine,
   hatchPerkEgg,
-  activatePerkItem,
+  activateInventoryToken,
   activatePerkEventToken,
   activateMaxSupplyDropToken,
   redeemBattlePassTierSkip,
@@ -44,6 +44,17 @@ import {
   PERK_MUSIC_DUCK,
 } from '../lib/perkMachineMusicEngine';
 import { SavvySalePerkBadge } from '../components/events/SavvySaleBanner';
+import TokenActivationModal from '../components/inventory/TokenActivationModal';
+import {
+  INVENTORY_TOKEN_DEFS,
+  isBoostActiveForDef,
+} from '../lib/inventoryTokens';
+import {
+  createActivationIdempotencyKey,
+  stashActivationPresentation,
+} from '../lib/inventoryActivationBus';
+import { notifyInventoryUpdated } from '../hooks/useActiveBoosts';
+import '../styles/InventoryTokens.css';
 import '../styles/PerkMachine.css';
 import '../styles/EggHatchery.css';
 import '../styles/PerkRewardIndex.css';
@@ -77,30 +88,6 @@ function prettyMode(mode) {
   return mode.toUpperCase();
 }
 
-/** Inventory items the player can activate, with copy for the activation modal. */
-const ACTIVATABLE_DEFS = [
-  {
-    key: 'battlePassXp15',
-    icon: '⚡',
-    label: '1.5× Battle Pass XP Token',
-    effect: 'Activates a 1.5× Battle Pass XP boost for the next 24 hours.',
-    countFrom: (s) => Number(s?.tokens?.battlePassXp15) || 0,
-  },
-  {
-    key: 'savvyMultiplier15',
-    icon: '✨',
-    label: '1.5× Savvy Token',
-    effect: 'Activates a 1.5× Savvy boost on Perk Machine rewards for 24 hours.',
-    countFrom: (s) => Number(s?.tokens?.savvyMultiplier15) || 0,
-  },
-  {
-    key: 'extraFreeSpin',
-    icon: '🎰',
-    label: 'Extra Free Spin Egg',
-    effect: 'Adds one free Perk Machine spin right now.',
-    countFrom: (s) => Number(s?.eggInventory?.extraFreeSpin) || 0,
-  },
-];
 
 function ReelColumn({ spinning, symbol, revealed, highlight, isMultiplier }) {
   return (
@@ -263,6 +250,7 @@ function HatchRewardsInventory({ status, onActivateEvent, onMaxSupplyDrop, onTie
 }
 
 export default function PerkMachine() {
+  const navigate = useNavigate();
   const { user, refreshProfile, patchUser } = useAuth();
   const cosmetics = useCosmeticsLoadout();
   const savvy = useSavvyPoints();
@@ -288,6 +276,7 @@ export default function PerkMachine() {
   const [confirmToast, setConfirmToast] = useState(null);
   const [coinBurst, setCoinBurst] = useState(0);
   const [activationItem, setActivationItem] = useState(null);
+  const [activatingKey, setActivatingKey] = useState(null);
   const [activating, setActivating] = useState(false);
   const [boostNow, setBoostNow] = useState(Date.now());
   const [saleMs, setSaleMs] = useState(0);
@@ -744,30 +733,53 @@ export default function PerkMachine() {
     [refreshProfile, patchUser, user, savvyBalance, fireCoinBurst, showConfirm, cosmetics]
   );
 
+  const tokenActivating = Boolean(activatingKey);
+
   const handleActivate = useCallback(
-    async (itemKey) => {
-      if (activating) return;
-      setActivating(true);
+    async (def) => {
+      if (!def || activatingKey) return;
+      setActivatingKey(def.itemType);
+      const idempotencyKey = createActivationIdempotencyKey(def.itemType);
       try {
-        const result = await activatePerkItem(itemKey);
+        const result = await activateInventoryToken(def.itemType, idempotencyKey);
+        if (!result?.success || !result?.consumed) {
+          throw new Error(result?.message || 'Token could not be activated. Nothing was consumed.');
+        }
         if (result?.status) setStatus(result.status);
         if (typeof refreshProfile === 'function') await refreshProfile();
         window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
-        const label = result?.item?.label || 'Boost';
-        showConfirm(
-          result?.freeSpins
-            ? `${label} activated — free spin ready`
-            : `${label} activated`
-        );
+        notifyInventoryUpdated();
+
+        stashActivationPresentation({
+          itemType: def.itemType,
+          navigationTarget: result.navigationTarget || def.navigationTarget,
+          activation: result.activation,
+          presentation: result.presentation,
+          freeSpinsTotal: result.freeSpinsTotal,
+        });
+
         setActivationItem(null);
+
+        const target = result.navigationTarget || def.navigationTarget;
+        if (target && target !== '/perk-machine') {
+          navigate(target);
+        } else if (def.itemType === 'extra_free_spin_egg') {
+          showConfirm('Free Spin Added');
+          machinePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          showConfirm(result.message || `${def.label} activated`);
+        }
       } catch (e) {
-        const msg = e?.response?.data?.message || e?.message || 'Activation failed.';
+        const msg =
+          e?.response?.data?.message ||
+          e?.message ||
+          'Token could not be activated. Nothing was consumed.';
         showConfirm(msg, 'error');
       } finally {
-        setActivating(false);
+        setActivatingKey(null);
       }
     },
-    [activating, refreshProfile, showConfirm]
+    [activatingKey, refreshProfile, showConfirm, navigate]
   );
 
   const handleHatchStatusUpdate = useCallback((nextStatus) => {
@@ -1150,10 +1162,12 @@ export default function PerkMachine() {
           <div className="perk-tokens-panel">
             <div className="perk-tokens-panel__title">🎁 Inventory</div>
             <ul className="perk-tokens-list">
-              {ACTIVATABLE_DEFS.map((def) => {
+              {INVENTORY_TOKEN_DEFS.map((def) => {
                 const count = def.countFrom(status);
+                const isActive = isBoostActiveForDef(status, def);
+                const isBusy = activatingKey === def.itemType;
                 return (
-                  <li key={def.key} className="perk-inv-item">
+                  <li key={def.itemType} className="perk-inv-item">
                     <span className="perk-inv-item__label">
                       {def.icon} {def.label}
                     </span>
@@ -1162,10 +1176,10 @@ export default function PerkMachine() {
                       <button
                         type="button"
                         className="perk-inv-item__use"
-                        disabled={count < 1}
-                        onClick={() => setActivationItem({ ...def, count })}
+                        disabled={count < 1 || (tokenActivating && !isBusy)}
+                        onClick={() => setActivationItem({ ...def, count, isActive })}
                       >
-                        Use
+                        {isBusy ? 'Activating…' : isActive ? 'Extend +30m' : 'Use'}
                       </button>
                     </span>
                   </li>
@@ -1246,41 +1260,15 @@ export default function PerkMachine() {
         <PerkMachineAdminPanel onStatusRefresh={loadStatus} />
       ) : null}
 
-      {activationItem ? (
-        <div
-          className="perk-activate-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Activate boost"
-          onClick={() => !activating && setActivationItem(null)}
-        >
-          <div className="perk-activate-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="perk-activate-modal__icon" aria-hidden>{activationItem.icon}</div>
-            <h3 className="perk-activate-modal__title">Activate this boost?</h3>
-            <p className="perk-activate-modal__name">{activationItem.label}</p>
-            <p className="perk-activate-modal__effect">{activationItem.effect}</p>
-            <p className="perk-activate-modal__count">You have {activationItem.count} available.</p>
-            <div className="perk-activate-modal__actions">
-              <button
-                type="button"
-                className="perk-activate-modal__cancel"
-                disabled={activating}
-                onClick={() => setActivationItem(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="perk-activate-modal__confirm"
-                disabled={activating}
-                onClick={() => void handleActivate(activationItem.key)}
-              >
-                {activating ? 'Activating…' : 'Activate'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TokenActivationModal
+        open={Boolean(activationItem)}
+        def={activationItem}
+        count={activationItem?.count || 0}
+        activating={tokenActivating}
+        isActive={Boolean(activationItem?.isActive)}
+        onCancel={() => !tokenActivating && setActivationItem(null)}
+        onConfirm={() => activationItem && void handleActivate(activationItem)}
+      />
 
       {ticketUnlock ? (
         <div className="perk-ticket-unlock" role="alert" aria-live="assertive" key={ticketUnlock.id}>

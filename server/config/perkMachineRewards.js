@@ -49,8 +49,8 @@ const REWARD_POOL = Object.freeze([
   {
     id: 'token_savvy_mult',
     type: 'token',
-    tokenKey: 'savvyMultiplier15',
-    label: '1.5× Savvy Token',
+    tokenKey: 'savvyLevelXp15',
+    label: '1.5× Savvy Level XP Token',
     icon: '✨',
     rarity: 'rare',
     weight: 5,
@@ -149,7 +149,7 @@ const REWARD_INDEX = Object.freeze([
  */
 const EXTRA_HATCH_REWARDS = Object.freeze([
   { id: 'savvy_500', type: 'savvy', amount: 500, label: '+500 Savvy', icon: '💎', rarity: 'legendary', weight: 1 },
-  { id: 'free_spin', type: 'egg', eggTier: 'extraFreeSpin', label: 'Free Spin', icon: '🎰', rarity: 'uncommon', weight: 1 },
+  { id: 'free_spin', type: 'egg', eggTier: 'extraFreeSpin', label: 'Extra Free Spin Egg', icon: '🎰', rarity: 'uncommon', weight: 1 },
   { id: 'scout_upgrade', type: 'scout_upgrade', label: 'Savvy Scout Upgrade', icon: '🤖', rarity: 'legendary', weight: 1 },
 ]);
 

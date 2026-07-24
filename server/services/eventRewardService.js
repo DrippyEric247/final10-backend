@@ -34,7 +34,6 @@ async function applyEventReward(user, rewardDef, idempotencyPrefix) {
     const tier = reward.eggTier;
     if (tier === 'extraFreeSpin') {
       pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin || 0) + 1;
-      pm.extraFreeSpins = Number(pm.extraFreeSpins || 0) + 1;
     } else if (tier && pm.eggInventory[tier] != null) {
       pm.eggInventory[tier] = Number(pm.eggInventory[tier] || 0) + 1;
     }

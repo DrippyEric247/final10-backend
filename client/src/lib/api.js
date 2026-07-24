@@ -370,8 +370,21 @@ export async function hatchPerkEgg(eggTier) {
   return data;
 }
 
-export async function activatePerkItem(itemKey) {
-  const { data } = await api.post("/perk-machine/activate", { itemKey });
+export async function activatePerkItem(itemKey, idempotencyKey) {
+  const { data } = await api.post("/perk-machine/activate", {
+    itemKey,
+    idempotencyKey,
+  });
+  return data;
+}
+
+export async function activateInventoryToken(itemType, idempotencyKey) {
+  const { data } = await api.post("/inventory/use", { itemType, idempotencyKey });
+  return data;
+}
+
+export async function getInventoryStatus() {
+  const { data } = await api.get("/inventory/status");
   return data;
 }
 

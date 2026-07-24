@@ -12,6 +12,8 @@ import { findCallingCard, findEmblem } from "../lib/customizationCatalog";
 import { useSavvyScoutMissionsOptional } from "../context/SavvyScoutMissionsContext";
 import EventHistorySection from "../components/profile/EventHistorySection";
 import ProgressHistorySection from "../components/profile/ProgressHistorySection";
+import ActiveBoostsBar from "../components/inventory/ActiveBoostsBar";
+import { useActiveBoosts } from "../hooks/useActiveBoosts";
 import "../styles/ProfilePageLayout.css";
 import "../styles/SavvyScoutMissions.css";
 
@@ -77,6 +79,7 @@ export default function ProfilePageLayout({
 }) {
   const { snapshot } = useFinal10Power();
   const scoutMissions = useSavvyScoutMissionsOptional()?.snapshot;
+  const activeBoosts = useActiveBoosts(Boolean(user?.id || user?._id));
   const powerBar = useMemo(() => {
     void snapshot;
     return getUniversalBoostState();
@@ -132,6 +135,7 @@ export default function ProfilePageLayout({
               <span aria-hidden>·</span>
               <span>{xpPct}% to next</span>
             </div>
+            <ActiveBoostsBar boosts={activeBoosts} compact className="f10-profile-active-boosts" />
             <div className="f10-profile-loadout-strip" aria-label="Equipped calling card">
               <span
                 className="f10-profile-loadout-emblem"

@@ -117,21 +117,40 @@ router.post('/activate', auth, async (req, res, next) => {
     const user = await User.findById(req.user.id);
     if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
 
-    const itemKey = String(req.body?.itemKey || '').trim();
+    const itemKey = String(req.body?.itemKey || req.body?.itemType || '').trim();
+    const idempotencyKey = String(req.body?.idempotencyKey || '').trim();
+
+    if (idempotencyKey) {
+      const { useInventoryToken } = require('../services/inventoryActivationService');
+      const result = await useInventoryToken(user, { itemType: itemKey, idempotencyKey });
+      await user.save();
+      const status = await getPerkMachineStatusWithEvents(user);
+      return res.json({ ...result, status });
+    }
+
     const result = activatePerkItem(user, itemKey);
     await user.save();
 
     const { user: _omit, ...rest } = result;
     res.json({
       ...rest,
-      message: result.boost
-        ? `${result.item.label} activated.`
-        : `${result.item.label} activated.`,
+      success: true,
+      consumed: true,
+      message: result.boost?.extended
+        ? `${result.item.label} extended.`
+        : result.freeSpins
+          ? 'Free spin added.'
+          : `${result.item.label} activated.`,
       status: getPerkMachineStatus(user),
     });
   } catch (err) {
     if (err.status) {
-      return res.status(err.status).json({ message: err.message, code: err.code });
+      return res.status(err.status).json({
+        success: false,
+        consumed: false,
+        message: err.message,
+        code: err.code,
+      });
     }
     console.error('[perk-machine/activate]', err);
     next(err);

@@ -228,6 +228,7 @@ auditStartup({
 console.log('[startup] boot phase=audit_startup');
 app.use('/api/streak',      require('./routes/streakRoutes'));
 app.use('/api/perk-machine', require('./routes/perkMachineRoutes'));
+app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/scout-flight', require('./routes/scoutFlightRoutes'));
 app.use('/api/events', require('./routes/eventsRoutes'));
 app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));

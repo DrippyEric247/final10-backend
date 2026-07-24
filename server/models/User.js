@@ -90,6 +90,7 @@ const userSchema = new mongoose.Schema({
     },
     tokens: {
       battlePassXp15: { type: Number, default: 0 },
+      savvyLevelXp15: { type: Number, default: 0 },
       savvyMultiplier15: { type: Number, default: 0 },
       /** Free 3-slot spin token (from supply drops). */
       paid3Spin: { type: Number, default: 0 },

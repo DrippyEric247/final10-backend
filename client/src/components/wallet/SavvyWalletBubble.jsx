@@ -12,6 +12,8 @@ import {
 import { playSavvyWalletSound, playUiClick } from "../../lib/savvyWalletSound";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { SCOUT_COPY } from "../../config/savvyScoutBranding";
+import ActiveBoostsBar from "../inventory/ActiveBoostsBar";
+import { useActiveBoosts } from "../../hooks/useActiveBoosts";
 import "../../styles/SavvyWalletBubble.css";
 
 const MOBILE_MQ = "(max-width: 767px)";
@@ -367,6 +369,7 @@ export default function SavvyWalletBubble() {
   const touchStartY = useRef(0);
   const idleTimerRef = useRef(null);
   const reduceMotion = useReducedMotion();
+  const activeBoosts = useActiveBoosts(Boolean(user));
   const [wallet, setWallet] = useState(() => getWalletSnapshot());
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -692,6 +695,8 @@ export default function SavvyWalletBubble() {
               </motion.span>
               <span className="savvy-wallet-balance-sub">Savvy</span>
             </div>
+
+            <ActiveBoostsBar boosts={activeBoosts} compact className="savvy-wallet-active-boosts" />
 
             <AnimatePresence>
               {floatLabel ? (

@@ -194,8 +194,24 @@ async function grantProfileXp(user, {
   const userLevel = await getUserLevelDoc(userId);
 
   let xpAmount = Math.round(Number(amount) || 0);
+  let baseAmount = xpAmount;
   if (!xpAmount && source) {
-    xpAmount = Math.round(defaultAmountForSource(source) * (Number(multiplier) || 1));
+    baseAmount = defaultAmountForSource(source);
+    xpAmount = baseAmount;
+  }
+
+  let tokenMult = 1;
+  try {
+    // eslint-disable-next-line global-require
+    tokenMult = require('./perkBoostService').getProfileXpMultiplier(user) || 1;
+  } catch {
+    tokenMult = 1;
+  }
+  const eventMult = Number(multiplier) || 1;
+  const profileTokenBonus =
+    tokenMult > 1 && baseAmount > 0 ? Math.round(baseAmount * (tokenMult - 1) * eventMult) : 0;
+  if (baseAmount > 0) {
+    xpAmount = Math.round(baseAmount * eventMult * tokenMult);
   }
   if (xpAmount <= 0) {
     return { granted: false, amount: 0, duplicate: false };
@@ -237,7 +253,14 @@ async function grantProfileXp(user, {
     sourceId: sourceId ? String(sourceId) : null,
     eventId: eventId ? String(eventId) : null,
     sessionId: effectiveSessionId,
-    metadata,
+    metadata: {
+      ...metadata,
+      profileXpBase: baseAmount,
+      tokenBonus: profileTokenBonus,
+      tokenMultiplier: tokenMult,
+      eventMultiplier: eventMult,
+      totalProfileXp: xpAmount,
+    },
     idempotencyKey: key,
     createdAt: new Date(),
   });

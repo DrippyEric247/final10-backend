@@ -72,7 +72,7 @@ export function resolveRewardReveal(reward) {
       key: `token-${reward.tokenKey || "boost"}`,
       icon: isXp ? "⚡" : "✨",
       eyebrow: "Boost Token",
-      title: reward.label || (isXp ? "1.5× Battle Pass XP Token" : "1.5× Savvy Token"),
+      title: reward.label || (isXp ? "1.5× Battle Pass XP Token" : "1.5× Savvy Level XP Token"),
       subtitle: "Added to your inventory.",
       accent: isXp ? "#38bdf8" : "#a78bfa",
       tier: "rare",

@@ -1,52 +1,62 @@
 /**
  * Perk Machine timed boosts + inventory activation.
- *
- * Activating a token consumes it and starts a timed boost (stored on
- * user.perkMachine.activeBoosts). Multipliers are read at grant time so the
- * effect is server-authoritative and visible everywhere.
  */
 
-const BOOST_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const {
+  TOKEN_DURATION_MS,
+  INVENTORY_TOKENS,
+  resolveInventoryToken,
+  tokenCountForUser,
+  consumeTokenFromUser,
+} = require('../config/inventoryTokens');
 
-/** Items the player can activate from inventory. */
-const ACTIVATABLE_ITEMS = Object.freeze({
-  battlePassXp15: {
-    key: 'battlePassXp15',
-    kind: 'boost',
-    source: 'tokens',
-    label: '1.5× Battle Pass XP',
-    icon: '⚡',
-    multiplier: 1.5,
-    durationMs: BOOST_DURATION_MS,
-    effect: '1.5× Battle Pass XP for the next 24 hours.',
-  },
-  savvyMultiplier15: {
-    key: 'savvyMultiplier15',
-    kind: 'boost',
-    source: 'tokens',
-    label: '1.5× Savvy',
-    icon: '✨',
-    multiplier: 1.5,
-    durationMs: BOOST_DURATION_MS,
-    effect: '1.5× Savvy from Perk Machine rewards for the next 24 hours.',
-  },
-  extraFreeSpin: {
-    key: 'extraFreeSpin',
-    kind: 'free_spin',
-    source: 'eggInventory',
-    label: 'Extra Free Spin Egg',
-    icon: '🎰',
-    effect: 'Adds one free Perk Machine spin right now.',
-  },
+/** @deprecated use TOKEN_DURATION_MS */
+const BOOST_DURATION_MS = TOKEN_DURATION_MS;
+
+/** Items the player can activate from inventory (legacy export). */
+const ACTIVATABLE_ITEMS = Object.freeze(
+  Object.fromEntries(
+    Object.values(INVENTORY_TOKENS).map((def) => [
+      def.itemKey,
+      {
+        key: def.itemKey,
+        itemType: def.itemType,
+        kind: def.kind,
+        source: def.source,
+        label: def.label,
+        activeLabel: def.activeLabel || def.label,
+        icon: def.icon,
+        multiplier: def.multiplier || null,
+        durationMs: def.durationMs || TOKEN_DURATION_MS,
+        effect: def.confirmBody,
+        navigationTarget: def.navigationTarget,
+      },
+    ])
+  )
+);
+
+/** Legacy savvyMultiplier15 maps to savvy level XP token. */
+ACTIVATABLE_ITEMS.savvyMultiplier15 = {
+  ...ACTIVATABLE_ITEMS.savvyLevelXp15,
+  key: 'savvyMultiplier15',
+};
+
+const PERSONAL_EVENTS = Object.freeze({
+  doubleXp: { kind: 'doubleXp', label: 'Double XP', icon: '⚡', xpMultiplier: 2 },
+  savvySale: { kind: 'savvySale', label: 'Savvy Sale', icon: '🏷️' },
 });
 
 function ensureBoostDoc(user) {
   if (!user.perkMachine || typeof user.perkMachine !== 'object') user.perkMachine = {};
   const pm = user.perkMachine;
   if (!pm.activeBoosts || typeof pm.activeBoosts !== 'object') pm.activeBoosts = {};
-  if (!pm.tokens || typeof pm.tokens !== 'object') pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0 };
+  if (!pm.tokens || typeof pm.tokens !== 'object') {
+    pm.tokens = { battlePassXp15: 0, savvyLevelXp15: 0, savvyMultiplier15: 0 };
+  }
+  if (typeof pm.tokens.savvyLevelXp15 !== 'number') pm.tokens.savvyLevelXp15 = 0;
   if (!pm.eggInventory || typeof pm.eggInventory !== 'object') pm.eggInventory = {};
   if (typeof pm.extraFreeSpins !== 'number') pm.extraFreeSpins = 0;
+  if (!Array.isArray(pm.inventoryTransactions)) pm.inventoryTransactions = [];
   return pm;
 }
 
@@ -55,16 +65,6 @@ function isBoostActive(user, key) {
   if (!b || !b.expiresAt) return false;
   return new Date(b.expiresAt).getTime() > Date.now();
 }
-
-function getSavvyMultiplier(user) {
-  return isBoostActive(user, 'savvyMultiplier15') ? ACTIVATABLE_ITEMS.savvyMultiplier15.multiplier : 1;
-}
-
-/** Labels + icons for personal timed events (activated from egg-hatch tokens). */
-const PERSONAL_EVENTS = Object.freeze({
-  doubleXp: { kind: 'doubleXp', label: 'Double XP', icon: '⚡', xpMultiplier: 2 },
-  savvySale: { kind: 'savvySale', label: 'Savvy Sale', icon: '🏷️' },
-});
 
 function isPersonalEventActive(user, kind) {
   const e = user?.perkMachine?.personalEvents?.[kind];
@@ -75,7 +75,7 @@ function isPersonalEventActive(user, kind) {
 function getBpXpMultiplier(user) {
   let mult = 1;
   if (isBoostActive(user, 'battlePassXp15')) {
-    mult = Math.max(mult, ACTIVATABLE_ITEMS.battlePassXp15.multiplier);
+    mult = Math.max(mult, INVENTORY_TOKENS.battle_pass_xp_token.multiplier);
   }
   if (isPersonalEventActive(user, 'doubleXp')) {
     mult = Math.max(mult, PERSONAL_EVENTS.doubleXp.xpMultiplier);
@@ -83,16 +83,39 @@ function getBpXpMultiplier(user) {
   return mult;
 }
 
+function getProfileXpMultiplier(user) {
+  if (isBoostActive(user, 'savvyLevelXp15')) {
+    return INVENTORY_TOKENS.savvy_level_xp_token.multiplier;
+  }
+  // Legacy boost key migration
+  if (isBoostActive(user, 'savvyMultiplier15')) {
+    return INVENTORY_TOKENS.savvy_level_xp_token.multiplier;
+  }
+  return 1;
+}
+
+/** @deprecated Savvy Level XP token no longer multiplies Savvy Points. */
+function getSavvyMultiplier(_user) {
+  return 1;
+}
+
 function formatDurationLabel(ms) {
   const totalMin = Math.round((Number(ms) || 0) / 60000);
   if (totalMin >= 60) {
-    const hours = Math.round(totalMin / 60);
-    return `${hours} hour${hours === 1 ? '' : 's'}`;
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours} hour${hours === 1 ? '' : 's'}`;
   }
   return `${totalMin} min`;
 }
 
-/** Owned (not-yet-activated) personal timed event tokens. */
+function formatRemainingMs(ms) {
+  const total = Math.max(0, Math.round(Number(ms) / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function serializeTimedEventTokens(user) {
   const list = Array.isArray(user?.perkMachine?.timedEventTokens)
     ? user.perkMachine.timedEventTokens
@@ -107,7 +130,6 @@ function serializeTimedEventTokens(user) {
   }));
 }
 
-/** Currently-running personal timed events. */
 function serializePersonalEvents(user) {
   const events = user?.perkMachine?.personalEvents || {};
   const now = Date.now();
@@ -129,10 +151,69 @@ function serializePersonalEvents(user) {
   return out.sort((a, b) => a.remainingMs - b.remainingMs);
 }
 
-/**
- * Activate a personal timed-event token by id. Consumes the token and starts
- * (or extends) the matching personal event window.
- */
+function serializeActiveBoosts(user) {
+  const out = [];
+  const boosts = user?.perkMachine?.activeBoosts || {};
+  const now = Date.now();
+  for (const [key, val] of Object.entries(boosts)) {
+    const def =
+      Object.values(INVENTORY_TOKENS).find((t) => t.boostKey === key || t.itemKey === key) ||
+      ACTIVATABLE_ITEMS[key];
+    if (!def || !val?.expiresAt) continue;
+    const remainingMs = new Date(val.expiresAt).getTime() - now;
+    if (remainingMs <= 0) continue;
+    out.push({
+      key,
+      type: def.boostKey || def.itemKey || key,
+      itemType: def.itemType || null,
+      label: def.activeLabel || def.label,
+      icon: def.icon,
+      multiplier: def.multiplier || null,
+      activatedAt: val.activatedAt || null,
+      expiresAt: val.expiresAt,
+      remainingMs,
+      remainingLabel: formatRemainingMs(remainingMs),
+      extended: Boolean(val.extended),
+    });
+  }
+  return out.sort((a, b) => a.remainingMs - b.remainingMs);
+}
+
+function activateTimedBoost(user, def, sourceInventoryItemId = null) {
+  const pm = ensureBoostDoc(user);
+  const boostKey = def.boostKey || def.itemKey;
+  const now = Date.now();
+  const existing = pm.activeBoosts?.[boostKey];
+  const wasActive = existing && new Date(existing.expiresAt).getTime() > now;
+  const base =
+    wasActive ? new Date(existing.expiresAt).getTime() : now;
+  pm.activeBoosts = {
+    ...pm.activeBoosts,
+    [boostKey]: {
+      type: boostKey,
+      multiplier: def.multiplier,
+      activatedAt: wasActive ? existing.activatedAt : new Date(now),
+      expiresAt: new Date(base + (def.durationMs || TOKEN_DURATION_MS)),
+      source: 'inventory_token',
+      sourceInventoryItemId: sourceInventoryItemId || def.itemType,
+      status: 'active',
+      extended: wasActive,
+    },
+  };
+  // Remove legacy key if migrating
+  if (boostKey === 'savvyLevelXp15' && pm.activeBoosts.savvyMultiplier15) {
+    delete pm.activeBoosts.savvyMultiplier15;
+  }
+  user.markModified('perkMachine');
+  return {
+    type: boostKey,
+    multiplier: def.multiplier,
+    activatedAt: pm.activeBoosts[boostKey].activatedAt,
+    expiresAt: pm.activeBoosts[boostKey].expiresAt,
+    extended: wasActive,
+  };
+}
+
 function activatePersonalEventToken(user, tokenId) {
   const pm = ensureBoostDoc(user);
   if (!Array.isArray(pm.timedEventTokens)) pm.timedEventTokens = [];
@@ -175,35 +256,11 @@ function activatePersonalEventToken(user, tokenId) {
   };
 }
 
-/** Serialize currently active timed boosts (for the Active Boosts panel). */
-function serializeActiveBoosts(user) {
-  const out = [];
-  const boosts = user?.perkMachine?.activeBoosts || {};
-  const now = Date.now();
-  for (const [key, val] of Object.entries(boosts)) {
-    const def = ACTIVATABLE_ITEMS[key];
-    if (!def || !val?.expiresAt) continue;
-    const remainingMs = new Date(val.expiresAt).getTime() - now;
-    if (remainingMs <= 0) continue;
-    out.push({
-      key,
-      label: def.label,
-      icon: def.icon,
-      multiplier: def.multiplier || null,
-      activatedAt: val.activatedAt || null,
-      expiresAt: val.expiresAt,
-      remainingMs,
-    });
-  }
-  return out.sort((a, b) => a.remainingMs - b.remainingMs);
-}
-
 /**
- * Activate an inventory item. Returns { activated, item, boost?, user }.
- * Throws Error with .status/.code on validation failures.
+ * Activate an inventory item by canonical itemType or legacy itemKey.
  */
-function activatePerkItem(user, itemKey) {
-  const def = ACTIVATABLE_ITEMS[String(itemKey || '')];
+function activatePerkItem(user, itemKeyOrType, opts = {}) {
+  const def = resolveInventoryToken(itemKeyOrType);
   if (!def) {
     const err = new Error('That item cannot be activated.');
     err.status = 400;
@@ -211,58 +268,86 @@ function activatePerkItem(user, itemKey) {
     throw err;
   }
   const pm = ensureBoostDoc(user);
+  const have = tokenCountForUser(user, def);
+  if (have < 1) {
+    const err = new Error(`You don't have a ${def.label} to activate.`);
+    err.status = 400;
+    err.code = def.kind === 'free_spin' ? 'NO_EGG' : 'NO_TOKEN';
+    throw err;
+  }
+
+  const quantityBefore = have;
+  if (!consumeTokenFromUser(user, def)) {
+    const err = new Error(`You don't have a ${def.label} to activate.`);
+    err.status = 400;
+    err.code = def.kind === 'free_spin' ? 'NO_EGG' : 'NO_TOKEN';
+    throw err;
+  }
+  const quantityAfter = tokenCountForUser(user, def);
 
   if (def.kind === 'boost') {
-    const have = Number(pm.tokens?.[def.key]) || 0;
-    if (have < 1) {
-      const err = new Error(`You don't have a ${def.label} token to activate.`);
-      err.status = 400;
-      err.code = 'NO_TOKEN';
-      throw err;
-    }
-    pm.tokens[def.key] = have - 1;
-    const now = Date.now();
-    const existing = pm.activeBoosts?.[def.key];
-    const base = existing && new Date(existing.expiresAt).getTime() > now
-      ? new Date(existing.expiresAt).getTime()
-      : now;
-    pm.activeBoosts = {
-      ...pm.activeBoosts,
-      [def.key]: {
-        activatedAt: existing?.activatedAt ? existing.activatedAt : new Date(now),
-        expiresAt: new Date(base + def.durationMs),
-      },
-    };
-    user.markModified('perkMachine');
+    const activation = activateTimedBoost(user, def, opts.sourceInventoryItemId || def.itemType);
     return {
       activated: true,
-      item: { key: def.key, label: def.label, icon: def.icon, effect: def.effect },
-      boost: {
-        key: def.key,
+      consumed: true,
+      itemType: def.itemType,
+      item: {
+        key: def.itemKey,
+        itemType: def.itemType,
         label: def.label,
         icon: def.icon,
-        expiresAt: pm.activeBoosts[def.key].expiresAt,
-        multiplier: def.multiplier,
+        effect: def.confirmBody,
       },
+      activation,
+      boost: {
+        key: activation.type,
+        label: def.activeLabel,
+        icon: def.icon,
+        expiresAt: activation.expiresAt,
+        multiplier: activation.multiplier,
+        extended: activation.extended,
+      },
+      inventoryQuantity: quantityAfter,
+      navigationTarget: def.navigationTarget,
+      presentation: {
+        title: def.presentationTitle,
+        subtitle: def.presentationSubtitle,
+        activeLabel: def.activeLabel,
+        kind: def.itemType,
+      },
+      transactionAction: activation.extended ? 'boost_extended' : 'boost_activated',
+      quantityBefore,
+      quantityAfter,
       user,
     };
   }
 
   if (def.kind === 'free_spin') {
-    const have = Number(pm.eggInventory?.extraFreeSpin) || 0;
-    if (have < 1) {
-      const err = new Error('You have no Extra Free Spin eggs to activate.');
-      err.status = 400;
-      err.code = 'NO_EGG';
-      throw err;
-    }
-    pm.eggInventory.extraFreeSpin = have - 1;
     pm.extraFreeSpins = Number(pm.extraFreeSpins || 0) + 1;
     user.markModified('perkMachine');
     return {
       activated: true,
-      item: { key: def.key, label: def.label, icon: def.icon, effect: def.effect },
+      consumed: true,
+      itemType: def.itemType,
+      item: {
+        key: def.itemKey,
+        itemType: def.itemType,
+        label: def.label,
+        icon: def.icon,
+        effect: def.confirmBody,
+      },
       freeSpins: 1,
+      freeSpinsTotal: Number(pm.extraFreeSpins) || 0,
+      inventoryQuantity: quantityAfter,
+      navigationTarget: def.navigationTarget,
+      presentation: {
+        title: def.presentationTitle,
+        subtitle: def.presentationSubtitle,
+        kind: def.itemType,
+      },
+      transactionAction: 'free_spin_added',
+      quantityBefore,
+      quantityAfter,
       user,
     };
   }
@@ -275,15 +360,19 @@ function activatePerkItem(user, itemKey) {
 
 module.exports = {
   BOOST_DURATION_MS,
+  TOKEN_DURATION_MS,
   ACTIVATABLE_ITEMS,
   PERSONAL_EVENTS,
   isBoostActive,
   isPersonalEventActive,
   getSavvyMultiplier,
   getBpXpMultiplier,
+  getProfileXpMultiplier,
   serializeActiveBoosts,
   serializeTimedEventTokens,
   serializePersonalEvents,
   activatePerkItem,
   activatePersonalEventToken,
+  resolveInventoryToken,
+  tokenCountForUser,
 };

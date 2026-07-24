@@ -34,6 +34,8 @@ import ErrorState from "../components/ui/states/ErrorState";
 import { SavvyPointsIcon } from "../components/rewards/SavvyPointsIcon";
 import { useSavvyPoints } from "../store/savvyStore";
 import "../styles/BattlePassPage.css";
+import ActiveBoostsBar from "../components/inventory/ActiveBoostsBar";
+import { useActiveBoosts } from "../hooks/useActiveBoosts";
 
 type BattlePassRewardType = "points" | "emblem" | "card" | "boost" | "bp_xp" | "title" | "power";
 
@@ -249,6 +251,7 @@ export default function BattlePassPage() {
   const authBundle = useAuth() as { user: TaskResolverContext["authUser"]; token?: string | null } | null;
   const user = authBundle?.user ?? null;
   const authToken = authBundle?.token ?? null;
+  const activeBoosts = useActiveBoosts(Boolean(authToken));
   const savvyLive = useSavvyPoints();
   const progression = useProgression(Boolean(authToken));
   const entitlement = useEntitlement(Boolean(authToken));
@@ -455,6 +458,7 @@ export default function BattlePassPage() {
           onRetry={() => void progression.reload()}
         />
       ) : null}
+      <ActiveBoostsBar boosts={activeBoosts} compact className="f10-bp-active-boosts" />
       <header className="f10-bp-hero">
         <div className="f10-bp-hero-inner">
           <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}>

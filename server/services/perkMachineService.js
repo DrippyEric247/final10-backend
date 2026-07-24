@@ -63,7 +63,7 @@ function ensurePerkMachineDoc(user) {
   if (!Array.isArray(pm.spinHistory)) pm.spinHistory = [];
   if (typeof pm.extraFreeSpins !== 'number') pm.extraFreeSpins = 0;
   if (!pm.tokens || typeof pm.tokens !== 'object') {
-    pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0, paid3Spin: 0 };
+    pm.tokens = { battlePassXp15: 0, savvyLevelXp15: 0, savvyMultiplier15: 0, paid3Spin: 0 };
   }
   if (typeof pm.tokens.paid3Spin !== 'number') pm.tokens.paid3Spin = 0;
   if (typeof pm.tokens.paid2Spin !== 'number') pm.tokens.paid2Spin = 0;
@@ -168,6 +168,8 @@ function getPerkMachineStatus(user) {
     eggInventory: serializeEggInventory(pm),
     tokens: {
       battlePassXp15: Number(pm.tokens?.battlePassXp15) || 0,
+      savvyLevelXp15:
+        (Number(pm.tokens?.savvyLevelXp15) || 0) + (Number(pm.tokens?.savvyMultiplier15) || 0),
       savvyMultiplier15: Number(pm.tokens?.savvyMultiplier15) || 0,
       paid3Spin: Number(pm.tokens?.paid3Spin) || 0,
       paid2Spin: Number(pm.tokens?.paid2Spin) || 0,
@@ -278,7 +280,6 @@ async function applyReward(user, rewardDef, spinId) {
     const tier = rewardDef.eggTier;
     if (tier === 'extraFreeSpin') {
       pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin) + qty;
-      pm.extraFreeSpins = Number(pm.extraFreeSpins) + qty;
     } else if (tier && pm.eggInventory[tier] != null) {
       pm.eggInventory[tier] = Number(pm.eggInventory[tier]) + qty;
     }

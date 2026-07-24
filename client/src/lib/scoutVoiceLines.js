@@ -57,6 +57,15 @@ export const SCOUT_VOICE_LINES = Object.freeze({
   event_summary: {
     text: 'Another found. Another win. Stay Savvy.',
   },
+  battle_pass_boost: {
+    text: 'Battle Pass XP boost activated.',
+  },
+  savvy_level_boost: {
+    text: 'Savvy Level XP boost online. Keep earning.',
+  },
+  free_spin_added: {
+    text: 'Free spin added. The Perk Machine is ready.',
+  },
 });
 
 const EVENT_AUDIO_TO_VOICE = Object.freeze({

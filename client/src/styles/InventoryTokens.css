@@ -1,0 +1,249 @@
+.f10-token-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 12050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.f10-token-modal__card {
+  width: min(100%, 420px);
+  border-radius: 18px;
+  border: 1px solid rgba(192, 132, 252, 0.35);
+  background: linear-gradient(180deg, rgba(30, 27, 75, 0.98), rgba(15, 23, 42, 0.98));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  padding: 22px 20px 18px;
+  text-align: center;
+}
+
+.f10-token-modal__icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.f10-token-modal__title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  color: #f8fafc;
+}
+
+.f10-token-modal__body,
+.f10-token-modal__count,
+.f10-token-modal__extend {
+  margin: 0 0 10px;
+  color: #cbd5e1;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.f10-token-modal__extend {
+  color: #c084fc;
+  font-weight: 600;
+}
+
+.f10-token-modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.f10-token-modal__btn {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.f10-token-modal__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.f10-token-modal__btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.f10-token-modal__btn--primary {
+  background: linear-gradient(90deg, #a855f7, #6366f1);
+  color: #fff;
+}
+
+.f10-token-present {
+  position: fixed;
+  inset: 0;
+  z-index: 12100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.f10-token-present__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.82);
+}
+
+.f10-token-present__card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 460px);
+  border-radius: 20px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: radial-gradient(circle at top, rgba(49, 46, 129, 0.95), rgba(15, 23, 42, 0.98));
+  box-shadow: 0 0 40px rgba(168, 85, 247, 0.25);
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.f10-token-present__kicker {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.f10-token-present__title {
+  margin: 8px 0 4px;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  color: #fde68a;
+}
+
+.f10-token-present__subtitle {
+  margin: 0 0 16px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.f10-token-present__level {
+  margin: 0 0 8px;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.f10-token-present__bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.f10-token-present__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.f10-token-present__bar-fill--bp {
+  background: linear-gradient(90deg, #fbbf24, #f97316);
+}
+
+.f10-token-present__bar-fill--profile {
+  background: linear-gradient(90deg, #c084fc, #22d3ee);
+}
+
+.f10-token-present__breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.f10-token-present__breakdown li {
+  display: flex;
+  justify-content: space-between;
+  color: #cbd5e1;
+  font-size: 0.88rem;
+}
+
+.f10-token-present__hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.f10-token-present__hint--spin {
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.f10-token-present__active {
+  margin: 14px 0 0;
+  color: #a7f3d0;
+  font-weight: 700;
+}
+
+.f10-active-boosts {
+  border-radius: 14px;
+  border: 1px solid rgba(192, 132, 252, 0.25);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 10px 12px;
+}
+
+.f10-active-boosts--compact {
+  padding: 8px 10px;
+}
+
+.f10-active-boosts__title {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c084fc;
+  font-weight: 700;
+}
+
+.f10-active-boosts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.f10-active-boosts__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+}
+
+.f10-active-boosts__icon {
+  font-size: 1rem;
+}
+
+.f10-active-boosts__mult {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.f10-active-boosts__timer {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .f10-token-present__card,
+  .f10-token-modal__card {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-token-present__bar-fill {
+    transition: none !important;
+  }
+}
