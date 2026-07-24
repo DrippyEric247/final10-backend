@@ -15,6 +15,7 @@ import EventsFloatingTab from './components/events/EventsFloatingTab';
 import { LiveEventsProvider } from './context/LiveEventsContext';
 import EventsPage from './pages/EventsPage';
 import Final10SideAssistant from './components/Final10SideAssistant';
+import SavvyScoutVoiceHost from './components/scout/SavvyScoutVoiceHost';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
 import AuthDebugger from './components/AuthDebugger';
 import DevOverridePanel from './components/dev/DevOverridePanel';
@@ -284,6 +285,7 @@ export default function App() {
         <ProgressionRecapHost />
         <CallingCardUnlockCeremony />
         <SmartCoachHost enabled={Boolean(user)} />
+        <SavvyScoutVoiceHost />
         <Final10SideAssistant />
         <TourHost enabled={showPostOnboardingFtue} />
         {user ? <TabJourneyPanel /> : null}

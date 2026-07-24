@@ -1592,11 +1592,24 @@
   margin-bottom: 8px;
 }
 
+.f10-assistant-ai-speaking-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
 .f10-scout-waveform {
   display: inline-flex;
   align-items: flex-end;
   gap: 3px;
   height: 22px;
+}
+
+.f10-scout-waveform--speaking .f10-scout-waveform__bar {
+  background: linear-gradient(180deg, #c084fc, #67e8f9);
+  animation-duration: 0.72s;
 }
 
 .f10-scout-waveform__bar {

@@ -4,6 +4,7 @@ import { useSavvyScoutMissions } from "../context/SavvyScoutMissionsContext";
 import SavvyScoutMissionsPanel from "../components/scout/SavvyScoutMissionsPanel";
 import Final10Slogan from "../components/branding/Final10Slogan";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
+import { playScoutVoiceLine } from "../lib/scoutVoiceLines";
 import { SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import "../styles/SavvyScoutMissions.css";
 
@@ -30,6 +31,7 @@ export default function MissionLog() {
       const res = await claimMission(id);
       if (res.ok && res.rewardSavvy) {
         emitPowerToast(res.rewardSavvy, res.message || `+${res.rewardSavvy} Savvy added to your wallet`);
+        playScoutVoiceLine("mission_complete");
       } else if (!res.ok && res.message) {
         window.alert(res.message);
       }

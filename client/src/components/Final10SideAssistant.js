@@ -49,10 +49,15 @@ import "../styles/SavvyScoutMissions.css";
 import SavvyWalletBubble from "./wallet/SavvyWalletBubble";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import {
-  duckAppMusic,
-  unduckAppMusic,
-} from "../lib/appMusicCoordinator";
-import { MENU_MUSIC_DUCK } from "../lib/menuMusicEngine";
+  playScoutVoice,
+  stopScoutVoice,
+  setScoutVoiceEnabled,
+  preloadScoutAudio,
+} from "../lib/savvyScoutAudioService";
+import {
+  playScoutVoiceLine,
+  resolveVoiceLineFromAnswer,
+} from "../lib/scoutVoiceLines";
 
 const SCOUT_GREETING =
   "Savvy Scout reporting. What opportunity are we hunting today?";
@@ -79,11 +84,6 @@ const MIN_API_INTERVAL_MS = 1200;
 function getSpeechRecognitionCtor() {
   if (typeof window === "undefined") return null;
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
-
-function getSynth() {
-  if (typeof window === "undefined") return null;
-  return window.speechSynthesis || null;
 }
 
 function loadVoicePref() {
@@ -128,29 +128,6 @@ function buildSpeech(answer) {
     parts.push(actionLabel.replace(/[.!?]+$/, "") + ".");
   }
   return parts.join(" ").trim();
-}
-
-function pickConfidentVoice(synth) {
-  if (!synth) return null;
-  const voices = synth.getVoices() || [];
-  if (voices.length === 0) return null;
-  // Prefer punchy, natural en-US voices if the platform ships them.
-  const priority = [
-    /Google US English/i,
-    /Samantha/i,
-    /Microsoft (Aria|Jenny|Guy)/i,
-    /Alex/i,
-    /Daniel/i,
-  ];
-  for (const pat of priority) {
-    const m = voices.find((v) => pat.test(v.name) && /^en/i.test(v.lang));
-    if (m) return m;
-  }
-  return (
-    voices.find((v) => /en-US/i.test(v.lang)) ||
-    voices.find((v) => /^en/i.test(v.lang)) ||
-    voices[0]
-  );
 }
 
 function loadDismissed() {
@@ -635,7 +612,7 @@ export default function Final10SideAssistant() {
   const lastVoiceIntentRef = useRef(null);
   const voiceOnRef = useRef(voiceOn);
   const supportsSR = useMemo(() => Boolean(getSpeechRecognitionCtor()), []);
-  const supportsTTS = useMemo(() => Boolean(getSynth()), []);
+  const supportsVoicePlayback = useMemo(() => typeof window !== "undefined", []);
   const [subscriptionTier, setSubscriptionTier] = useState(() =>
     getEffectiveSubscriptionTier()
   );
@@ -653,7 +630,12 @@ export default function Final10SideAssistant() {
 
   useEffect(() => {
     voiceOnRef.current = voiceOn;
+    setScoutVoiceEnabled(voiceOn);
   }, [voiceOn]);
+
+  useEffect(() => {
+    void preloadScoutAudio();
+  }, []);
 
   const dismiss = useCallback((id) => {
     dismissedRef.current.add(String(id));
@@ -756,6 +738,7 @@ export default function Final10SideAssistant() {
         message: d.body || "I found something worth checking.",
         url: String(d.url || ""),
       });
+      playScoutVoiceLine("win");
       setDealFoundFlash(true);
       if (dealFlashTimerRef.current) {
         window.clearTimeout(dealFlashTimerRef.current);
@@ -853,6 +836,7 @@ export default function Final10SideAssistant() {
         const res = await missionsCtx.claimMission(missionId);
         if (res.ok && res.rewardSavvy) {
           emitPowerToast(res.rewardSavvy, res.message || `+${res.rewardSavvy} Savvy added to your wallet`);
+          playScoutVoiceLine("mission_complete");
         } else if (!res.ok && res.message) {
           setCoachToast({
             eyebrow: "Savvy Scout",
@@ -885,12 +869,14 @@ export default function Final10SideAssistant() {
   }, [dealToast, navigate]);
 
   const scoutState = useMemo(() => {
+    if (speaking) return "speaking";
     if (dealFoundFlash) return "dealFound";
     if (externalScoutState) return externalScoutState;
     if (aiBusy || suggestionsLoading) return "searching";
     if (unread > 0 || (missionSnapshot?.claimableCount || 0) > 0) return "excited";
     return "idle";
   }, [
+    speaking,
     dealFoundFlash,
     externalScoutState,
     aiBusy,
@@ -1257,64 +1243,34 @@ export default function Final10SideAssistant() {
   );
 
   const stopSpeaking = useCallback(() => {
-    const synth = getSynth();
-    if (!synth) return;
-    try {
-      synth.cancel();
-    } catch {
-      /* ignore */
-    }
     utteranceRef.current = null;
+    stopScoutVoice({ reason: "user_stopped" });
     setSpeaking(false);
-    unduckAppMusic(MENU_MUSIC_DUCK.VOICE_LINE);
   }, []);
 
   const aiStateLabel = useMemo(() => {
     if (listening) return "Listening";
     if (aiBusy) return "Processing";
-    if (speaking) return "Responding";
+    if (speaking) return "Speaking";
     return "Ready";
   }, [listening, aiBusy, speaking]);
 
   const speakAnswer = useCallback(
     (answer) => {
       if (!voiceOnRef.current) return;
-      const synth = getSynth();
-      if (!synth) return;
-      const text = buildSpeech(answer);
-      if (!text) return;
-      try {
-        synth.cancel();
-      } catch {
-        /* ignore */
-      }
-      const u = new window.SpeechSynthesisUtterance(text);
-      const voice = pickConfidentVoice(synth);
-      if (voice) u.voice = voice;
-      // Confident + slightly energetic: bumped rate, mildly lifted pitch.
-      u.rate = 1.12;
-      u.pitch = 1.05;
-      u.volume = 1;
-      u.onstart = () => {
-        setSpeaking(true);
-        duckAppMusic(MENU_MUSIC_DUCK.VOICE_LINE);
-      };
-      u.onend = () => {
-        setSpeaking(false);
-        utteranceRef.current = null;
-        unduckAppMusic(MENU_MUSIC_DUCK.VOICE_LINE);
-      };
-      u.onerror = () => {
-        setSpeaking(false);
-        utteranceRef.current = null;
-        unduckAppMusic(MENU_MUSIC_DUCK.VOICE_LINE);
-      };
-      utteranceRef.current = u;
-      try {
-        synth.speak(u);
-      } catch {
-        setSpeaking(false);
-      }
+      const lineKey = resolveVoiceLineFromAnswer(answer);
+      const text = lineKey ? null : buildSpeech(answer);
+      if (!lineKey && !text) return;
+
+      void playScoutVoice({
+        lineKey: lineKey || undefined,
+        text: text || undefined,
+        onStart: () => setSpeaking(true),
+        onEnd: () => {
+          setSpeaking(false);
+          utteranceRef.current = null;
+        },
+      });
     },
     []
   );
@@ -1328,6 +1284,9 @@ export default function Final10SideAssistant() {
       stopSpeaking();
       setAiError("");
       setAiBusy(true);
+      if (voiceOnRef.current) {
+        playScoutVoiceLine("scanning");
+      }
       const placeholder = {
         id: `q_${Date.now()}`,
         ts: Date.now(),
@@ -1517,6 +1476,7 @@ export default function Final10SideAssistant() {
       if (!payload) return;
       try {
         await createSavvyAlert(payload);
+        playScoutVoiceLine("alert_created");
         updateHistoryAnswer(turnId, {
           alertState: "created",
           reason: Number.isFinite(intent?.maxPrice)
@@ -1719,36 +1679,29 @@ export default function Final10SideAssistant() {
     return () => window.removeEventListener("f10-behavior-updated", onChange);
   }, []);
 
+  useEffect(() => {
+    if (!expanded || !showGreeting || !voiceOn) return undefined;
+    const t = window.setTimeout(() => {
+      playScoutVoiceLine("greeting");
+    }, 420);
+    return () => window.clearTimeout(t);
+  }, [expanded, showGreeting, voiceOn]);
+
+  useEffect(() => {
+    stopSpeaking();
+  }, [activeTab, stopSpeaking]);
+
   const toggleVoice = useCallback(() => {
     setVoiceOn((prev) => {
       const next = !prev;
       saveVoicePref(next);
+      setScoutVoiceEnabled(next);
       if (!next) {
-        // Turning voice OFF also silences any in-flight utterance.
-        const synth = getSynth();
-        if (synth) {
-          try {
-            synth.cancel();
-          } catch {
-            /* ignore */
-          }
-        }
+        stopScoutVoice({ reason: "voice_disabled" });
+        setSpeaking(false);
       }
       return next;
     });
-  }, []);
-
-  // Prime voice list (Chrome loads voices async). Harmless if unsupported.
-  useEffect(() => {
-    const synth = getSynth();
-    if (!synth || typeof synth.onvoiceschanged === "undefined") return undefined;
-    const handler = () => {
-      /* just forces list population */
-    };
-    synth.onvoiceschanged = handler;
-    return () => {
-      if (synth.onvoiceschanged === handler) synth.onvoiceschanged = null;
-    };
   }, []);
 
   // Stop mic + TTS when the panel closes so no ghost audio hangs around.
@@ -2036,7 +1989,7 @@ export default function Final10SideAssistant() {
                         turnId={row.id}
                         answer={row.answer}
                         onNav={handleNav}
-                        onSpeak={supportsTTS ? speakAnswer : null}
+                        onSpeak={supportsVoicePlayback ? speakAnswer : null}
                         voiceOn={voiceOn}
                         onNotifyMe={handleNotifyMe}
                         onShowBest={handleShowBest}
@@ -2124,7 +2077,7 @@ export default function Final10SideAssistant() {
 
               <div className="f10-assistant-ai-voicebar">
                 <div className="f10-assistant-ai-voicebar-group">
-                  {supportsTTS ? (
+                  {supportsVoicePlayback ? (
                     <button
                       type="button"
                       role="switch"
@@ -2165,14 +2118,18 @@ export default function Final10SideAssistant() {
                   </button>
                 </div>
                 {!listening && speaking ? (
-                  <button
-                    type="button"
-                    className="f10-assistant-ai-voicebar-status f10-assistant-ai-voicebar-status--speaking"
-                    onClick={stopSpeaking}
-                    title="Stop speaking"
-                  >
-                    ▮▮ Speaking — tap to stop
-                  </button>
+                  <div className="f10-assistant-ai-speaking-row">
+                    <SavvyScoutWaveform active speaking />
+                    <button
+                      type="button"
+                      className="f10-assistant-ai-voicebar-status f10-assistant-ai-voicebar-status--speaking"
+                      onClick={stopSpeaking}
+                      title="Stop Savvy Scout voice"
+                      aria-label="Stop Savvy Scout voice"
+                    >
+                      ▮▮ Savvy Scout speaking…
+                    </button>
+                  </div>
                 ) : null}
               </div>
 

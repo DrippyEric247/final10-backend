@@ -154,6 +154,40 @@
   border-color: rgba(234, 179, 8, 0.85);
 }
 
+.savvy-scout-btn--speaking .savvy-scout-btn__ring {
+  animation: savvy-scout-glow-pulse 0.85s ease-in-out infinite;
+}
+
+.savvy-scout-btn--speaking .savvy-scout-btn__frame {
+  border-color: rgba(192, 132, 252, 0.9);
+  box-shadow:
+    0 0 22px rgba(192, 132, 252, 0.55),
+    0 8px 28px rgba(124, 58, 237, 0.45);
+}
+
+.savvy-scout-btn--speaking .savvy-scout-btn__img {
+  animation:
+    savvy-scout-float 4.5s ease-in-out infinite,
+    savvy-scout-mechanical-pulse 0.85s ease-in-out infinite;
+}
+
+.savvy-scout-btn--speaking .savvy-scout-btn__mag {
+  opacity: 0.85;
+  animation: savvy-scout-mag-pulse 0.85s ease-in-out infinite;
+}
+
+@keyframes savvy-scout-mechanical-pulse {
+  0%, 100% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-1px) scale(1.02) rotate(-0.6deg); }
+  70% { transform: translateY(0) scale(1.01) rotate(0.5deg); }
+}
+
+.savvy-scout-btn--reduced.savvy-scout-btn--speaking .savvy-scout-btn__img,
+.savvy-scout-btn--reduced.savvy-scout-btn--speaking .savvy-scout-btn__ring,
+.savvy-scout-btn--reduced.savvy-scout-btn--speaking .savvy-scout-btn__mag {
+  animation: none;
+}
+
 @keyframes savvy-scout-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }

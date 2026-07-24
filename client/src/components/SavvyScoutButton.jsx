@@ -5,7 +5,7 @@ import "../styles/SavvyScoutButton.css";
 /**
  * Floating Savvy Scout mascot button — visual skin for the side assistant.
  * @param {{
- *   state?: "idle" | "searching" | "dealFound" | "excited",
+ *   state?: "idle" | "searching" | "dealFound" | "excited" | "speaking",
  *   expanded?: boolean,
  *   unread?: number,
  *   missionGlow?: boolean,

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { EventActivationParticles } from './EventActivationParticles';
 import { playEventActivationWithDuck } from '../../lib/eventActivationAudio';
+import { playScoutVoiceLine } from '../../lib/scoutVoiceLines';
+import { stopScoutVoice } from '../../lib/savvyScoutAudioService';
 
 function formatSavvy(n) {
   return Math.round(Number(n) || 0).toLocaleString();
@@ -93,7 +95,13 @@ export default function EventSummaryModal({
     if (!summary) return undefined;
     const key = audioKeyForEvent(summary.eventKey);
     void playEventActivationWithDuck(key).catch(() => {});
-    return undefined;
+    const voiceTimer = window.setTimeout(() => {
+      playScoutVoiceLine('event_summary');
+    }, 1900);
+    return () => {
+      window.clearTimeout(voiceTimer);
+      stopScoutVoice({ reason: 'modal_closed' });
+    };
   }, [summary]);
 
   const optionalLines = useMemo(() => {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, startTransition, useState } from
 import { EventIconVisual } from './EventIconVisual';
 import { EventActivationParticles } from './EventActivationParticles';
 import { playEventActivationWithDuck } from '../../lib/eventActivationAudio';
+import { playScoutVoiceLine, scoutVoiceLineForEventAudio } from '../../lib/scoutVoiceLines';
 import {
   unduckAppMusic,
   EVENT_DUCK_UP_MS,
@@ -72,6 +73,10 @@ export function EventActivationReveal({ event, onFlyComplete }) {
     void playEventActivationWithDuck(profile.audioKey, {
       fallbackMs: profile.audioFallbackMs,
     }).then(() => {
+      const voiceLine = scoutVoiceLineForEventAudio(profile.audioKey);
+      if (voiceLine) {
+        playScoutVoiceLine(voiceLine);
+      }
       startTransition(() => setPhase('activated'));
       const holdTimer = window.setTimeout(() => {
         startFlyAnimation();
