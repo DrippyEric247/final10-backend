@@ -128,7 +128,7 @@ const Profile = () => {
     };
   }, []);
 
-  // Handle points earned from redeem codes
+  // Handle points earned from redeem codes — balance sync handled in RedeemCodeSection
   const handlePointsEarned = (points) => {
     setPointsUpdating(true);
     queryClient.invalidateQueries(['dailyTasks']);
@@ -136,8 +136,7 @@ const Profile = () => {
     queryClient.invalidateQueries(['levelStats']);
     queryClient.invalidateQueries(['milestones']);
     
-    // Show success message
-    setShowSuccessMessage(`+${points} points earned!`);
+    setShowSuccessMessage(`+${points} Savvy earned!`);
     setTimeout(() => {
       setShowSuccessMessage('');
       setPointsUpdating(false);

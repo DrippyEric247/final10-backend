@@ -13,6 +13,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { applyServerSavvyBalance } from "../../lib/applyServerSavvyBalance";
 import { SAVVY_SCOUT } from "../../config/savvyScoutBranding";
 import {
   claimCommunityReward,
@@ -67,7 +68,7 @@ const FALLBACK_PROGRESS = {
 };
 
 export default function CommunityHubSections({ onPostWin }) {
-  const { user } = useAuth();
+  const { user, patchUser } = useAuth();
   const [goals, setGoals] = useState(null);
   const [progress, setProgress] = useState(null);
   const [milestones, setMilestones] = useState([]);
@@ -174,9 +175,15 @@ export default function CommunityHubSections({ onPostWin }) {
   const handleClaimMission = async (missionId) => {
     setClaimingMissionId(missionId);
     try {
-      const result = claimCommunityMission(missionId);
+      const result = await claimCommunityMission(missionId);
       refreshMissions();
-      toast.success(result.pending ? result.message : `+${result.amount} Savvy claimed!`);
+      if (result.duplicate) {
+        toast.success("Already claimed for this period.");
+      } else if (result.amount > 0) {
+        toast.success(`+${result.amount} Savvy claimed!`);
+      } else {
+        toast.success("Mission claimed.");
+      }
     } catch (err) {
       toast.error(err?.message || "Could not claim mission.");
     } finally {

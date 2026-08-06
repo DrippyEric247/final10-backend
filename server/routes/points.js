@@ -7,6 +7,12 @@ const User = require('../models/User');
 const Points = require('../models/PointsLedger');
 const CFG = require('../config/points');
 const { debitSavvy } = require('../services/savvyBalanceService');
+const {
+  serializeCreditState,
+  convertSavvyToCredits,
+  redeemSavvyStoreItem,
+} = require('../services/savvyCreditService');
+const { SAVVY_STORE_ITEMS } = require('../config/savvyStoreItems');
 
 // ---- GET /api/points ----
 // returns just the points balance (for compatibility)
@@ -30,10 +36,12 @@ router.get('/me', auth, async (req, res) => {
 
   res.json({
     pointsBalance: user.pointsBalance ?? 0,
+    savvyPoints: user.savvyPoints ?? user.pointsBalance ?? 0,
     lifetimePointsEarned: user.lifetimePointsEarned ?? 0,
     badges: user.badges ?? [],
     recent,
     trial: user.trial ?? { isActive: false },
+    savvyCredits: serializeCreditState(user),
   });
 });
 
@@ -89,6 +97,58 @@ router.post('/redeem', auth, async (req, res) => {
   } catch (err) {
     console.error('Redeem error', err);
     return res.status(500).json({ error: 'Redeem failed' });
+  }
+});
+
+/** GET /api/points/credits — discount credit wallet */
+router.get('/credits', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true, ...serializeCreditState(user), storeItems: SAVVY_STORE_ITEMS });
+  } catch (err) {
+    console.error('[points/credits]', err);
+    res.status(500).json({ error: 'Failed to load credits' });
+  }
+});
+
+/** POST /api/points/convert-credits — Savvy → discount credit */
+router.post('/convert-credits', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const result = await convertSavvyToCredits(user, {
+      points: req.body?.points,
+      idempotencyKey: req.body?.idempotencyKey,
+    });
+    await user.save();
+    res.json(result);
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ ok: false, error: err.message, code: err.code });
+    }
+    console.error('[points/convert-credits]', err);
+    res.status(500).json({ ok: false, error: 'Convert failed' });
+  }
+});
+
+/** POST /api/points/redeem-store — Savvy store item */
+router.post('/redeem-store', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const result = await redeemSavvyStoreItem(user, {
+      itemId: req.body?.itemId,
+      idempotencyKey: req.body?.idempotencyKey,
+    });
+    await user.save();
+    res.json(result);
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ ok: false, error: err.message, code: err.code });
+    }
+    console.error('[points/redeem-store]', err);
+    res.status(500).json({ ok: false, error: 'Redeem failed' });
   }
 });
 

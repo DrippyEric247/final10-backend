@@ -1,3 +1,4 @@
+import { getSavvyCredits, convertSavvyToCreditsRemote, redeemSavvyStoreItemRemote } from "./api";
 import { getDollarValue } from "./savvyValue";
 
 const CREDIT_STATE_KEY = "f10_savvy_credit_state_v1";
@@ -12,6 +13,31 @@ export const SAVVY_STORE_ITEMS = [
 
 function defaultState() {
   return { creditCents: 0, premiumDays: 0, updatedAt: 0, history: [] };
+}
+
+function isAuthenticated() {
+  try {
+    return Boolean(localStorage.getItem("f10_token"));
+  } catch {
+    return false;
+  }
+}
+
+function cacheCreditState(remote) {
+  const value = {
+    ...defaultState(),
+    creditCents: Math.max(0, Number(remote?.creditCents) || 0),
+    premiumDays: Math.max(0, Number(remote?.premiumDays) || 0),
+    updatedAt: Date.now(),
+    history: [],
+  };
+  try {
+    localStorage.setItem(CREDIT_STATE_KEY, JSON.stringify(value));
+    window.dispatchEvent(new CustomEvent(SAVVY_CREDIT_EVENT, { detail: value }));
+  } catch {
+    /* ignore */
+  }
+  return value;
 }
 
 export function getSavvyCreditState() {
@@ -29,6 +55,17 @@ export function getSavvyCreditState() {
   }
 }
 
+/** Hydrate credit wallet from server (authoritative when logged in). */
+export async function syncSavvyCreditStateFromServer() {
+  if (!isAuthenticated()) return getSavvyCreditState();
+  try {
+    const remote = await getSavvyCredits();
+    return cacheCreditState(remote);
+  } catch {
+    return getSavvyCreditState();
+  }
+}
+
 function setSavvyCreditState(next) {
   const value = { ...defaultState(), ...next, updatedAt: Date.now() };
   localStorage.setItem(CREDIT_STATE_KEY, JSON.stringify(value));
@@ -36,49 +73,62 @@ function setSavvyCreditState(next) {
   return value;
 }
 
-export function convertPointsToCredits(pointsToConvert, currentPoints) {
+/** Convert Savvy → discount credits (server-authoritative when authenticated). */
+export async function convertPointsToCredits(pointsToConvert, _currentPoints, idempotencyKey) {
   const pts = Math.max(0, Math.round(Number(pointsToConvert) || 0));
-  const balance = Math.max(0, Math.round(Number(currentPoints) || 0));
   if (!pts) return { ok: false, reason: "Enter points to convert." };
-  if (pts > balance) return { ok: false, reason: "Not enough Savvy points." };
-  const addedCents = Math.round(getDollarValue(pts) * 100);
-  const prev = getSavvyCreditState();
-  const next = setSavvyCreditState({
-    ...prev,
-    creditCents: prev.creditCents + addedCents,
-    history: [
-      { id: `h_${Date.now()}`, type: "convert", points: pts, creditCents: addedCents, ts: Date.now() },
-      ...prev.history,
-    ].slice(0, 40),
-  });
-  return { ok: true, nextPoints: balance - pts, creditState: next };
+
+  if (isAuthenticated()) {
+    try {
+      const result = await convertSavvyToCreditsRemote({
+        points: pts,
+        idempotencyKey: idempotencyKey || `convert_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      });
+      if (!result?.ok) return { ok: false, reason: result?.error || "Could not convert points." };
+      const creditState = cacheCreditState(result.creditState);
+      return {
+        ok: true,
+        nextPoints: result.newBalance,
+        newBalance: result.newBalance,
+        creditState,
+        pointsConverted: pts,
+        duplicate: Boolean(result.duplicate),
+      };
+    } catch (err) {
+      return { ok: false, reason: err?.response?.data?.error || err?.message || "Could not convert points." };
+    }
+  }
+
+  return { ok: false, reason: "Sign in to convert Savvy to credits." };
 }
 
-export function redeemSavvyStoreItem(itemId, currentPoints) {
+/** Redeem Savvy store catalog item (server-authoritative when authenticated). */
+export async function redeemSavvyStoreItem(itemId, _currentPoints, idempotencyKey) {
   const item = SAVVY_STORE_ITEMS.find((x) => x.id === itemId);
   if (!item) return { ok: false, reason: "Item unavailable." };
-  const balance = Math.max(0, Math.round(Number(currentPoints) || 0));
-  if (item.costSavvy > balance) return { ok: false, reason: "Not enough Savvy points." };
-  const prev = getSavvyCreditState();
-  const next = setSavvyCreditState({
-    ...prev,
-    creditCents: prev.creditCents + item.creditCents,
-    premiumDays: prev.premiumDays + item.premiumDays,
-    history: [
-      {
-        id: `h_${Date.now()}`,
-        type: "redeem_item",
-        itemId: item.id,
-        itemLabel: item.label,
-        points: item.costSavvy,
-        creditCents: item.creditCents,
-        premiumDays: item.premiumDays,
-        ts: Date.now(),
-      },
-      ...prev.history,
-    ].slice(0, 40),
-  });
-  return { ok: true, nextPoints: balance - item.costSavvy, creditState: next, item };
+
+  if (isAuthenticated()) {
+    try {
+      const result = await redeemSavvyStoreItemRemote({
+        itemId,
+        idempotencyKey: idempotencyKey || `store_${itemId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      });
+      if (!result?.ok) return { ok: false, reason: result?.error || "Could not redeem item." };
+      const creditState = cacheCreditState(result.creditState);
+      return {
+        ok: true,
+        nextPoints: result.newBalance,
+        newBalance: result.newBalance,
+        creditState,
+        item: result.item || item,
+        duplicate: Boolean(result.duplicate),
+      };
+    } catch (err) {
+      return { ok: false, reason: err?.response?.data?.error || err?.message || "Could not redeem item." };
+    }
+  }
+
+  return { ok: false, reason: "Sign in to redeem store items." };
 }
 
 export function getApplicableCreditForPrice(priceDollars, availableCreditCents) {
@@ -109,3 +159,4 @@ export function applyCreditToOrder(priceDollars, requestedCents) {
   };
 }
 
+export { getDollarValue } from "./savvyValue";

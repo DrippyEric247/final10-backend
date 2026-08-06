@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const { claimCommunityMissionReward } = require('../services/communityMissionService');
 const { creditSavvy } = require('../services/savvyBalanceService');
 const Alert = require('../models/Alert');
 const Auction = require('../models/Auction');
@@ -324,6 +325,46 @@ router.get('/leaderboard', async (req, res) => {
   } catch (error) {
     console.error('Error fetching community leaderboard:', error);
     res.status(500).json({ message: 'Failed to fetch leaderboard' });
+  }
+});
+
+/** POST /api/community/missions/claim — idempotent Savvy for social missions */
+router.post('/missions/claim', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ ok: false, message: 'User not found' });
+
+    const result = await claimCommunityMissionReward(user, {
+      missionId: req.body?.missionId,
+      periodKey: req.body?.periodKey,
+      idempotencyKey: req.body?.idempotencyKey,
+    });
+    await user.save();
+
+    res.json({
+      success: true,
+      ok: true,
+      granted: result.granted || result.amount > 0,
+      duplicate: result.duplicate,
+      alreadyClaimed: result.alreadyClaimed,
+      amount: result.amount,
+      added: result.added,
+      savvyEarned: result.added,
+      newBalance: result.newBalance,
+      missionId: result.missionId,
+      periodKey: result.periodKey,
+    });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({
+        ok: false,
+        success: false,
+        message: err.message,
+        code: err.code,
+      });
+    }
+    console.error('[community/missions/claim]', err);
+    res.status(500).json({ ok: false, success: false, message: 'Claim failed' });
   }
 });
 

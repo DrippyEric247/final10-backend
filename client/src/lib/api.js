@@ -260,6 +260,30 @@ export async function redeemPointsDiscount(body) {
   return data;
 }
 
+/** GET /api/points/credits — server discount credit wallet */
+export async function getSavvyCredits() {
+  const { data } = await api.get("/points/credits");
+  return data;
+}
+
+/** POST /api/points/convert-credits — Savvy → discount credit (server debit) */
+export async function convertSavvyToCreditsRemote(body) {
+  const { data } = await api.post("/points/convert-credits", body);
+  return data;
+}
+
+/** POST /api/points/redeem-store — spend Savvy on store catalog item */
+export async function redeemSavvyStoreItemRemote(body) {
+  const { data } = await api.post("/points/redeem-store", body);
+  return data;
+}
+
+/** POST /api/community/missions/claim — community hub mission Savvy */
+export async function claimCommunityMissionRemote(body) {
+  const { data } = await api.post("/community/missions/claim", body);
+  return data;
+}
+
 /** Server-authoritative daily Savvy claim. Returns `added`, `newBalance`, `reward` log payload. */
 export async function claimDailyLogin() {
   const { data } = await api.post("/auctions/claim-daily-login");

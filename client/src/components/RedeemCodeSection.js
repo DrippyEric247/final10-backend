@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import easterEggService from '../services/easterEggService';
 import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
+import { useAuth } from '../context/AuthContext';
+import { applyServerSavvyBalance } from '../lib/applyServerSavvyBalance';
+import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
+import { notifyWalletFromLegacyReward } from '../lib/pointsEngine';
 import Final10SocialLinks from './Final10SocialLinks';
 import { SAVVY_SCOUT } from '../config/savvyScoutBranding';
 
@@ -88,6 +92,7 @@ function TrailerPromoSuccessCard({ payload }) {
 }
 
 const RedeemCodeSection = ({ onPointsEarned }) => {
+  const { patchUser } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -194,6 +199,22 @@ const RedeemCodeSection = ({ onPointsEarned }) => {
       }
 
       const savvyEarned = data.savvyEarned ?? data.pointsEarned ?? 0;
+      const newBalance = data.newBalance != null ? Math.round(Number(data.newBalance)) : null;
+
+      if (newBalance != null && patchUser) {
+        applyServerSavvyBalance(patchUser, newBalance, {
+          source: 'easter_egg_redeem',
+          amountAdded: savvyEarned,
+        });
+      } else if (savvyEarned > 0) {
+        notifyWalletFromLegacyReward({ amount: savvyEarned, source: 'easter_egg_redeem' });
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+      } catch {
+        /* ignore */
+      }
 
       setRecentRedemptions((prev) => [
         {

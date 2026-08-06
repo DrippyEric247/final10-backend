@@ -48,6 +48,20 @@ const userSchema = new mongoose.Schema({
   pointsBalance: { type: Number, default: 0 },
   /** Lifetime Savvy earned (credits only; debits do not reduce). */
   lifetimePointsEarned: { type: Number, default: 0 },
+  /** Discount credits + premium days from Savvy store redemptions. */
+  savvyCredits: {
+    creditCents: { type: Number, default: 0 },
+    premiumDays: { type: Number, default: 0 },
+  },
+  /** Community hub mission claim audit trail. */
+  communityMissionClaims: [{
+    missionId: { type: String },
+    periodKey: { type: String },
+    cadence: { type: String },
+    amount: { type: Number, default: 0 },
+    idempotencyKey: { type: String },
+    claimedAt: { type: Date, default: Date.now },
+  }],
   badges: [{ type: String }],                         // user badges/achievements
   trial: {                                            // trial information
     isActive: { type: Boolean, default: false },

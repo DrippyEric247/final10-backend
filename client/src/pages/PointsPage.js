@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppConfig } from '../lib/useAppConfig';
 import { useSavvyPoints } from '../store/savvyStore';
 import { useAuth } from '../context/AuthContext';
+import { applyServerSavvyBalance } from '../lib/applyServerSavvyBalance';
+import { SAVVY_AUTH_REFRESH_REQUEST } from '../store/savvyStore';
 import { SavvyPointsIcon } from '../components/rewards/SavvyPointsIcon';
 import { formatDollarValue } from '../lib/savvyValue';
 import {
@@ -11,6 +13,7 @@ import {
   convertPointsToCredits,
   getSavvyCreditState,
   redeemSavvyStoreItem,
+  syncSavvyCreditStateFromServer,
 } from '../lib/savvyCredits';
 import { getLifetimeLeaderboard, getMyPoints, redeemPointsDiscount } from '../lib/api';
 import { parseApiError, isRateLimitError, userSafeErrorMessage } from '../lib/apiErrorParsing';
@@ -26,8 +29,8 @@ const pct = n => `${Math.round((n ?? 0) * 100)}%`;
 
 export default function PointsPage() {
   const { cfg, loading: configLoading, error: configError, reload: reloadConfig } = useAppConfig();               // trialDays, multipliers, badgeTiers, discountRatio, etc.
-  const { refreshProfile } = useAuth();
-  const { savvyPoints, spendPoints } = useSavvyPoints();
+  const { refreshProfile, patchUser } = useAuth();
+  const { savvyPoints } = useSavvyPoints();
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
@@ -96,6 +99,7 @@ export default function PointsPage() {
 
   useEffect(() => {
     void loadWallet();
+    void syncSavvyCreditStateFromServer().then(setCreditState);
   }, [loadWallet]);
 
   // trial countdown (minutes precision)
@@ -144,12 +148,20 @@ export default function PointsPage() {
 
       if (resp?.ok) {
         setToast(`Redeemed ${fmt(amount)} points → ${resp.discountUSD ? `$${resp.discountUSD.toFixed(2)} off` : 'applied'}`);
+        if (resp.newBalance != null && patchUser) {
+          applyServerSavvyBalance(patchUser, resp.newBalance, {
+            source: 'auction_redeem',
+            amountAdded: amount,
+          });
+        }
         try {
+          window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
           const me = await getMyPoints();
           await refreshProfile();
           setLifetime(me.lifetimePointsEarned || 0);
           setBadges(me.badges || []);
           setHistory(me.recent || []);
+          if (me.savvyCredits) setCreditState(await syncSavvyCreditStateFromServer());
         } catch {
           /* refresh best-effort */
         }
@@ -179,17 +191,23 @@ export default function PointsPage() {
     setTimeout(() => setToast(''), 2500);
   };
 
-  const convertToCredits = () => {
+  const convertToCredits = async () => {
     const pts = Math.max(0, Math.round(Number(convertInput) || 0));
     const ok = window.confirm(`Convert ${pts.toLocaleString()} Savvy to $${formatDollarValue(pts)} credit?`);
     if (!ok) return;
-    const result = convertPointsToCredits(pts, savvyPoints);
+    const result = await convertPointsToCredits(pts, savvyPoints);
     if (!result.ok) {
       setToast(result.reason || 'Could not convert points');
       setTimeout(() => setToast(''), 2800);
       return;
     }
-    spendPoints(pts, 'Convert to credit');
+    if (result.newBalance != null && patchUser) {
+      applyServerSavvyBalance(patchUser, result.newBalance, {
+        source: 'savvy_credit_convert',
+        oldValue: savvyPoints,
+      });
+    }
+    window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
     setCreditState(result.creditState);
     setConvertInput('');
     setCoinPulse(true);
@@ -198,18 +216,24 @@ export default function PointsPage() {
     setTimeout(() => setToast(''), 2800);
   };
 
-  const redeemStoreItem = (itemId) => {
+  const redeemStoreItem = async (itemId) => {
     const item = SAVVY_STORE_ITEMS.find((x) => x.id === itemId);
     if (!item) return;
     const text = `Spend ${item.costSavvy.toLocaleString()} Savvy for ${item.label}?`;
     if (!window.confirm(text)) return;
-    const result = redeemSavvyStoreItem(itemId, savvyPoints);
+    const result = await redeemSavvyStoreItem(itemId, savvyPoints);
     if (!result.ok) {
       setToast(result.reason || 'Redemption failed');
       setTimeout(() => setToast(''), 2800);
       return;
     }
-    spendPoints(item.costSavvy, item.label || 'Store redeem');
+    if (result.newBalance != null && patchUser) {
+      applyServerSavvyBalance(patchUser, result.newBalance, {
+        source: 'savvy_store_redeem',
+        oldValue: savvyPoints,
+      });
+    }
+    window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
     setCreditState(result.creditState);
     setCoinPulse(true);
     setTimeout(() => setCoinPulse(false), 1300);

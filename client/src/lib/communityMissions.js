@@ -1,11 +1,11 @@
 /**
- * Optional social missions for the Savvy Wins Community Hub.
- * Progress is stored client-side (daily/weekly cadence) with Savvy awarded on claim.
+ * Claim community mission — server grants Savvy with idempotency when authenticated.
  */
-
+import { claimCommunityMissionRemote } from "./api";
 import { SAVVY_AUTH_REFRESH_REQUEST } from "@savvy/core/events/universeEvents";
 import { FINAL10_SOCIALS } from "../config/final10Socials";
 import { makeReferralLink, getReferralUserId } from "./referrals";
+import { notifyWalletFromLegacyReward } from "./pointsEngine";
 
 const STORAGE_KEY = "f10_community_missions_v1";
 const SYNC_EVENT = "f10-community-missions-updated";
@@ -49,6 +49,14 @@ function saveState(state) {
 
 function periodKey(cadence) {
   return cadence === "weekly" ? weekKey() : todayKey();
+}
+
+function isAuthenticated() {
+  try {
+    return Boolean(localStorage.getItem("f10_token"));
+  } catch {
+    return false;
+  }
 }
 
 /** @typedef {'daily'|'weekly'|'one_time'} MissionCadence */
@@ -176,21 +184,52 @@ export function completeCommunityMission(missionId) {
 }
 
 /**
- * Claim Savvy for a completed mission in the current period.
- * Social missions are tracked locally; Savvy grants require server verification.
+ * Claim Savvy for a completed mission — server database wins.
  */
-export function claimCommunityMission(missionId) {
+export async function claimCommunityMission(missionId) {
   const mission = COMMUNITY_MISSION_CATALOG.find((m) => m.id === missionId);
   if (!mission) throw new Error("Unknown mission");
 
   const state = loadState();
-  const key = `${missionId}:${periodKey(mission.cadence)}`;
+  const period = periodKey(mission.cadence);
+  const key = `${missionId}:${period}`;
 
   if (!state.completions[key]) throw new Error("Mission not completed yet");
   if (state.claims[key]) throw new Error("Already claimed");
 
+  if (!isAuthenticated()) {
+    throw new Error("Sign in to claim Savvy rewards.");
+  }
+
+  const idempotencyKey = `community_${missionId}_${period}_${Date.now()}`;
+  let data;
+  try {
+    data = await claimCommunityMissionRemote({
+      missionId,
+      periodKey: period,
+      idempotencyKey,
+    });
+  } catch (err) {
+    throw new Error(err?.response?.data?.message || err?.message || "Could not claim reward.");
+  }
+
+  if (data?.alreadyClaimed || data?.duplicate) {
+    state.claims[key] = Date.now();
+    saveState(state);
+    return { missionId, amount: 0, duplicate: true };
+  }
+
+  if (!data?.success && !data?.ok) {
+    throw new Error(data?.message || "Could not claim reward.");
+  }
+
   state.claims[key] = Date.now();
   saveState(state);
+
+  const amount = Math.max(0, Math.round(Number(data.added ?? data.amount ?? mission.rewardSavvy) || 0));
+  if (amount > 0) {
+    notifyWalletFromLegacyReward({ amount, source: `community_mission_${missionId}` });
+  }
 
   try {
     window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
@@ -200,9 +239,9 @@ export function claimCommunityMission(missionId) {
 
   return {
     missionId,
-    amount: 0,
-    pending: true,
-    message: "Mission logged. Savvy rewards sync from the server when verified.",
+    amount,
+    newBalance: data.newBalance,
+    duplicate: Boolean(data.duplicate),
   };
 }
 
