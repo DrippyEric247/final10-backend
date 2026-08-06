@@ -5,9 +5,56 @@
 const { resolveInventoryToken } = require('../config/inventoryTokens');
 const { activatePerkItem } = require('./perkBoostService');
 const { getPerkMachineStatus } = require('./perkMachineService');
+const { ensureProgressDocuments } = require('./battlePassPersistenceService');
+const { computeTierFromXp } = require('../lib/battlePassConfig');
+const { grantProfileXp } = require('./profileXpService');
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_TRANSACTIONS = 200;
+
+async function grantInstantInventoryXp(user, def, idempotencyKey) {
+  const pendingXpBreakdown = {};
+  const bpKey = `${idempotencyKey}:bp_xp`;
+  if (def.instantBpXp > 0) {
+    const amount = Math.max(0, Math.round(Number(def.instantBpXp) || 0));
+    const { bp } = await ensureProgressDocuments(user._id);
+    const alreadyGranted = (bp.claimedRewardIds || []).includes(bpKey);
+    if (!alreadyGranted) {
+      const beforeXp = Number(bp.xp) || 0;
+      const tierBefore = bp.tier;
+      bp.xp = beforeXp + amount;
+      bp.tier = computeTierFromXp(bp.xp);
+      bp.claimedRewardIds = [...(bp.claimedRewardIds || []), bpKey];
+      await bp.save();
+      pendingXpBreakdown.baseXp = amount;
+      pendingXpBreakdown.tokenBonus = 0;
+      pendingXpBreakdown.totalXp = amount;
+      pendingXpBreakdown.battlePass = {
+        beforeXp,
+        afterXp: bp.xp,
+        tierBefore,
+        tierAfter: bp.tier,
+      };
+    }
+  }
+  if (def.instantProfileXp > 0) {
+    const amount = Math.max(0, Math.round(Number(def.instantProfileXp) || 0));
+    const profileResult = await grantProfileXp(user, {
+      amount,
+      source: 'inventory_token',
+      idempotencyKey: `${idempotencyKey}:profile_xp`,
+      metadata: { itemType: def.itemType },
+    });
+    pendingXpBreakdown.profileXp = profileResult.amount || amount;
+    pendingXpBreakdown.profile = profileResult.progress || null;
+    if (!pendingXpBreakdown.baseXp) {
+      pendingXpBreakdown.baseXp = amount;
+      pendingXpBreakdown.tokenBonus = Math.max(0, (profileResult.amount || amount) - amount);
+      pendingXpBreakdown.totalXp = profileResult.amount || amount;
+    }
+  }
+  return Object.keys(pendingXpBreakdown).length ? pendingXpBreakdown : null;
+}
 
 function pruneTransactions(pm) {
   if (!Array.isArray(pm.inventoryTransactions)) return;
@@ -101,7 +148,30 @@ async function useInventoryToken(user, payload = {}) {
     throw err;
   }
 
+  let pendingXpBreakdown = null;
+  if (def.kind === 'boost') {
+    try {
+      pendingXpBreakdown = await grantInstantInventoryXp(user, def, idempotencyKey);
+    } catch (xpErr) {
+      // eslint-disable-next-line no-console
+      console.error('[inventory/use] instant XP grant failed', xpErr?.message);
+    }
+  }
+
   const status = getPerkMachineStatus(user);
+  let message = `${def.label} activated.`;
+  if (result.boost?.extended) {
+    message = `${def.label} extended by 30 minutes.`;
+  } else if (result.freeSpins) {
+    message = 'Free spin added.';
+  } else if (result.streakShield) {
+    message = 'Shield Activated — your streak is protected for 24 hours.';
+  } else if (result.scoutFlightLaunch) {
+    message = 'Scout Flight ready — launching now.';
+  } else if (pendingXpBreakdown?.totalXp) {
+    message = `+${pendingXpBreakdown.totalXp} XP granted.`;
+  }
+
   const response = {
     success: true,
     consumed: true,
@@ -112,13 +182,13 @@ async function useInventoryToken(user, payload = {}) {
     boost: result.boost || null,
     freeSpins: result.freeSpins || null,
     freeSpinsTotal: result.freeSpinsTotal ?? status.extraFreeSpins,
+    autoSpin: Boolean(result.autoSpin),
+    streakShield: result.streakShield || null,
+    scoutFlightLaunch: Boolean(result.scoutFlightLaunch),
+    pendingXpBreakdown,
     navigationTarget: result.navigationTarget,
     presentation: result.presentation,
-    message: result.boost?.extended
-      ? `${def.label} extended by 30 minutes.`
-      : result.freeSpins
-        ? 'Free spin added.'
-        : `${def.label} activated.`,
+    message,
     activeBoosts: status.activeBoosts,
     inventory: {
       tokens: status.tokens,

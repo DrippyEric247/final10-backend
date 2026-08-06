@@ -175,6 +175,8 @@ export default function BattlePassRewardTracks({
 
         if (newBalance != null) {
           applyServerSavvyBalance(patchUser, newBalance, {
+            source: 'battle_pass_tier_claim',
+            amountAdded: grant?.savvyGranted,
             lifetimePointsEarned: res?.lifetimePointsEarned ?? res?.user?.lifetimePointsEarned,
           });
         }

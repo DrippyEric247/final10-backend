@@ -3,7 +3,7 @@
  * Progress is stored client-side (daily/weekly cadence) with Savvy awarded on claim.
  */
 
-import { awardPoints } from "./pointsEngine";
+import { SAVVY_AUTH_REFRESH_REQUEST } from "@savvy/core/events/universeEvents";
 import { FINAL10_SOCIALS } from "../config/final10Socials";
 import { makeReferralLink, getReferralUserId } from "./referrals";
 
@@ -177,6 +177,7 @@ export function completeCommunityMission(missionId) {
 
 /**
  * Claim Savvy for a completed mission in the current period.
+ * Social missions are tracked locally; Savvy grants require server verification.
  */
 export function claimCommunityMission(missionId) {
   const mission = COMMUNITY_MISSION_CATALOG.find((m) => m.id === missionId);
@@ -191,14 +192,18 @@ export function claimCommunityMission(missionId) {
   state.claims[key] = Date.now();
   saveState(state);
 
-  awardPoints({
-    action: "scout_mission",
-    amount: mission.rewardSavvy,
-    label: mission.title,
-    rarity: mission.rewardSavvy >= 75 ? "EPIC" : mission.rewardSavvy >= 25 ? "GOOD" : "NORMAL",
-  });
+  try {
+    window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
+  } catch {
+    /* ignore */
+  }
 
-  return { missionId, amount: mission.rewardSavvy };
+  return {
+    missionId,
+    amount: 0,
+    pending: true,
+    message: "Mission logged. Savvy rewards sync from the server when verified.",
+  };
 }
 
 export function subscribeCommunityMissions(cb) {

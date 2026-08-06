@@ -176,7 +176,7 @@ export default function CommunityHubSections({ onPostWin }) {
     try {
       const result = claimCommunityMission(missionId);
       refreshMissions();
-      toast.success(`+${result.amount} Savvy claimed!`);
+      toast.success(result.pending ? result.message : `+${result.amount} Savvy claimed!`);
     } catch (err) {
       toast.error(err?.message || "Could not claim mission.");
     } finally {

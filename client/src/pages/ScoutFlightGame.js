@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { applyServerSavvyBalance } from '../lib/applyServerSavvyBalance';
 import {
   getScoutFlightTournamentStatus,
   getScoutFlightChampionship,
@@ -708,7 +709,10 @@ export default function ScoutFlightGame() {
         if (Number(result.savvyEarned) > 0 && typeof patchUser === 'function') {
           const nextBalance = Math.round(Number(result.savvyBalance ?? result.status?.savvyBalance ?? 0));
           if (nextBalance > 0) {
-            patchUser({ savvyPointsServerBase: nextBalance, savvyPoints: nextBalance });
+            applyServerSavvyBalance(patchUser, nextBalance, {
+              source: 'scout_flight_tournament',
+              amountAdded: Math.round(Number(result.savvyEarned) || 0),
+            });
           }
         }
         window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));

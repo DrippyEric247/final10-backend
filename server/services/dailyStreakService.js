@@ -32,6 +32,7 @@ function ensureDailyStreakDoc(user) {
   if (typeof ds.scoutShields !== 'number') ds.scoutShields = 0;
   if (typeof ds.legacyLoyalistUnlocked !== 'boolean') ds.legacyLoyalistUnlocked = false;
   if (typeof ds.shieldsConsumed !== 'number') ds.shieldsConsumed = 0;
+  if (!ds.streakShieldActiveUntil) ds.streakShieldActiveUntil = null;
   return ds;
 }
 
@@ -102,6 +103,9 @@ function updateStreakWithShield(user, today = utcDayKey()) {
   } else if (gap === 2 && ds.scoutShields > 0) {
     ds.scoutShields -= 1;
     ds.shieldsConsumed = (ds.shieldsConsumed || 0) + 1;
+    streak += 1;
+    shieldUsed = true;
+  } else if (gap > 1 && ds.streakShieldActiveUntil && new Date(ds.streakShieldActiveUntil).getTime() > Date.now()) {
     streak += 1;
     shieldUsed = true;
   } else {
@@ -542,6 +546,25 @@ async function adminGrantMilestoneRewards(user, milestoneDay, adminRunId) {
   return grants;
 }
 
+/** Manually activate a streak shield — 24h proactive protection. */
+function activateStreakShieldProtection(user) {
+  const ds = ensureDailyStreakDoc(user);
+  if (Number(ds.scoutShields) < 1) {
+    const err = new Error('You have no Streak Shields to activate.');
+    err.status = 400;
+    err.code = 'NO_SHIELD';
+    throw err;
+  }
+  ds.scoutShields -= 1;
+  const until = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  ds.streakShieldActiveUntil = until;
+  user.markModified('dailyStreak');
+  return {
+    activeUntil: until,
+    shieldsRemaining: Number(ds.scoutShields) || 0,
+  };
+}
+
 module.exports = {
   claimDailyStreak,
   getStreakStatus,
@@ -551,4 +574,5 @@ module.exports = {
   syncStreakFields,
   clearTodayClaimLock,
   adminGrantMilestoneRewards,
+  activateStreakShieldProtection,
 };

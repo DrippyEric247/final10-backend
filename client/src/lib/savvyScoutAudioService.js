@@ -388,6 +388,7 @@ export async function playScoutVoice(opts = {}) {
 
     unlockAudio();
     duckAppMusic(MENU_MUSIC_DUCK.VOICE_LINE);
+    void playMovementAccent(session);
 
     const movementBuffer = await loadBuffer(SCOUT_AUDIO.movement).catch(() => null);
     const ctx = ensureContext();
@@ -399,6 +400,7 @@ export async function playScoutVoice(opts = {}) {
 
     const finish = (reason) => {
       if (session !== playSession) return;
+      void playMovementAccent(session);
       devLog(reason === 'voice_end' ? 'voice ended' : 'robot layer ended', { session, reason });
       clearActivePlayback(session);
       unduckAppMusic(MENU_MUSIC_DUCK.VOICE_LINE);

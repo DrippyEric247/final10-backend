@@ -4,7 +4,7 @@
  */
 
 import { claimScoutMissionReward as apiClaimScoutMissionReward, getScoutMissionProgress, recordScoutMissionAction as apiRecordScoutMissionAction } from "./api";
-import { awardPoints } from "./pointsEngine";
+import { notifyWalletFromLegacyReward } from "./pointsEngine";
 import {
   SCOUT_MISSION_ACTION_EVENT,
   SCOUT_MISSION_POPUP_EVENT,
@@ -561,15 +561,15 @@ function applyServerProgressRows(state, rows) {
 
     if (row.complete || serverProgress >= target) {
       const local = getProgress(state, def);
-      const next = Math.min(target, Math.max(local, serverProgress));
+      const next = Math.min(target, serverProgress);
       if (next !== local) {
         state.progress[key] = next;
         changed = true;
       }
-    } else if (serverProgress < target) {
+    } else {
       const local = getProgress(state, def);
-      if (local >= target && !row.complete) {
-        state.progress[key] = Math.min(local, serverProgress);
+      if (local !== serverProgress) {
+        state.progress[key] = serverProgress;
         changed = true;
       }
     }
@@ -670,7 +670,10 @@ export async function claimScoutMission(missionId) {
     const reward = Math.max(1, Number(data.added ?? data.rewardSavvy ?? def.rewardSavvy) || 0);
     const newBalance = data.newBalance != null ? Math.round(Number(data.newBalance)) : undefined;
 
-    awardPoints(`scout_mission_${def.id}`, reward);
+    notifyWalletFromLegacyReward({
+      amount: reward,
+      source: `scout_mission_${def.id}`,
+    });
 
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console

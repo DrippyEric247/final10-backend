@@ -1,5 +1,6 @@
 import { hydrateBattlePassFromServer, hydrateCosmeticUnlocksFromServer } from "./battlePassEngine";
 import { setEquippedCallingCardId, setEquippedEmblemId } from "./customizationCatalog";
+import { setServerPowerMultiplier } from "./final10PowerEngine";
 
 export type ProgressionApiState = {
   user: Record<string, unknown>;
@@ -66,5 +67,9 @@ export function hydrateProgressionClientCache(
   }
   if (state.soundtracks) {
     hydrateSoundtracksFromServer(state.soundtracks);
+  }
+  const pm = Number(state.user?.powerMultiplier);
+  if (Number.isFinite(pm) && pm >= 1) {
+    setServerPowerMultiplier(pm);
   }
 }

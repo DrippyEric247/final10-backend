@@ -16,6 +16,7 @@ import { LiveEventsProvider } from './context/LiveEventsContext';
 import EventsPage from './pages/EventsPage';
 import Final10SideAssistant from './components/Final10SideAssistant';
 import SavvyScoutVoiceHost from './components/scout/SavvyScoutVoiceHost';
+import ProgressionCelebrationHost from './components/progression/ProgressionCelebrationHost';
 import InventoryActivationHost from './components/inventory/InventoryActivationHost';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
 import AuthDebugger from './components/AuthDebugger';
@@ -287,6 +288,7 @@ export default function App() {
         <CallingCardUnlockCeremony />
         <SmartCoachHost enabled={Boolean(user)} />
         <SavvyScoutVoiceHost />
+        <ProgressionCelebrationHost />
         <InventoryActivationHost />
         <Final10SideAssistant />
         <TourHost enabled={showPostOnboardingFtue} />

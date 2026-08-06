@@ -70,6 +70,7 @@ const userSchema = new mongoose.Schema({
     claimedComebackTiers: [{ type: String }],
     legacyLoyalistUnlocked: { type: Boolean, default: false },
     shieldsConsumed: { type: Number, default: 0 },
+    streakShieldActiveUntil: { type: Date, default: null },
   },
   /** Savvy Perk Machine — spins, egg inventory, tokens */
   perkMachine: {

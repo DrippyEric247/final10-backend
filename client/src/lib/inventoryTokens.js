@@ -37,10 +37,33 @@ export const INVENTORY_TOKEN_DEFS = Object.freeze([
     icon: '🎰',
     label: 'Extra Free Spin Egg',
     confirmTitle: 'Use Extra Free Spin Egg?',
-    confirmBody: 'Adds one free Perk Machine spin to your account.',
+    confirmBody: 'Adds one free Perk Machine spin and opens the wheel.',
     navigationTarget: '/perk-machine',
     scoutVoiceLine: 'supply_drop',
     countFrom: (s) => Number(s?.eggInventory?.extraFreeSpin) || 0,
+    autoSpin: true,
+  },
+  {
+    itemType: 'streak_shield',
+    itemKey: 'streakShield',
+    icon: '🛡️',
+    label: 'Streak Shield',
+    confirmTitle: 'Activate Streak Shield?',
+    confirmBody: 'Protect your login streak for the next 24 hours.',
+    navigationTarget: '/daily-streak',
+    scoutVoiceLine: 'reward_confirmed',
+    countFrom: (s) => Number(s?.streakShields) || 0,
+  },
+  {
+    itemType: 'scout_flight_ticket',
+    itemKey: 'scoutFlightTicket',
+    icon: '🎫',
+    label: 'Scout Flight Ticket',
+    confirmTitle: 'Launch Scout Flight?',
+    confirmBody: 'Use a ticket to launch Scout Flight instantly.',
+    navigationTarget: '/scout-flight',
+    scoutVoiceLine: 'scanning',
+    countFrom: (s) => Number(s?.tournamentTicketProgress?.ticketsOwned) || 0,
   },
 ]);
 
@@ -49,6 +72,8 @@ export const LEGACY_KEY_TO_ITEM_TYPE = Object.freeze({
   savvyMultiplier15: 'savvy_level_xp_token',
   savvyLevelXp15: 'savvy_level_xp_token',
   extraFreeSpin: 'extra_free_spin_egg',
+  streakShield: 'streak_shield',
+  scoutFlightTicket: 'scout_flight_ticket',
 });
 
 export function resolveInventoryTokenDef(input) {

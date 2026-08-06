@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { SAVVY_AUTH_REFRESH_REQUEST } from "../store/savvyStore";
+import { reconcileSavvyBalance } from "../lib/reconcileSavvyBalance";
+import { applyServerSavvyBalance } from "../lib/applyServerSavvyBalance";
 import {
   SCOUT_MISSION_SYNC_EVENT,
   claimScoutMission,
@@ -73,13 +75,19 @@ export function SavvyScoutMissionsProvider({ children }) {
   const claimMission = useCallback(
     async (missionId) => {
       const res = await claimScoutMission(missionId);
-      if (res.ok && res.newBalance != null) {
-        patchUser({
-          savvyPoints: res.newBalance,
-          savvyPointsServerBase: res.newBalance,
-        });
-      }
       if (res.ok) {
+        if (res.newBalance != null && patchUser) {
+          applyServerSavvyBalance(patchUser, res.newBalance, {
+            source: 'scout_mission_claim',
+            amountAdded: res.rewardSavvy,
+          });
+        } else if (patchUser) {
+          void reconcileSavvyBalance(patchUser, {
+            source: 'scout_mission_claim',
+            currentBalance: user?.savvyPoints,
+            userId: user?.id || user?._id,
+          });
+        }
         try {
           window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
         } catch {
@@ -90,7 +98,7 @@ export function SavvyScoutMissionsProvider({ children }) {
       setTick((n) => n + 1);
       return res;
     },
-    [patchUser]
+    [patchUser, user]
   );
 
   const syncFromServer = useCallback(async () => {

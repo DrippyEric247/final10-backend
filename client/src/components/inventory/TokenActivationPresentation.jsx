@@ -46,6 +46,10 @@ export default function TokenActivationPresentation({
       playScoutVoiceLine('savvy_level_boost');
     } else if (payload?.itemType === 'extra_free_spin_egg') {
       playScoutVoiceLine('free_spin_added');
+    } else if (payload?.itemType === 'streak_shield') {
+      playScoutVoiceLine('reward_confirmed');
+    } else if (payload?.itemType === 'scout_flight_ticket') {
+      playScoutVoiceLine('scanning');
     }
     const t1 = window.setTimeout(() => setPhase('detail'), reduceMotion ? 200 : 900);
     const t2 = window.setTimeout(() => {
@@ -145,6 +149,24 @@ export default function TokenActivationPresentation({
           <p className="f10-token-present__hint f10-token-present__hint--spin">
             Free Spin Added — {payload.freeSpinsTotal ?? 1} ready to use.
           </p>
+        ) : null}
+
+        {payload.itemType === 'streak_shield' ? (
+          <div className="f10-token-present__shield">
+            <p className="f10-token-present__hint">🛡️ Shield Activated</p>
+            <p className="f10-token-present__hint">Your streak is protected for 24 hours.</p>
+          </div>
+        ) : null}
+
+        {pendingXp?.totalXp ? (
+          <motion.p
+            className="f10-token-present__float-xp"
+            initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.9 }}
+            animate={{ opacity: 1, y: -8, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+          >
+            +{pendingXp.totalXp} XP
+          </motion.p>
         ) : null}
 
         {phase === 'done' ? (

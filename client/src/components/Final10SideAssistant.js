@@ -60,7 +60,7 @@ import {
 } from "../lib/scoutVoiceLines";
 
 const SCOUT_GREETING =
-  "Savvy Scout reporting. What opportunity are we hunting today?";
+  "🟣 Savvy Scout online… Route locked. Opportunity scan complete. Welcome back — let's go find today's Best Move.";
 
 const ASK_QUICK_CHIPS = Object.freeze([
   { label: "Gaming", query: "find gaming deals under $100" },

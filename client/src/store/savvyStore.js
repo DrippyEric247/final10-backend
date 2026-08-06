@@ -12,7 +12,7 @@ import React, {
   useState,
 } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getMyPoints } from "../lib/api";
+import { reconcileSavvyBalance } from "../lib/reconcileSavvyBalance";
 import { ApiCoolingDownError } from "../lib/apiRequestGate";
 import {
   awardPoints as persistWalletAward,
@@ -95,27 +95,18 @@ export function SavvyPointsProvider({ children }) {
 
   const bumpWallet = useCallback(() => setWalletTick((t) => t + 1), []);
 
-  /** Sync Savvy balance via /points/me — avoids hammering /auth/me. */
+  /** Sync Savvy balance via /points/me — server database wins. */
   const schedulePointsSync = useCallback(() => {
     if (!user) return;
     if (pointsSyncTimerRef.current) window.clearTimeout(pointsSyncTimerRef.current);
     pointsSyncTimerRef.current = window.setTimeout(() => {
       pointsSyncTimerRef.current = null;
-      void getMyPoints()
-        .then((me) => {
-          const balance = Math.max(0, Math.round(Number(me?.pointsBalance) || 0));
-          patchUser({
-            savvyPoints: balance,
-            savvyPointsServerBase: balance,
-            lifetimePointsEarned: me?.lifetimePointsEarned,
-          });
-          try {
-            window.dispatchEvent(new CustomEvent(SAVVY_STORE_UPDATED));
-          } catch {
-            /* ignore */
-          }
-          bumpWallet();
-        })
+      void reconcileSavvyBalance(patchUser, {
+        source: 'points_sync',
+        currentBalance: user.savvyPoints,
+        userId: user.id || user._id,
+      })
+        .then(() => bumpWallet())
         .catch((err) => {
           if (!(err instanceof ApiCoolingDownError) && err?.isCoolingDown !== true) {
             if (process.env.NODE_ENV !== "production") {
@@ -231,20 +222,13 @@ export function SavvyPointsProvider({ children }) {
   const syncPoints = useCallback(async () => {
     if (!user) return null;
     try {
-      const me = await getMyPoints();
-      const balance = Math.max(0, Math.round(Number(me?.pointsBalance) || 0));
-      patchUser({
-        savvyPoints: balance,
-        savvyPointsServerBase: balance,
-        lifetimePointsEarned: me?.lifetimePointsEarned,
+      const balance = await reconcileSavvyBalance(patchUser, {
+        source: 'manual_sync',
+        currentBalance: user.savvyPoints,
+        userId: user.id || user._id,
       });
       bumpWallet();
-      try {
-        window.dispatchEvent(new CustomEvent(SAVVY_STORE_UPDATED));
-      } catch {
-        /* ignore */
-      }
-      return me;
+      return balance != null ? { pointsBalance: balance } : null;
     } catch (err) {
       if (process.env.NODE_ENV !== "production") {
         // eslint-disable-next-line no-console
@@ -253,6 +237,21 @@ export function SavvyPointsProvider({ children }) {
       return null;
     }
   }, [user, patchUser, bumpWallet]);
+
+  /** Reconcile on tab focus / visibility — keeps desktop and mobile aligned. */
+  useEffect(() => {
+    if (!user) return undefined;
+    const onFocus = () => schedulePointsSync();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') schedulePointsSync();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user, schedulePointsSync]);
 
   const animatePointGain = useCallback((amount, opts = {}) => {
     const amt = Math.max(1, Math.round(Number(amount) || 0));

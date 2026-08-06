@@ -221,12 +221,22 @@ export function unlockBattlePassPremium() {
   bump();
 }
 
+function isAuthenticatedSession() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return Boolean(localStorage.getItem('f10_token'));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {keyof typeof BATTLE_PASS_XP} source
  * @param {number} [overrideAmount]
  */
 export function recordBattlePassXp(source, overrideAmount) {
   if (typeof window === "undefined") return null;
+  if (isAuthenticatedSession()) return null;
   if (source === "daily_login" && !tryConsumeDailyLoginBpSlot()) return null;
   const amt =
     overrideAmount != null && Number.isFinite(overrideAmount)
@@ -253,6 +263,7 @@ const BP_MISSION_SAVVY_KEY = "f10_bp_mission_savvy_lifetime";
  */
 export function grantBpMissionRewards(payload) {
   if (typeof window === "undefined") return;
+  if (isAuthenticatedSession()) return;
   const xp = Math.max(0, Number(payload?.xp) || 0);
   const savvy = Math.max(0, Number(payload?.savvyPoints) || 0);
   const lint = Math.max(0, Number(payload?.powerLintDelta) || 0);

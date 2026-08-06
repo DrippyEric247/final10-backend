@@ -9,10 +9,7 @@
  * interest doesn't out-vote this-session interest.
  */
 
-import { awardPoints } from "./pointsEngine";
-
 const STORAGE_KEY = "f10_user_behavior_v1";
-let lastSaveSavvyAt = 0;
 const LOG_LIMIT = 120;
 const HALF_LIFE_MS = 3 * 24 * 60 * 60 * 1000; // weight halves every 3 days
 
@@ -109,17 +106,6 @@ export function trackItemSave(item) {
     itemId: shortId(item),
     title: item.title,
   });
-  const now = Date.now();
-  if (now - lastSaveSavvyAt > 2600) {
-    lastSaveSavvyAt = now;
-    try {
-      if (typeof localStorage !== "undefined" && localStorage.getItem("f10_token")) {
-        awardPoints("save_item");
-      }
-    } catch {
-      /* ignore */
-    }
-  }
 }
 
 /**

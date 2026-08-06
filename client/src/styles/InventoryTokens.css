@@ -234,6 +234,19 @@
   white-space: nowrap;
 }
 
+.f10-token-present__float-xp {
+  margin: 12px 0 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #c084fc;
+  text-shadow: 0 0 18px rgba(192, 132, 252, 0.55);
+  letter-spacing: 0.02em;
+}
+
+.f10-token-present__shield {
+  margin-top: 8px;
+}
+
 @media (max-width: 480px) {
   .f10-token-present__card,
   .f10-token-modal__card {

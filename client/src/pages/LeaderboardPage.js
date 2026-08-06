@@ -160,10 +160,7 @@ export default function LeaderboardPage() {
         isCurrentUser: true,
         emblemId: equippedEmblemId || row.emblemId,
         callingCardId: equippedCallingCardId || row.callingCardId,
-        savvyPoints: Math.max(
-          Number(row.savvyPoints) || 0,
-          Math.round(Number(user.savvyPoints) || 0)
-        ),
+        savvyPoints: Math.round(Number(row.savvyPoints) || 0),
       };
 
       try {

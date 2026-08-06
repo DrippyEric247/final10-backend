@@ -232,7 +232,7 @@ export async function gatedRequest(key, run, opts = {}) {
     return run();
   }
 
-  if (inflight.has(key)) {
+  if (inflight.has(key) && !force) {
     return inflight.get(key);
   }
 

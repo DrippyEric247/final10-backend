@@ -13,7 +13,8 @@ import { hydrateMembershipFromApi } from "../lib/membershipSync";
 import { parseApiError, userSafeErrorMessage } from "../lib/apiErrorParsing";
 import { getDevSavvyPointsOffset, isDev, FINAL10_DEV_OVERRIDE_EVENT } from "../lib/devOverride";
 import { getEquippedCallingCardId, getEquippedEmblemId } from "../lib/customizationCatalog";
-import { setPermanentPowerBonus } from "../lib/final10PowerEngine";
+import { setPermanentPowerBonus, setServerPowerMultiplier } from "../lib/final10PowerEngine";
+import { reconcileSavvyBalance } from "../lib/reconcileSavvyBalance";
 
 /** Default shape so TS/JS consumers never destructure off `null` when Provider wraps the app. */
 const defaultAuthValue = {
@@ -102,6 +103,9 @@ export function AuthProvider({ children }) {
     async (rawUser) => {
       const merged = withLoadout(rawUser);
       await hydrateMembershipFromApi(merged, getEntitlementsMe);
+      if (typeof merged.powerMultiplier === "number" && merged.powerMultiplier >= 1) {
+        setServerPowerMultiplier(merged.powerMultiplier);
+      }
       logUserMembership(merged);
       return merged;
     },
@@ -221,6 +225,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     setAuthToken(null);
     setError("");
+    setServerPowerMultiplier(null);
     // Clear any additional auth-related data
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('token');
@@ -232,6 +237,19 @@ export function AuthProvider({ children }) {
     if (!partial || typeof partial !== "object") return;
     setUser((prev) => (prev ? withLoadout({ ...prev, ...partial }) : prev));
   }, [withLoadout]);
+
+  useEffect(() => {
+    const onSession = () => {
+      if (!user) return;
+      void reconcileSavvyBalance(patchUser, {
+        source: 'auth_session',
+        currentBalance: user.savvyPoints,
+        userId: user.id || user._id,
+      });
+    };
+    window.addEventListener(AUTH_SESSION_EVENT, onSession);
+    return () => window.removeEventListener(AUTH_SESSION_EVENT, onSession);
+  }, [user, patchUser]);
 
   const refreshProfile = useCallback(async () => {
     const stored = localStorage.getItem(STORAGE_KEY);

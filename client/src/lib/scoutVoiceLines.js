@@ -15,7 +15,7 @@ export const SCOUT_VOICE_STATE_EVENT = 'f10:scout-voice-state';
 
 export const SCOUT_VOICE_LINES = Object.freeze({
   greeting: {
-    text: 'Savvy Scout reporting. What opportunity are we hunting today?',
+    text: "Savvy Scout online… Route locked. Opportunity scan complete. Welcome back — let's go find today's Best Move.",
     src: SCOUT_AUDIO.voiceSample,
   },
   scanning: {

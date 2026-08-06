@@ -171,6 +171,20 @@ async function adjustSavvyBalance(userOrId, {
 
   syncUserDocFromDb(userOrId, updated);
 
+  const logPayload = {
+    userId: String(userId),
+    oldValue: balanceBefore,
+    amountAdded: amt,
+    source,
+    rewardType: rewardType || source,
+    multiplier: meta?.multiplier ?? null,
+    finalTotal: balanceAfter,
+    idempotencyKey,
+    timestamp: new Date().toISOString(),
+  };
+  // eslint-disable-next-line no-console
+  console.log('[SavvyBalance]', JSON.stringify(logPayload));
+
   if (amt > 0) {
     auditRewardGrant({
       userId: String(userId),

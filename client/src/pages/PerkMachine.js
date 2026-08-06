@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { applyServerSavvyBalance } from '../lib/applyServerSavvyBalance';
 import {
   getPerkMachineStatus,
   spinPerkMachine,
@@ -49,6 +50,7 @@ import {
   INVENTORY_TOKEN_DEFS,
   isBoostActiveForDef,
 } from '../lib/inventoryTokens';
+import { celebrateBattlePassXp, emitProgressionCelebration } from '../lib/progressionCelebrationBus';
 import {
   createActivationIdempotencyKey,
   stashActivationPresentation,
@@ -570,7 +572,10 @@ export default function PerkMachine() {
           Number(result?.savvyBalance ?? result?.status?.savvyBalance ?? user?.savvyPoints ?? 0)
         );
         if (typeof patchUser === 'function') {
-          patchUser({ savvyPointsServerBase: nextBalance, savvyPoints: nextBalance });
+          applyServerSavvyBalance(patchUser, nextBalance, {
+            source: 'perk_machine_spin',
+            oldValue: balanceBefore,
+          });
         }
         window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
         if (typeof refreshProfile === 'function') await refreshProfile();
@@ -712,7 +717,10 @@ export default function PerkMachine() {
         Number(result?.savvyBalance ?? result?.status?.savvyBalance ?? user?.savvyPoints ?? 0)
       );
       if (typeof patchUser === 'function') {
-        patchUser({ savvyPointsServerBase: nextBalance, savvyPoints: nextBalance });
+        applyServerSavvyBalance(patchUser, nextBalance, {
+          source: 'perk_machine_hatch',
+          oldValue: balanceBefore,
+        });
       }
       window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
       if (typeof refreshProfile === 'function') await refreshProfile();
@@ -756,16 +764,34 @@ export default function PerkMachine() {
           activation: result.activation,
           presentation: result.presentation,
           freeSpinsTotal: result.freeSpinsTotal,
+          pendingXpBreakdown: result.pendingXpBreakdown,
+          streakShield: result.streakShield,
+          autoSpin: result.autoSpin,
         });
+
+        if (result.pendingXpBreakdown?.totalXp) {
+          if (def.itemType === 'battle_pass_xp_token') {
+            celebrateBattlePassXp(result.pendingXpBreakdown.totalXp, { source: 'inventory_token' });
+          } else if (def.itemType === 'savvy_level_xp_token') {
+            emitProgressionCelebration({
+              kind: 'profile_xp',
+              amount: result.pendingXpBreakdown.totalXp,
+              source: 'inventory_token',
+            });
+          }
+        } else if (result.streakShield) {
+          emitProgressionCelebration({ kind: 'streak', amount: 0, label: 'Shield Activated', subtitle: '24h streak protection' });
+        } else if (result.scoutFlightLaunch) {
+          emitProgressionCelebration({ kind: 'inventory', amount: 0, label: 'Scout Flight Ready', icon: '🎫' });
+        }
 
         setActivationItem(null);
 
         const target = result.navigationTarget || def.navigationTarget;
         if (target && target !== '/perk-machine') {
           navigate(target);
-        } else if (def.itemType === 'extra_free_spin_egg') {
-          showConfirm('Free Spin Added');
-          machinePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (result.autoSpin || def.itemType === 'extra_free_spin_egg') {
+          window.setTimeout(() => void handleSpin('free'), 700);
         } else {
           showConfirm(result.message || `${def.label} activated`);
         }
@@ -779,7 +805,7 @@ export default function PerkMachine() {
         setActivatingKey(null);
       }
     },
-    [activatingKey, refreshProfile, showConfirm, navigate]
+    [activatingKey, refreshProfile, showConfirm, navigate, handleSpin]
   );
 
   const handleHatchStatusUpdate = useCallback((nextStatus) => {
@@ -795,10 +821,7 @@ export default function PerkMachine() {
         }
       }
       if (typeof result?.savvyBalance === 'number' && typeof patchUser === 'function') {
-        patchUser({
-          savvyPointsServerBase: result.savvyBalance,
-          savvyPoints: result.savvyBalance,
-        });
+        applyServerSavvyBalance(patchUser, result.savvyBalance, { source: 'perk_machine_use' });
       }
       window.dispatchEvent(new CustomEvent(SAVVY_AUTH_REFRESH_REQUEST));
     },
@@ -1179,26 +1202,12 @@ export default function PerkMachine() {
                         disabled={count < 1 || (tokenActivating && !isBusy)}
                         onClick={() => setActivationItem({ ...def, count, isActive })}
                       >
-                        {isBusy ? 'Activating…' : isActive ? 'Extend +30m' : 'Use'}
+                        {isBusy ? 'Activating…' : isActive && def.boostKey ? 'Extend +30m' : 'Use'}
                       </button>
                     </span>
                   </li>
                 );
               })}
-              <li className="perk-inv-item perk-inv-item--passive">
-                <span className="perk-inv-item__label">🛡️ Streak Shields</span>
-                <span className="perk-inv-item__right"><strong>{status?.streakShields ?? 0}</strong></span>
-              </li>
-              <li className="perk-inv-item perk-inv-item--passive">
-                <span className="perk-inv-item__label">🎖️ Calling Cards</span>
-                <span className="perk-inv-item__right"><strong>{status?.callingCardDrops ?? 0}</strong></span>
-              </li>
-              <li className="perk-inv-item perk-inv-item--passive">
-                <span className="perk-inv-item__label">🎫 Scout Flight Tickets</span>
-                <span className="perk-inv-item__right">
-                  <strong>{status?.tournamentTicketProgress?.ticketsOwned ?? 0}</strong>
-                </span>
-              </li>
             </ul>
           </div>
 

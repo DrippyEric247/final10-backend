@@ -1,0 +1,96 @@
+.f10-prog-celebrate-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.f10-prog-celebrate-root--shake {
+  animation: f10-prog-shake 0.42s ease-out;
+}
+
+@keyframes f10-prog-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(2px, 1px); }
+}
+
+.f10-prog-celebrate {
+  position: absolute;
+  top: 38%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 22px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(30, 10, 50, 0.92), rgba(15, 5, 30, 0.88));
+  border: 1px solid rgba(192, 132, 252, 0.45);
+  box-shadow:
+    0 0 32px rgba(168, 85, 247, 0.35),
+    0 8px 28px rgba(0, 0, 0, 0.45);
+  color: #f5f3ff;
+  text-align: center;
+  min-width: 160px;
+}
+
+.f10-prog-celebrate__burst {
+  position: absolute;
+  inset: -8px;
+  border-radius: 20px;
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.25) 0%, transparent 70%);
+  animation: f10-prog-pulse 1.2s ease-out infinite;
+}
+
+@keyframes f10-prog-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+.f10-prog-celebrate__icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  z-index: 1;
+}
+
+.f10-prog-celebrate__label {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  z-index: 1;
+  color: #e9d5ff;
+  text-shadow: 0 0 16px rgba(192, 132, 252, 0.6);
+}
+
+.f10-prog-celebrate__sub {
+  font-size: 0.8rem;
+  color: #c4b5fd;
+  z-index: 1;
+}
+
+.f10-prog-celebrate--LEGENDARY .f10-prog-celebrate__label {
+  color: #fde68a;
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.7);
+}
+
+.f10-prog-celebrate--EPIC .f10-prog-celebrate__label {
+  color: #f0abfc;
+}
+
+.f10-prog-celebrate--RARE .f10-prog-celebrate__label {
+  color: #93c5fd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f10-prog-celebrate-root--shake {
+    animation: none;
+  }
+  .f10-prog-celebrate__burst {
+    animation: none;
+  }
+}

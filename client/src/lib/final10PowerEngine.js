@@ -4,6 +4,8 @@ const STORAGE_KEY = "final10_power_v1";
 const BP_POWER_LINT_KEY = "f10_bp_power_lint";
 /** Permanent top-bar multiplier bonus (server-authoritative, mirrored locally). */
 const PERM_POWER_BONUS_KEY = "f10_perm_power_bonus";
+/** Server-authoritative power multiplier from Battle Pass (cross-device). */
+const SERVER_POWER_MULTIPLIER_KEY = "f10_server_power_multiplier";
 
 /** Read the permanent multiplier bonus earned from egg hatches. */
 export function getPermanentPowerBonus() {
@@ -26,6 +28,36 @@ export function setPermanentPowerBonus(value) {
     const prev = getPermanentPowerBonus();
     localStorage.setItem(PERM_POWER_BONUS_KEY, String(next));
     if (Math.abs(prev - next) > 1e-9) {
+      emit();
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/** Sync server powerMultiplier — single source of truth when authenticated. */
+export function getServerPowerMultiplier() {
+  try {
+    const n = Number(localStorage.getItem(SERVER_POWER_MULTIPLIER_KEY));
+    if (!Number.isFinite(n) || n < 1) return null;
+    return Math.min(POWER.MAX_MULTIPLIER, n);
+  } catch {
+    return null;
+  }
+}
+
+export function setServerPowerMultiplier(value) {
+  const next = Number.isFinite(Number(value)) ? Math.max(1, Math.min(POWER.MAX_MULTIPLIER, Number(value))) : null;
+  try {
+    const prev = getServerPowerMultiplier();
+    if (next == null) {
+      localStorage.removeItem(SERVER_POWER_MULTIPLIER_KEY);
+    } else {
+      localStorage.setItem(SERVER_POWER_MULTIPLIER_KEY, String(next));
+    }
+    if (prev !== next) {
       emit();
       return true;
     }
@@ -228,6 +260,34 @@ export function getPowerCoreEventName() {
  */
 export function getPowerSnapshot() {
   const raw = loadRaw();
+  const serverMult = getServerPowerMultiplier();
+
+  if (serverMult != null && serverMult >= 1) {
+    const permanentBonus = getPermanentPowerBonus();
+    const currentMultiplier = clamp(serverMult + permanentBonus, 1, POWER.MAX_MULTIPLIER);
+    const tier = resolveTier(currentMultiplier);
+    const nextAt = nextTierThreshold(currentMultiplier);
+    const progressSpan = Math.max(0.001, nextAt - tier.min);
+    const progressValue = clamp((currentMultiplier - tier.min) / progressSpan, 0, 1);
+    return {
+      currentMultiplier,
+      currentTier: tier.label,
+      currentTierKey: tier.key,
+      currentPowerPoints: Math.round(currentMultiplier * 100),
+      nextTierTarget: nextAt,
+      progressToNextTier: progressValue,
+      activityBoost: 0,
+      streakBoost: 0,
+      skillBoost: 0,
+      promoBoost: 0,
+      syncBoost: 0,
+      permanentBonus,
+      serverMultiplier: serverMult,
+      loginStreakDays: raw.loginStreakDays || 0,
+      momentumHint: momentumMessage(raw),
+    };
+  }
+
   const activityBoost = clamp(raw.activityAcc || 0, 0, POWER.CAPS.activity);
   const streakBoost = computeLoginStreakBoost(raw.loginStreakDays || 0);
   const skillBoost = clamp(raw.skillAcc || 0, 0, POWER.CAPS.skill);

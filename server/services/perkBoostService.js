@@ -340,12 +340,74 @@ function activatePerkItem(user, itemKeyOrType, opts = {}) {
       freeSpinsTotal: Number(pm.extraFreeSpins) || 0,
       inventoryQuantity: quantityAfter,
       navigationTarget: def.navigationTarget,
+      autoSpin: Boolean(def.autoSpin),
       presentation: {
         title: def.presentationTitle,
         subtitle: def.presentationSubtitle,
         kind: def.itemType,
       },
       transactionAction: 'free_spin_added',
+      quantityBefore,
+      quantityAfter,
+      user,
+    };
+  }
+
+  if (def.kind === 'streak_shield') {
+    const ds = ensureDailyStreakDoc(user);
+    const until = new Date(Date.now() + (def.durationMs || 24 * 60 * 60 * 1000));
+    ds.streakShieldActiveUntil = until;
+    user.markModified('dailyStreak');
+    return {
+      activated: true,
+      consumed: true,
+      itemType: def.itemType,
+      item: {
+        key: def.itemKey,
+        itemType: def.itemType,
+        label: def.label,
+        icon: def.icon,
+        effect: def.confirmBody,
+      },
+      streakShield: {
+        activeUntil: until,
+        shieldsRemaining: quantityAfter,
+      },
+      inventoryQuantity: quantityAfter,
+      navigationTarget: def.navigationTarget,
+      presentation: {
+        title: def.presentationTitle,
+        subtitle: def.presentationSubtitle,
+        kind: def.itemType,
+      },
+      transactionAction: 'streak_shield_activated',
+      quantityBefore,
+      quantityAfter,
+      user,
+    };
+  }
+
+  if (def.kind === 'scout_flight_ticket') {
+    return {
+      activated: true,
+      consumed: true,
+      itemType: def.itemType,
+      item: {
+        key: def.itemKey,
+        itemType: def.itemType,
+        label: def.label,
+        icon: def.icon,
+        effect: def.confirmBody,
+      },
+      scoutFlightLaunch: true,
+      inventoryQuantity: quantityAfter,
+      navigationTarget: def.navigationTarget,
+      presentation: {
+        title: def.presentationTitle,
+        subtitle: def.presentationSubtitle,
+        kind: def.itemType,
+      },
+      transactionAction: 'scout_flight_launched',
       quantityBefore,
       quantityAfter,
       user,
