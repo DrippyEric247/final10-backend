@@ -1,5 +1,4 @@
 import { getSavvyCredits, convertSavvyToCreditsRemote, redeemSavvyStoreItemRemote } from "./api";
-import { getDollarValue } from "./savvyValue";
 
 const CREDIT_STATE_KEY = "f10_savvy_credit_state_v1";
 export const SAVVY_CREDIT_EVENT = "f10-savvy-credit-updated";
@@ -158,5 +157,3 @@ export function applyCreditToOrder(priceDollars, requestedCents) {
     discountedPrice: Math.max(0, (Math.round((Number(priceDollars) || 0) * 100) - applicable) / 100),
   };
 }
-
-export { getDollarValue } from "./savvyValue";
