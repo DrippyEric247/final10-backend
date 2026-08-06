@@ -176,6 +176,12 @@ export default function CommunityHubSections({ onPostWin }) {
     setClaimingMissionId(missionId);
     try {
       const result = await claimCommunityMission(missionId);
+      if (result.newBalance != null && patchUser) {
+        applyServerSavvyBalance(patchUser, result.newBalance, {
+          source: 'community_mission',
+          amountAdded: result.amount,
+        });
+      }
       refreshMissions();
       if (result.duplicate) {
         toast.success("Already claimed for this period.");
