@@ -14,6 +14,7 @@ import EventHistorySection from "../components/profile/EventHistorySection";
 import ProgressHistorySection from "../components/profile/ProgressHistorySection";
 import ActiveBoostsBar from "../components/inventory/ActiveBoostsBar";
 import { useActiveBoosts } from "../hooks/useActiveBoosts";
+import { deriveAccountProgression } from "../lib/accountProgression";
 import "../styles/ProfilePageLayout.css";
 import "../styles/SavvyScoutMissions.css";
 
@@ -34,21 +35,9 @@ export default function ProfilePageLayout({
   bestMovePowerLine = "Best Moves: 0 / 5 used today",
   savvyNextUnlock,
   leaderboardScore,
-  permanentRank,
-  nextPermanentRank,
-  rankProgressToNext,
   taskProgress,
   taskBonusMessage,
-  taskDailyBonusMin,
-  taskDailyBonusMax,
   boostSystemRows,
-  vipRankName,
-  vipStatusMode,
-  weeklyActivityScore,
-  vipPromoteThreshold,
-  vipMaintainThreshold,
-  hasSilverRank,
-  silverMinPoints,
   levelInfo,
   streakWeeks,
   displayTaskStreak,
@@ -85,43 +74,25 @@ export default function ProfilePageLayout({
     return getUniversalBoostState();
   }, [snapshot]);
 
+  const account = useMemo(() => {
+    if (levelInfo?.accountProgression) return levelInfo.accountProgression;
+    const lifetime =
+      Number(levelInfo?.lifetimeProfileXp ?? levelInfo?.totalXP) || 0;
+    return deriveAccountProgression(lifetime);
+  }, [levelInfo]);
+
   const nextBoostLine = savvyNextUnlock?.maxed
     ? "Max sync"
     : `${savvyNextUnlock?.nextBoost} · ${savvyNextUnlock?.systemsNeeded} more system${
         savvyNextUnlock?.systemsNeeded === 1 ? "" : "s"
       }`;
 
-  const rankPct = Math.round(Number(rankProgressToNext?.pct) || 0);
-  const xpRange = levelInfo?.xpInfo?.xpRange > 0 ? levelInfo.xpInfo.xpRange : 1;
-  const xpPct = Math.min(
-    100,
-    Math.round(((levelInfo?.xpInfo?.xpProgress || 0) / xpRange) * 100)
-  );
-
-  const vipBarPct = hasSilverRank
-    ? Math.min(100, Math.round((weeklyActivityScore / vipPromoteThreshold) * 100))
-    : Math.min(100, Math.round((basePoints / silverMinPoints) * 100));
-
-  const vipHeadline =
-    vipStatusMode === "locked"
-      ? `Reach Silver (${silverMinPoints.toLocaleString()} pts)`
-      : vipStatusMode === "atRisk"
-      ? `Stay above ${vipMaintainThreshold} activity`
-      : vipStatusMode === "unlocking"
-      ? `Hit ${vipPromoteThreshold} for full VIP`
-      : "VIP active this week";
-
-  const vipSub =
-    vipStatusMode === "locked"
-      ? `${Math.max(0, silverMinPoints - basePoints).toLocaleString()} pts to go`
-      : hasSilverRank
-      ? `${weeklyActivityScore}/${vipPromoteThreshold} activity`
-      : `${basePoints}/${silverMinPoints} pts`;
   const headerCard = findCallingCard(equippedCallingCardId);
   const headerEmblem = findEmblem(equippedEmblemId);
 
   const taskList = Array.isArray(taskProgress?.tasks) ? taskProgress.tasks : [];
   const tasksToShow = taskList.slice(0, 5);
+  const prestigeActive = account.prestige > 0;
 
   return (
     <div className="min-h-screen bg-gray-950 f10-profile-page f10-profile-with-power">
@@ -130,10 +101,26 @@ export default function ProfilePageLayout({
           <div>
             <h1>Profile</h1>
             <p className="sub">{user?.firstName || user?.username || "Player"}</p>
-            <div className="f10-profile-level-badge" aria-label="Profile level">
-              <span>Level {levelInfo?.currentLevel || 1}</span>
-              <span aria-hidden>·</span>
-              <span>{xpPct}% to next</span>
+            <div
+              className={`f10-profile-level-badge${prestigeActive ? " f10-profile-level-badge--prestige" : ""}`}
+              aria-label="Account progression"
+            >
+              {prestigeActive ? (
+                <>
+                  <span className="f10-profile-prestige-mark">P{account.prestige}</span>
+                  <span>
+                    Level {account.level} / {account.maxLevel}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={{ color: account.rankColor }}>{account.rankName}</span>
+                  <span aria-hidden>·</span>
+                  <span>
+                    Level {account.level} / {account.maxLevel}
+                  </span>
+                </>
+              )}
             </div>
             <ActiveBoostsBar boosts={activeBoosts} compact className="f10-profile-active-boosts" />
             <div className="f10-profile-loadout-strip" aria-label="Equipped calling card">
@@ -180,6 +167,56 @@ export default function ProfilePageLayout({
           {savvyBalanceSlot}
         </div>
 
+        {/* Account Progression — single source of truth for level + rank */}
+        <section
+          className={`f10-profile-card f10-account-progression${prestigeActive ? " f10-account-progression--prestige" : ""}`}
+          aria-labelledby="f10-account-progression-hd"
+        >
+          <h2 id="f10-account-progression-hd" className="f10-profile-card-hd">
+            Account Progression
+          </h2>
+
+          <p
+            className={`f10-account-progression__headline${prestigeActive ? " f10-account-progression__headline--prestige" : ""}`}
+          >
+            {prestigeActive ? account.headlineEmphasis : account.headline}
+          </p>
+
+          <p className="f10-account-progression__xp tabular-nums">
+            {account.xpProgress.toLocaleString()} / {account.xpRange.toLocaleString()} XP
+          </p>
+
+          <div className="f10-profile-bar" role="progressbar" aria-valuenow={account.xpPercent} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className="f10-profile-bar-fill f10-account-progression__fill"
+              style={{
+                width: `${account.xpPercent}%`,
+                background: prestigeActive
+                  ? "linear-gradient(90deg,#fbbf24,#a855f7)"
+                  : `linear-gradient(90deg, ${account.rankColor}, #c084fc)`,
+              }}
+            />
+          </div>
+
+          <div className="f10-account-progression__footer">
+            <span className="f10-account-progression__next">
+              Next: <strong>{account.nextLabel}</strong>
+            </span>
+            {account.prestigeHint ? (
+              <span className="f10-account-progression__prestige-hint">{account.prestigeHint}</span>
+            ) : null}
+          </div>
+
+          <p className="f10-account-progression__lifetime tabular-nums">
+            {account.lifetimeProfileXp.toLocaleString()} lifetime XP
+            {account.prestige > 0 ? (
+              <span className="f10-account-progression__prestige-tag"> · Prestige {account.prestige}</span>
+            ) : (
+              <span className="f10-account-progression__prestige-tag"> · Prestige 0</span>
+            )}
+          </p>
+        </section>
+
         <section className="f10-profile-card" aria-label="Advantage system status">
           <h2 className="f10-profile-card-hd">Advantage System</h2>
           <div className="f10-profile-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.6rem", alignItems: "center" }}>
@@ -196,7 +233,6 @@ export default function ProfilePageLayout({
           </div>
         </section>
 
-        {/* 2 — Summary */}
         <section className="f10-profile-card" aria-labelledby="f10-sum-hd">
           <h2 id="f10-sum-hd" className="f10-profile-card-hd">
             Summary
@@ -220,12 +256,17 @@ export default function ProfilePageLayout({
             </div>
             <div>
               <p className="f10-profile-stat-label">Rank</p>
-              <p className="f10-profile-stat-value">{permanentRank.name}</p>
+              <p className="f10-profile-stat-value" style={{ color: account.rankColor }}>
+                {account.rankName}
+                {account.prestige > 0 ? (
+                  <span className="f10-account-progression__prestige-inline"> · P{account.prestige}</span>
+                ) : null}
+              </p>
             </div>
             <div>
-              <p className="f10-profile-stat-label">Points</p>
+              <p className="f10-profile-stat-label">Level</p>
               <p className="f10-profile-stat-value tabular-nums">
-                {basePoints.toLocaleString()}
+                {account.level} / {account.maxLevel}
               </p>
             </div>
           </div>
@@ -267,7 +308,6 @@ export default function ProfilePageLayout({
           onViewLoadout={onRivalryViewLoadout}
         />
 
-        {/* 3 — Savvy Scout Missions (contextual; full log is secondary) */}
         <section className="f10-profile-card" aria-labelledby="f10-scout-missions-hd">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
             <h2 id="f10-scout-missions-hd" className="f10-profile-card-hd" style={{ margin: 0 }}>
@@ -313,7 +353,6 @@ export default function ProfilePageLayout({
           ) : null}
         </section>
 
-        {/* 4 — Systems that affect leaderboard score (Power = top bar) */}
         <section className="f10-profile-card" aria-labelledby="f10-sys-hd">
           <h2 id="f10-sys-hd" className="f10-profile-card-hd">
             Score systems
@@ -339,53 +378,6 @@ export default function ProfilePageLayout({
           ))}
         </section>
 
-        {/* 5 — VIP */}
-        <section className="f10-profile-card" aria-labelledby="f10-vip-hd">
-          <h2 id="f10-vip-hd" className="f10-profile-card-hd">
-            VIP · {vipRankName}
-          </h2>
-          <p className="text-sm font-bold text-white m-0">{vipHeadline}</p>
-          <p className="f10-profile-stat-label" style={{ marginTop: "0.25rem" }}>
-            {vipSub}
-          </p>
-          <div className="f10-profile-bar" aria-hidden>
-            <div
-              className="f10-profile-bar-fill"
-              style={{
-                width: `${vipBarPct}%`,
-                background:
-                  vipStatusMode === "atRisk"
-                    ? "linear-gradient(90deg,#fb7185,#f43f5e)"
-                    : undefined,
-              }}
-            />
-          </div>
-        </section>
-
-        {/* 6 — Level / XP */}
-        <section className="f10-profile-card" aria-labelledby="f10-lv-hd">
-          <h2 id="f10-lv-hd" className="f10-profile-card-hd">
-            Profile Level {levelInfo?.currentLevel || 1}
-          </h2>
-          <p className="text-sm text-gray-300 m-0 tabular-nums">
-            {levelInfo?.xpInfo?.xpProgress ?? 0} / {levelInfo?.xpInfo?.xpRange ?? 100} XP ·{" "}
-            {levelInfo?.totalXP ?? 0} lifetime
-          </p>
-          <div className="f10-profile-bar" aria-hidden>
-            <div
-              className="f10-profile-bar-fill"
-              style={{
-                width: `${xpPct}%`,
-                background: "linear-gradient(90deg,#c084fc,#e879f9)",
-              }}
-            />
-          </div>
-          <p className="f10-profile-stat-label" style={{ marginTop: "0.35rem" }}>
-            Next: level rewards + milestones
-          </p>
-        </section>
-
-        {/* 7 — Streak / wins */}
         <section className="f10-profile-card" aria-labelledby="f10-st-hd">
           <h2 id="f10-st-hd" className="f10-profile-card-hd">
             Streaks
@@ -396,27 +388,6 @@ export default function ProfilePageLayout({
             Task streak: <strong>{displayTaskStreak}w</strong>
           </p>
         </section>
-
-        {/* Rank progress (compact, under streak or merge — user asked rank in summary; add thin bar for next rank) */}
-        {nextPermanentRank ? (
-          <section className="f10-profile-card" aria-labelledby="f10-rank-hd">
-            <h2 id="f10-rank-hd" className="f10-profile-card-hd">
-              Next rank · {nextPermanentRank.name}
-            </h2>
-            <p className="text-sm text-gray-300 m-0 tabular-nums">
-              {rankProgressToNext.ptsRemaining.toLocaleString()} pts left
-            </p>
-            <div className="f10-profile-bar" aria-hidden>
-              <div
-                className="f10-profile-bar-fill"
-                style={{
-                  width: `${rankPct}%`,
-                  background: "linear-gradient(90deg,#fbbf24,#f59e0b)",
-                }}
-              />
-            </div>
-          </section>
-        ) : null}
 
         <section className="f10-profile-card" style={{ marginBottom: "0.5rem" }}>
           <RedeemCodeSection onPointsEarned={onPointsEarned} />

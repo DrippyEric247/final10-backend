@@ -9,22 +9,26 @@ const {
   labelForSource,
   defaultAmountForSource,
 } = require('../config/profileXpConfig');
+const { deriveAccountProgression } = require('../config/accountProgression');
 
 const MAX_XP_HISTORY = 500;
 const MAX_RECAPS = 120;
 const MAX_ACTIVE_SESSIONS = 16;
 
 function buildProgressSnapshot(userLevel) {
-  const xpInfo = userLevel.getXPForCurrentLevel();
+  const derived = deriveAccountProgression(userLevel.totalXP);
   return {
-    level: userLevel.currentLevel,
+    level: derived.level,
+    prestige: derived.prestige,
     totalXp: userLevel.totalXP,
     lifetimeProfileXp: userLevel.totalXP,
-    prestige: userLevel.prestige || 0,
-    xpProgress: xpInfo.xpProgress,
-    xpRange: xpInfo.xpRange,
-    xpToNext: xpInfo.xpNeeded,
-    xpPercent: xpInfo.xpRange > 0 ? Math.round((xpInfo.xpProgress / xpInfo.xpRange) * 100) : 0,
+    xpProgress: derived.xpProgress,
+    xpRange: derived.xpRange,
+    xpToNext: derived.xpToNext,
+    xpPercent: derived.xpPercent,
+    rankName: derived.rankName,
+    rankColor: derived.rankColor,
+    accountProgression: derived,
   };
 }
 
@@ -158,6 +162,7 @@ async function getUserLevelDoc(userId) {
 async function getProfileProgress(userId) {
   const userLevel = await getUserLevelDoc(userId);
   const snapshot = buildProgressSnapshot(userLevel);
+  const derived = snapshot.accountProgression;
   return {
     profileLevel: snapshot.level,
     profileXp: snapshot.totalXp,
@@ -168,6 +173,9 @@ async function getProfileProgress(userId) {
     xpRange: snapshot.xpRange,
     xpToNext: snapshot.xpToNext,
     xpPercent: snapshot.xpPercent,
+    rankName: snapshot.rankName,
+    rankColor: snapshot.rankColor,
+    accountProgression: derived,
     milestones: userLevel.milestones || [],
     claimedMilestoneRewards: userLevel.claimedMilestoneRewards || [],
   };

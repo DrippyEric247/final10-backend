@@ -1,4 +1,10 @@
 const mongoose = require('mongoose');
+const {
+  ACCOUNT_MAX_LEVEL,
+  ACCOUNT_MAX_PRESTIGE,
+  deriveAccountProgression,
+  applyAccountProgressionToDoc,
+} = require('../config/accountProgression');
 
 const userLevelSchema = new mongoose.Schema({
   userId: {
@@ -7,11 +13,14 @@ const userLevelSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  /** Visible account level within the current prestige cycle (1–55). */
   currentLevel: {
     type: Number,
     default: 1,
-    min: 1
+    min: 1,
+    max: ACCOUNT_MAX_LEVEL,
   },
+  /** Lifetime profile XP — never decreases. Prestige + level derive from this. */
   totalXP: {
     type: Number,
     default: 0,
@@ -32,7 +41,7 @@ const userLevelSchema = new mongoose.Schema({
     awardedAt: Date,
     type: {
       type: String,
-      enum: ['level_up', 'milestone', 'achievement'],
+      enum: ['level_up', 'milestone', 'achievement', 'prestige_up'],
       default: 'level_up'
     }
   }],
@@ -52,7 +61,8 @@ const userLevelSchema = new mongoose.Schema({
     streakDays: { type: Number, default: 0 },
     longestStreak: { type: Number, default: 0 }
   },
-  prestige: { type: Number, default: 0, min: 0 },
+  /** Account prestige 0–10 (COD-style). Derived from lifetime XP, stored for queries. */
+  prestige: { type: Number, default: 0, min: 0, max: ACCOUNT_MAX_PRESTIGE },
   lastLevelUpAt: { type: Date, default: null },
   claimedMilestoneRewards: [{
     milestoneId: String,
@@ -118,95 +128,73 @@ const userLevelSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for efficient queries
-// Note: userId index is automatically created by unique: true
 userLevelSchema.index({ currentLevel: -1 });
 userLevelSchema.index({ totalXP: -1 });
+userLevelSchema.index({ prestige: -1 });
 
-// Calculate XP required for next level (exponential growth)
-userLevelSchema.methods.calculateXPForLevel = function(level) {
-  // Level 1: 0-99 XP
-  // Level 2: 100-249 XP  
-  // Level 3: 250-449 XP
-  // Level 4: 450-699 XP
-  // Level 5: 700-999 XP
-  // Level 6+: 1000 + (level-6) * 500 XP per level
-  
-  if (level <= 1) return 0;
-  if (level <= 5) {
-    return Math.floor(50 * Math.pow(level, 2) - 50 * level);
-  }
-  return 1000 + (level - 6) * 500;
+/** Reconcile stored level/prestige from lifetime XP (legacy migration). */
+userLevelSchema.methods.syncAccountProgression = async function syncAccountProgression() {
+  const beforeLevel = this.currentLevel;
+  const beforePrestige = this.prestige || 0;
+  const derived = applyAccountProgressionToDoc(this);
+  const changed = this.currentLevel !== beforeLevel || (this.prestige || 0) !== beforePrestige;
+  if (changed) await this.save();
+  return derived;
 };
 
-// Calculate XP range for current level
-userLevelSchema.methods.getXPForCurrentLevel = function() {
-  const currentLevelStart = this.calculateXPForLevel(this.currentLevel);
-  const nextLevelStart = this.calculateXPForLevel(this.currentLevel + 1);
+userLevelSchema.methods.getXPForCurrentLevel = function getXPForCurrentLevel() {
+  const derived = deriveAccountProgression(this.totalXP);
   return {
-    currentLevelStart,
-    nextLevelStart,
-    xpNeeded: nextLevelStart - this.totalXP,
-    xpProgress: this.totalXP - currentLevelStart,
-    xpRange: nextLevelStart - currentLevelStart
+    currentLevelStart: derived.xpProgress > 0 ? this.totalXP - derived.xpProgress : this.totalXP,
+    nextLevelStart: this.totalXP + derived.xpToNext,
+    xpNeeded: derived.xpToNext,
+    xpProgress: derived.xpProgress,
+    xpRange: derived.xpRange,
   };
 };
 
-// Award XP and check for level up
-userLevelSchema.methods.awardXP = async function(xpAmount, source = 'task_completion') {
-  const beforeLevel = this.currentLevel;
+userLevelSchema.methods.awardXP = async function awardXP(xpAmount, source = 'task_completion') {
+  const before = deriveAccountProgression(this.totalXP);
   this.totalXP += xpAmount;
-  
-  // Check for level up
-  let leveledUp = false;
-  let newLevel = this.currentLevel;
-  
-  while (this.totalXP >= this.calculateXPForLevel(newLevel + 1)) {
-    newLevel++;
-    leveledUp = true;
-  }
-  
-  this.currentLevel = newLevel;
-  
-  // Update XP progress
-  const xpInfo = this.getXPForCurrentLevel();
-  this.xpToNextLevel = xpInfo.xpNeeded;
-  this.xpProgress = xpInfo.xpProgress;
-  
-  // Award level up rewards
+  const after = applyAccountProgressionToDoc(this);
+
+  const levelsGained = Math.max(0, after.level - before.level);
+  const prestiged = after.prestige > before.prestige;
+  const leveledUp = levelsGained > 0 || prestiged;
+
   if (leveledUp) {
-    const levelsGained = newLevel - beforeLevel;
-    const totalReward = levelsGained * 500; // 500 points per level
-    
+    this.lastLevelUpAt = new Date();
+    const totalReward = (levelsGained + (prestiged ? 1 : 0)) * 500;
     this.levelUpRewards.push({
-      level: newLevel,
+      level: after.level,
       pointsAwarded: totalReward,
       awardedAt: new Date(),
-      type: 'level_up'
+      type: prestiged && levelsGained === 0 ? 'prestige_up' : 'level_up',
     });
-    
-    // Update user's points using mongoose directly to avoid circular dependency
+
     await mongoose.model('User').findByIdAndUpdate(this.userId, {
-      $inc: { points: totalReward }
+      $inc: { points: totalReward },
     });
-    
-    // Check for milestones
-    await this.checkMilestones();
+
+    await this.checkMilestones(after);
   }
-  
+
   await this.save();
-  
+
   return {
     leveledUp,
-    newLevel,
-    levelsGained: leveledUp ? newLevel - beforeLevel : 0,
-    pointsAwarded: leveledUp ? (newLevel - beforeLevel) * 500 : 0,
-    xpInfo: this.getXPForCurrentLevel()
+    prestiged,
+    newLevel: after.level,
+    newPrestige: after.prestige,
+    levelsGained: levelsGained + (prestiged ? 1 : 0),
+    pointsAwarded: leveledUp ? (levelsGained + (prestiged ? 1 : 0)) * 500 : 0,
+    xpInfo: this.getXPForCurrentLevel(),
+    accountProgression: after,
   };
 };
 
-// Check for milestone achievements
-userLevelSchema.methods.checkMilestones = async function() {
+userLevelSchema.methods.checkMilestones = async function checkMilestones(derived) {
+  const prog = derived || deriveAccountProgression(this.totalXP);
   const milestones = [
     { level: 5, name: 'Rookie Trader', description: 'Reached level 5', reward: 250 },
     { level: 10, name: 'Smart Shopper', description: 'Reached level 10', reward: 500 },
@@ -214,67 +202,54 @@ userLevelSchema.methods.checkMilestones = async function() {
     { level: 20, name: 'Deal Hunter', description: 'Reached level 20', reward: 1000 },
     { level: 25, name: 'Bargain Master', description: 'Reached level 25', reward: 1500 },
     { level: 30, name: 'Final10 Legend', description: 'Reached level 30', reward: 2000 },
-    { level: 50, name: 'Auction God', description: 'Reached level 50', reward: 5000 }
+    { level: 50, name: 'Auction God', description: 'Reached level 50', reward: 5000 },
   ];
-  
+
   const newMilestones = [];
-  
+  const visibleLevel = prog.level + prog.prestige * ACCOUNT_MAX_LEVEL;
+
   for (const milestone of milestones) {
-    // Check if milestone is achieved and not already recorded
-    if (this.currentLevel >= milestone.level && 
-        !this.milestones.some(m => m.milestone === milestone.name)) {
-      
+    if (visibleLevel >= milestone.level &&
+        !this.milestones.some((m) => m.milestone === milestone.name)) {
       this.milestones.push({
         milestone: milestone.name,
         description: milestone.description,
         achievedAt: new Date(),
-        reward: milestone.reward
+        reward: milestone.reward,
       });
-      
       newMilestones.push(milestone);
-      
-      // Award milestone points using mongoose directly to avoid circular dependency
       await mongoose.model('User').findByIdAndUpdate(this.userId, {
-        $inc: { points: milestone.reward }
+        $inc: { points: milestone.reward },
       });
     }
   }
-  
-  if (newMilestones.length > 0) {
-    await this.save();
-  }
-  
+
+  if (newMilestones.length > 0) await this.save();
   return newMilestones;
 };
 
-// Update stats
-userLevelSchema.methods.updateStats = function(statType, increment = 1) {
+userLevelSchema.methods.updateStats = function updateStats(statType, increment = 1) {
   if (this.stats[statType] !== undefined) {
     this.stats[statType] += increment;
   }
   return this.save();
 };
 
-// Get level leaderboard
-userLevelSchema.statics.getLevelLeaderboard = async function(limit = 50) {
+userLevelSchema.statics.getLevelLeaderboard = async function getLevelLeaderboard(limit = 50) {
   return this.find()
     .populate('userId', 'username profileImage firstName lastName')
-    .sort({ currentLevel: -1, totalXP: -1 })
+    .sort({ prestige: -1, currentLevel: -1, totalXP: -1 })
     .limit(limit);
 };
 
-// Get user's level info
-userLevelSchema.statics.getUserLevelInfo = async function(userId) {
+userLevelSchema.statics.getUserLevelInfo = async function getUserLevelInfo(userId) {
   let userLevel = await this.findOne({ userId });
-  
   if (!userLevel) {
-    // Create new level record
     userLevel = new this({ userId });
     await userLevel.save();
   }
-  
+  await userLevel.syncAccountProgression();
   return userLevel;
 };
 
 module.exports = mongoose.model('UserLevel', userLevelSchema);
-

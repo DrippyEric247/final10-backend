@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { EventActivationParticles } from '../events/EventActivationParticles';
 import { playProfileXpAudio } from '../../lib/profileXpAudio';
+import { deriveAccountProgression } from '../../lib/accountProgression';
 
 function formatXp(n) {
   return Math.round(Number(n) || 0).toLocaleString();
@@ -13,21 +14,13 @@ function barPercent(progress, range) {
   return Math.min(100, Math.round(((Number(progress) || 0) / r) * 100));
 }
 
-function calcLevelStart(level) {
-  if (level <= 1) return 0;
-  if (level <= 5) return Math.floor(50 * level ** 2 - 50 * level);
-  return 1000 + (level - 6) * 500;
-}
-
 function progressFromTotal(totalXp) {
-  let level = 1;
-  while (totalXp >= calcLevelStart(level + 1)) level += 1;
-  const start = calcLevelStart(level);
-  const next = calcLevelStart(level + 1);
+  const derived = deriveAccountProgression(totalXp);
   return {
-    level,
-    xpProgress: totalXp - start,
-    xpRange: Math.max(1, next - start),
+    level: derived.level,
+    prestige: derived.prestige,
+    xpProgress: derived.xpProgress,
+    xpRange: derived.xpRange,
   };
 }
 

@@ -54,13 +54,13 @@ export function pickNextBestGoal(input) {
     bpTotalTiers,
     auctionsWon,
     auctionNextMilestoneAt,
-    weeklyActivityScore,
-    vipMaintainThreshold,
-    vipPromoteThreshold,
-    hasSilverRank,
-    vipStatusMode,
     leaderboardRank,
     leaderboardScore,
+    accountLevel,
+    accountPrestige,
+    accountXpToNext,
+    accountXpProgress,
+    accountXpRange,
   } = input;
 
   if (tasksTotal > 0 && tasksCompleted < tasksTotal) {
@@ -115,46 +115,52 @@ export function pickNextBestGoal(input) {
     });
   }
 
-  if (hasSilverRank && vipStatusMode === "atRisk") {
-    const need = Math.max(0, vipMaintainThreshold - weeklyActivityScore);
+  if (accountLevel != null && accountXpRange > 0 && accountXpToNext > 0) {
+    const progress = Number(accountXpProgress) || 0;
+    const range = Number(accountXpRange) || 1;
+    const ratio = progress / range;
     candidates.push({
-      score: 86,
+      score: 84 + ratio * 20,
       goal: {
-        id: "vip_risk",
-        goalType: "streak_protection",
-        title: "Protect VIP status",
-        subtitle: `Stay above ${vipMaintainThreshold} weekly activity`,
-        progressCurrent: weeklyActivityScore,
-        progressTarget: vipMaintainThreshold,
-        remainingLabel: `${need} activity pts`,
+        id: "account_level",
+        goalType: "account_progression",
+        title:
+          accountPrestige > 0
+            ? `Prestige ${accountPrestige} · push to the next level`
+            : `Reach account level ${Number(accountLevel) + 1}`,
+        subtitle: "Earn profile XP from deals, tasks, and events",
+        progressCurrent: progress,
+        progressTarget: range,
+        remainingLabel: `${Math.max(0, accountXpToNext).toLocaleString()} XP`,
         reward: {
-          headline: "VIP trial perk",
-          detail: "Hold tier through Sunday",
+          headline: "+500 Savvy on level up",
+          detail: "Account rank advances with level",
           accent: "violet",
         },
-        ctaLabel: "Protect My Streak",
-        ctaActionId: "protect_vip",
+        ctaLabel: "Keep Climbing",
+        ctaActionId: "account_xp",
       },
     });
-  } else if (hasSilverRank && vipStatusMode === "unlocking") {
-    const need = Math.max(0, vipPromoteThreshold - weeklyActivityScore);
+  }
+
+  if (accountLevel >= 55 && accountPrestige < 10 && accountXpToNext <= 0) {
     candidates.push({
-      score: 78,
+      score: 90,
       goal: {
-        id: "vip_promo",
-        goalType: "vip_promotion",
-        title: "Max out VIP this week",
-        subtitle: `Hit ${vipPromoteThreshold} activity for full perks`,
-        progressCurrent: weeklyActivityScore,
-        progressTarget: vipPromoteThreshold,
-        remainingLabel: `${need} activity pts`,
+        id: "prestige_ready",
+        goalType: "prestige",
+        title: `Prestige ${Number(accountPrestige || 0) + 1} is ready`,
+        subtitle: "You hit level 55 — prestige to reset the ladder",
+        progressCurrent: 55,
+        progressTarget: 55,
+        remainingLabel: "Ready now",
         reward: {
-          headline: "VIP trial perk",
-          detail: "Full VIP lane unlock",
-          accent: "emerald",
+          headline: "Prestige badge",
+          detail: "Keep all lifetime XP",
+          accent: "gold",
         },
-        ctaLabel: "Keep Climbing",
-        ctaActionId: "vip_promote",
+        ctaLabel: "View Progression",
+        ctaActionId: "view_progression",
       },
     });
   }

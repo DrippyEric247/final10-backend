@@ -75,18 +75,6 @@ const getWeekKeyUTC = (timestampMs) => {
   return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 };
 
-const PERMANENT_RANKS = [
-  { name: "Bronze", minPoints: 0, color: "text-amber-500" },
-  { name: "Silver", minPoints: 1000, color: "text-slate-300" },
-  { name: "Gold", minPoints: 5000, color: "text-yellow-400" },
-  { name: "Platinum", minPoints: 12000, color: "text-cyan-300" },
-  { name: "Legend", minPoints: 25000, color: "text-fuchsia-400" },
-];
-
-const VIP_RANKS = ["VIP Bronze", "VIP Silver", "VIP Gold", "VIP Platinum", "VIP Legend"];
-const VIP_MAINTAIN_THRESHOLD = 100;
-const VIP_PROMOTE_THRESHOLD = 180;
-
 const TASK_DAILY_BONUS_MIN = 100;
 const TASK_DAILY_BONUS_MAX = 130;
 
@@ -214,52 +202,6 @@ const Profile = () => {
     0,
     (completedTasksCount * 25) + (streakWeeks * 10) + Math.min(100, Math.floor(basePoints / 1000) * 5)
   );
-  const permanentRank =
-    [...PERMANENT_RANKS].reverse().find((rank) => basePoints >= rank.minPoints) || PERMANENT_RANKS[0];
-  const permanentRankIndex = PERMANENT_RANKS.findIndex((r) => r.name === permanentRank.name);
-  const nextPermanentRank = PERMANENT_RANKS[permanentRankIndex + 1] || null;
-  const rankProgressToNext = (() => {
-    if (!nextPermanentRank) {
-      return {
-        pct: 100,
-        blocksFilled: 9,
-        ptsRemaining: 0,
-      };
-    }
-    const lo = permanentRank.minPoints;
-    const hi = nextPermanentRank.minPoints;
-    const span = Math.max(1, hi - lo);
-    const t = (basePoints - lo) / span;
-    const pct = Math.max(0, Math.min(100, t * 100));
-    const blocksFilled = Math.min(9, Math.round((pct / 100) * 9));
-    return {
-      pct,
-      blocksFilled,
-      ptsRemaining: Math.max(0, nextPermanentRank.minPoints - basePoints),
-    };
-  })();
-  const silverMinPoints = PERMANENT_RANKS.find((r) => r.name === "Silver")?.minPoints ?? 1000;
-  const hasSilverRank = basePoints >= silverMinPoints;
-  const vipStatusMode = !hasSilverRank
-    ? "locked"
-    : weeklyActivityScore < VIP_MAINTAIN_THRESHOLD
-    ? "atRisk"
-    : weeklyActivityScore < VIP_PROMOTE_THRESHOLD
-    ? "unlocking"
-    : "active";
-  const vipRankDataRaw = (() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem("f10_vip_rank_data") || "{}");
-      return {
-        tier: Number.isFinite(Number(raw.tier)) ? Number(raw.tier) : 0,
-        lastEvaluatedWeek: raw.lastEvaluatedWeek || currentWeekKey,
-        lastScore: Number(raw.lastScore) || 0,
-      };
-    } catch {
-      return { tier: 0, lastEvaluatedWeek: currentWeekKey, lastScore: 0 };
-    }
-  })();
-  const [vipRankData, setVipRankData] = useState(vipRankDataRaw);
   const [taskBonusMessage, setTaskBonusMessage] = useState("");
   const [unlockToasts, setUnlockToasts] = useState([]);
   const prevTaskDoneSetRef = useRef(null);
@@ -576,53 +518,6 @@ const Profile = () => {
   }, [basePoints, streakWeeks, displayTaskStreak, breakdown, savvySyncBonus, tabExplorerBoost, totalBoost, leaderboardScore]);
 
   useEffect(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem("f10_weekly_activity_scores") || "{}");
-      raw[currentWeekKey] = weeklyActivityScore;
-      localStorage.setItem("f10_weekly_activity_scores", JSON.stringify(raw));
-    } catch {
-      localStorage.setItem(
-        "f10_weekly_activity_scores",
-        JSON.stringify({ [currentWeekKey]: weeklyActivityScore })
-      );
-    }
-  }, [currentWeekKey, weeklyActivityScore]);
-
-  useEffect(() => {
-    setVipRankData((prev) => {
-      if (!prev || prev.lastEvaluatedWeek === currentWeekKey) {
-        return prev;
-      }
-
-      let nextTier = Number(prev.tier) || 0;
-      const priorScore = Number(prev.lastScore) || 0;
-
-      if (priorScore >= VIP_PROMOTE_THRESHOLD) {
-        nextTier = Math.min(VIP_RANKS.length - 1, nextTier + 1);
-      } else if (priorScore < VIP_MAINTAIN_THRESHOLD) {
-        nextTier = Math.max(0, nextTier - 1);
-      }
-
-      return {
-        tier: nextTier,
-        lastEvaluatedWeek: currentWeekKey,
-        lastScore: weeklyActivityScore,
-      };
-    });
-  }, [currentWeekKey, weeklyActivityScore]);
-
-  useEffect(() => {
-    setVipRankData((prev) => ({
-      ...prev,
-      lastScore: weeklyActivityScore,
-    }));
-  }, [weeklyActivityScore]);
-
-  useEffect(() => {
-    localStorage.setItem("f10_vip_rank_data", JSON.stringify(vipRankData));
-  }, [vipRankData]);
-
-  useEffect(() => {
     localStorage.setItem("f10_profile_visits", String((Number(localStorage.getItem("f10_profile_visits") || 0) + 1)));
   }, []);
 
@@ -928,7 +823,7 @@ const Profile = () => {
       powerMultiplier: Number(ub.currentBoost) || 1,
       bundleStreakWeeks: streakWeeks,
       taskStreakWeeks: displayTaskStreak,
-      vipTier: Math.min(5, Math.max(0, Number(vipRankData?.tier) || 0)),
+      vipTier: 0,
       seasonTiersCleared: bp.completedCount,
       auctionsWon,
       savvyPointsThisWeek: weeklyActivityScore,
@@ -967,7 +862,6 @@ const Profile = () => {
     streakWeeks,
     displayTaskStreak,
     weeklyActivityScore,
-    vipRankData?.tier,
     searchParams,
   ]);
 
@@ -1014,11 +908,11 @@ const Profile = () => {
       bpTotalTiers: BATTLE_PASS_TIERS.length,
       auctionsWon,
       auctionNextMilestoneAt: 5,
-      weeklyActivityScore,
-      vipMaintainThreshold: VIP_MAINTAIN_THRESHOLD,
-      vipPromoteThreshold: VIP_PROMOTE_THRESHOLD,
-      hasSilverRank,
-      vipStatusMode,
+      accountLevel: levelData?.level?.currentLevel,
+      accountPrestige: levelData?.level?.prestige,
+      accountXpToNext: levelData?.level?.xpToNextLevel,
+      accountXpProgress: levelData?.level?.xpProgress,
+      accountXpRange: levelData?.level?.xpInfo?.xpRange,
     });
     return { activityItems, nextGoal };
   }, [
@@ -1031,9 +925,7 @@ const Profile = () => {
     taskProgress.total,
     streakWeeks,
     displayTaskStreak,
-    weeklyActivityScore,
-    hasSilverRank,
-    vipStatusMode,
+    levelData,
   ]);
 
   const handleProfileGoalCta = useCallback((actionId) => {
@@ -1082,7 +974,6 @@ const Profile = () => {
     on: Boolean(systems[row.systemKey]),
     progress: getSavvyRowStatus(row.systemKey) === "inProgress",
   }));
-  const vipRankName = VIP_RANKS[Math.min(VIP_RANKS.length - 1, Math.max(0, Number(vipRankData?.tier) || 0))];
 
   return (
     <>
@@ -1127,21 +1018,11 @@ const Profile = () => {
         bestMovePowerLine={bestMoveUsageLine}
         savvyNextUnlock={savvyNextUnlock}
         leaderboardScore={leaderboardScore}
-        permanentRank={permanentRank}
-        nextPermanentRank={nextPermanentRank}
-        rankProgressToNext={rankProgressToNext}
         taskProgress={taskProgress}
         taskBonusMessage={taskBonusMessage}
         taskDailyBonusMin={TASK_DAILY_BONUS_MIN}
         taskDailyBonusMax={TASK_DAILY_BONUS_MAX}
         boostSystemRows={boostSystemRowsLayout}
-        vipRankName={vipRankName}
-        vipStatusMode={vipStatusMode}
-        weeklyActivityScore={weeklyActivityScore}
-        vipPromoteThreshold={VIP_PROMOTE_THRESHOLD}
-        vipMaintainThreshold={VIP_MAINTAIN_THRESHOLD}
-        hasSilverRank={hasSilverRank}
-        silverMinPoints={silverMinPoints}
         levelInfo={levelInfo}
         streakWeeks={streakWeeks}
         displayTaskStreak={displayTaskStreak}
