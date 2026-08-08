@@ -10,6 +10,7 @@ import {
   isSoundMuted,
 } from "../../lib/pointsEngine";
 import { playSavvyWalletSound, playUiClick } from "../../lib/savvyWalletSound";
+import { openCamoLocker } from "../../lib/camoLockerBus";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { SCOUT_COPY } from "../../config/savvyScoutBranding";
 import ActiveBoostsBar from "../inventory/ActiveBoostsBar";
@@ -287,6 +288,13 @@ function WalletBody({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: 0.14 }}
             >
+              <button
+                type="button"
+                className="savvy-wallet-btn"
+                onClick={() => openCamoLocker({ source: "wallet_panel" })}
+              >
+                Camo Locker
+              </button>
               <button type="button" className="savvy-wallet-btn" onClick={toggleDrawer} aria-expanded={drawerOpen}>
                 {drawerOpen ? "Hide stats" : "Earnings detail"}
               </button>
@@ -777,6 +785,13 @@ export default function SavvyWalletBubble() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, delay: 0.06 }}
             >
+              <button
+                type="button"
+                className="savvy-wallet-btn"
+                onClick={() => openCamoLocker({ source: "wallet_panel" })}
+              >
+                Camo Locker
+              </button>
               <button type="button" className="savvy-wallet-btn" onClick={toggleDrawer} aria-expanded={drawerOpen}>
                 {drawerOpen ? "Hide stats" : "Earnings detail"}
               </button>

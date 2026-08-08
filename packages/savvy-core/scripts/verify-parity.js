@@ -5,8 +5,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as universeEvents from "../src/events/universeEvents.js";
+import * as camoLocker from "../src/config/camoLocker.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -198,6 +200,9 @@ const EVENT_SOURCES = {
   SAVVY_AUTH_REFRESH_REQUEST: "store/savvyStore.js",
   SAVVY_STORE_UPDATED: "store/savvyStore.js",
   CALLING_CARD_UNLOCK_EVENT: "lib/callingCardUnlockBus.js",
+  CAMO_LOCKER_OPEN_EVENT: "lib/camoLockerBus.js",
+  CAMO_LOCKER_CLOSE_EVENT: "lib/camoLockerBus.js",
+  CAMO_LOCKER_SYNC_EVENT: "lib/camoLockerBus.js",
   SAVVY_ALERT_EVENT: "lib/savvyAlerts.js",
   SCOUT_MISSION_SYNC_EVENT: "lib/savvyScoutMissions.js",
   SCOUT_MISSION_POPUP_EVENT: "lib/savvyScoutMissions.js",
@@ -218,5 +223,51 @@ if (exportedCount !== expectedCount) {
   fail(`UNIVERSE_EVENTS has ${exportedCount} entries, expected ${expectedCount}`);
 }
 ok(`UNIVERSE_EVENTS registry complete (${exportedCount} events)`);
+
+/* ------------------------- Camo Locker catalog parity ---------------------- */
+
+const SERVER_CAMO_CONFIG = path.resolve(PACKAGE_ROOT, "../../server/config/camoLocker.js");
+
+console.log("\nCamo Locker catalog:");
+if (!fs.existsSync(SERVER_CAMO_CONFIG)) {
+  fail(`server camo mirror missing at ${SERVER_CAMO_CONFIG}`);
+}
+
+const serverCamo = createRequire(import.meta.url)(SERVER_CAMO_CONFIG);
+
+if (serverCamo.CAMO_CATALOG_VERSION !== camoLocker.CAMO_CATALOG_VERSION) {
+  fail(
+    `CAMO_CATALOG_VERSION mismatch: package=${camoLocker.CAMO_CATALOG_VERSION} server=${serverCamo.CAMO_CATALOG_VERSION}`
+  );
+}
+ok(`CAMO_CATALOG_VERSION === ${camoLocker.CAMO_CATALOG_VERSION}`);
+
+const packageIds = camoLocker.CAMO_ITEM_IDS.join(",");
+const serverIds = serverCamo.CAMO_ITEM_IDS.join(",");
+if (packageIds !== serverIds) {
+  fail(
+    `camo item IDs drift.\n  package (${camoLocker.CAMO_ITEM_IDS.length}): ${packageIds}\n  server  (${serverCamo.CAMO_ITEM_IDS.length}): ${serverIds}`
+  );
+}
+ok(`camo item IDs match (${camoLocker.CAMO_ITEM_IDS.length} items)`);
+
+for (const item of camoLocker.CAMO_ITEMS) {
+  const mirror = serverCamo.getCamoItem(item.id);
+  if (!mirror) fail(`server mirror is missing camo item ${item.id}`);
+  if (mirror.threshold !== item.threshold) {
+    fail(
+      `${item.id} threshold mismatch: package=${item.threshold} server=${mirror.threshold}`
+    );
+  }
+  if (mirror.rarity !== item.rarity) {
+    fail(`${item.id} rarity mismatch: package=${item.rarity} server=${mirror.rarity}`);
+  }
+  const packageGates = JSON.stringify(item.gates);
+  const serverGates = JSON.stringify(mirror.gates);
+  if (packageGates !== serverGates) {
+    fail(`${item.id} gate drift.\n  package: ${packageGates}\n  server:  ${serverGates}`);
+  }
+}
+ok("camo thresholds, rarities and unlock gates match server mirror");
 
 console.log("\n✓ All parity checks passed.\n");

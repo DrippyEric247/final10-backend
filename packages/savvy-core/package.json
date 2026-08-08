@@ -13,6 +13,11 @@
       "require": "./src/config/savvyRewards.js",
       "default": "./src/config/savvyRewards.js"
     },
+    "./config/camoLocker": {
+      "import": "./src/config/camoLocker.js",
+      "require": "./src/config/camoLocker.js",
+      "default": "./src/config/camoLocker.js"
+    },
     "./config/scoutBranding": {
       "import": "./src/config/scoutBranding.js",
       "require": "./src/config/scoutBranding.js",

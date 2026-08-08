@@ -13,6 +13,11 @@ export const SAVVY_STORE_UPDATED = "f10:savvy-store-updated";
 // Calling cards
 export const CALLING_CARD_UNLOCK_EVENT = "f10:calling-card-unlock";
 
+// Camo Locker (universal overlay — any app can open it)
+export const CAMO_LOCKER_OPEN_EVENT = "f10:camo-locker-open";
+export const CAMO_LOCKER_CLOSE_EVENT = "f10:camo-locker-close";
+export const CAMO_LOCKER_SYNC_EVENT = "f10:camo-locker-sync";
+
 // Alerts
 export const SAVVY_ALERT_EVENT = "f10-savvy-alert-created";
 
@@ -33,6 +38,9 @@ export const UNIVERSE_EVENTS = Object.freeze({
   SAVVY_AUTH_REFRESH_REQUEST,
   SAVVY_STORE_UPDATED,
   CALLING_CARD_UNLOCK_EVENT,
+  CAMO_LOCKER_OPEN_EVENT,
+  CAMO_LOCKER_CLOSE_EVENT,
+  CAMO_LOCKER_SYNC_EVENT,
   SAVVY_ALERT_EVENT,
   SCOUT_MISSION_SYNC_EVENT,
   SCOUT_MISSION_POPUP_EVENT,

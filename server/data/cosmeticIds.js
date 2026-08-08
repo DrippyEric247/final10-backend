@@ -122,6 +122,13 @@ const BATTLE_PASS_S1_COSMETIC_IDS = new Set([
   'boost_egg_slot_s1',
 ]);
 
+/**
+ * Savvy Camo Locker apparel unlocks (`camo_<category>_<camo>_<rewardType>`).
+ * Generated from the universal catalog so a new camo or category only needs a
+ * config edit — never a change here.
+ */
+const CAMO_ITEM_IDS = new Set(require('../config/camoLocker').CAMO_ITEM_IDS);
+
 /** Role-based auto-unlocks (mirrors client adminCosmetics ROLE_AUTO_GRANTS). */
 const ROLE_AUTO_GRANTS = {
   influencer: ['card_savvy_creator', 'sigil_savvy_creator'],
@@ -146,7 +153,8 @@ function isKnownCosmeticId(id) {
     EMBLEM_IDS.has(id) ||
     CALLING_CARD_IDS.has(id) ||
     TITLE_IDS.has(id) ||
-    BATTLE_PASS_S1_COSMETIC_IDS.has(id)
+    BATTLE_PASS_S1_COSMETIC_IDS.has(id) ||
+    CAMO_ITEM_IDS.has(id)
   );
 }
 
@@ -160,6 +168,7 @@ module.exports = {
   CALLING_CARD_IDS,
   TITLE_IDS,
   BATTLE_PASS_S1_COSMETIC_IDS,
+  CAMO_ITEM_IDS,
   ROLE_AUTO_GRANTS,
   isKnownCosmeticId,
   roleAutoUnlockIds,

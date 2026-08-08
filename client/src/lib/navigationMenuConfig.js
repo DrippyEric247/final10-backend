@@ -68,6 +68,14 @@ export const MORE_MENU_SECTIONS = Object.freeze([
         shortLabel: 'Cards',
         path: '/customization',
       },
+      {
+        key: 'camoLocker',
+        name: 'Camo Locker',
+        shortLabel: 'Camo',
+        // Opens the universal overlay instead of navigating, so the page
+        // underneath is preserved.
+        action: 'camoLocker',
+      },
       { key: 'savvyWins', name: 'Savvy Wins', shortLabel: 'Savvy Wins', path: '/win-feed' },
       { key: 'leaderboards', name: 'Leaderboards', shortLabel: 'Ranks', path: '/leaderboard' },
     ],

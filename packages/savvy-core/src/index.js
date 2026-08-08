@@ -4,4 +4,5 @@
 
 export * from "./events/universeEvents.js";
 export * from "./config/savvyRewards.js";
+export * from "./config/camoLocker.js";
 export * from "./config/scoutBranding.js";

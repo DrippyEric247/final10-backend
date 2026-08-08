@@ -412,6 +412,29 @@ export async function getInventoryStatus() {
   return data;
 }
 
+/* ---------------- Savvy Camo Locker (universal across Savvy apps) --------- */
+
+export async function getCamoLocker() {
+  const { data } = await api.get("/camo-locker/me");
+  return data;
+}
+
+/** Signals a qualifying category action — the server owns the increment + caps. */
+export async function recordCamoCategoryProgress(category, increment) {
+  const { data } = await api.post("/camo-locker/progress", { category, increment });
+  return data;
+}
+
+export async function markCamosSeen(itemIds) {
+  const { data } = await api.post("/camo-locker/seen", { itemIds });
+  return data;
+}
+
+export async function claimCamoReward(itemId) {
+  const { data } = await api.post("/camo-locker/claim", { itemId });
+  return data;
+}
+
 export async function activatePerkEventToken(tokenId) {
   const { data } = await api.post("/perk-machine/activate-event", { tokenId });
   return data;

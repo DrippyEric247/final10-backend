@@ -53,6 +53,24 @@ exports.cosmeticsAdminRevokeBody = Joi.object({
   itemId: Joi.string().trim().min(1).max(128).required(),
 });
 
+// Savvy Camo Locker — clients may only name a category, never a count.
+exports.camoProgressBody = Joi.object({
+  category: Joi.string()
+    .trim()
+    .valid(...require('../config/camoLocker').CAMO_CATEGORY_IDS)
+    .required(),
+  increment: Joi.number().integer().min(1).max(5).optional(),
+});
+
+exports.camoItemBody = Joi.object({
+  itemId: Joi.string().trim().min(1).max(128).required(),
+});
+
+exports.camoAdminGrantBody = Joi.object({
+  userKey: Joi.string().trim().min(1).max(256).required(),
+  itemId: Joi.string().trim().min(1).max(128).required(),
+});
+
 // Phase B: creator/referral attribution payload captured client-side and
 // forwarded on signup. Loose by design — never block signup on attribution.
 const attributionPayload = Joi.object({

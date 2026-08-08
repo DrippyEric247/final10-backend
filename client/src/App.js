@@ -19,6 +19,7 @@ import SavvyScoutVoiceHost from './components/scout/SavvyScoutVoiceHost';
 import ProgressionCelebrationHost from './components/progression/ProgressionCelebrationHost';
 import InventoryActivationHost from './components/inventory/InventoryActivationHost';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
+import CamoLockerHost from './components/camo/CamoLockerHost';
 import AuthDebugger from './components/AuthDebugger';
 import DevOverridePanel from './components/dev/DevOverridePanel';
 import DevModeBadge from './components/dev/DevModeBadge';
@@ -286,6 +287,7 @@ export default function App() {
         <EventActivationHost />
         <ProgressionRecapHost />
         <CallingCardUnlockCeremony />
+        <CamoLockerHost />
         <SmartCoachHost enabled={Boolean(user)} />
         <SavvyScoutVoiceHost />
         <ProgressionCelebrationHost />

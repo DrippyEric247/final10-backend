@@ -318,6 +318,7 @@ app.use('/api/owner', ownerControlRoutes);
 app.use('/api/progression', progressionRoutes);
 app.use('/api/soundtracks', require('./routes/soundtrackRoutes'));
 app.use('/api/cosmetics', cosmeticRoutes);
+app.use('/api/camo-locker', require('./routes/camoLockerRoutes'));
 app.use('/api/entitlements', entitlementRoutes);
 app.use('/api/offers', offersRoutes);
 app.use('/api/business-offers', businessOffersRoutes);

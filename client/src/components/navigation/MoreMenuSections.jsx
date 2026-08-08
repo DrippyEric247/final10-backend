@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Award,
@@ -14,6 +14,7 @@ import {
   Settings,
   Shield,
   ShieldCheck,
+  Shirt,
   ShoppingBag,
   Sparkles,
   Target,
@@ -22,8 +23,10 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useMoreMenu } from '../../context/MoreMenuContext';
 import { shouldShowAdminNav } from '../../lib/adminAccess';
 import { isNavActive } from '../../lib/navigationActive';
+import { openCamoLocker } from '../../lib/camoLockerBus';
 import {
   ADMIN_MORE_ITEMS,
   MORE_MENU_SECTIONS,
@@ -42,6 +45,7 @@ const MORE_ITEM_ICONS = {
   perkMachine: Dices,
   battlePass: Target,
   customization: Award,
+  camoLocker: Shirt,
   savvyWins: Trophy,
   leaderboards: Medal,
   lifeOptimizer: Building2,
@@ -65,7 +69,16 @@ function resolveMoreItemIcon(item) {
 export default function MoreMenuSections({ variant = 'more', onReportBug }) {
   const location = useLocation();
   const { user } = useAuth() || {};
+  const { closeMore } = useMoreMenu();
   const showAdminNav = shouldShowAdminNav(user);
+
+  const runMoreMenuAction = useCallback(
+    (action) => {
+      closeMore();
+      if (action === 'camoLocker') openCamoLocker({ source: 'more_menu' });
+    },
+    [closeMore]
+  );
 
   const sections = useMemo(() => {
     const base = MORE_MENU_SECTIONS.map((section) => ({
@@ -103,6 +116,36 @@ export default function MoreMenuSections({ variant = 'more', onReportBug }) {
           <div className="nav-more-grid">
             {section.items.map((item) => {
               const Icon = item.Icon || resolveMoreItemIcon(item);
+
+              // Action items open an overlay instead of navigating, so the
+              // current page stays exactly where it is.
+              if (item.action) {
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    title={item.title || item.name}
+                    className={`nav-item nav-item--${variant}`}
+                    onClick={() => runMoreMenuAction(item.action)}
+                  >
+                    <span className="nav-icon nav-icon-wrap">
+                      {Icon ? (
+                        <Icon
+                          className="nav-lucide-icon"
+                          size={NAV_ICON_SIZE}
+                          strokeWidth={NAV_ICON_STROKE}
+                          aria-hidden
+                        />
+                      ) : null}
+                    </span>
+                    <span className="nav-label nav-label--full">{item.name}</span>
+                    <span className="nav-label nav-label--short">
+                      {item.shortLabel || item.name}
+                    </span>
+                  </button>
+                );
+              }
+
               const active = isNavActive(
                 location.pathname,
                 location.hash,
