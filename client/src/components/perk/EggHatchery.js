@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import EggCard from './EggCard';
 import EggHatchModal from './EggHatchModal';
+import EggCamoCollectionModal from '../egg-camo/EggCamoCollectionModal';
 import { buildOwnedEggs } from '../../lib/eggHatchery';
 import '../../styles/EggExchange.css';
 
@@ -19,6 +20,7 @@ const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
  */
 export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onSpinClick }) {
   const [activeEgg, setActiveEgg] = useState(null);
+  const [camoOpen, setCamoOpen] = useState(false);
 
   const ownedEggs = useMemo(() => buildOwnedEggs(eggInventory), [eggInventory]);
 
@@ -33,6 +35,11 @@ export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onS
       <header className="egg-hatchery__header">
         <h2 className="egg-hatchery__title">🥚 Egg Hatchery</h2>
         <p className="egg-hatchery__subtitle">Collect. Hatch. Power Up Savvy Scout.</p>
+        <div className="egg-hatchery__camo-entry">
+          <button type="button" className="egg-hatchery__camo-btn" onClick={() => setCamoOpen(true)}>
+            🎖️ EGG CAMO COLLECTION
+          </button>
+        </div>
       </header>
 
       {ownedEggs.length > 0 ? (
@@ -69,6 +76,8 @@ export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onS
       <div className="egg-hatchery__exchange-link">
         <Link to="/egg-exchange">🧪 Egg Exchange Chamber — fuse into higher tiers</Link>
       </div>
+
+      <EggCamoCollectionModal open={camoOpen} onClose={() => setCamoOpen(false)} />
     </section>
   );
 }

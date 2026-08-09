@@ -285,6 +285,23 @@ async function applyReward(user, rewardDef, spinId) {
     }
     granted.eggsGranted = qty;
     if (qty > 1) granted.spinMultiplierApplied = qty;
+    try {
+      const { isHatchableEggTier } = require('../config/eggCamoCollection');
+      if (isHatchableEggTier(tier)) {
+        const eggSource = String(spinId || '').startsWith('hatch:')
+          ? 'perk_machine_hatch'
+          : 'perk_machine';
+        const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
+        await recordLegitimateEggAcquisition(user, {
+          tier,
+          quantity: qty,
+          source: eggSource,
+          skipSave: true,
+        });
+      }
+    } catch (err) {
+      console.error('[egg-camo] perk machine grant tracking failed', err?.message || err);
+    }
   } else if (rewardDef.type === 'token' && rewardDef.tokenKey) {
     pm.tokens[rewardDef.tokenKey] = Number(pm.tokens[rewardDef.tokenKey] || 0) + qty;
     if (qty > 1) granted.spinMultiplierApplied = qty;

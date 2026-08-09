@@ -14,6 +14,7 @@ const {
   claimCamoReward,
   markCamosSeen,
 } = require('../services/camoLockerService');
+const { getMasterClassifiedForUser } = require('../services/masterClassifiedService');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -29,6 +30,15 @@ function forward(err, next) {
 router.get('/me', auth, async (req, res, next) => {
   try {
     return res.json(await getCamoLockerForUser(req.user._id));
+  } catch (err) {
+    return forward(err, next);
+  }
+});
+
+/** Classified / Master Collection — server-authoritative camo mastery endgame. */
+router.get('/master-classified/me', auth, async (req, res, next) => {
+  try {
+    return res.json(await getMasterClassifiedForUser(req.user._id));
   } catch (err) {
     return forward(err, next);
   }

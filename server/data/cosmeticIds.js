@@ -42,6 +42,8 @@ const EMBLEM_IDS = new Set([
   'sigil_scout_flight_silver',
   'sigil_scout_flight_bronze',
   'sigil_scout_flight_top10',
+  // Classified / Master Collection
+  'sigil_master_classified',
 ]);
 
 const CALLING_CARD_IDS = new Set([
@@ -96,6 +98,8 @@ const CALLING_CARD_IDS = new Set([
   'card_pm_gold_standard',
   'card_pm_apex_closer',
   'card_pm_jackpot_royalty',
+  // Classified / Master Collection
+  'card_master_classified',
 ]);
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);
@@ -120,6 +124,8 @@ const BATTLE_PASS_S1_COSMETIC_IDS = new Set([
   'badge_scout_flight_participation',
   'border_founding_beta',
   'boost_egg_slot_s1',
+  // Classified / Master Collection entitlements
+  'lobby_anim_master_classified',
 ]);
 
 /**
@@ -128,6 +134,9 @@ const BATTLE_PASS_S1_COSMETIC_IDS = new Set([
  * config edit — never a change here.
  */
 const CAMO_ITEM_IDS = new Set(require('../config/camoLocker').CAMO_ITEM_IDS);
+const MASTER_CLASSIFIED_ITEM_IDS = new Set(
+  require('../config/masterClassifiedCollection').MASTER_CLASSIFIED_ITEM_IDS
+);
 
 /** Role-based auto-unlocks (mirrors client adminCosmetics ROLE_AUTO_GRANTS). */
 const ROLE_AUTO_GRANTS = {
@@ -154,7 +163,8 @@ function isKnownCosmeticId(id) {
     CALLING_CARD_IDS.has(id) ||
     TITLE_IDS.has(id) ||
     BATTLE_PASS_S1_COSMETIC_IDS.has(id) ||
-    CAMO_ITEM_IDS.has(id)
+    CAMO_ITEM_IDS.has(id) ||
+    MASTER_CLASSIFIED_ITEM_IDS.has(id)
   );
 }
 

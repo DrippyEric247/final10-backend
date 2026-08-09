@@ -7,6 +7,8 @@ import CamoPreviewModal from './CamoPreviewModal';
 import CamoDetailPanel from './CamoDetailPanel';
 import CamoImage from './CamoImage';
 import useCamoLocker from '../../hooks/useCamoLocker';
+import ClassifiedCollectionPanel from '../master-classified/ClassifiedCollectionPanel';
+import useMasterClassifiedCollection from '../../hooks/useMasterClassifiedCollection';
 import { getApparelType, getCategoryRewardTypes } from '@savvy/core/config/camoLocker';
 import { claimCamoReward, getNukeCollectionPreview } from '../../lib/api';
 import { requestCamoLockerSync } from '../../lib/camoLockerBus';
@@ -53,6 +55,9 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
   } = locker;
 
   const [nukePreview, setNukePreview] = useState(null);
+  const [classifiedOpen, setClassifiedOpen] = useState(false);
+
+  const masterClassified = useMasterClassifiedCollection(open);
 
   const [view, setView] = useState('category');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -87,6 +92,12 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
     return () => {
       document.body.style.overflow = previous;
     };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setClassifiedOpen(false);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -604,6 +615,48 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
                     </div>
                   ) : null}
 
+                  <button
+                    type="button"
+                    className="f10-camo-cat f10-camo-cat--classified"
+                    style={{ '--camo-accent': '#a855f7' }}
+                    onClick={() => setClassifiedOpen(true)}
+                  >
+                    <div className="f10-camo-cat__art">
+                      <div className="f10-camo-img">
+                        <div className="f10-camo-img__fallback" aria-hidden>
+                          <span className="f10-camo-img__glyph">👑</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="f10-camo-cat__body">
+                      <div className="f10-camo-cat__top">
+                        <span className="f10-camo-cat__icon" aria-hidden>
+                          👑
+                        </span>
+                        <div>
+                          <div className="f10-camo-cat__name">CLASSIFIED COLLECTION</div>
+                          <div className="f10-camo-cat__type">
+                            MASTER · FUSION WEAVE
+                          </div>
+                        </div>
+                        <ChevronRight className="f10-camo-cat__chev" size={16} strokeWidth={2.4} aria-hidden />
+                      </div>
+                      <div className="f10-camo-cat__progress">
+                        {masterClassified.summary?.camoComplete ?? 0} / {masterClassified.summary?.camoTotal ?? 6} CAMO
+                        FAMILIES
+                      </div>
+                      <div className="f10-camo-card__track">
+                        <div
+                          className="f10-camo-card__fill"
+                          style={{ width: `${masterClassified.summary?.camoPercent ?? 0}%` }}
+                        />
+                      </div>
+                      <div className="f10-camo-cat__highest">
+                        STATUS: {masterClassified.summary?.mastered ? 'MASTERED' : masterClassified.summary?.status || 'CLASSIFIED'}
+                      </div>
+                    </div>
+                  </button>
+
                   {upcomingCategories.map((category) => (
                     <div
                       key={category.id}
@@ -686,6 +739,12 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
           />
         ) : null}
       </AnimatePresence>
+
+      <ClassifiedCollectionPanel
+        open={classifiedOpen}
+        onClose={() => setClassifiedOpen(false)}
+        lockerSummary={summary}
+      />
     </motion.div>,
     document.body
   );

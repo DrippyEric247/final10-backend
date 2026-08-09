@@ -164,6 +164,21 @@ async function performEggExchange(user, exchangeType) {
   pm.eggInventory[recipe.fromTier] = ownedFrom - recipe.eggsRequired;
   pm.eggInventory[recipe.toTier] = Number(pm.eggInventory[recipe.toTier] || 0) + 1;
 
+  try {
+    const { isHatchableEggTier } = require('../config/eggCamoCollection');
+    if (isHatchableEggTier(recipe.toTier)) {
+      const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
+      await recordLegitimateEggAcquisition(user, {
+        tier: recipe.toTier,
+        quantity: 1,
+        source: 'egg_exchange',
+        skipSave: true,
+      });
+    }
+  } catch (err) {
+    console.error('[egg-camo] exchange output tracking failed', err?.message || err);
+  }
+
   const historyEntry = {
     exchangeId,
     exchangeType: recipe.exchangeType,

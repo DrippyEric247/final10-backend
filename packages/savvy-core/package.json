@@ -23,6 +23,16 @@
       "require": "./src/config/camoLocker.js",
       "default": "./src/config/camoLocker.js"
     },
+    "./config/eggCamoCollection": {
+      "import": "./src/config/eggCamoCollection.js",
+      "require": "./src/config/eggCamoCollection.js",
+      "default": "./src/config/eggCamoCollection.js"
+    },
+    "./config/masterClassifiedCollection": {
+      "import": "./src/config/masterClassifiedCollection.js",
+      "require": "./src/config/masterClassifiedCollection.js",
+      "default": "./src/config/masterClassifiedCollection.js"
+    },
     "./config/scoutBranding": {
       "import": "./src/config/scoutBranding.js",
       "require": "./src/config/scoutBranding.js",

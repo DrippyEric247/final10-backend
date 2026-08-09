@@ -441,6 +441,26 @@ export async function getNukeCollectionPreview() {
   return data;
 }
 
+/** Classified / Master Collection — six-camo Camo Locker mastery endgame. */
+export async function getMasterClassifiedCollection() {
+  const { data } = await api.get("/camo-locker/master-classified/me");
+  return data;
+}
+
+/* ---------------- Egg Camo Collection (lifetime Egg mastery) ---------------- */
+
+export async function getEggCamoCollection() {
+  const { data } = await api.get("/egg-camo/me");
+  return data;
+}
+
+export async function acknowledgeEggCamoCelebrations(camoIds) {
+  const { data } = await api.post("/egg-camo/celebrations/ack", {
+    camoIds: Array.isArray(camoIds) ? camoIds : camoIds ? [camoIds] : [],
+  });
+  return data;
+}
+
 /** Admin Nuke Monitor — summary dashboard cards. */
 export async function getNukeMonitorSummary(params = {}) {
   const { data } = await api.get("/admin/nuke-monitor/summary", { params });

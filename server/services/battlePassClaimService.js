@@ -102,6 +102,20 @@ async function applyClaimReward(user, inventory, reward, idemKey) {
         pm.eggInventory[tier] = Number(pm.eggInventory[tier] || 0) + 1;
       }
       user.markModified('perkMachine');
+      try {
+        const { isHatchableEggTier } = require('../config/eggCamoCollection');
+        if (isHatchableEggTier(tier)) {
+          const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
+          await recordLegitimateEggAcquisition(user, {
+            tier,
+            quantity: 1,
+            source: 'battle_pass',
+            skipSave: true,
+          });
+        }
+      } catch (err) {
+        console.error('[egg-camo] battle pass egg tracking failed', err?.message || err);
+      }
       return { kind: 'egg', eggTier: tier };
     }
     case 'free_spin': {
@@ -149,6 +163,20 @@ async function applyClaimReward(user, inventory, reward, idemKey) {
         pm.eggInventory[tier] = Number(pm.eggInventory[tier] || 0) + 1;
       }
       user.markModified('perkMachine');
+      try {
+        const { isHatchableEggTier } = require('../config/eggCamoCollection');
+        if (isHatchableEggTier(tier)) {
+          const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
+          await recordLegitimateEggAcquisition(user, {
+            tier,
+            quantity: 1,
+            source: 'battle_pass',
+            skipSave: true,
+          });
+        }
+      } catch (err) {
+        console.error('[egg-camo] battle pass mythic_chance tracking failed', err?.message || err);
+      }
       return { kind: 'mythic_chance', eggTier: tier, mythicWon: won };
     }
     case 'soundtrack': {

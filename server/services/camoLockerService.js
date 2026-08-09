@@ -214,6 +214,12 @@ async function evaluateCamoUnlocks(userId) {
   for (const itemId of newlyUnlocked) {
     await grantCamoUnlock(userId, itemId, 'camo_progress');
   }
+  try {
+    const { evaluateMasterClassifiedUnlocks } = require('./masterClassifiedService');
+    await evaluateMasterClassifiedUnlocks(userId);
+  } catch (err) {
+    console.warn('[camoLocker] master classified evaluation failed:', err?.message || err);
+  }
   return newlyUnlocked;
 }
 

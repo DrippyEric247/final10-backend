@@ -8,6 +8,22 @@ const { ensurePerkMachineDoc } = require('./perkMachineService');
 const { adminGrantXp } = require('./battlePassClaimService');
 const { rewardToSummary } = require('../config/supplyDropRewards');
 
+async function trackEventEggGrant(user, tier, quantity = 1) {
+  try {
+    const { isHatchableEggTier } = require('../config/eggCamoCollection');
+    if (!isHatchableEggTier(tier)) return;
+    const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
+    await recordLegitimateEggAcquisition(user, {
+      tier,
+      quantity,
+      source: 'supply_drop',
+      skipSave: true,
+    });
+  } catch (err) {
+    console.error('[egg-camo] event egg tracking failed', err?.message || err);
+  }
+}
+
 async function applyEventReward(user, rewardDef, idempotencyPrefix) {
   const reward = { ...rewardDef };
   const prefix = idempotencyPrefix || `event:${user._id}:${crypto.randomUUID()}`;
@@ -38,6 +54,7 @@ async function applyEventReward(user, rewardDef, idempotencyPrefix) {
       pm.eggInventory[tier] = Number(pm.eggInventory[tier] || 0) + 1;
     }
     user.markModified('perkMachine');
+    await trackEventEggGrant(user, tier, 1);
   } else if (reward.type === 'egg_chance_epic') {
     const pm = ensurePerkMachineDoc(user);
     const chance = Number(reward.epicChance) || 0.35;
@@ -54,6 +71,7 @@ async function applyEventReward(user, rewardDef, idempotencyPrefix) {
       granted.epicRoll = false;
     }
     user.markModified('perkMachine');
+    await trackEventEggGrant(user, granted.eggTier, 1);
   } else if (reward.type === 'token' && reward.tokenKey) {
     const pm = ensurePerkMachineDoc(user);
     if (!pm.tokens) pm.tokens = { battlePassXp15: 0, savvyMultiplier15: 0, paid3Spin: 0 };

@@ -430,6 +430,65 @@ const userSchema = new mongoose.Schema({
     reportOpened: { type: Boolean, default: false },
   },
 
+  /** Lifetime Egg rarity mastery — independent of current egg inventory. */
+  eggCamoProgress: {
+    lifetimeCollected: {
+      common: { type: Number, default: 0 },
+      rare: { type: Number, default: 0 },
+      epic: { type: Number, default: 0 },
+      legendary: { type: Number, default: 0 },
+      mythic: { type: Number, default: 0 },
+    },
+    unlockedCamos: {
+      woodland: { type: Boolean, default: false },
+      tiger: { type: Boolean, default: false },
+      arctic: { type: Boolean, default: false },
+      gold: { type: Boolean, default: false },
+      diamond: { type: Boolean, default: false },
+      darkNebula: { type: Boolean, default: false },
+    },
+    unlockHistory: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    collectionMastered: { type: Boolean, default: false },
+    collectionMasteredAt: { type: Date, default: null },
+    backfilledAt: { type: Date, default: null },
+    pendingUnlockCelebrations: [{ type: String }],
+  },
+
+  /** Classified / Master Collection — six-camo Camo Locker mastery endgame. */
+  masterClassifiedProgress: {
+    collectionMastered: { type: Boolean, default: false },
+    collectionMasteredAt: { type: Date, default: null },
+    /** Sequential mint across all Master Collection earners. */
+    collectionSerialNumber: { type: Number, default: null },
+    savvyBonusGranted: { type: Boolean, default: false },
+    shoeTicketState: {
+      type: String,
+      default: 'LOCKED',
+      enum: [
+        'LOCKED',
+        'EARNED',
+        'REDEEMABLE',
+        'SUBMITTED',
+        'APPROVED',
+        'IN_CUSTOMIZATION',
+        'SHIPPED_BACK',
+        'COMPLETED',
+      ],
+    },
+    /** Immutable snapshot at legitimate Master unlock — never rewritten. */
+    unlockSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    completionData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+  },
+
   // ---- community stats ----
   totalTransactions: { type: Number, default: 0 },  // For time saved calculation
   
