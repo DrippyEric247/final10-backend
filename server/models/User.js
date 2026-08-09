@@ -182,6 +182,16 @@ const userSchema = new mongoose.Schema({
     rareScoutFlightRoute: { type: Number, default: 0 },
     mythicSupplyBeacon: { type: Number, default: 0 },
   },
+  /** Cross-app contract telemetry for Savvy Universe objectives */
+  contractsMeta: {
+    appOpens: [
+      {
+        appId: String,
+        day: String,
+        at: { type: Date, default: Date.now },
+      },
+    ],
+  },
   /** Scout Support / Deal Streak progression */
   scoutSupport: {
     dealStreakCount: { type: Number, default: 0 },

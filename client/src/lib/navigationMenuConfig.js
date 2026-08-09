@@ -76,6 +76,12 @@ export const MORE_MENU_SECTIONS = Object.freeze([
         // underneath is preserved.
         action: 'camoLocker',
       },
+      {
+        key: 'contracts',
+        name: 'Contracts',
+        shortLabel: 'Contracts',
+        action: 'contracts',
+      },
       { key: 'savvyWins', name: 'Savvy Wins', shortLabel: 'Savvy Wins', path: '/win-feed' },
       { key: 'leaderboards', name: 'Leaderboards', shortLabel: 'Ranks', path: '/leaderboard' },
     ],

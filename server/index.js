@@ -333,6 +333,7 @@ app.use('/api/market-value', marketValueRoutes);
 app.use('/api/analytics', analyticsIngestRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/scout-missions', require('./routes/scoutMissions'));
+app.use('/api/contracts', require('./routes/contractsRoutes'));
 app.use('/api/test-alert', require('./routes/testAlert'));
 app.use('/api/email', require('./routes/email'));
 app.use('/api/admin/email-test', require('./routes/adminEmailTestRoutes'));

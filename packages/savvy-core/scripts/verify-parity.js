@@ -210,6 +210,9 @@ const EVENT_SOURCES = {
   BP_UPDATE_EVENT: "lib/battlePassConfig.js",
   BP_TIER_COMPLETE_EVENT: "lib/battlePassConfig.js",
   BATTLE_PASS_ACTION_EVENT: "lib/battlePassActionBus.js",
+  CONTRACTS_OPEN_EVENT: "lib/contractsBus.js",
+  CONTRACTS_CLOSE_EVENT: "lib/contractsBus.js",
+  CONTRACTS_SYNC_EVENT: "lib/contractsBus.js",
 };
 
 console.log("\nEvent constants:");

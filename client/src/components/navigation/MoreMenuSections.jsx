@@ -6,6 +6,7 @@ import {
   Bookmark,
   Bug,
   Building2,
+  ClipboardList,
   Crown,
   Dices,
   Gift,
@@ -27,6 +28,7 @@ import { useMoreMenu } from '../../context/MoreMenuContext';
 import { shouldShowAdminNav } from '../../lib/adminAccess';
 import { isNavActive } from '../../lib/navigationActive';
 import { openCamoLocker } from '../../lib/camoLockerBus';
+import { openContractsHub } from '../../lib/contractsBus';
 import {
   ADMIN_MORE_ITEMS,
   MORE_MENU_SECTIONS,
@@ -46,6 +48,7 @@ const MORE_ITEM_ICONS = {
   battlePass: Target,
   customization: Award,
   camoLocker: Shirt,
+  contracts: ClipboardList,
   savvyWins: Trophy,
   leaderboards: Medal,
   lifeOptimizer: Building2,
@@ -76,6 +79,7 @@ export default function MoreMenuSections({ variant = 'more', onReportBug }) {
     (action) => {
       closeMore();
       if (action === 'camoLocker') openCamoLocker({ source: 'more_menu' });
+      if (action === 'contracts') openContractsHub({ appId: 'final10', source: 'more_menu' });
     },
     [closeMore]
   );

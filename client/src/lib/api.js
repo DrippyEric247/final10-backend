@@ -453,6 +453,23 @@ export async function getMasterClassifiedAdminPreview() {
   return data;
 }
 
+/* ---------------- Savvy Universe Contracts ---------------- */
+
+export async function getContractsHub(appId = "final10") {
+  const { data } = await api.get("/contracts/hub", { params: { appId } });
+  return data;
+}
+
+export async function claimContractReward(contractId, appId = "final10") {
+  const { data } = await api.post("/contracts/claim", { contractId, appId });
+  return data;
+}
+
+export async function recordContractAppOpen(appId = "final10") {
+  const { data } = await api.post("/contracts/record-app-open", { appId });
+  return data;
+}
+
 /* ---------------- Egg Camo Collection (lifetime Egg mastery) ---------------- */
 
 export async function getEggCamoCollection() {

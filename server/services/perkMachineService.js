@@ -631,6 +631,9 @@ async function spinPerkMachine(user, options = {}) {
     user.markModified('perkMachine');
     await user.save();
 
+    const { fireContractTrigger } = require('./contractHooks');
+    fireContractTrigger(userId, 'perk_machine_spin');
+
     const topRarity = highestRarity(rewards);
     let resultMessage = pickResultMessage(topRarity);
     if (isJackpot) {

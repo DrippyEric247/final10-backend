@@ -326,6 +326,9 @@ async function submitTournamentScore(user, { runId, score, elapsedMs }) {
   await run.save();
   await user.save();
 
+  const { fireContractTrigger } = require('./contractHooks');
+  fireContractTrigger(user._id, 'scout_flight_run');
+
   const personalBest = await getPersonalBest(user._id);
   const dailyRank = await getDailyRank(user._id);
   let monthlyRank = { rank: null, score: 0, totalPlayers: 0 };

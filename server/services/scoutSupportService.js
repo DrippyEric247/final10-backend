@@ -124,6 +124,11 @@ async function registerDealAction(user, actionType, meta = {}) {
   user.markModified('scoutSupport');
   await user.save();
 
+  if (count === 5) {
+    const { fireContractTrigger } = require('./contractHooks');
+    fireContractTrigger(user._id, 'deal_streak_complete');
+  }
+
   return {
     status: buildStatus(user),
     newlyUnlocked,

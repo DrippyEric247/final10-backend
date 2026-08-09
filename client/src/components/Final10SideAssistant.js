@@ -47,6 +47,7 @@ import "../styles/Final10SideAssistant.css";
 import "../styles/ScoutMobilePopups.css";
 import "../styles/SavvyScoutMissions.css";
 import SavvyWalletBubble from "./wallet/SavvyWalletBubble";
+import ContractsBubble from "./contracts/ContractsBubble";
 import { emitPowerToast } from "../lib/final10PowerFeedback";
 import {
   playScoutVoice,
@@ -2199,6 +2200,7 @@ export default function Final10SideAssistant() {
 
       <div id="f10-event-hud-anchor" className="f10-event-hud-anchor" aria-hidden />
 
+      <ContractsBubble appId="final10" />
       <SavvyWalletBubble />
 
       <SavvyScoutButton

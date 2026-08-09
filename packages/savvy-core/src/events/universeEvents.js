@@ -18,6 +18,11 @@ export const CAMO_LOCKER_OPEN_EVENT = "f10:camo-locker-open";
 export const CAMO_LOCKER_CLOSE_EVENT = "f10:camo-locker-close";
 export const CAMO_LOCKER_SYNC_EVENT = "f10:camo-locker-sync";
 
+// Contracts (universal missions hub)
+export const CONTRACTS_OPEN_EVENT = "f10:contracts-open";
+export const CONTRACTS_CLOSE_EVENT = "f10:contracts-close";
+export const CONTRACTS_SYNC_EVENT = "f10:contracts-sync";
+
 // Alerts
 export const SAVVY_ALERT_EVENT = "f10-savvy-alert-created";
 
@@ -41,6 +46,9 @@ export const UNIVERSE_EVENTS = Object.freeze({
   CAMO_LOCKER_OPEN_EVENT,
   CAMO_LOCKER_CLOSE_EVENT,
   CAMO_LOCKER_SYNC_EVENT,
+  CONTRACTS_OPEN_EVENT,
+  CONTRACTS_CLOSE_EVENT,
+  CONTRACTS_SYNC_EVENT,
   SAVVY_ALERT_EVENT,
   SCOUT_MISSION_SYNC_EVENT,
   SCOUT_MISSION_POPUP_EVENT,

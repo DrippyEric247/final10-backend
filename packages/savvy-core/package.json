@@ -33,6 +33,11 @@
       "require": "./src/config/masterClassifiedCollection.js",
       "default": "./src/config/masterClassifiedCollection.js"
     },
+    "./config/contracts": {
+      "import": "./src/config/contracts/index.js",
+      "require": "./src/config/contracts/index.js",
+      "default": "./src/config/contracts/index.js"
+    },
     "./config/scoutBranding": {
       "import": "./src/config/scoutBranding.js",
       "require": "./src/config/scoutBranding.js",

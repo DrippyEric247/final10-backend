@@ -20,6 +20,7 @@ import ProgressionCelebrationHost from './components/progression/ProgressionCele
 import InventoryActivationHost from './components/inventory/InventoryActivationHost';
 import CallingCardUnlockCeremony from './components/cosmetics/CallingCardUnlockCeremony';
 import CamoLockerHost from './components/camo/CamoLockerHost';
+import ContractsHost from './components/contracts/ContractsHost';
 import AuthDebugger from './components/AuthDebugger';
 import DevOverridePanel from './components/dev/DevOverridePanel';
 import DevModeBadge from './components/dev/DevModeBadge';
@@ -289,6 +290,7 @@ export default function App() {
         <ProgressionRecapHost />
         <CallingCardUnlockCeremony />
         <CamoLockerHost />
+        <ContractsHost />
         <SmartCoachHost enabled={Boolean(user)} />
         <SavvyScoutVoiceHost />
         <ProgressionCelebrationHost />

@@ -193,6 +193,12 @@ async function markDealRewardClickout(user, { listingId, listing = {} }) {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
+  const { fireContractTrigger, isDeepDiscountListing } = require('./contractHooks');
+  fireContractTrigger(user._id, 'deal_found');
+  if (isDeepDiscountListing(listing)) {
+    fireContractTrigger(user._id, 'deep_discount_deal');
+  }
+
   return {
     estimate: { ...estimate, state: 'pending' },
     alreadyClaimed: false,
