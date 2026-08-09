@@ -12,14 +12,15 @@ const {
 const { isKnownCosmeticId } = require('../data/cosmeticIds');
 
 describe('camo locker catalog', () => {
-  test('generates the 30 starter reward slots', () => {
-    expect(CAMO_ITEMS).toHaveLength(30);
+  test('generates the starter reward slots', () => {
+    expect(CAMO_ITEMS).toHaveLength(36);
     expect(CAMO_CATEGORY_IDS).toEqual([
       'retail',
       'outdoor',
       'fitness',
       'automotive',
       'electronics',
+      'luxury',
     ]);
   });
 
@@ -82,12 +83,35 @@ describe('camo locker catalog', () => {
 
   test('the first camo in every category is reachable without gates', () => {
     const starters = CAMO_ITEMS.filter((i) => i.camo === 'woodland');
-    expect(starters).toHaveLength(5);
+    expect(starters).toHaveLength(6);
     for (const item of starters) {
       expect(item.gates).toHaveLength(0);
       expect(
         evaluateCamoRequirement(item, { categoryCount: item.threshold }).requirementsMet
       ).toBe(true);
     }
+  });
+
+  test('luxury shiesty ladder is complete woodland through dark nebula', () => {
+    const luxury = CAMO_ITEMS.filter((i) => i.category === 'luxury').sort(
+      (a, b) => a.order - b.order
+    );
+    expect(luxury).toHaveLength(6);
+    expect(luxury.map((i) => i.id)).toEqual([
+      'camo_luxury_woodland_shiesty',
+      'camo_luxury_tiger_shiesty',
+      'camo_luxury_arctic_shiesty',
+      'camo_luxury_gold_shiesty',
+      'camo_luxury_diamond_shiesty',
+      'camo_luxury_dark-nebula_shiesty',
+    ]);
+    expect(luxury[5]).toMatchObject({
+      camo: 'darkNebula',
+      rewardType: 'shiesty',
+      order: 6,
+      threshold: 500,
+      rarity: 'mythic',
+    });
+    expect(luxury[5].gates).toHaveLength(3);
   });
 });

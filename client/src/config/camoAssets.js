@@ -21,6 +21,7 @@ import {
   CAMOS,
   ACTIVE_CAMO_CATEGORIES,
   getApparelType,
+  getCategoryCamos,
 } from '@savvy/core/config/camoLocker';
 
 /** Root folder for all camo renders (served from `client/public`). */
@@ -58,7 +59,7 @@ function buildCamoAssets() {
   for (const category of ACTIVE_CAMO_CATEGORIES) {
     const apparelId = category.rewardType;
     map[category.id] = { [apparelId]: {} };
-    for (const camo of CAMOS) {
+    for (const camo of getCategoryCamos(category)) {
       map[category.id][apparelId][camo.id] = conventionPath(category.id, apparelId, camo.id);
     }
   }
@@ -77,7 +78,124 @@ export const camoAssets = buildCamoAssets();
  *     preview: 'https://cdn.savvy.app/camo/fitness-shorts-dark-nebula-hero@2x.webp',
  *   },
  */
-export const CAMO_ASSET_OVERRIDES = {};
+export const CAMO_ASSET_OVERRIDES = {
+  /** Woodland Hoodie — full collectible display art (jpeg per art drop). */
+  camo_outdoor_woodland_hoodie: {
+    image: `${CAMO_ASSET_ROOT}/outdoor/hoodies/camo_woodland_hoodie.jpeg`,
+  },
+  /** Tiger Hoodie — full collectible display art (jpeg per art drop). */
+  camo_outdoor_tiger_hoodie: {
+    image: `${CAMO_ASSET_ROOT}/outdoor/hoodies/camo_tiger_hoodie.jpeg`,
+  },
+  /** Arctic Hoodie — full collectible display art (jpeg per art drop). */
+  camo_outdoor_arctic_hoodie: {
+    image: `${CAMO_ASSET_ROOT}/outdoor/hoodies/camo_arctic_hoodie.jpeg`,
+  },
+  /** Gold Hoodie — full collectible display art (jpeg per art drop). */
+  camo_outdoor_gold_hoodie: {
+    image: `${CAMO_ASSET_ROOT}/outdoor/hoodies/camo_gold_hoodie.jpeg`,
+  },
+  /** Diamond Hoodie — full collectible display art (jpeg per art drop). */
+  camo_outdoor_diamond_hoodie: {
+    image: `${CAMO_ASSET_ROOT}/outdoor/hoodies/camo_diamond_hoodie.jpeg`,
+  },
+  /** Dark Nebula Hoodie — full collectible display art (jpeg per art drop). */
+  'camo_outdoor_dark-nebula_hoodie': {
+    image: `${CAMO_ASSET_ROOT}/outdoor/hoodies/camo_dark_nebula_hoodie.jpeg`,
+  },
+  /** Woodland Gloves — full collectible display art (jpeg per art drop). */
+  camo_automotive_woodland_gloves: {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_woodland_gloves.jpeg`,
+  },
+  /** Tiger Gloves — full collectible display art (jpeg per art drop). */
+  camo_automotive_tiger_gloves: {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_tiger_gloves.jpeg`,
+  },
+  /** Arctic Gloves — full collectible display art (jpeg per art drop). */
+  camo_automotive_arctic_gloves: {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_arctic_gloves.jpeg`,
+  },
+  /** Gold Gloves — full collectible display art (jpeg per art drop). */
+  camo_automotive_gold_gloves: {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_gold_gloves.jpeg`,
+  },
+  /** Diamond Gloves — full collectible display art (jpeg per art drop). */
+  camo_automotive_diamond_gloves: {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_diamond_gloves.jpeg`,
+  },
+  /** Dark Nebula Gloves — full collectible display art (jpeg per art drop). */
+  'camo_automotive_dark-nebula_gloves': {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_dark_nebula_gloves.jpeg`,
+  },
+  /** Woodland Socks — full collectible display art (jpeg per art drop). */
+  camo_electronics_woodland_socks: {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_woodland_socks.jpeg`,
+  },
+  /** Tiger Socks — full collectible display art (jpeg per art drop). */
+  camo_electronics_tiger_socks: {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_tiger_socks.jpeg`,
+  },
+  /** Arctic Socks — full collectible display art (jpeg per art drop). */
+  camo_electronics_arctic_socks: {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_arctic_socks.jpeg`,
+  },
+  /** Gold Socks — full collectible display art (jpeg per art drop). */
+  camo_electronics_gold_socks: {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_gold_socks.jpeg`,
+  },
+  /** Diamond Socks — full collectible display art (jpeg per art drop). */
+  camo_electronics_diamond_socks: {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_diamond_socks.jpeg`,
+  },
+  /** Dark Nebula Socks — full collectible display art (jpeg per art drop). */
+  'camo_electronics_dark-nebula_socks': {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_dark_nebula_socks.jpeg`,
+  },
+  /** Woodland Shiesty — full collectible display art (jpeg per art drop). */
+  camo_luxury_woodland_shiesty: {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_woodland_shiesty.jpeg`,
+  },
+  /** Tiger Shiesty — full collectible display art (jpeg per art drop). */
+  camo_luxury_tiger_shiesty: {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_tiger_shiesty.jpeg`,
+  },
+  /** Arctic Shiesty — full collectible display art (jpeg per art drop). */
+  camo_luxury_arctic_shiesty: {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_arctic_shiesty.jpeg`,
+  },
+  /** Gold Shiesty — full collectible display art (jpeg per art drop). */
+  camo_luxury_gold_shiesty: {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_gold_shiesty.jpeg`,
+  },
+  /** Diamond Shiesty — full collectible display art (jpeg per art drop). */
+  camo_luxury_diamond_shiesty: {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_diamond_shiesty.jpeg`,
+  },
+  /** Dark Nebula Shiesty — full collectible display art (jpeg per art drop). */
+  'camo_luxury_dark-nebula_shiesty': {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_dark_nebula_shiesty.jpeg`,
+  },
+  /** Tiger T-Shirt — full collectible display art (jpeg per art drop). */
+  camo_retail_tiger_tshirt: {
+    image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_tiger_tshirt.jpeg`,
+  },
+  /** Arctic T-Shirt — full collectible display art (jpeg per art drop). */
+  camo_retail_arctic_tshirt: {
+    image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_arctic_tshirt.jpeg`,
+  },
+  /** Gold T-Shirt — full collectible display art (jpeg per art drop). */
+  camo_retail_gold_tshirt: {
+    image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_gold_tshirt.jpeg`,
+  },
+  /** Diamond T-Shirt — full collectible display art (jpeg per art drop). */
+  camo_retail_diamond_tshirt: {
+    image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_diamond_tshirt.jpeg`,
+  },
+  /** Dark Nebula T-Shirt — full collectible display art (jpeg per art drop). */
+  'camo_retail_dark-nebula_tshirt': {
+    image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_dark_nebula_tshirt.jpeg`,
+  },
+};
 
 /**
  * Category hero art (the big image on each category card). Optional — the card
@@ -113,7 +231,8 @@ export function resolveCamoPreviewImage(item) {
   if (!item) return CAMO_ASSET_PLACEHOLDER;
   const override = CAMO_ASSET_OVERRIDES[item.id];
   if (override?.preview) return override.preview;
-  return conventionPath(item.category, item.rewardType, item.camo, { preview: true });
+  // Dedicated `-preview` renders are optional — card art is the default hero.
+  return resolveCamoImage(item);
 }
 
 /**

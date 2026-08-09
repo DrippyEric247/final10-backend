@@ -13,7 +13,7 @@
  */
 
 /** Bump when items/thresholds change so clients can bust caches. */
-export const CAMO_CATALOG_VERSION = 1;
+export const CAMO_CATALOG_VERSION = 7;
 
 /** Prefix for every camo cosmetic ID persisted in the shared cosmetic inventory. */
 export const CAMO_ID_PREFIX = 'camo';
@@ -138,6 +138,7 @@ export const APPAREL_TYPES = Object.freeze([
   Object.freeze({ id: 'shorts', name: 'Shorts', plural: 'Shorts', assetSlug: 'shorts' }),
   Object.freeze({ id: 'gloves', name: 'Gloves', plural: 'Gloves', assetSlug: 'gloves' }),
   Object.freeze({ id: 'socks', name: 'Socks', plural: 'Socks', assetSlug: 'socks' }),
+  Object.freeze({ id: 'shiesty', name: 'Shiesty', plural: 'Shiesties', assetSlug: 'shiesties' }),
   // Future reward types — flip `comingSoon` off once art + a category exist.
   Object.freeze({ id: 'hat', name: 'Hat', plural: 'Hats', assetSlug: 'hats', comingSoon: true }),
   Object.freeze({ id: 'mask', name: 'Mask', plural: 'Masks', assetSlug: 'masks', comingSoon: true }),
@@ -193,6 +194,7 @@ export const APPAREL_TYPES = Object.freeze([
  * @property {string} blurb
  * @property {string} activityLabel what the requirement counter measures
  * @property {boolean} [comingSoon]
+ * @property {ReadonlyArray<string>} [camoIds] optional subset of CAMOS for partial ladders
  */
 
 /** @type {readonly CamoCategory[]} */
@@ -246,12 +248,12 @@ export const CAMO_CATEGORIES = Object.freeze([
   Object.freeze({
     id: 'luxury',
     name: 'Luxury',
-    rewardType: null,
+    rewardType: 'shiesty',
     icon: '💎',
     accentColor: '#fbbf24',
     blurb: 'High-end drops and designer finds.',
     activityLabel: 'Luxury Deals',
-    comingSoon: true,
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula'],
   }),
   Object.freeze({
     id: 'home',
@@ -416,6 +418,15 @@ export function getCamoRarity(rarityId) {
   return CAMO_RARITIES[rarityId] || CAMO_RARITIES.common;
 }
 
+/** Camos available in a category — full ladder unless `camoIds` narrows it. */
+export function getCategoryCamos(category) {
+  if (category?.camoIds?.length) {
+    const allowed = new Set(category.camoIds);
+    return CAMOS.filter((c) => allowed.has(c.id));
+  }
+  return CAMOS;
+}
+
 /* ------------------------------------------------------------------ *
  * Catalog generation
  * ------------------------------------------------------------------ */
@@ -472,7 +483,9 @@ function buildItem(category, camo) {
 
 /** Every camo item in the universe, ordered by category then camo ladder. */
 export const CAMO_ITEMS = Object.freeze(
-  ACTIVE_CAMO_CATEGORIES.flatMap((category) => CAMOS.map((camo) => buildItem(category, camo)))
+  ACTIVE_CAMO_CATEGORIES.flatMap((category) =>
+    getCategoryCamos(category).map((camo) => buildItem(category, camo))
+  )
 );
 
 /** Fast lookup by item ID. */

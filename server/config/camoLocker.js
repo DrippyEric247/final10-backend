@@ -7,7 +7,7 @@
  * `packages/savvy-core` asserts parity on every ID and threshold.
  */
 
-const CAMO_CATALOG_VERSION = 1;
+const CAMO_CATALOG_VERSION = 7;
 const CAMO_ID_PREFIX = 'camo';
 
 const CAMO_RARITY_RANKS = Object.freeze({
@@ -42,6 +42,12 @@ const CAMO_CATEGORIES = Object.freeze([
   Object.freeze({ id: 'fitness', name: 'Fitness', rewardType: 'shorts' }),
   Object.freeze({ id: 'automotive', name: 'Automotive', rewardType: 'gloves' }),
   Object.freeze({ id: 'electronics', name: 'Electronics', rewardType: 'socks' }),
+  Object.freeze({
+    id: 'luxury',
+    name: 'Luxury',
+    rewardType: 'shiesty',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula'],
+  }),
 ]);
 
 const CAMO_CATEGORY_IDS = Object.freeze(CAMO_CATEGORIES.map((c) => c.id));
@@ -86,9 +92,17 @@ function isCamoItemId(id) {
   return typeof id === 'string' && id.startsWith(`${CAMO_ID_PREFIX}_`);
 }
 
+function getCategoryCamos(category) {
+  if (category?.camoIds?.length) {
+    const allowed = new Set(category.camoIds);
+    return CAMOS.filter((c) => allowed.has(c.id));
+  }
+  return CAMOS;
+}
+
 const CAMO_ITEMS = Object.freeze(
   CAMO_CATEGORIES.flatMap((category) =>
-    CAMOS.map((camo) =>
+    getCategoryCamos(category).map((camo) =>
       Object.freeze({
         id: buildCamoItemId(category.id, camo.id, category.rewardType),
         camo: camo.id,
