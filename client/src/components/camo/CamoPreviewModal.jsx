@@ -70,8 +70,7 @@ export default function CamoPreviewModal({ item, onClose, onHowToEarn }) {
             alt={item.name}
             accentColor={item.accentColor}
             loading="eager"
-            dimmed
-            className="f10-camo-img--hero"
+            className="f10-camo-img--hero f10-camo-preview__artwork"
           />
           <span className="f10-camo-preview__watermark">
             <Lock size={12} strokeWidth={2.5} aria-hidden /> Preview Only — Item Not Yet Unlocked
