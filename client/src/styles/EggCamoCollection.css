@@ -306,6 +306,23 @@
   background: rgba(2, 6, 23, 0.55);
 }
 
+/* Locked collection cards stay dimmed; preview modal always shows full-brightness artwork. */
+.f10-egg-camo-preview__stage .f10-camo-img,
+.f10-egg-camo-preview__stage .f10-egg-camo-preview__artwork {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.f10-egg-camo-preview__stage .f10-camo-img__img.is-loaded,
+.f10-egg-camo-preview__stage .f10-camo-img__fallback {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.f10-egg-camo-preview__stage .f10-camo-img::after {
+  display: none !important;
+}
+
 .f10-egg-camo-preview__watermark {
   position: absolute;
   inset: auto 12px 12px auto;

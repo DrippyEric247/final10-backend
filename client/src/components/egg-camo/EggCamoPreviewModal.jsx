@@ -45,8 +45,7 @@ export default function EggCamoPreviewModal({ item, onClose, onViewCollection })
               alt={item.name}
               accentColor={item.accentColor}
               glyph="🥚"
-              className="f10-camo-img--hero"
-              dimmed={!unlocked}
+              className="f10-camo-img--hero f10-egg-camo-preview__artwork"
             />
             {!unlocked ? <div className="f10-egg-camo-preview__watermark">PREVIEW</div> : null}
           </div>
