@@ -13,6 +13,7 @@ const ASSET_OVERRIDES = Object.freeze({
   master_classified_mask: '/assets/classified/master-mask.png',
   master_classified_tshirt: '/assets/classified/master-tshirt.png',
   master_classified_arm_sleeve: '/assets/classified/master-arm-sleeve.png',
+  master_classified_gloves: '/assets/classified/master-gloves.jpeg',
   master_classified_shorts: '/assets/classified/master-shorts.png',
   master_classified_leg_sleeve: '/assets/classified/master-leg-sleeve.png',
   master_classified_socks: '/assets/classified/master-socks.png',
@@ -38,4 +39,20 @@ export function withMasterClassifiedImages(item) {
     imageUrl: item.assetPath || resolveMasterClassifiedAsset(item.id),
     previewImageUrl: item.assetPath || resolveMasterClassifiedAsset(item.id),
   };
+}
+
+/** Central catalog of every Classified Master asset for admin preview and tooling. */
+export function listMasterClassifiedAssetCatalog() {
+  return MASTER_CLASSIFIED_ITEMS.map((def) => {
+    const assetPath = resolveMasterClassifiedAsset(def.id);
+    return {
+      ...def,
+      assetPath,
+      assetKey: def.slug,
+      imageUrl: assetPath,
+      previewImageUrl: assetPath,
+      rewardTypeName: def.shortName,
+      categoryName: 'CLASSIFIED MASTER',
+    };
+  });
 }

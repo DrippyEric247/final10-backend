@@ -69,6 +69,7 @@ export default function useMasterClassifiedCollection(enabled = true) {
     bonusEmblemId: payload?.bonusEmblemId || null,
     bonusCallingCardId: payload?.bonusCallingCardId || null,
     heroAsset: getMasterClassifiedHeroAsset(),
+    adminPreviewAccess: Boolean(payload?.adminPreviewAccess),
     reload,
   };
 }

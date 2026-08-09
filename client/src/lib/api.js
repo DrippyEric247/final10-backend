@@ -447,6 +447,12 @@ export async function getMasterClassifiedCollection() {
   return data;
 }
 
+/** Admin-only Classified Master asset preview (404 for normal users). Read-only. */
+export async function getMasterClassifiedAdminPreview() {
+  const { data } = await api.get("/camo-locker/master-classified/admin-preview");
+  return data;
+}
+
 /* ---------------- Egg Camo Collection (lifetime Egg mastery) ---------------- */
 
 export async function getEggCamoCollection() {

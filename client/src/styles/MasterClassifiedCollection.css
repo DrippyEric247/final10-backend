@@ -450,3 +450,193 @@
 .f10-camo-cat--classified .f10-camo-cat__type {
   color: var(--classified-purple, #a855f7);
 }
+
+.f10-classified-admin-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.f10-classified-admin-controls__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(2, 6, 23, 0.55);
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.f10-classified-admin-controls__toggle.is-active {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: var(--classified-gold);
+}
+
+.f10-classified-admin-controls__badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fde68a;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.f10-classified-admin-preview__note {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.f10-classified-admin-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .f10-classified-admin-preview__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .f10-classified-admin-preview__grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
+.f10-classified-admin-card {
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.f10-classified-admin-card__thumb {
+  aspect-ratio: 4 / 5;
+  background: #0a0a12;
+}
+
+.f10-classified-admin-card__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.f10-classified-admin-card__missing {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--classified-purple);
+  font-size: 1.4rem;
+}
+
+.f10-classified-admin-card__body {
+  padding: 8px;
+}
+
+.f10-classified-admin-card__name {
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--classified-gold);
+}
+
+.f10-classified-admin-card__type {
+  margin-top: 2px;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.f10-classified-admin-card__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.f10-classified-admin-card__labels span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.f10-classified-admin-card__preview {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+}
+
+.f10-classified-artwork--admin .f10-classified-artwork__panel {
+  width: min(960px, 100%);
+}
+
+.f10-classified-artwork__admin-kicker {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: #fde68a;
+}
+
+.f10-classified-artwork__admin-status {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.f10-classified-artwork__frame--full-brightness .f10-classified-artwork__img {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.f10-classified-artwork__admin-meta {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.f10-classified-artwork__admin-row {
+  display: grid;
+  gap: 2px;
+  font-size: 0.72rem;
+}
+
+.f10-classified-artwork__admin-row span {
+  color: rgba(148, 163, 184, 0.9);
+  letter-spacing: 0.08em;
+}
+
+.f10-classified-artwork__admin-row strong {
+  color: #e2e8f0;
+  font-weight: 600;
+  word-break: break-word;
+}

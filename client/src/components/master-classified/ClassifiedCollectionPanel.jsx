@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { Check, ChevronLeft, Crown, Lock, Sparkles, X } from 'lucide-react';
+import { Check, ChevronLeft, Crown, Eye, EyeOff, Lock, Sparkles, X } from 'lucide-react';
+import { getMasterClassifiedAdminPreview } from '../../lib/api';
 import useMasterClassifiedCollection from '../../hooks/useMasterClassifiedCollection';
+import ClassifiedAdminPreviewCard from './ClassifiedAdminPreviewCard';
 import ClassifiedArtworkModal, { ClassifiedItemCard } from './ClassifiedArtworkModal';
 import '../../styles/CamoLocker.css';
 import '../../styles/MasterClassifiedCollection.css';
@@ -21,6 +23,9 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
   const dragControls = useDragControls();
   const scrollRef = useRef(null);
   const [artworkItem, setArtworkItem] = useState(null);
+  const [adminPreviewMode, setAdminPreviewMode] = useState(false);
+  const [adminPreviewData, setAdminPreviewData] = useState(null);
+  const [adminPreviewLoading, setAdminPreviewLoading] = useState(false);
 
   const {
     loading,
@@ -34,12 +39,15 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
     savvyBonusGranted,
     bonusEmblemId,
     bonusCallingCardId,
+    adminPreviewAccess,
     reload,
   } = useMasterClassifiedCollection(open);
 
   useEffect(() => {
     if (!open) {
       setArtworkItem(null);
+      setAdminPreviewMode(false);
+      setAdminPreviewData(null);
       return undefined;
     }
     const prev = document.body.style.overflow;
@@ -74,6 +82,36 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
   const openArtwork = useCallback((item) => {
     if (item?.imageUrl) setArtworkItem(item);
   }, []);
+
+  const loadAdminPreview = useCallback(async () => {
+    setAdminPreviewLoading(true);
+    try {
+      const data = await getMasterClassifiedAdminPreview();
+      setAdminPreviewData(data);
+      setAdminPreviewMode(true);
+    } catch {
+      setAdminPreviewData(null);
+      setAdminPreviewMode(false);
+    } finally {
+      setAdminPreviewLoading(false);
+    }
+  }, []);
+
+  const toggleAdminPreview = useCallback(async () => {
+    if (adminPreviewMode) {
+      setAdminPreviewMode(false);
+      setArtworkItem(null);
+      return;
+    }
+    await loadAdminPreview();
+  }, [adminPreviewMode, loadAdminPreview]);
+
+  const adminPreviewItems = useMemo(
+    () => adminPreviewData?.items || [],
+    [adminPreviewData]
+  );
+
+  const artworkAdminPreview = Boolean(artworkItem?.adminPreview);
 
   if (!open) return null;
 
@@ -131,6 +169,31 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
             </button>
           </div>
           <p className="f10-classified-locker__blurb">{collection?.blurb}</p>
+          {adminPreviewAccess ? (
+            <div className="f10-classified-admin-controls">
+              <button
+                type="button"
+                className={`f10-classified-admin-controls__toggle ${adminPreviewMode ? 'is-active' : ''}`}
+                onClick={toggleAdminPreview}
+                disabled={adminPreviewLoading}
+              >
+                {adminPreviewMode ? (
+                  <>
+                    <EyeOff size={13} strokeWidth={2.4} aria-hidden /> HIDE MASTER PIECES
+                  </>
+                ) : (
+                  <>
+                    <Eye size={13} strokeWidth={2.4} aria-hidden /> VIEW MASTER PIECES
+                  </>
+                )}
+              </button>
+              {adminPreviewMode ? (
+                <div className="f10-classified-admin-controls__badge" role="status">
+                  ADMIN PREVIEW MODE — No rewards are being unlocked.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {lockerSummary ? (
             <div className="f10-camo-locker__stats f10-classified-locker__stats">
               <div className="f10-camo-stat">
@@ -281,7 +344,18 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
 
                 <div className="f10-classified-rewards">
                   <div className="f10-classified-rewards__head">MASTER REWARDS</div>
-                  {!revealRewards ? (
+                  {adminPreviewMode ? (
+                    <div className="f10-classified-admin-preview">
+                      <p className="f10-classified-admin-preview__note">
+                        Visual inspection only. Progression and ownership are unchanged.
+                      </p>
+                      <div className="f10-classified-admin-preview__grid">
+                        {adminPreviewItems.map((item) => (
+                          <ClassifiedAdminPreviewCard key={item.id} item={item} onPreview={openArtwork} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : !revealRewards ? (
                     <div className="f10-classified-rewards__classified">
                       <Lock size={16} aria-hidden />
                       <p>Complete all six camo families to declassify Master rewards.</p>
@@ -307,7 +381,13 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
 
       <AnimatePresence>
         {artworkItem ? (
-          <ClassifiedArtworkModal item={artworkItem} onClose={() => setArtworkItem(null)} />
+          <ClassifiedArtworkModal
+            item={artworkItem}
+            onClose={() => setArtworkItem(null)}
+            adminPreview={artworkAdminPreview}
+            summary={adminPreviewData?.summary || summary}
+            unlockRequirement={adminPreviewData?.unlockRequirement || ''}
+          />
         ) : null}
       </AnimatePresence>
     </motion.div>,

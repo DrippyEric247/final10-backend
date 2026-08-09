@@ -14,7 +14,7 @@ const {
   claimCamoReward,
   markCamosSeen,
 } = require('../services/camoLockerService');
-const { getMasterClassifiedForUser } = require('../services/masterClassifiedService');
+const { getMasterClassifiedForUser, getMasterClassifiedAdminPreview } = require('../services/masterClassifiedService');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -40,6 +40,16 @@ router.get('/master-classified/me', auth, async (req, res, next) => {
   try {
     return res.json(await getMasterClassifiedForUser(req.user._id));
   } catch (err) {
+    return forward(err, next);
+  }
+});
+
+/** Admin-only Classified Master asset preview — 404 for normal users. Read-only; no unlock side effects. */
+router.get('/master-classified/admin-preview', auth, async (req, res, next) => {
+  try {
+    return res.json(await getMasterClassifiedAdminPreview(req.user._id));
+  } catch (err) {
+    if (err.status === 404) return next(new HttpError(404, 'NOT_FOUND', 'Not found'));
     return forward(err, next);
   }
 });

@@ -13,6 +13,7 @@ const {
   MASTER_CLASSIFIED_COLLECTION,
   MASTER_CLASSIFIED_ITEMS,
   MASTER_CLASSIFIED_ITEM_IDS,
+  MASTER_CLASSIFIED_HERO_ASSET,
   MASTER_SAVVY_BONUS_FRACTION,
   MASTER_BONUS_EMBLEM_ID,
   MASTER_BONUS_CALLING_CARD_ID,
@@ -22,6 +23,7 @@ const {
   summarizeMasterClassifiedCollection,
 } = require('../config/masterClassifiedCollection');
 const { auditFireAndForget } = require('./securityAuditService');
+const { isFounderAdminEmail } = require('../lib/founderAdminAccess');
 
 const OPERATOR_RANKS = [
   { id: 'recruit', label: 'Recruit', minLevel: 1 },
@@ -39,6 +41,23 @@ function getOperatorRank(profileLevel) {
     if (level >= candidate.minLevel) rank = candidate;
   }
   return rank;
+}
+
+/** Admin-only Classified asset preview — mirrors requireAdminAccess gate (404 for everyone else). */
+function canAccessClassifiedAdminPreview(user) {
+  if (!user) return false;
+  const role = String(user.role || '').toLowerCase();
+  if (role === 'admin' || role === 'superadmin') return true;
+  if (typeof user.isAdmin === 'function' && user.isAdmin()) return true;
+  if (typeof user.isSuperAdmin === 'function' && user.isSuperAdmin()) return true;
+  return isFounderAdminEmail(user.email);
+}
+
+function denyClassifiedAdminPreviewNotFound() {
+  const err = new Error('Not found');
+  err.status = 404;
+  err.code = 'NOT_FOUND';
+  return err;
 }
 
 function ensureMasterProgress(user) {
@@ -326,10 +345,57 @@ async function getMasterClassifiedForUser(userId) {
     bonusEmblemId: MASTER_BONUS_EMBLEM_ID,
     bonusCallingCardId: MASTER_BONUS_CALLING_CARD_ID,
     bonusLobbyAnimId: MASTER_BONUS_LOBBY_ANIM_ID,
+    adminPreviewAccess: canAccessClassifiedAdminPreview(user),
+  };
+}
+
+/**
+ * Read-only admin preview of every uploaded Classified Master asset.
+ * Never grants, unlocks, or mutates progression.
+ */
+async function getMasterClassifiedAdminPreview(userId) {
+  const user = await User.findById(userId).select('-password');
+  if (!user || !canAccessClassifiedAdminPreview(user)) {
+    throw denyClassifiedAdminPreviewNotFound();
+  }
+
+  const base = await getMasterClassifiedForUser(userId);
+
+  const items = MASTER_CLASSIFIED_ITEMS.map((def) => {
+    const row = base.items.find((i) => i.id === def.id);
+    return {
+      id: def.id,
+      slug: def.slug,
+      name: def.name,
+      shortName: def.shortName,
+      kind: def.kind || 'apparel',
+      rewardTypeName: def.shortName,
+      categoryName: 'CLASSIFIED MASTER',
+      assetPath: def.assetPath,
+      assetKey: def.slug,
+      imageUrl: def.assetPath,
+      previewImageUrl: def.assetPath,
+      adminPreview: true,
+      owned: Boolean(row?.unlocked),
+      collectionStatus: base.summary?.mastered ? 'MASTERED' : 'LOCKED / NOT EARNED',
+    };
+  });
+
+  return {
+    previewMode: true,
+    adminPreview: true,
+    message: 'ADMIN PREVIEW ONLY — No rewards are being unlocked.',
+    unlockRequirement: 'Complete all six camo families to declassify Master rewards.',
+    collection: base.collection,
+    summary: base.summary,
+    items,
+    heroAsset: MASTER_CLASSIFIED_HERO_ASSET,
   };
 }
 
 module.exports = {
   evaluateMasterClassifiedUnlocks,
   getMasterClassifiedForUser,
+  getMasterClassifiedAdminPreview,
+  canAccessClassifiedAdminPreview,
 };

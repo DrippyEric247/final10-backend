@@ -5,9 +5,9 @@ import { X, ZoomIn } from 'lucide-react';
 
 /**
  * Full poster artwork viewer — object-fit contain, no crop.
- * @param {{ item: object|null, onClose: () => void }} props
+ * @param {{ item: object|null, onClose: () => void, adminPreview?: boolean, summary?: object|null, unlockRequirement?: string }} props
  */
-export default function ClassifiedArtworkModal({ item, onClose }) {
+export default function ClassifiedArtworkModal({ item, onClose, adminPreview = false, summary = null, unlockRequirement = '' }) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.();
@@ -21,7 +21,7 @@ export default function ClassifiedArtworkModal({ item, onClose }) {
   return createPortal(
     <AnimatePresence>
       <motion.div
-        className="f10-classified-artwork"
+        className={`f10-classified-artwork ${adminPreview ? 'f10-classified-artwork--admin' : ''}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -46,10 +46,21 @@ export default function ClassifiedArtworkModal({ item, onClose }) {
             <X size={18} strokeWidth={2.4} />
           </button>
           <div className="f10-classified-artwork__head">
-            <h3>{item.name}</h3>
-            <span>Fusion Weave · Gold · Diamond · Dark Nebula</span>
+            <h3>
+              {adminPreview ? `CLASSIFIED MASTER ${item.name}` : item.name}
+            </h3>
+            {adminPreview ? (
+              <>
+                <span className="f10-classified-artwork__admin-kicker">ADMIN PREVIEW ONLY</span>
+                <span className="f10-classified-artwork__admin-status">
+                  Collection Status: {item.collectionStatus || (summary?.mastered ? 'MASTERED' : 'LOCKED / NOT EARNED')}
+                </span>
+              </>
+            ) : (
+              <span>Fusion Weave · Gold · Diamond · Dark Nebula</span>
+            )}
           </div>
-          <div className="f10-classified-artwork__frame">
+          <div className="f10-classified-artwork__frame f10-classified-artwork__frame--full-brightness">
             <img
               src={item.imageUrl}
               alt={item.name}
@@ -57,6 +68,42 @@ export default function ClassifiedArtworkModal({ item, onClose }) {
               loading="eager"
             />
           </div>
+          {adminPreview ? (
+            <div className="f10-classified-artwork__admin-meta">
+              {summary ? (
+                <div className="f10-classified-artwork__admin-row">
+                  <span>Collection progress</span>
+                  <strong>
+                    {summary.masterUnlocked || 0}/{summary.masterTotal || 10} Master pieces
+                    {' · '}
+                    {summary.masterPercent || 0}%
+                  </strong>
+                </div>
+              ) : null}
+              {unlockRequirement ? (
+                <div className="f10-classified-artwork__admin-row">
+                  <span>Unlock requirement</span>
+                  <strong>{unlockRequirement}</strong>
+                </div>
+              ) : null}
+              {item.assetKey ? (
+                <div className="f10-classified-artwork__admin-row">
+                  <span>Asset key</span>
+                  <strong>{item.assetKey}</strong>
+                </div>
+              ) : null}
+              {item.assetPath ? (
+                <div className="f10-classified-artwork__admin-row">
+                  <span>Asset path</span>
+                  <strong>{item.assetPath}</strong>
+                </div>
+              ) : null}
+              <div className="f10-classified-artwork__admin-row">
+                <span>Asset loaded</span>
+                <strong>{item.imageUrl ? 'Yes' : 'No'}</strong>
+              </div>
+            </div>
+          ) : null}
           {item.kind === 'shoe_ticket' ? (
             <div className="f10-classified-artwork__shoe-note">
               <p>{item.shoeTicketCopy || 'Choose your pair. Ship it in. We make it Savvy.'}</p>
@@ -80,7 +127,7 @@ export default function ClassifiedArtworkModal({ item, onClose }) {
             </div>
           ) : null}
           <button type="button" className="f10-camo-btn--ghost f10-classified-artwork__done" onClick={onClose}>
-            CLOSE
+            {adminPreview ? 'CLOSE PREVIEW' : 'CLOSE'}
           </button>
         </motion.div>
       </motion.div>
