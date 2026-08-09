@@ -205,10 +205,81 @@ async function markDealRewardClickout(user, { listingId, listing = {} }) {
   };
 }
 
+/**
+ * Confirm a verified deal purchase — grants Savvy idempotently and records qualifying deal.
+ * Server-only; requires prior pending DealRewardState from clickout.
+ */
+async function confirmVerifiedDealPurchase(user, { listingId, listing = {} }) {
+  const id = String(listingId || '').trim();
+  if (!id) {
+    const err = new Error('listingId is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const pending = await DealRewardState.findOne({
+    userId: user._id,
+    listingId: id,
+    status: 'pending',
+  });
+  if (!pending) {
+    const err = new Error('No pending deal purchase to confirm.');
+    err.status = 404;
+    err.code = 'NOT_PENDING';
+    throw err;
+  }
+
+  const estimate = await estimateDealReward(user, { ...listing, listingId: id });
+  const idempotencyKey = `deal_purchase:${user._id}:${id}`;
+
+  const existingLog = await SavvyRewardLog.findOne({ userId: user._id, idempotencyKey }).lean();
+  if (existingLog) {
+    pending.status = 'claimed';
+    await pending.save();
+    return { estimate, alreadyClaimed: true, granted: false };
+  }
+
+  const { grantSavvyReward } = require('./savvyRewardService');
+  const grant = await grantSavvyReward(user, {
+    rewardType: 'deal_purchase',
+    amount: pending.totalSavvy || estimate.totalSavvy || 0,
+    idempotencyKey,
+    note: 'Verified deal purchase',
+    meta: { listingId: id, source: 'deal_purchase_confirm' },
+  });
+
+  pending.status = 'claimed';
+  await pending.save();
+  await user.save();
+
+  const categoryRaw =
+    listing.category ||
+    listing.categoryId ||
+    listing.primaryCategory ||
+    pending.meta?.category ||
+    null;
+
+  const { recordQualifyingDealFromPurchase } = require('./dealStreakHooks');
+  recordQualifyingDealFromPurchase(user._id, {
+    listingId: id,
+    categoryRaw,
+    meta: { listingId: id, savvyGranted: grant.amount },
+  });
+
+  return {
+    estimate: { ...estimate, state: 'claimed' },
+    granted: Boolean(grant.granted),
+    duplicate: Boolean(grant.duplicate),
+    amount: grant.amount,
+    newBalance: grant.newBalance,
+  };
+}
+
 module.exports = {
   estimateDealReward,
   estimateDealRewardsBatch,
   markDealRewardClickout,
+  confirmVerifiedDealPurchase,
   getRewardTrustTier,
   deriveBaseSavvy,
 };

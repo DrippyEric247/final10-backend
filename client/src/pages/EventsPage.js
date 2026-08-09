@@ -5,10 +5,15 @@ import { useAuth } from '../context/AuthContext';
 import { shouldShowAdminNav } from '../lib/adminAccess';
 import EventHubCard, { EventHistoryRow } from '../components/events/EventHubCard';
 import ScoutSupportPanel from '../components/events/ScoutSupportPanel';
+import DealStreakPanel from '../components/dealStreak/DealStreakPanel';
+import NukeCategoryChallenges from '../components/dealStreak/NukeCategoryChallenges';
+import NukeStreakCompleteModal from '../components/dealStreak/NukeStreakCompleteModal';
+import { acknowledgeNukeCelebration } from '../lib/api';
 import LiveEventsAdminPanel from '../components/events/LiveEventsAdminPanel';
 import LoadingState from '../components/ui/states/LoadingState';
 import '../styles/UniversalEvents.css';
 import '../styles/LiveEvents.css';
+import '../styles/DealStreak.css';
 
 function EmptySection({ message }) {
   return <p className="events-empty">{message}</p>;
@@ -26,6 +31,13 @@ export default function EventsPage() {
     refresh,
   } = useLiveEvents();
   const [toast, setToast] = useState('');
+  const [nukeModalOpen, setNukeModalOpen] = useState(false);
+
+  const pendingCelebration = hub?.dealStreak?.nuke?.pendingCelebration || null;
+
+  React.useEffect(() => {
+    if (pendingCelebration) setNukeModalOpen(true);
+  }, [pendingCelebration]);
 
   const showAdmin = shouldShowAdminNav(user);
 
@@ -168,6 +180,14 @@ export default function EventsPage() {
         )}
       </section>
 
+      <section className="events-section" aria-labelledby="events-deal-streak-heading">
+        <h2 id="events-deal-streak-heading" className="events-section__title">
+          Deal Streak
+        </h2>
+        <DealStreakPanel status={hub?.dealStreak} />
+        <NukeCategoryChallenges nuke={hub?.dealStreak?.nuke} />
+      </section>
+
       <section className="events-section" aria-labelledby="events-scout-heading">
         <h2 id="events-scout-heading" className="events-section__title">
           Scout Support
@@ -214,6 +234,20 @@ export default function EventsPage() {
       </section>
 
       {showAdmin ? <LiveEventsAdminPanel onRefresh={refresh} /> : null}
+
+      <NukeStreakCompleteModal
+        open={nukeModalOpen}
+        celebration={pendingCelebration}
+        onClose={async () => {
+          setNukeModalOpen(false);
+          try {
+            await acknowledgeNukeCelebration();
+            await refresh();
+          } catch {
+            /* ignore */
+          }
+        }}
+      />
     </div>
   );
 }

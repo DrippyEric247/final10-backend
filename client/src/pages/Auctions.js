@@ -1201,6 +1201,7 @@ export default function Auctions() {
           marketplace: "ebay",
           progressionTrustToken: winTok,
           source: "real_bid_flow",
+          category: item.category || item.categoryId || item.primaryCategory || null,
         });
       }
       recordBattlePassXp("bid_place");
@@ -1227,6 +1228,7 @@ export default function Auctions() {
             marketplace: "ebay",
             progressionTrustToken: winTok,
             source: "mock_bid_flow",
+            category: item.category || item.categoryId || item.primaryCategory || null,
           });
         }
         recordBattlePassXp("bid_place");

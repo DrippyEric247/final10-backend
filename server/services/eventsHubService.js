@@ -8,6 +8,7 @@ const { SCOUT_SUPPORT_MILESTONES, nextMilestoneAfter } = require('../config/scou
 const { getActiveDropForUser } = require('./supplyDropService');
 const { getActiveSavvySale } = require('./savvySaleService');
 const { buildStatus } = require('./scoutSupportService');
+const { buildDealStreakStatus } = require('./dealStreakService');
 const { getEggExchangeStatus } = require('./eggExchangeService');
 const { applyTierEventMultiplier } = require('../lib/pointsEventMultipliers');
 const { buildActivationState } = require('./eventActivationService');
@@ -237,6 +238,7 @@ function buildUpcomingPlaceholders() {
 async function buildEventsHub(user) {
   const [drop, sale] = await Promise.all([getActiveDropForUser(user._id), getActiveSavvySale()]);
   const scoutStatus = buildStatus(user);
+  const dealStreak = buildDealStreakStatus(user);
 
   const activeEvents = [];
   const claimableRewards = [];
@@ -289,6 +291,7 @@ async function buildEventsHub(user) {
     upcomingEvents,
     completedHistory,
     scoutSupport: scoutStatus,
+    dealStreak,
     eggExchange: eggExchange.mythicFusionProgress,
     activation,
     timers: {

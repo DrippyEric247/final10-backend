@@ -474,8 +474,10 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
         recordScoutMissionTrigger,
       } = require('./scoutMissionProgressService');
       const { fireContractProgressionEvent } = require('./contractHooks');
+      const { recordQualifyingDealFromProgressionEvent } = require('./dealStreakHooks');
       void recordScoutProgressFromProgressionEvent(userId, event.type);
       fireContractProgressionEvent(userId, event.type);
+      recordQualifyingDealFromProgressionEvent(userId, event);
       if (Number(bp.tier) > tierBefore) {
         void recordScoutMissionTrigger(userId, 'battle_pass_tier_up');
       }

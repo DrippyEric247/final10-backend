@@ -1,0 +1,222 @@
+/* Deal Streak + Nuke category challenges */
+
+.f10-deal-streak-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.f10-deal-streak-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.f10-deal-streak-panel__title {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #7dd3fc;
+}
+
+.f10-deal-streak-panel__count {
+  font-size: 28px;
+  font-weight: 900;
+  color: #f8fafc;
+  line-height: 1;
+}
+
+.f10-deal-streak-panel__sub {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.f10-deal-streak-panel__note,
+.f10-deal-streak-panel__meta {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.f10-nuke-challenges {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(163, 230, 53, 0.25);
+}
+
+.f10-nuke-challenges__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #a3e635;
+}
+
+.f10-nuke-challenges__note {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.95);
+  line-height: 1.45;
+}
+
+.f10-nuke-challenges__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .f10-nuke-challenges__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.f10-nuke-challenge-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(163, 230, 53, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.f10-nuke-challenge-card.is-active {
+  border-color: rgba(163, 230, 53, 0.45);
+}
+
+.f10-nuke-challenge-card.is-complete {
+  opacity: 0.78;
+}
+
+.f10-nuke-challenge-card__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.f10-nuke-challenge-card__icon {
+  font-size: 20px;
+}
+
+.f10-nuke-challenge-card__head h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ecfccb;
+}
+
+.f10-nuke-challenge-card__head p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.f10-nuke-challenge-card__desc {
+  margin: 6px 0 0;
+  font-size: 10px;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.f10-nuke-challenge-card__status {
+  margin-top: 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #a3e635;
+}
+
+.f10-nuke-complete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.f10-nuke-complete-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.f10-nuke-complete-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 420px);
+  padding: 22px 18px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(163, 230, 53, 0.45);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(163, 230, 53, 0.16), transparent 60%),
+    linear-gradient(180deg, #0a0f1a 0%, #050508 100%);
+  text-align: center;
+}
+
+.f10-nuke-complete-modal__kicker {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #a3e635;
+}
+
+.f10-nuke-complete-modal__stat {
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: 0.06em;
+}
+
+.f10-nuke-complete-modal__sub {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.f10-nuke-complete-modal__unlock {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ecfccb;
+}
+
+.f10-nuke-complete-modal__camo {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.f10-nuke-complete-modal__close {
+  width: 100%;
+  margin-top: 16px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(163, 230, 53, 0.4);
+  background: rgba(163, 230, 53, 0.12);
+  color: #ecfccb;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .f10-deal-streak-panel__count {
+    font-size: 24px;
+  }
+
+  .f10-nuke-complete-modal__stat {
+    font-size: 18px;
+  }
+}

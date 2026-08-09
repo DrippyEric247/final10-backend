@@ -214,6 +214,51 @@ const userSchema = new mongoose.Schema({
       },
     ],
   },
+  /** Account-level qualifying deal streak (verified purchases/wins) */
+  dealStreak: {
+    currentDealStreak: { type: Number, default: 0 },
+    longestDealStreak: { type: Number, default: 0 },
+    totalQualifiedDeals: { type: Number, default: 0 },
+    lastQualifiedDealAt: { type: Date, default: null },
+    latestQualifiedDealId: { type: String, default: null },
+    streakStartedAt: { type: Date, default: null },
+    streakUpdatedAt: { type: Date, default: null },
+    streakMilestonesClaimed: [{ type: Number }],
+    streakHistory: [
+      {
+        dealId: String,
+        category: String,
+        source: String,
+        counted: { type: Boolean, default: true },
+        skipReason: String,
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    nuke: {
+      activeCategory: { type: String, default: null },
+      activeStreak: { type: Number, default: 0 },
+      longestByCategory: { type: mongoose.Schema.Types.Mixed, default: {} },
+      completedChallenges: [
+        {
+          challengeId: String,
+          category: String,
+          camoItemId: String,
+          completedAt: { type: Date, default: Date.now },
+          rewardGranted: { type: Boolean, default: false },
+        },
+      ],
+      pendingCelebration: {
+        challengeId: String,
+        title: String,
+        category: String,
+        categoryName: String,
+        camoItemId: String,
+        camoName: String,
+        target: Number,
+        completedAt: Date,
+      },
+    },
+  },
   /** Recent Max Supply Drop claims for profile/history */
   supplyDropClaimHistory: [
     {

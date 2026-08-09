@@ -29,6 +29,8 @@ const auctionWon = Joi.object({
   secondsRemaining: Joi.number().min(0).max(86400).required(),
   marketplace: Joi.string().trim().max(40).required(),
   progressionTrustToken: Joi.string().trim().min(16).max(128).optional(),
+  category: Joi.string().trim().max(80).allow('', null).optional(),
+  categoryId: Joi.string().trim().max(80).allow('', null).optional(),
 });
 
 const dailyLogin = Joi.object({

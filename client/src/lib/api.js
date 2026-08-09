@@ -470,6 +470,16 @@ export async function recordContractAppOpen(appId = "final10") {
   return data;
 }
 
+export async function getDealStreakStatus() {
+  const { data } = await api.get("/deal-streak/status");
+  return data;
+}
+
+export async function acknowledgeNukeCelebration() {
+  const { data } = await api.post("/deal-streak/ack-celebration");
+  return data;
+}
+
 /* ---------------- Egg Camo Collection (lifetime Egg mastery) ---------------- */
 
 export async function getEggCamoCollection() {
