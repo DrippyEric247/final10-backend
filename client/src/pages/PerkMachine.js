@@ -25,6 +25,7 @@ import PerkMachineScoutFloater from '../components/perk/PerkMachineScoutFloater'
 import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import EggHatchery from '../components/perk/EggHatchery';
 import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournamentProgress';
+import SpinHeatIndicator from '../components/perk/SpinHeatIndicator';
 import PerkRewardIndexModal from '../components/perk/PerkRewardIndexModal';
 import PerkRewardReveal from '../components/perk/PerkRewardReveal';
 import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
@@ -281,6 +282,7 @@ export default function PerkMachine() {
   const [activatingKey, setActivatingKey] = useState(null);
   const [activating, setActivating] = useState(false);
   const [boostNow, setBoostNow] = useState(Date.now());
+  const [spinHeatFlash, setSpinHeatFlash] = useState(null);
   const [saleMs, setSaleMs] = useState(0);
   const [ticketProgressPulse, setTicketProgressPulse] = useState(false);
   const [ticketUnlock, setTicketUnlock] = useState(null);
@@ -366,19 +368,13 @@ export default function PerkMachine() {
   const paidCosts = useMemo(() => {
     const costs = status?.spinCosts || {};
     const sale = Boolean(costs.paid_1?.saleApplied || status?.savvySale?.active || hubSaleActive);
-    const base = {
-      paid_1: costs.paid_1?.originalSavvy ?? costs.paid_1?.savvy ?? 20,
-      paid_2: costs.paid_2?.originalSavvy ?? costs.paid_2?.savvy ?? 40,
-      paid_3: costs.paid_3?.originalSavvy ?? costs.paid_3?.savvy ?? 60,
-    };
-    const half = (n) => Math.max(0, Math.round(n / 2));
     return {
-      paid_1: sale ? (costs.paid_1?.savvy ?? half(base.paid_1)) : (costs.paid_1?.savvy ?? 20),
-      paid_2: sale ? (costs.paid_2?.savvy ?? half(base.paid_2)) : (costs.paid_2?.savvy ?? 40),
-      paid_3: sale ? (costs.paid_3?.savvy ?? half(base.paid_3)) : (costs.paid_3?.savvy ?? 60),
-      orig_1: base.paid_1,
-      orig_2: base.paid_2,
-      orig_3: base.paid_3,
+      paid_1: costs.paid_1?.savvy ?? 20,
+      paid_2: costs.paid_2?.savvy ?? 40,
+      paid_3: costs.paid_3?.savvy ?? 60,
+      orig_1: costs.paid_1?.originalSavvy ?? costs.paid_1?.baseSavvy ?? 20,
+      orig_2: costs.paid_2?.originalSavvy ?? costs.paid_2?.baseSavvy ?? 40,
+      orig_3: costs.paid_3?.originalSavvy ?? costs.paid_3?.baseSavvy ?? 60,
       sale,
     };
   }, [status?.spinCosts, status?.savvySale?.active, hubSaleActive]);
@@ -478,6 +474,16 @@ export default function PerkMachine() {
         0
     )
   );
+
+  const paidSpinAffordability = useMemo(() => {
+    const tokens = status?.tokens || {};
+    return {
+      paid_1: savvyBalance >= paidCosts.paid_1,
+      paid_2: savvyBalance >= paidCosts.paid_2 || Number(tokens.paid2Spin) > 0,
+      paid_3: savvyBalance >= paidCosts.paid_3 || Number(tokens.paid3Spin) > 0,
+    };
+  }, [savvyBalance, paidCosts, status?.tokens]);
+
   const slotCount = displayRewards.length || 1;
 
   const reelSymbols = useMemo(() => {
@@ -548,6 +554,15 @@ export default function PerkMachine() {
           Array.isArray(result.rawRewards) && result.rawRewards.length ? result.rawRewards : rewards;
         setStatus(result.status || status);
         setLastMultiplier(result.multiplier || null);
+
+        if (result.spinHeat?.increased) {
+          setSpinHeatFlash({
+            previousMultiplier: result.spinHeat.previousMultiplier,
+            currentMultiplier: result.spinHeat.currentMultiplier,
+            increased: true,
+          });
+          window.setTimeout(() => setSpinHeatFlash(null), 3200);
+        }
 
         const eggWin = rewards.find((r) => r.type === 'egg' && !r.multiplierRole);
         if (eggWin?.eggTier) {
@@ -1000,6 +1015,8 @@ export default function PerkMachine() {
             />
           </div>
 
+          <SpinHeatIndicator spinHeat={status?.spinHeat} increaseFlash={spinHeatFlash} />
+
           <div className="perk-free-timer">
             {freeReady ? (
               <span className="perk-free-timer__ready">✅ Free Daily Spin ready</span>
@@ -1040,7 +1057,7 @@ export default function PerkMachine() {
             <button
               type="button"
               className="perk-btn perk-btn--slot1"
-              disabled={spinning || savvyBalance < paidCosts.paid_1}
+              disabled={spinning || !paidSpinAffordability.paid_1}
               onClick={() => void handleSpin('paid_1')}
             >
               {renderSpinPrice('paid_1', 20)}
@@ -1048,7 +1065,7 @@ export default function PerkMachine() {
             <button
               type="button"
               className="perk-btn perk-btn--slot2"
-              disabled={spinning || savvyBalance < paidCosts.paid_2}
+              disabled={spinning || !paidSpinAffordability.paid_2}
               onClick={() => void handleSpin('paid_2')}
             >
               {renderSpinPrice('paid_2', 40)}
@@ -1056,7 +1073,7 @@ export default function PerkMachine() {
             <button
               type="button"
               className="perk-btn perk-btn--slot3"
-              disabled={spinning || savvyBalance < paidCosts.paid_3}
+              disabled={spinning || !paidSpinAffordability.paid_3}
               onClick={() => void handleSpin('paid_3')}
             >
               {renderSpinPrice('paid_3', 60)}

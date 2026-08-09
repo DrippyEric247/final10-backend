@@ -92,6 +92,10 @@ const userSchema = new mongoose.Schema({
     lastSpinAt: { type: Date, default: null },
     /** Atomic spin lock — cleared after spin completes or TTL expires. */
     spinLockUntil: { type: Date, default: null },
+    /** Spin Heat anti-abuse pricing tier index (0 = 1x … 5 = 10x). */
+    spinHeatTierIndex: { type: Number, default: 0 },
+    /** UTC timestamp when max heat cooldown ends and pricing resets to 1x. */
+    spinHeatCooldownUntil: { type: Date, default: null },
     lastHatchAt: { type: Date, default: null },
     extraFreeSpins: { type: Number, default: 0 },
     scoutUpgrades: { type: Number, default: 0 },

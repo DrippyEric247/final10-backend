@@ -53,6 +53,13 @@ const {
   PERK_CALLING_CARD_DUPLICATE_SAVVY,
   pickPerkCallingCard,
 } = require('../config/perkCallingCards');
+const {
+  maybeResetSpinHeat,
+  getSpinHeatState,
+  formatSpinHeatForClient,
+  advanceSpinHeat,
+} = require('./spinHeatService');
+const { applySpinHeatToBaseCost } = require('../config/spinHeatConfig');
 
 function ensurePerkMachineDoc(user) {
   if (!user.perkMachine || typeof user.perkMachine !== 'object') {
@@ -77,6 +84,8 @@ function ensurePerkMachineDoc(user) {
   if (!Array.isArray(pm.timedEventTokens)) pm.timedEventTokens = [];
   if (!pm.personalEvents || typeof pm.personalEvents !== 'object') pm.personalEvents = {};
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
+  if (typeof pm.spinHeatTierIndex !== 'number') pm.spinHeatTierIndex = 0;
+  if (pm.spinHeatCooldownUntil === undefined) pm.spinHeatCooldownUntil = null;
   return pm;
 }
 
@@ -197,14 +206,37 @@ function getPerkMachineStatus(user) {
 }
 
 async function getPerkMachineStatusWithEvents(user) {
+  ensurePerkMachineDoc(user);
+  const heatReset = maybeResetSpinHeat(user);
+  if (heatReset) {
+    user.markModified('perkMachine');
+    await user.save();
+  }
+
   const status = getPerkMachineStatus(user);
+  const heatState = getSpinHeatState(user);
+
+  for (const key of ['paid_1', 'paid_2', 'paid_3']) {
+    const base = status.spinCosts[key]?.savvy || 0;
+    const heatCost = applySpinHeatToBaseCost(base, heatState.multiplier);
+    status.spinCosts[key] = {
+      ...status.spinCosts[key],
+      savvy: heatCost,
+      baseSavvy: base,
+      spinHeatMultiplier: heatState.multiplier,
+      spinHeatApplied: heatState.multiplier > 1,
+    };
+  }
+
+  status.spinHeat = formatSpinHeatForClient(heatState);
+
   const savvySale = await getActiveSavvySale();
   const saleActive = savvySale?.active;
 
   if (saleActive) {
     for (const key of ['paid_1', 'paid_2', 'paid_3']) {
-      const base = status.spinCosts[key]?.savvy || 0;
-      const pricing = resolveSavvySaleSpinPricing(base, savvySale);
+      const heatBase = status.spinCosts[key]?.savvy || 0;
+      const pricing = resolveSavvySaleSpinPricing(heatBase, savvySale);
       status.spinCosts[key] = {
         ...status.spinCosts[key],
         savvy: pricing.cost,
@@ -445,9 +477,14 @@ async function spinPerkMachine(user, options = {}) {
     user = lockedUser;
     ensurePerkMachineDoc(user);
 
+    if (maybeResetSpinHeat(user)) {
+      user.markModified('perkMachine');
+    }
+
+    const heatBeforeSpin = getSpinHeatState(user);
     const tier = readTier(user);
-    let savvyCost = config.savvy;
-    let originalSavvyCost = config.savvy;
+    let savvyCost = applySpinHeatToBaseCost(config.savvy, heatBeforeSpin.multiplier);
+    let originalSavvyCost = savvyCost;
     let savvySaleApplied = false;
     let savvySaleSavings = 0;
     let usedPaid3Token = false;
@@ -462,7 +499,7 @@ async function spinPerkMachine(user, options = {}) {
       usedExtraFreeSpin = claim.usedExtraFreeSpin;
       ensurePerkMachineDoc(user);
     } else {
-      const salePricing = resolveSavvySaleSpinPricing(config.savvy, savvySale);
+      const salePricing = resolveSavvySaleSpinPricing(savvyCost, savvySale);
       originalSavvyCost = salePricing.originalCost;
       savvyCost = salePricing.cost;
       savvySaleApplied = salePricing.saleApplied;
@@ -473,14 +510,14 @@ async function spinPerkMachine(user, options = {}) {
       if (mode === SPIN_MODES.PAID_3 && Number(pmTokens.paid3Spin) > 0 && !options.adminBypassCost) {
         pm.tokens.paid3Spin = Number(pm.tokens.paid3Spin) - 1;
         savvyCost = 0;
-        originalSavvyCost = config.savvy;
+        originalSavvyCost = applySpinHeatToBaseCost(config.savvy, heatBeforeSpin.multiplier);
         usedPaid3Token = true;
         savvySaleApplied = false;
         savvySaleSavings = 0;
       } else if (mode === SPIN_MODES.PAID_2 && Number(pmTokens.paid2Spin) > 0 && !options.adminBypassCost) {
         pm.tokens.paid2Spin = Number(pm.tokens.paid2Spin) - 1;
         savvyCost = 0;
-        originalSavvyCost = config.savvy;
+        originalSavvyCost = applySpinHeatToBaseCost(config.savvy, heatBeforeSpin.multiplier);
         usedPaid2Token = true;
         savvySaleApplied = false;
         savvySaleSavings = 0;
@@ -490,12 +527,12 @@ async function spinPerkMachine(user, options = {}) {
         !savvySaleApplied &&
         !options.adminBypassCost
       ) {
-        // Personal Savvy Sale token active → discount this spin.
-        const discounted = applySavvySaleDiscountPercent(config.savvy);
+        const heatBase = applySpinHeatToBaseCost(config.savvy, heatBeforeSpin.multiplier);
+        const discounted = applySavvySaleDiscountPercent(heatBase);
         savvyCost = discounted;
-        originalSavvyCost = config.savvy;
+        originalSavvyCost = heatBase;
         savvySaleApplied = true;
-        savvySaleSavings = config.savvy - discounted;
+        savvySaleSavings = heatBase - discounted;
       }
 
       const balance = Math.round(Number(user.savvyPoints) || 0);
@@ -535,6 +572,7 @@ async function spinPerkMachine(user, options = {}) {
           originalSavvyCost,
           savvySaleSavings,
           actualCostCharged: savvyCost,
+          spinHeatMultiplier: heatBeforeSpin.multiplier,
         },
       });
       if (!spend.spent && !spend.duplicate) {
@@ -628,6 +666,17 @@ async function spinPerkMachine(user, options = {}) {
 
     const ticketResult = recordSpinForTournamentTicket(user, pm);
 
+    let spinHeatAdvance = null;
+    if (
+      mode !== SPIN_MODES.FREE &&
+      savvyCost > 0 &&
+      !options.adminBypassCost &&
+      !usedPaid3Token &&
+      !usedPaid2Token
+    ) {
+      spinHeatAdvance = advanceSpinHeat(user);
+    }
+
     user.markModified('perkMachine');
     await user.save();
 
@@ -689,6 +738,18 @@ async function spinPerkMachine(user, options = {}) {
       savvySaleSavings: usedPaid3Token ? 0 : savvySaleSavings,
       originalSavvyCost: mode === SPIN_MODES.FREE ? 0 : originalSavvyCost,
       tournamentTicket: ticketResult,
+      spinHeat: spinHeatAdvance
+        ? {
+            ...formatSpinHeatForClient(getSpinHeatState(user)),
+            previousMultiplier: spinHeatAdvance.previousMultiplier,
+            currentMultiplier: spinHeatAdvance.currentMultiplier,
+            increased: spinHeatAdvance.increased,
+            paidMultiplier: heatBeforeSpin.multiplier,
+          }
+        : {
+            ...formatSpinHeatForClient(getSpinHeatState(user)),
+            paidMultiplier: heatBeforeSpin.multiplier,
+          },
       status: await getPerkMachineStatusWithEvents(user),
     };
   } catch (err) {
