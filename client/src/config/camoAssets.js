@@ -18,7 +18,6 @@
  */
 
 import {
-  CAMOS,
   ACTIVE_CAMO_CATEGORIES,
   getApparelType,
   getCategoryCamos,
