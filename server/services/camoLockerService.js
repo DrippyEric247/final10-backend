@@ -21,6 +21,15 @@ const {
   isValidCamoCategory,
   evaluateCamoRequirement,
 } = require('../config/camoLocker');
+const { isNukeCamoItemId } = require('../config/nukeCollection');
+const { canAccessNukeCollection, stripNukeFromRecord } = require('./nukeAccessService');
+const {
+  isAdminOwnerOnlyItem,
+  canViewCamoItem,
+  filterCamoItemsForUser,
+  assertCanViewCamoItem,
+} = require('./camoVisibilityService');
+const { NUKE_COLLECTION, NUKE_REQUIREMENTS } = require('../config/nukeCollection');
 
 /** Hard ceiling on how much a single category counter can move per day. */
 const DAILY_CATEGORY_CAP = 40;
@@ -59,6 +68,13 @@ function readCamoUnlockMeta(inv) {
       serialNumber: entry.serialNumber == null ? null : Number(entry.serialNumber),
       source: entry.source || 'system',
       claimedAt: entry.claimedAt ? new Date(entry.claimedAt).toISOString() : null,
+      capturedProfileLevel:
+        entry.capturedProfileLevel == null ? null : Number(entry.capturedProfileLevel),
+      capturedPrestige: entry.capturedPrestige == null ? null : Number(entry.capturedPrestige),
+      capturedEmblemId: entry.capturedEmblemId || null,
+      capturedCallingCardId: entry.capturedCallingCardId || null,
+      capturedUserId: entry.capturedUserId ? String(entry.capturedUserId) : null,
+      capturedUsername: entry.capturedUsername || null,
     };
   }
   return meta;
@@ -114,16 +130,23 @@ function ensureCamoFields(inv) {
  * Record the unlock metadata row for a camo the user just earned.
  * Idempotent: an existing row is left untouched (serial never changes).
  */
-async function ensureUnlockMetadata(inv, itemId, source) {
+async function ensureUnlockMetadata(inv, itemId, source, capture = {}) {
   if (findUnlockEntry(inv, itemId)) return false;
   const serialNumber = await nextSerialNumber(itemId);
-  inv.camoUnlocks.push({
+  const row = {
     itemId,
     unlockedAt: new Date(),
     serialNumber,
     source: String(source || 'system').slice(0, 64),
     claimedAt: null,
-  });
+  };
+  if (capture.profileLevel != null) row.capturedProfileLevel = capture.profileLevel;
+  if (capture.prestige != null) row.capturedPrestige = capture.prestige;
+  if (capture.emblemId) row.capturedEmblemId = capture.emblemId;
+  if (capture.callingCardId) row.capturedCallingCardId = capture.callingCardId;
+  if (capture.userId) row.capturedUserId = capture.userId;
+  if (capture.username) row.capturedUsername = String(capture.username).slice(0, 64);
+  inv.camoUnlocks.push(row);
   return true;
 }
 
@@ -135,9 +158,30 @@ async function ensureUnlockMetadata(inv, itemId, source) {
 async function grantCamoUnlock(userId, itemId, source = 'camo_locker') {
   if (!isKnownCamoItemId(itemId)) throw badRequest('Unknown camo item', 'UNKNOWN_CAMO');
   const isNew = await grantSystemCosmeticUnlock(userId, itemId, source);
-  const { inv } = await ensureProgressDocuments(userId);
+  const user = await User.findById(userId).select('username emblemId callingCardId');
+  const { inv, bp } = await ensureProgressDocuments(userId);
   ensureCamoFields(inv);
-  const added = await ensureUnlockMetadata(inv, itemId, source);
+  let capture = {};
+  if (isAdminOwnerOnlyItem(itemId)) {
+    const metrics = await loadAccountMetrics(user, bp);
+    let prestige = 0;
+    try {
+      const { getProfileProgress } = require('./profileXpService');
+      const progress = await getProfileProgress(userId);
+      prestige = Math.max(0, Number(progress?.prestige) || 0);
+    } catch {
+      /* prestige optional */
+    }
+    capture = {
+      profileLevel: metrics.profileLevel,
+      prestige,
+      emblemId: user?.emblemId || null,
+      callingCardId: user?.callingCardId || null,
+      userId: String(userId),
+      username: user?.username || '',
+    };
+  }
+  const added = await ensureUnlockMetadata(inv, itemId, source, capture);
   if (added) await inv.save();
   return isNew || added;
 }
@@ -157,6 +201,8 @@ async function evaluateCamoUnlocks(userId) {
 
   const newlyUnlocked = [];
   for (const item of CAMO_ITEMS) {
+    if (isNukeCamoItemId(item.id)) continue;
+    if (item.grantOnly || isAdminOwnerOnlyItem(item)) continue;
     if (owned.has(item.id)) continue;
     const result = evaluateCamoRequirement(item, {
       categoryCount: counters[item.category] || 0,
@@ -222,7 +268,12 @@ async function getCamoLockerForUser(userId) {
   const unlockMeta = readCamoUnlockMeta(inv);
   const owned = new Set(inv.unlockedItemIds || []);
 
-  const items = CAMO_ITEMS.map((item) => {
+  const visibleItems = filterCamoItemsForUser(
+    CAMO_ITEMS.filter((item) => !isNukeCamoItemId(item.id)),
+    user
+  );
+
+  const items = visibleItems.map((item) => {
     const unlocked = owned.has(item.id);
     const requirement = evaluateCamoRequirement(item, {
       categoryCount: counters[item.category] || 0,
@@ -240,8 +291,16 @@ async function getCamoLockerForUser(userId) {
       unlockedAt: meta?.unlockedAt || null,
       serialNumber: meta?.serialNumber ?? null,
       claimedAt: meta?.claimedAt || null,
+      capturedProfileLevel: meta?.capturedProfileLevel ?? null,
+      capturedPrestige: meta?.capturedPrestige ?? null,
+      capturedEmblemId: meta?.capturedEmblemId || null,
+      capturedCallingCardId: meta?.capturedCallingCardId || null,
+      capturedUserId: meta?.capturedUserId || null,
+      capturedUsername: meta?.capturedUsername || null,
     };
   });
+
+  const visibleIdSet = new Set(visibleItems.map((i) => i.id));
 
   return {
     catalogVersion: CAMO_CATALOG_VERSION,
@@ -251,16 +310,23 @@ async function getCamoLockerForUser(userId) {
     profileLevel: metrics.profileLevel,
     currentStreak: metrics.currentStreak,
     battlePassTier: metrics.battlePassTier,
-    categoryProgress: counters,
+    categoryProgress: stripNukeFromRecord(counters),
     unlockedCamoIds: items.filter((i) => i.unlocked).map((i) => i.id),
-    newCamoIds: (inv.newItemIds || []).filter((id) => isKnownCamoItemId(id)),
+    newCamoIds: (inv.newItemIds || []).filter(
+      (id) => visibleIdSet.has(id) && isKnownCamoItemId(id) && !isNukeCamoItemId(id)
+    ),
     items,
+    nukePreviewAccess: canAccessNukeCollection(user),
+    privateRewardsAccess: canAccessNukeCollection(user),
   };
 }
 
 /** Clear the NEW ribbon for camo items (delegates to the shared newItemIds list). */
 async function markCamosSeen(userId, itemIds) {
-  const ids = (Array.isArray(itemIds) ? itemIds : []).filter((id) => isKnownCamoItemId(id));
+  const user = await User.findById(userId).select('-password');
+  const ids = (Array.isArray(itemIds) ? itemIds : []).filter(
+    (id) => isKnownCamoItemId(id) && canViewCamoItem(user, id)
+  );
   if (!ids.length) return getCamoLockerForUser(userId);
   const { inv } = await ensureProgressDocuments(userId);
   const drop = new Set(ids);
@@ -275,6 +341,8 @@ async function markCamosSeen(userId, itemIds) {
  */
 async function claimCamoReward(userId, itemId) {
   if (!isKnownCamoItemId(itemId)) throw badRequest('Unknown camo item', 'UNKNOWN_CAMO');
+  const user = await User.findById(userId).select('-password');
+  assertCanViewCamoItem(user, itemId);
   const { inv } = await ensureProgressDocuments(userId);
   if (!(inv.unlockedItemIds || []).includes(itemId)) {
     const err = new Error('Camo is not unlocked');
@@ -296,9 +364,31 @@ async function claimCamoReward(userId, itemId) {
   return getCamoLockerForUser(userId);
 }
 
+/**
+ * Founder/admin Nuke Collection preview — read-only shell, no ownership side effects.
+ */
+async function getNukeCollectionPreview(user) {
+  if (!canAccessNukeCollection(user)) {
+    const err = new Error('Not found');
+    err.status = 404;
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  return {
+    previewMode: true,
+    collection: NUKE_COLLECTION,
+    requirements: NUKE_REQUIREMENTS,
+    items: [],
+    plannedRewardTypes: NUKE_COLLECTION.plannedRewardTypes,
+    message:
+      'Preview only — no rewards populated yet. Preview does not grant ownership or serial numbers.',
+  };
+}
+
 module.exports = {
   DAILY_CATEGORY_CAP,
   getCamoLockerForUser,
+  getNukeCollectionPreview,
   recordCamoCategoryProgress,
   evaluateCamoUnlocks,
   grantCamoUnlock,

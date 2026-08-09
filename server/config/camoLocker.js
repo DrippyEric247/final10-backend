@@ -7,7 +7,7 @@
  * `packages/savvy-core` asserts parity on every ID and threshold.
  */
 
-const CAMO_CATALOG_VERSION = 7;
+const CAMO_CATALOG_VERSION = 15;
 const CAMO_ID_PREFIX = 'camo';
 
 const CAMO_RARITY_RANKS = Object.freeze({
@@ -33,20 +33,54 @@ const CAMOS = Object.freeze([
     order: 6,
     threshold: 500,
   }),
+  Object.freeze({
+    id: 'nukeStreak',
+    name: 'Nuke Streak',
+    rarity: 'mythic',
+    order: 7,
+    threshold: 999999,
+    visibility: 'admin_owner',
+    grantOnly: true,
+  }),
 ]);
 
 /** Categories that currently award rewards, bound to one apparel type each. */
 const CAMO_CATEGORIES = Object.freeze([
-  Object.freeze({ id: 'retail', name: 'Retail', rewardType: 'tshirt' }),
+  Object.freeze({
+    id: 'retail',
+    name: 'Retail',
+    rewardType: 'tshirt',
+    rewardTypes: ['tshirt', 'hoodie'],
+    rewardTypeCamoIds: Object.freeze({
+      tshirt: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+      hoodie: ['nukeStreak'],
+    }),
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+  }),
   Object.freeze({ id: 'outdoor', name: 'Outdoor', rewardType: 'hoodie' }),
-  Object.freeze({ id: 'fitness', name: 'Fitness', rewardType: 'shorts' }),
-  Object.freeze({ id: 'automotive', name: 'Automotive', rewardType: 'gloves' }),
-  Object.freeze({ id: 'electronics', name: 'Electronics', rewardType: 'socks' }),
+  Object.freeze({
+    id: 'fitness',
+    name: 'Fitness',
+    rewardType: 'shorts',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+  }),
+  Object.freeze({
+    id: 'automotive',
+    name: 'Automotive',
+    rewardType: 'gloves',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+  }),
+  Object.freeze({
+    id: 'electronics',
+    name: 'Electronics',
+    rewardType: 'socks',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+  }),
   Object.freeze({
     id: 'luxury',
     name: 'Luxury',
     rewardType: 'shiesty',
-    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula'],
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
   }),
 ]);
 
@@ -73,6 +107,7 @@ const CAMO_GATES = Object.freeze({
     { metric: 'battlePassTier', min: 50, label: 'Reach Battle Pass Tier 50' },
     { metric: 'currentStreak', min: 14, label: 'Hold a 14-day streak' },
   ]),
+  nukeStreak: Object.freeze([]),
 });
 
 function slug(value) {
@@ -92,28 +127,40 @@ function isCamoItemId(id) {
   return typeof id === 'string' && id.startsWith(`${CAMO_ID_PREFIX}_`);
 }
 
-function getCategoryCamos(category) {
-  if (category?.camoIds?.length) {
-    const allowed = new Set(category.camoIds);
+function getCategoryRewardTypes(category) {
+  if (category?.rewardTypes?.length) return category.rewardTypes;
+  if (category?.rewardType) return [category.rewardType];
+  return [];
+}
+
+function getCategoryCamos(category, rewardType) {
+  const typeIds =
+    (rewardType && category?.rewardTypeCamoIds?.[rewardType]) || category?.camoIds;
+  if (typeIds?.length) {
+    const allowed = new Set(typeIds);
     return CAMOS.filter((c) => allowed.has(c.id));
   }
-  return CAMOS;
+  return CAMOS.filter((c) => c.visibility !== 'admin_owner');
 }
 
 const CAMO_ITEMS = Object.freeze(
   CAMO_CATEGORIES.flatMap((category) =>
-    getCategoryCamos(category).map((camo) =>
-      Object.freeze({
-        id: buildCamoItemId(category.id, camo.id, category.rewardType),
-        camo: camo.id,
-        category: category.id,
-        rewardType: category.rewardType,
-        rarity: camo.rarity,
-        rarityRank: CAMO_RARITY_RANKS[camo.rarity] || 1,
-        order: camo.order,
-        threshold: camo.threshold,
-        gates: CAMO_GATES[camo.id] || Object.freeze([]),
-      })
+    getCategoryRewardTypes(category).flatMap((rewardType) =>
+      getCategoryCamos(category, rewardType).map((camo) =>
+        Object.freeze({
+          id: buildCamoItemId(category.id, camo.id, rewardType),
+          camo: camo.id,
+          category: category.id,
+          rewardType,
+          rarity: camo.rarity,
+          rarityRank: CAMO_RARITY_RANKS[camo.rarity] || 1,
+          order: camo.order,
+          threshold: camo.threshold,
+          gates: CAMO_GATES[camo.id] || Object.freeze([]),
+          visibility: camo.visibility || 'public',
+          grantOnly: Boolean(camo.grantOnly),
+        })
+      )
     )
   )
 );

@@ -21,6 +21,7 @@ import {
   ACTIVE_CAMO_CATEGORIES,
   getApparelType,
   getCategoryCamos,
+  getCategoryRewardTypes,
 } from '@savvy/core/config/camoLocker';
 
 /** Root folder for all camo renders (served from `client/public`). */
@@ -56,10 +57,12 @@ function conventionPath(categoryId, apparelId, camoId, { preview = false } = {})
 function buildCamoAssets() {
   const map = {};
   for (const category of ACTIVE_CAMO_CATEGORIES) {
-    const apparelId = category.rewardType;
-    map[category.id] = { [apparelId]: {} };
-    for (const camo of getCategoryCamos(category)) {
-      map[category.id][apparelId][camo.id] = conventionPath(category.id, apparelId, camo.id);
+    map[category.id] = {};
+    for (const apparelId of getCategoryRewardTypes(category)) {
+      map[category.id][apparelId] = {};
+      for (const camo of getCategoryCamos(category, apparelId)) {
+        map[category.id][apparelId][camo.id] = conventionPath(category.id, apparelId, camo.id);
+      }
     }
   }
   return map;
@@ -126,6 +129,34 @@ export const CAMO_ASSET_OVERRIDES = {
   'camo_automotive_dark-nebula_gloves': {
     image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_dark_nebula_gloves.jpeg`,
   },
+  /** Woodland Shorts — full collectible display art (jpeg per art drop). */
+  camo_fitness_woodland_shorts: {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_woodland_shorts.jpeg`,
+  },
+  /** Tiger Shorts — full collectible display art (jpeg per art drop). */
+  camo_fitness_tiger_shorts: {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_tiger_shorts.jpeg`,
+  },
+  /** Arctic Shorts — full collectible display art (jpeg per art drop). */
+  camo_fitness_arctic_shorts: {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_arctic_shorts.jpeg`,
+  },
+  /** Gold Shorts — full collectible display art (jpeg per art drop). */
+  camo_fitness_gold_shorts: {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_gold_shorts.jpeg`,
+  },
+  /** Diamond Shorts — full collectible display art (jpeg per art drop). */
+  camo_fitness_diamond_shorts: {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_diamond_shorts.jpeg`,
+  },
+  /** Dark Nebula Shorts — full collectible display art (jpeg per art drop). */
+  'camo_fitness_dark-nebula_shorts': {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_dark_nebula_shorts.jpeg`,
+  },
+  /** Nuke Streak Shorts — private admin/owner preview art (Fitness). */
+  'camo_fitness_nuke-streak_shorts': {
+    image: `${CAMO_ASSET_ROOT}/fitness/shorts/camo_nuke_streak_shorts.jpeg`,
+  },
   /** Woodland Socks — full collectible display art (jpeg per art drop). */
   camo_electronics_woodland_socks: {
     image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_woodland_socks.jpeg`,
@@ -173,6 +204,26 @@ export const CAMO_ASSET_OVERRIDES = {
   /** Dark Nebula Shiesty — full collectible display art (jpeg per art drop). */
   'camo_luxury_dark-nebula_shiesty': {
     image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_dark_nebula_shiesty.jpeg`,
+  },
+  /** Nuke Streak Shiesty Mask — private admin/owner preview art. */
+  'camo_luxury_nuke-streak_shiesty': {
+    image: `${CAMO_ASSET_ROOT}/luxury/shiesties/camo_nuke_streak_shiesty.jpeg`,
+  },
+  /** Nuke Gloves — private admin/owner preview art (Automotive). */
+  'camo_automotive_nuke-streak_gloves': {
+    image: `${CAMO_ASSET_ROOT}/automotive/gloves/camo_nuke_streak_gloves.jpeg`,
+  },
+  /** Nuke Socks — private admin/owner preview art (Electronics). */
+  'camo_electronics_nuke-streak_socks': {
+    image: `${CAMO_ASSET_ROOT}/electronics/socks/camo_nuke_streak_socks.jpeg`,
+  },
+  /** Nuke Streak T-Shirt — private admin/owner preview art (Retail). */
+  'camo_retail_nuke-streak_tshirt': {
+    image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_nuke_streak_tshirt.jpeg`,
+  },
+  /** Nuke Hoodie — private admin/owner preview art (Retail). */
+  'camo_retail_nuke-streak_hoodie': {
+    image: `${CAMO_ASSET_ROOT}/retail/hoodies/camo_nuke_streak_hoodie.jpeg`,
   },
   /** Tiger T-Shirt — full collectible display art (jpeg per art drop). */
   camo_retail_tiger_tshirt: {

@@ -8,6 +8,8 @@ import {
   getOperatorRank,
   summarizeCamoProgress,
   summarizeCamoCollections,
+  filterVisibleCamoItems,
+  filterVisibleCamos,
   toPercent,
 } from '@savvy/core/config/camoLocker';
 import { withCamoImages, resolveCategoryHeroImage } from '../config/camoAssets';
@@ -22,25 +24,28 @@ function devLog(...args) {
 }
 
 /** Catalog-only rows used for guests and while the first fetch is in flight. */
-const LOCKED_FALLBACK = CAMO_ITEMS.map((item) => ({
-  ...withCamoImages(item),
-  unlocked: false,
-  progress: 0,
-  current: 0,
-  target: item.threshold,
-  gateStatus: item.gates.map((g) => ({ label: g.label, met: false, current: 0, min: g.min })),
-  gatesMet: false,
-  unlockedAt: null,
-  serialNumber: null,
-  claimedAt: null,
-  isNew: false,
-}));
+function buildLockedFallback(hasPrivateAccess) {
+  return filterVisibleCamoItems(CAMO_ITEMS, hasPrivateAccess).map((item) => ({
+    ...withCamoImages(item),
+    unlocked: false,
+    progress: 0,
+    current: 0,
+    target: item.threshold,
+    gateStatus: item.gates.map((g) => ({ label: g.label, met: false, current: 0, min: g.min })),
+    gatesMet: false,
+    unlockedAt: null,
+    serialNumber: null,
+    claimedAt: null,
+    isNew: false,
+  }));
+}
 
-function mergeServerState(state) {
-  if (!state?.items?.length) return LOCKED_FALLBACK;
+function mergeServerState(state, hasPrivateAccess) {
+  const catalog = filterVisibleCamoItems(CAMO_ITEMS, hasPrivateAccess);
+  if (!state?.items?.length) return buildLockedFallback(hasPrivateAccess);
   const byId = new Map(state.items.map((row) => [row.id, row]));
   const newIds = new Set(state.newCamoIds || []);
-  return CAMO_ITEMS.map((item) => {
+  return catalog.map((item) => {
     const row = byId.get(item.id);
     return {
       ...withCamoImages(item),
@@ -53,6 +58,12 @@ function mergeServerState(state) {
       unlockedAt: row?.unlockedAt || null,
       serialNumber: row?.serialNumber ?? null,
       claimedAt: row?.claimedAt || null,
+      capturedProfileLevel: row?.capturedProfileLevel ?? null,
+      capturedPrestige: row?.capturedPrestige ?? null,
+      capturedEmblemId: row?.capturedEmblemId || null,
+      capturedCallingCardId: row?.capturedCallingCardId || null,
+      capturedUserId: row?.capturedUserId || null,
+      capturedUsername: row?.capturedUsername || null,
       isNew: newIds.has(item.id),
     };
   });
@@ -89,7 +100,10 @@ export default function useCamoLocker(enabled = true) {
         setError(null);
         devLog('loaded user collection', {
           unlocked: data?.unlockedCamoIds?.length || 0,
-          total: CAMO_ITEMS.length,
+          total: filterVisibleCamoItems(
+            CAMO_ITEMS,
+            Boolean(data?.privateRewardsAccess ?? data?.nukePreviewAccess)
+          ).length,
         });
         return data;
       } catch (err) {
@@ -119,7 +133,14 @@ export default function useCamoLocker(enabled = true) {
     return () => window.removeEventListener(CAMO_LOCKER_SYNC_EVENT, onSync);
   }, [enabled, load]);
 
-  const items = useMemo(() => mergeServerState(serverState), [serverState]);
+  const hasPrivateAccess = Boolean(
+    serverState?.privateRewardsAccess ?? serverState?.nukePreviewAccess
+  );
+
+  const items = useMemo(
+    () => mergeServerState(serverState, hasPrivateAccess),
+    [serverState, hasPrivateAccess]
+  );
 
   const unlockedIds = useMemo(
     () => new Set(items.filter((i) => i.unlocked).map((i) => i.id)),
@@ -163,23 +184,26 @@ export default function useCamoLocker(enabled = true) {
 
   /** Placeholder cards for categories that aren't live yet. */
   const upcomingCategories = useMemo(
-    () => CAMO_CATEGORIES.filter((c) => c.comingSoon),
+    () => CAMO_CATEGORIES.filter((c) => c.comingSoon && c.visibility !== 'secret'),
     []
   );
 
   /** Per-camo cross-category collections ("Woodland Collection 4 / 5"). */
   const collections = useMemo(() => {
-    const rollups = summarizeCamoCollections(unlockedIds);
+    const visibleCamoIds = new Set(filterVisibleCamos(CAMOS, CAMO_ITEMS, hasPrivateAccess).map((c) => c.id));
+    const rollups = summarizeCamoCollections(unlockedIds).filter((rollup) =>
+      visibleCamoIds.has(rollup.camo)
+    );
     return rollups.map((rollup) => ({
       ...rollup,
       rarityLabel: getCamoRarity(rollup.rarity).label,
       items: items.filter((i) => i.camo === rollup.camo),
     }));
-  }, [items, unlockedIds]);
+  }, [items, unlockedIds, hasPrivateAccess]);
 
   const camoTiers = useMemo(
     () =>
-      CAMOS.map((camo) => {
+      filterVisibleCamos(CAMOS, CAMO_ITEMS, hasPrivateAccess).map((camo) => {
         const camoItems = items.filter((i) => i.camo === camo.id);
         const unlocked = camoItems.filter((i) => i.unlocked).length;
         return {
@@ -190,7 +214,7 @@ export default function useCamoLocker(enabled = true) {
           percent: toPercent(unlocked, camoItems.length),
         };
       }),
-    [items]
+    [items, hasPrivateAccess]
   );
 
   /**
@@ -241,5 +265,7 @@ export default function useCamoLocker(enabled = true) {
     categoryProgress: serverState?.categoryProgress || {},
     reload: load,
     markSeen,
+    nukePreviewAccess: hasPrivateAccess,
+    privateRewardsAccess: hasPrivateAccess,
   };
 }

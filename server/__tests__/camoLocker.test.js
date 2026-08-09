@@ -13,7 +13,8 @@ const { isKnownCosmeticId } = require('../data/cosmeticIds');
 
 describe('camo locker catalog', () => {
   test('generates the starter reward slots', () => {
-    expect(CAMO_ITEMS).toHaveLength(36);
+    expect(CAMO_ITEMS).toHaveLength(42);
+    expect(CAMO_ITEMS.filter((i) => i.visibility === 'admin_owner')).toHaveLength(6);
     expect(CAMO_CATEGORY_IDS).toEqual([
       'retail',
       'outdoor',
@@ -92,11 +93,11 @@ describe('camo locker catalog', () => {
     }
   });
 
-  test('luxury shiesty ladder is complete woodland through dark nebula', () => {
-    const luxury = CAMO_ITEMS.filter((i) => i.category === 'luxury').sort(
+  test('luxury shiesty ladder is complete woodland through dark nebula plus private nuke streak', () => {
+    const luxury = CAMO_ITEMS.filter((i) => i.category === 'luxury' && i.rewardType === 'shiesty').sort(
       (a, b) => a.order - b.order
     );
-    expect(luxury).toHaveLength(6);
+    expect(luxury).toHaveLength(7);
     expect(luxury.map((i) => i.id)).toEqual([
       'camo_luxury_woodland_shiesty',
       'camo_luxury_tiger_shiesty',
@@ -104,6 +105,7 @@ describe('camo locker catalog', () => {
       'camo_luxury_gold_shiesty',
       'camo_luxury_diamond_shiesty',
       'camo_luxury_dark-nebula_shiesty',
+      'camo_luxury_nuke-streak_shiesty',
     ]);
     expect(luxury[5]).toMatchObject({
       camo: 'darkNebula',
@@ -113,5 +115,120 @@ describe('camo locker catalog', () => {
       rarity: 'mythic',
     });
     expect(luxury[5].gates).toHaveLength(3);
+    expect(luxury[6]).toMatchObject({
+      camo: 'nukeStreak',
+      rewardType: 'shiesty',
+      order: 7,
+      visibility: 'admin_owner',
+      grantOnly: true,
+    });
+    expect(luxury[6].gates).toHaveLength(0);
+  });
+
+  test('automotive gloves ladder is complete woodland through dark nebula plus private nuke gloves', () => {
+    const automotiveGloves = CAMO_ITEMS.filter((i) => i.category === 'automotive').sort(
+      (a, b) => a.order - b.order
+    );
+    expect(automotiveGloves).toHaveLength(7);
+    expect(automotiveGloves.map((i) => i.id)).toEqual([
+      'camo_automotive_woodland_gloves',
+      'camo_automotive_tiger_gloves',
+      'camo_automotive_arctic_gloves',
+      'camo_automotive_gold_gloves',
+      'camo_automotive_diamond_gloves',
+      'camo_automotive_dark-nebula_gloves',
+      'camo_automotive_nuke-streak_gloves',
+    ]);
+    expect(automotiveGloves[6]).toMatchObject({
+      camo: 'nukeStreak',
+      rewardType: 'gloves',
+      order: 7,
+      visibility: 'admin_owner',
+      grantOnly: true,
+    });
+  });
+
+  test('electronics socks ladder is complete woodland through dark nebula plus private nuke socks', () => {
+    const electronicsSocks = CAMO_ITEMS.filter((i) => i.category === 'electronics').sort(
+      (a, b) => a.order - b.order
+    );
+    expect(electronicsSocks).toHaveLength(7);
+    expect(electronicsSocks.map((i) => i.id)).toEqual([
+      'camo_electronics_woodland_socks',
+      'camo_electronics_tiger_socks',
+      'camo_electronics_arctic_socks',
+      'camo_electronics_gold_socks',
+      'camo_electronics_diamond_socks',
+      'camo_electronics_dark-nebula_socks',
+      'camo_electronics_nuke-streak_socks',
+    ]);
+    expect(electronicsSocks[6]).toMatchObject({
+      camo: 'nukeStreak',
+      rewardType: 'socks',
+      order: 7,
+      visibility: 'admin_owner',
+      grantOnly: true,
+    });
+  });
+
+  test('retail t-shirt ladder is complete woodland through dark nebula plus private nuke streak', () => {
+    const retailTshirts = CAMO_ITEMS.filter(
+      (i) => i.category === 'retail' && i.rewardType === 'tshirt'
+    ).sort((a, b) => a.order - b.order);
+    expect(retailTshirts).toHaveLength(7);
+    expect(retailTshirts.map((i) => i.id)).toEqual([
+      'camo_retail_woodland_tshirt',
+      'camo_retail_tiger_tshirt',
+      'camo_retail_arctic_tshirt',
+      'camo_retail_gold_tshirt',
+      'camo_retail_diamond_tshirt',
+      'camo_retail_dark-nebula_tshirt',
+      'camo_retail_nuke-streak_tshirt',
+    ]);
+    expect(retailTshirts[6]).toMatchObject({
+      camo: 'nukeStreak',
+      rewardType: 'tshirt',
+      order: 7,
+      visibility: 'admin_owner',
+      grantOnly: true,
+    });
+  });
+
+  test('retail hoodie is private nuke streak only', () => {
+    const retailHoodies = CAMO_ITEMS.filter(
+      (i) => i.category === 'retail' && i.rewardType === 'hoodie'
+    );
+    expect(retailHoodies).toHaveLength(1);
+    expect(retailHoodies[0]).toMatchObject({
+      id: 'camo_retail_nuke-streak_hoodie',
+      camo: 'nukeStreak',
+      rewardType: 'hoodie',
+      order: 7,
+      visibility: 'admin_owner',
+      grantOnly: true,
+    });
+  });
+
+  test('fitness shorts ladder is complete woodland through dark nebula plus private nuke streak', () => {
+    const fitnessShorts = CAMO_ITEMS.filter((i) => i.category === 'fitness').sort(
+      (a, b) => a.order - b.order
+    );
+    expect(fitnessShorts).toHaveLength(7);
+    expect(fitnessShorts.map((i) => i.id)).toEqual([
+      'camo_fitness_woodland_shorts',
+      'camo_fitness_tiger_shorts',
+      'camo_fitness_arctic_shorts',
+      'camo_fitness_gold_shorts',
+      'camo_fitness_diamond_shorts',
+      'camo_fitness_dark-nebula_shorts',
+      'camo_fitness_nuke-streak_shorts',
+    ]);
+    expect(fitnessShorts[6]).toMatchObject({
+      camo: 'nukeStreak',
+      rewardType: 'shorts',
+      order: 7,
+      visibility: 'admin_owner',
+      grantOnly: true,
+    });
   });
 });

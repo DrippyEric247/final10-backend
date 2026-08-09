@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { ensureProgressDocuments } = require('./battlePassPersistenceService');
+const { filterVisibleItemIdsForUser } = require('./camoVisibilityService');
 const {
   EMBLEM_IDS,
   CALLING_CARD_IDS,
@@ -82,10 +83,10 @@ async function getCosmeticsForUser(userId) {
     throw err;
   }
   const { inv } = await ensureProgressDocuments(userId);
-  const unlocked = [...effectiveUnlockedSet(inv, user)];
+  const unlocked = filterVisibleItemIdsForUser([...effectiveUnlockedSet(inv, user)], user);
   return {
     unlockedItemIds: unlocked,
-    newItemIds: inv.newItemIds || [],
+    newItemIds: filterVisibleItemIdsForUser(inv.newItemIds || [], user),
     equipped: {
       emblemId: user.equippedCosmetics?.emblemId || 'sigil_starter',
       callingCardId: user.equippedCosmetics?.callingCardId || 'card_default',

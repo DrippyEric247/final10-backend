@@ -15,6 +15,13 @@ const camoUnlockSchema = new mongoose.Schema(
     source: { type: String, default: 'system' },
     /** Set once the user claims a physical/redeemable version of the reward. */
     claimedAt: { type: Date, default: null },
+    /** Snapshot fields for private/Nuke rewards at earn time. */
+    capturedProfileLevel: { type: Number, default: null },
+    capturedPrestige: { type: Number, default: null },
+    capturedEmblemId: { type: String, default: null },
+    capturedCallingCardId: { type: String, default: null },
+    capturedUserId: { type: String, default: null },
+    capturedUsername: { type: String, default: null },
   },
   { _id: false }
 );

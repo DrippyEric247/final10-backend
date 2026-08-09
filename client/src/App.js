@@ -61,6 +61,7 @@ import Profile from "./pages/Profile";            // protected
 import LeaderboardPage from "./pages/LeaderboardPage"; // protected
 import WinFeed from "./pages/WinFeed";            // public — Savvy Wins social feed
 import AdminCosmeticsPanel from "./pages/AdminCosmeticsPanel"; // owner-only grants
+import AdminNukeMonitor from "./pages/AdminNukeMonitor";
 import AdminEmailTestCenter from "./pages/AdminEmailTestCenter";
 import EasterEggAdmin from "./components/EasterEggAdmin";
 import Customization from "./pages/Customization"; // protected
@@ -677,6 +678,14 @@ export default function App() {
           element={
             <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
               <AdminCosmeticsPanel />
+            </InternalRoute>
+          }
+        />
+        <Route
+          path="/admin/nuke-monitor"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <AdminNukeMonitor />
             </InternalRoute>
           }
         />

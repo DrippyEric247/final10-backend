@@ -435,6 +435,33 @@ export async function claimCamoReward(itemId) {
   return data;
 }
 
+/** Admin/founder-only secret Nuke Collection preview (404 for normal users). */
+export async function getNukeCollectionPreview() {
+  const { data } = await api.get("/camo-locker/nuke/preview");
+  return data;
+}
+
+/** Admin Nuke Monitor — summary dashboard cards. */
+export async function getNukeMonitorSummary(params = {}) {
+  const { data } = await api.get("/admin/nuke-monitor/summary", { params });
+  return data;
+}
+
+export async function getNukeMonitorPlayers(params = {}) {
+  const { data } = await api.get("/admin/nuke-monitor/players", { params });
+  return data;
+}
+
+export async function getNukeMonitorPlayerDetail(userId, params = {}) {
+  const { data } = await api.get(`/admin/nuke-monitor/players/${userId}`, { params });
+  return data;
+}
+
+export async function simulateNukeProgress(userId, percent) {
+  const { data } = await api.post("/admin/nuke-monitor/simulate", { userId, percent });
+  return data;
+}
+
 export async function activatePerkEventToken(tokenId) {
   const { data } = await api.post("/perk-machine/activate-event", { tokenId });
   return data;

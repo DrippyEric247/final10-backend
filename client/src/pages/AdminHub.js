@@ -11,6 +11,7 @@ const ADMIN_LINKS = [
   { label: "Email Test Center", path: "/admin/email-test", description: "Send TEST emails to any user — no rewards or alerts" },
   { label: "Trailer codes", path: "/admin/trailer-codes", description: "BETA247 trailer redemptions and legacy easter eggs" },
   { label: "Cosmetics grants", path: "/admin/cosmetics", description: "Exclusive calling cards and emblems" },
+  { label: "Nuke Monitor", path: "/admin/nuke-monitor", description: "Secret Nuke Collection progress — admin only" },
   { label: "SavvyShield", path: "/shield-dashboard", description: "Fraud prevention and enforcement" },
   { label: "Founder control", path: "/owner-control", description: "User search, grants, founding access" },
   { label: "Launch KPIs", path: "/launch-kpis", description: "Growth and funnel metrics" },

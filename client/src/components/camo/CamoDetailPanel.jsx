@@ -96,6 +96,17 @@ export default function CamoDetailPanel({
             {item.categoryName} Collection · {item.collectionName}
           </div>
 
+          {item.privateReward ? (
+            <div className="f10-camo-detail__private">
+              <div className="f10-camo-detail__private-label">PRIVATE REWARD</div>
+              <p>Visibility: Admin / Owner Only</p>
+              <p className="f10-camo-detail__private-note">
+                This reward is hidden from public locker views, search, and collection counts until
+                released.
+              </p>
+            </div>
+          ) : null}
+
           <div className="f10-camo-detail__section">
             <div className="f10-camo-detail__label">Unlock Requirements</div>
             <ul className="f10-camo-detail__reqs">
@@ -153,6 +164,44 @@ export default function CamoDetailPanel({
                   <strong>{unlockDate}</strong>
                 </div>
               ) : null}
+              {item.capturedProfileLevel != null ? (
+                <div className="f10-camo-detail__stat">
+                  <span>Level at unlock</span>
+                  <strong>{item.capturedProfileLevel}</strong>
+                </div>
+              ) : null}
+              {item.capturedPrestige != null ? (
+                <div className="f10-camo-detail__stat">
+                  <span>Prestige at unlock</span>
+                  <strong>{item.capturedPrestige}</strong>
+                </div>
+              ) : null}
+              {item.capturedEmblemId ? (
+                <div className="f10-camo-detail__stat">
+                  <span>Emblem at unlock</span>
+                  <strong>{item.capturedEmblemId}</strong>
+                </div>
+              ) : null}
+              {item.capturedCallingCardId ? (
+                <div className="f10-camo-detail__stat">
+                  <span>Calling card at unlock</span>
+                  <strong>{item.capturedCallingCardId}</strong>
+                </div>
+              ) : null}
+              {item.capturedUsername ? (
+                <div className="f10-camo-detail__stat">
+                  <span>Operator at unlock</span>
+                  <strong>{item.capturedUsername}</strong>
+                </div>
+              ) : null}
+            </div>
+          ) : item.privateReward ? (
+            <div className="f10-camo-detail__section">
+              <div className="f10-camo-detail__label">Nuke Reward Data</div>
+              <p className="f10-camo-detail__about">
+                When earned, this reward permanently captures serial number, user ID, username,
+                profile level, prestige, emblem, calling card, and unlock timestamp.
+              </p>
             </div>
           ) : null}
 

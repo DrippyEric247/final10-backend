@@ -319,6 +319,7 @@ app.use('/api/progression', progressionRoutes);
 app.use('/api/soundtracks', require('./routes/soundtrackRoutes'));
 app.use('/api/cosmetics', cosmeticRoutes);
 app.use('/api/camo-locker', require('./routes/camoLockerRoutes'));
+app.use('/api/admin/nuke-monitor', require('./routes/nukeMonitorRoutes'));
 app.use('/api/entitlements', entitlementRoutes);
 app.use('/api/offers', offersRoutes);
 app.use('/api/business-offers', businessOffersRoutes);

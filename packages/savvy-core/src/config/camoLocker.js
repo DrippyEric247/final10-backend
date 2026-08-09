@@ -13,7 +13,13 @@
  */
 
 /** Bump when items/thresholds change so clients can bust caches. */
-export const CAMO_CATALOG_VERSION = 7;
+export const CAMO_CATALOG_VERSION = 15;
+
+/** Item/camo visibility tiers — server must enforce; client only mirrors. */
+export const CAMO_VISIBILITY = Object.freeze({
+  public: 'public',
+  adminOwner: 'admin_owner',
+});
 
 /** Prefix for every camo cosmetic ID persisted in the shared cosmetic inventory. */
 export const CAMO_ID_PREFIX = 'camo';
@@ -46,6 +52,9 @@ export const CAMO_RARITIES = Object.freeze({
  * @property {string} accentColorAlt secondary accent for gradients
  * @property {number} threshold     category actions required to unlock
  * @property {string} tagline       short flavour line
+ * @property {string} [visibility]  'public' (default) or 'admin_owner'
+ * @property {boolean} [grantOnly]  skip auto-unlock from category progress
+ * @property {Record<string, string>} [itemNameOverrides] per rewardType display names
  */
 
 /** @type {readonly CamoTier[]} */
@@ -115,6 +124,27 @@ export const CAMOS = Object.freeze([
     accentColorAlt: '#4c1d95',
     threshold: 500,
     tagline: 'The far end of the ladder. Almost nobody gets here.',
+  }),
+  Object.freeze({
+    id: 'nukeStreak',
+    name: 'Nuke Streak',
+    collectionName: 'Nuke Streak Collection',
+    rarity: 'mythic',
+    order: 7,
+    accentColor: '#eab308',
+    accentColorAlt: '#ca8a04',
+    threshold: 999999,
+    tagline: 'Private. Radioactive. Reserved for the endgame.',
+    visibility: CAMO_VISIBILITY.adminOwner,
+    grantOnly: true,
+    itemNameOverrides: Object.freeze({
+      shiesty: 'Nuke Streak Shiesty Mask',
+      gloves: 'Nuke Gloves',
+      socks: 'Nuke Socks',
+      tshirt: 'Nuke Streak T-Shirt',
+      shorts: 'NUKE STREAK SHORTS',
+      hoodie: 'NUKE HOODIE',
+    }),
   }),
 ]);
 
@@ -189,12 +219,16 @@ export const APPAREL_TYPES = Object.freeze([
  * @property {string} id
  * @property {string} name
  * @property {string} rewardType  ApparelType id (null when comingSoon)
+ * @property {ReadonlyArray<string>} [rewardTypes] multiple apparel types in one category
+ * @property {ReadonlyRecord<string, ReadonlyArray<string>>} [rewardTypeCamoIds] per-type camo ladders
  * @property {string} icon        emoji fallback when no art is present
  * @property {string} accentColor
  * @property {string} blurb
  * @property {string} activityLabel what the requirement counter measures
  * @property {boolean} [comingSoon]
  * @property {ReadonlyArray<string>} [camoIds] optional subset of CAMOS for partial ladders
+ * @property {string} [visibility] 'public' (default) or 'secret' for unreleased collections
+ * @property {string} [releaseStatus] e.g. 'unreleased' | 'active'
  */
 
 /** @type {readonly CamoCategory[]} */
@@ -203,10 +237,16 @@ export const CAMO_CATEGORIES = Object.freeze([
     id: 'retail',
     name: 'Retail',
     rewardType: 'tshirt',
+    rewardTypes: ['tshirt', 'hoodie'],
+    rewardTypeCamoIds: Object.freeze({
+      tshirt: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+      hoodie: ['nukeStreak'],
+    }),
     icon: '🛍️',
     accentColor: '#a855f7',
     blurb: 'Everyday hauls, price drops, and clearance sweeps.',
     activityLabel: 'Retail Deals',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
   }),
   Object.freeze({
     id: 'outdoor',
@@ -225,6 +265,7 @@ export const CAMO_CATEGORIES = Object.freeze([
     accentColor: '#f97316',
     blurb: 'Training gear, recovery tech, and gym essentials.',
     activityLabel: 'Fitness Deals',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
   }),
   Object.freeze({
     id: 'automotive',
@@ -234,6 +275,7 @@ export const CAMO_CATEGORIES = Object.freeze([
     accentColor: '#f43f5e',
     blurb: 'Parts, detailing, tools, and garage upgrades.',
     activityLabel: 'Automotive Deals',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
   }),
   Object.freeze({
     id: 'electronics',
@@ -243,6 +285,7 @@ export const CAMO_CATEGORIES = Object.freeze([
     accentColor: '#38bdf8',
     blurb: 'Audio, displays, components, and smart tech.',
     activityLabel: 'Electronics Deals',
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
   }),
   // Placeholders — give each a rewardType + drop `comingSoon` to activate.
   Object.freeze({
@@ -253,7 +296,21 @@ export const CAMO_CATEGORIES = Object.freeze([
     accentColor: '#fbbf24',
     blurb: 'High-end drops and designer finds.',
     activityLabel: 'Luxury Deals',
-    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula'],
+    camoIds: ['woodland', 'tiger', 'arctic', 'gold', 'diamond', 'darkNebula', 'nukeStreak'],
+  }),
+  /** Secret — admin/founder preview only. Items added when art ships. */
+  Object.freeze({
+    id: 'nuke',
+    name: 'Nuke Collection',
+    rewardType: null,
+    icon: '☢️',
+    accentColor: '#a3e635',
+    accentColorAlt: '#3f6212',
+    blurb: 'The endgame. Not public. Not easy. Not for everyone.',
+    activityLabel: 'Nuke Qualifying Actions',
+    visibility: 'secret',
+    releaseStatus: 'unreleased',
+    camoIds: [],
   }),
   Object.freeze({
     id: 'home',
@@ -307,9 +364,16 @@ export const CAMO_CATEGORIES = Object.freeze([
   }),
 ]);
 
-/** Categories that currently hand out rewards. */
+/** Categories that currently hand out rewards (excludes secret/unreleased). */
 export const ACTIVE_CAMO_CATEGORIES = Object.freeze(
-  CAMO_CATEGORIES.filter((c) => !c.comingSoon && c.rewardType)
+  CAMO_CATEGORIES.filter(
+    (c) => !c.comingSoon && c.rewardType && c.visibility !== 'secret'
+  )
+);
+
+/** Secret collections — never included in public locker payloads. */
+export const SECRET_CAMO_CATEGORIES = Object.freeze(
+  CAMO_CATEGORIES.filter((c) => c.visibility === 'secret')
 );
 
 /* ------------------------------------------------------------------ *
@@ -343,6 +407,7 @@ export const CAMO_GATES = Object.freeze({
     { metric: 'battlePassTier', min: 50, label: 'Reach Battle Pass Tier 50' },
     { metric: 'currentStreak', min: 14, label: 'Hold a 14-day streak' },
   ]),
+  nukeStreak: Object.freeze([]),
 });
 
 /* ------------------------------------------------------------------ *
@@ -410,6 +475,12 @@ export function getCamoCategory(categoryId) {
   return CAMO_CATEGORIES.find((c) => c.id === categoryId) || null;
 }
 
+/** True when a category is secret/unreleased and must not appear in public APIs. */
+export function isSecretCamoCategory(categoryId) {
+  const cat = getCamoCategory(categoryId);
+  return cat?.visibility === 'secret';
+}
+
 export function getApparelType(typeId) {
   return APPAREL_TYPES.find((t) => t.id === typeId) || null;
 }
@@ -418,13 +489,22 @@ export function getCamoRarity(rarityId) {
   return CAMO_RARITIES[rarityId] || CAMO_RARITIES.common;
 }
 
-/** Camos available in a category — full ladder unless `camoIds` narrows it. */
-export function getCategoryCamos(category) {
-  if (category?.camoIds?.length) {
-    const allowed = new Set(category.camoIds);
+/** Reward types bound to a category (supports multi-type categories like Luxury). */
+export function getCategoryRewardTypes(category) {
+  if (category?.rewardTypes?.length) return category.rewardTypes;
+  if (category?.rewardType) return [category.rewardType];
+  return [];
+}
+
+/** Camos available in a category — full ladder unless `camoIds` / per-type lists narrow it. */
+export function getCategoryCamos(category, rewardType) {
+  const typeIds =
+    (rewardType && category?.rewardTypeCamoIds?.[rewardType]) || category?.camoIds;
+  if (typeIds?.length) {
+    const allowed = new Set(typeIds);
     return CAMOS.filter((c) => allowed.has(c.id));
   }
-  return CAMOS;
+  return CAMOS.filter((c) => c.visibility !== CAMO_VISIBILITY.adminOwner);
 }
 
 /* ------------------------------------------------------------------ *
@@ -451,12 +531,32 @@ export function getCategoryCamos(category) {
  * @property {ReadonlyArray<{metric: string, min: number, label: string}>} gates
  * @property {number} order
  * @property {string} about
+ * @property {string} visibility       'public' | 'admin_owner'
+ * @property {boolean} grantOnly         admin-grant only; no progress unlock
+ * @property {boolean} privateReward    shorthand for admin_owner visibility
+ * @property {ReadonlyArray<string>} captureAtUnlock snapshot fields at earn time
  */
+
+/** Fields stamped on private/Nuke rewards when earned. */
+export const CAMO_CAPTURE_FIELDS = Object.freeze([
+  'serialNumber',
+  'profileLevel',
+  'prestige',
+  'emblemId',
+  'callingCardId',
+  'unlockedAt',
+  'userId',
+  'username',
+]);
 
 function buildItem(category, camo) {
   const apparel = getApparelType(category.rewardType);
   const rarity = getCamoRarity(camo.rarity);
   const rewardTypeName = apparel ? apparel.name : 'Reward';
+  const rewardTypeKey = category.rewardType;
+  const visibility = camo.visibility || CAMO_VISIBILITY.public;
+  const name =
+    camo.itemNameOverrides?.[rewardTypeKey] || `${camo.name} ${rewardTypeName}`;
   return Object.freeze({
     id: buildCamoItemId(category.id, camo.id, category.rewardType),
     camo: camo.id,
@@ -466,7 +566,7 @@ function buildItem(category, camo) {
     rewardType: category.rewardType,
     rewardTypeName,
     rewardTypePlural: apparel ? apparel.plural : 'Rewards',
-    name: `${camo.name} ${rewardTypeName}`,
+    name,
     rarity: camo.rarity,
     rarityLabel: rarity.label,
     rarityRank: rarity.rank,
@@ -474,18 +574,31 @@ function buildItem(category, camo) {
     accentColor: camo.accentColor,
     accentColorAlt: camo.accentColorAlt,
     threshold: camo.threshold,
-    requirementText: `Find ${camo.threshold} ${category.activityLabel}`,
+    requirementText:
+      visibility === CAMO_VISIBILITY.adminOwner
+        ? 'Private reward — unlock challenge not yet public'
+        : `Find ${camo.threshold} ${category.activityLabel}`,
     gates: CAMO_GATES[camo.id] || Object.freeze([]),
     order: camo.order,
     about: camo.tagline,
+    visibility,
+    grantOnly: Boolean(camo.grantOnly),
+    privateReward: visibility === CAMO_VISIBILITY.adminOwner,
+    captureAtUnlock: visibility === CAMO_VISIBILITY.adminOwner ? CAMO_CAPTURE_FIELDS : Object.freeze([]),
   });
+}
+
+function buildCategoryItems(category) {
+  return getCategoryRewardTypes(category).flatMap((rewardType) =>
+    getCategoryCamos(category, rewardType).map((camo) =>
+      buildItem({ ...category, rewardType }, camo)
+    )
+  );
 }
 
 /** Every camo item in the universe, ordered by category then camo ladder. */
 export const CAMO_ITEMS = Object.freeze(
-  ACTIVE_CAMO_CATEGORIES.flatMap((category) =>
-    getCategoryCamos(category).map((camo) => buildItem(category, camo))
-  )
+  ACTIVE_CAMO_CATEGORIES.flatMap((category) => buildCategoryItems(category))
 );
 
 /** Fast lookup by item ID. */
@@ -502,6 +615,34 @@ export const CAMO_ITEM_IDS = Object.freeze(CAMO_ITEMS.map((i) => i.id));
 /** @returns {CamoItemDefinition|null} */
 export function getCamoItem(itemId) {
   return CAMO_ITEMS_BY_ID[itemId] || null;
+}
+
+/** True when the item is hidden from normal users until released. */
+export function isAdminOwnerOnlyItem(item) {
+  return item?.visibility === CAMO_VISIBILITY.adminOwner;
+}
+
+/**
+ * Whether a viewer may see this catalog item in locker UI and API payloads.
+ * @param {CamoItemDefinition|{visibility?: string}} item
+ * @param {boolean} hasPrivateAccess from server auth (admin / owner)
+ */
+export function canViewCamoItem(item, hasPrivateAccess) {
+  if (!isAdminOwnerOnlyItem(item)) return true;
+  return Boolean(hasPrivateAccess);
+}
+
+/** Filter catalog rows for the current viewer. */
+export function filterVisibleCamoItems(items, hasPrivateAccess) {
+  return (items || []).filter((item) => canViewCamoItem(item, hasPrivateAccess));
+}
+
+/** Camo tiers that have at least one visible item for this viewer. */
+export function filterVisibleCamos(camos, items, hasPrivateAccess) {
+  const visibleIds = new Set(
+    filterVisibleCamoItems(items, hasPrivateAccess).map((i) => i.camo)
+  );
+  return (camos || []).filter((c) => visibleIds.has(c.id));
 }
 
 /** Items belonging to one category, in ladder order. */

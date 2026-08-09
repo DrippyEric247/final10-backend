@@ -267,6 +267,16 @@ for (const item of camoLocker.CAMO_ITEMS) {
   if (packageGates !== serverGates) {
     fail(`${item.id} gate drift.\n  package: ${packageGates}\n  server:  ${serverGates}`);
   }
+  const packageVisibility = item.visibility || "public";
+  const serverVisibility = mirror.visibility || "public";
+  if (packageVisibility !== serverVisibility) {
+    fail(
+      `${item.id} visibility mismatch: package=${packageVisibility} server=${serverVisibility}`
+    );
+  }
+  if (Boolean(item.grantOnly) !== Boolean(mirror.grantOnly)) {
+    fail(`${item.id} grantOnly mismatch: package=${item.grantOnly} server=${mirror.grantOnly}`);
+  }
 }
 ok("camo thresholds, rarities and unlock gates match server mirror");
 

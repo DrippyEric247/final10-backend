@@ -8,11 +8,13 @@ const schemas = require('../validation/schemas');
 const { HttpError } = require('../middleware/apiErrors');
 const {
   getCamoLockerForUser,
+  getNukeCollectionPreview,
   recordCamoCategoryProgress,
   grantCamoUnlock,
   claimCamoReward,
   markCamosSeen,
 } = require('../services/camoLockerService');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -28,6 +30,18 @@ router.get('/me', auth, async (req, res, next) => {
   try {
     return res.json(await getCamoLockerForUser(req.user._id));
   } catch (err) {
+    return forward(err, next);
+  }
+});
+
+/** Secret Nuke Collection preview — admin/founder only; 404 for everyone else. */
+router.get('/nuke/preview', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'Not found'));
+    return res.json(await getNukeCollectionPreview(user));
+  } catch (err) {
+    if (err.status === 404) return next(new HttpError(404, 'NOT_FOUND', 'Not found'));
     return forward(err, next);
   }
 });

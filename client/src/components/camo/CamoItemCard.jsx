@@ -67,6 +67,12 @@ export default function CamoItemCard({ item, onOpenDetail, onPreview, showCatego
         {item.isNew && unlocked ? (
           <span className="f10-camo-card__badge f10-camo-card__badge--new">NEW</span>
         ) : null}
+
+        {item.privateReward ? (
+          <span className="f10-camo-card__badge f10-camo-card__badge--private">
+            PRIVATE / ADMIN ONLY
+          </span>
+        ) : null}
       </button>
 
       <div className="f10-camo-card__body">

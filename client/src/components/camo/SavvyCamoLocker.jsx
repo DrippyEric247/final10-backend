@@ -7,7 +7,8 @@ import CamoPreviewModal from './CamoPreviewModal';
 import CamoDetailPanel from './CamoDetailPanel';
 import CamoImage from './CamoImage';
 import useCamoLocker from '../../hooks/useCamoLocker';
-import { claimCamoReward } from '../../lib/api';
+import { getApparelType, getCategoryRewardTypes } from '@savvy/core/config/camoLocker';
+import { claimCamoReward, getNukeCollectionPreview } from '../../lib/api';
 import { requestCamoLockerSync } from '../../lib/camoLockerBus';
 import '../../styles/CamoLocker.css';
 
@@ -48,10 +49,14 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
     nearestUnlock,
     reload,
     markSeen,
+    nukePreviewAccess,
   } = locker;
+
+  const [nukePreview, setNukePreview] = useState(null);
 
   const [view, setView] = useState('category');
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedRewardType, setSelectedRewardType] = useState(null);
   const [selectedCamo, setSelectedCamo] = useState(null);
   const [detailItemId, setDetailItemId] = useState(null);
   const [previewItemId, setPreviewItemId] = useState(null);
@@ -67,6 +72,7 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
     if (!open) return;
     setView(intent?.view || (intent?.camo ? 'camo' : 'category'));
     setSelectedCategory(intent?.category || null);
+    setSelectedRewardType(intent?.rewardType || null);
     setSelectedCamo(intent?.camo || null);
     setDetailItemId(intent?.itemId || null);
     setPreviewItemId(null);
@@ -82,6 +88,24 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
       document.body.style.overflow = previous;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !nukePreviewAccess) {
+      setNukePreview(null);
+      return undefined;
+    }
+    let cancelled = false;
+    getNukeCollectionPreview()
+      .then((data) => {
+        if (!cancelled) setNukePreview(data);
+      })
+      .catch(() => {
+        if (!cancelled) setNukePreview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, nukePreviewAccess]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -107,7 +131,7 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
   // Reset scroll on every navigation step.
   useEffect(() => {
     scrollRef.current?.scrollTo?.({ top: 0, behavior: 'auto' });
-  }, [view, selectedCategory, selectedCamo, detailItemId]);
+  }, [view, selectedCategory, selectedRewardType, selectedCamo, detailItemId]);
 
   /* --------------------------------- actions ------------------------------- */
 
@@ -148,6 +172,7 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
   const selectCategory = useCallback((categoryId) => {
     devLog('category selected:', categoryId);
     setSelectedCategory(categoryId);
+    setSelectedRewardType(null);
     setDetailItemId(null);
   }, []);
 
@@ -174,6 +199,7 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
   const switchView = useCallback((nextView) => {
     setView(nextView);
     setSelectedCategory(null);
+    setSelectedRewardType(null);
     setSelectedCamo(null);
     setDetailItemId(null);
     devLog('browse mode:', nextView);
@@ -185,6 +211,61 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
     () => categories.find((c) => c.id === selectedCategory) || null,
     [categories, selectedCategory]
   );
+
+  /** Retail Hoodies admin view merges the public outdoor ladder with the private Nuke Hoodie. */
+  const categoryDisplayItems = useMemo(() => {
+    if (!activeCategory) return [];
+    const rewardTypes = getCategoryRewardTypes(activeCategory);
+    const rewardType = selectedRewardType || rewardTypes[0] || activeCategory.rewardType;
+    if (activeCategory.id === 'retail' && rewardType === 'hoodie' && nukePreviewAccess) {
+      const outdoorHoodies = items
+        .filter((i) => i.category === 'outdoor' && i.rewardType === 'hoodie')
+        .sort((a, b) => a.order - b.order);
+      const retailHoodies = activeCategory.items
+        .filter((i) => i.rewardType === 'hoodie')
+        .sort((a, b) => a.order - b.order);
+      return [...outdoorHoodies, ...retailHoodies];
+    }
+    return activeCategory.items
+      .filter((i) => !rewardTypes.length || i.rewardType === rewardType)
+      .sort((a, b) => a.order - b.order);
+  }, [activeCategory, items, nukePreviewAccess, selectedRewardType]);
+
+  const categoryRewardTabs = useMemo(() => {
+    if (!activeCategory) return [];
+    const rewardTypes = getCategoryRewardTypes(activeCategory);
+    if (rewardTypes.length <= 1) return [];
+    return rewardTypes
+      .map((typeId) => {
+        const apparel = getApparelType(typeId);
+        const visibleCount =
+          typeId === 'hoodie' && activeCategory.id === 'retail' && nukePreviewAccess
+            ? items.filter((i) => i.category === 'outdoor' && i.rewardType === 'hoodie').length +
+              activeCategory.items.filter((i) => i.rewardType === 'hoodie').length
+            : activeCategory.items.filter((i) => i.rewardType === typeId).length;
+        return {
+          id: typeId,
+          label: (apparel?.plural || typeId).toUpperCase(),
+          visibleCount,
+        };
+      })
+      .filter((tab) => tab.visibleCount > 0);
+  }, [activeCategory, items, nukePreviewAccess]);
+
+  const activeRewardType = useMemo(() => {
+    if (!activeCategory) return null;
+    const rewardTypes = getCategoryRewardTypes(activeCategory);
+    if (!rewardTypes.length) return activeCategory.rewardType;
+    if (selectedRewardType && categoryRewardTabs.some((t) => t.id === selectedRewardType)) {
+      return selectedRewardType;
+    }
+    return categoryRewardTabs[0]?.id || rewardTypes[0];
+  }, [activeCategory, categoryRewardTabs, selectedRewardType]);
+
+  const activeRewardTypeLabel = useMemo(() => {
+    if (!activeRewardType) return activeCategory?.items[0]?.rewardTypePlural || '';
+    return getApparelType(activeRewardType)?.plural || activeRewardType;
+  }, [activeCategory, activeRewardType]);
 
   const activeCamoCollection = useMemo(
     () => collections.find((c) => c.camo === selectedCamo) || null,
@@ -359,15 +440,38 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
                 <div className="f10-camo-section__head">
                   <h3>
                     {activeCategory.name.toUpperCase()}
-                    <span>{activeCategory.items[0]?.rewardTypePlural || ''}</span>
+                    <span>{activeRewardTypeLabel}</span>
                   </h3>
                   <div className="f10-camo-section__meta">
                     {activeCategory.unlocked} / {activeCategory.total} Camos Unlocked
                     {activeCategory.highestCamo ? ` · Highest: ${activeCategory.highestCamo}` : ''}
                   </div>
                 </div>
+                {categoryRewardTabs.length > 1 ? (
+                  <div
+                    className="f10-camo-locker__tabs f10-camo-locker__tabs--sub"
+                    role="tablist"
+                    aria-label={`${activeCategory.name} apparel types`}
+                  >
+                    {categoryRewardTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeRewardType === tab.id}
+                        className={`f10-camo-tab ${activeRewardType === tab.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setSelectedRewardType(tab.id);
+                          setDetailItemId(null);
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="f10-camo-grid">
-                  {activeCategory.items.map((item) => (
+                  {categoryDisplayItems.map((item) => (
                     <CamoItemCard
                       key={item.id}
                       item={item}
@@ -476,6 +580,29 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
                       </div>
                     </button>
                   ))}
+
+                  {nukePreview?.collection ? (
+                    <div
+                      className="f10-camo-cat f10-camo-cat--nuke-preview"
+                      style={{ '--camo-accent': nukePreview.collection.accentColor }}
+                    >
+                      <div className="f10-camo-cat__art">
+                        <div className="f10-camo-img">
+                          <div className="f10-camo-img__fallback" aria-hidden>
+                            <span className="f10-camo-img__glyph">{nukePreview.collection.icon}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="f10-camo-cat__body">
+                        <div className="f10-camo-cat__name">
+                          {nukePreview.collection.name.toUpperCase()}
+                        </div>
+                        <div className="f10-camo-cat__type">ADMIN PREVIEW · UNRELEASED</div>
+                        <div className="f10-camo-cat__progress">0 / 0 rewards live</div>
+                        <div className="f10-camo-cat__highest">{nukePreview.message}</div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {upcomingCategories.map((category) => (
                     <div
