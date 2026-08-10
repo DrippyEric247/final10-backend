@@ -6,6 +6,7 @@ import {
   getScoutFlightTournamentStatus,
   getScoutFlightChampionship,
   startScoutFlightTournament,
+  adminStartScoutFlightTestRun,
   submitScoutFlightTournamentScore,
   getScoutFlightLeaderboard,
   getScoutFlightSeasonLeaderboard,
@@ -29,6 +30,37 @@ import {
 } from '../lib/scoutFlightEngine';
 import { emitScoutFlightSound, SCOUT_FLIGHT_SOUNDS } from '../lib/scoutFlightAudio';
 import {
+  attachNukeState,
+  devForceNukeActivation,
+  devSeedNukeClock,
+  devSetNukeSurvival,
+  getNukeRunSummary,
+  handleNukeRunEnd,
+} from '../lib/scoutFlightNukeEngine';
+import { NUKE_STATE } from '../lib/scoutFlightNukeConfig';
+import { detectNukeQualityTier } from '../lib/scoutFlightNukeQuality';
+import { startScoutFlightHeartbeatLoop } from '../lib/scoutFlightHeartbeat';
+import { handleNukeAudioEvent, stopAllNukeAudio } from '../lib/scoutFlightNukeAudio';
+import {
+  drawCrumblingObstacle,
+  drawNukeBlastWall,
+  drawNukeDebris,
+  drawNukeFlash,
+  drawNukeShockwaves,
+  drawNukeSky,
+  drawNukeVignette,
+  drawNukeWarningAtmosphere,
+  getNukeShakeOffset,
+} from '../lib/scoutFlightNukeRender';
+import {
+  ScoutFlightNukeActivation,
+  ScoutFlightNukeAnomaly,
+  ScoutFlightNukeDeathBanner,
+  ScoutFlightNukeDevPanel,
+  ScoutFlightNukeHud,
+  ScoutFlightNukeResults,
+} from '../components/scoutFlight/ScoutFlightNukeUI';
+import {
   exitScoutFlightGameplayMusic,
   isMenuMusicRoute,
   startScoutFlightGameplayMusicFromGesture,
@@ -47,6 +79,7 @@ import {
   setScoutFlightGameplayFocus,
 } from '../lib/scoutFlightGameplayFocus';
 import '../styles/ScoutFlight.css';
+import '../styles/ScoutFlightNuke.css';
 import {
   ScoutFlightChampionshipScreen,
   ScoutFlightLeaderboardPanel,
@@ -257,11 +290,52 @@ function handleGameEvents(events) {
     if (ev.type === 'combo') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.COMBO, { bonus: ev.bonus });
     if (ev.type === 'crash') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.CRASH, { score: ev.score });
     if (ev.type === 'new_best') emitScoutFlightSound(SCOUT_FLIGHT_SOUNDS.NEW_BEST, { score: ev.score });
+    if (ev.type.startsWith('nuke_')) handleNukeAudioEvent(ev);
   }
 }
 
+/**
+ * Nuke Lab visibility. Never available to ordinary production users: it requires
+ * a dev build, or an admin/founder account opting in via ?nukeLab=1.
+ */
+function nukeDevToolsAllowed(user) {
+  if (process.env.NODE_ENV !== 'production') return true;
+  const isAdmin = Boolean(user?.isAdmin || user?.isFounder || user?.role === 'admin');
+  if (!isAdmin) return false;
+  try {
+    return new URLSearchParams(window.location.search).get('nukeLab') === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Snapshot signature so the Nuke HUD re-renders about once per second, not per frame. */
+function nukeViewSignature(nuke) {
+  if (!nuke) return '';
+  return [
+    nuke.state,
+    nuke.multiplier,
+    nuke.visualPhase,
+    nuke.warningStage?.id || '',
+    Math.floor(nuke.activeMs / 1000),
+    Math.floor(nuke.nukeSurvivalMs / 1000),
+  ].join('|');
+}
+
+function toNukeView(nuke) {
+  return {
+    state: nuke.state,
+    practice: nuke.practice,
+    multiplier: nuke.multiplier,
+    visualPhase: nuke.visualPhase,
+    warningStage: nuke.warningStage,
+    activeMs: nuke.activeMs,
+    nukeSurvivalMs: nuke.nukeSurvivalMs,
+  };
+}
+
 export default function ScoutFlightGame() {
-  const { patchUser, refreshProfile } = useAuth();
+  const { user, patchUser, refreshProfile } = useAuth();
   const pageRef = useRef(null);
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
@@ -295,10 +369,37 @@ export default function ScoutFlightGame() {
   const musicStartedRef = useRef(false);
   const debugAllowed = isDebugHitboxAllowed();
 
+  const [qualityTier] = useState(() => detectNukeQualityTier());
+  const [nukeView, setNukeView] = useState(null);
+  const [nukeSummary, setNukeSummary] = useState(null);
+  const nukeViewSigRef = useRef('');
+  const nukeSummaryRef = useRef(false);
+  const heartbeatSeqRef = useRef(0);
+  const isTestRunRef = useRef(false);
+  const nukeDevAllowed = nukeDevToolsAllowed(user);
+
   const isPracticeSession = menuMode === 'practice';
   const isTournamentSession = menuMode === 'tournament';
   const isPracticeMode = isPracticeSession || difficultyId === 'PRACTICE';
   const gameplayActive = Boolean(menuMode);
+
+  useEffect(() => {
+    heartbeatSeqRef.current = 0;
+  }, [activeRunId]);
+
+  useEffect(() => {
+    if (!isTournamentSession || !activeRunId || paused || uiPhase !== PHASE.PLAYING) {
+      return undefined;
+    }
+
+    const stop = startScoutFlightHeartbeatLoop({
+      getGame: () => gameRef.current,
+      runId: activeRunId,
+      sequenceRef: heartbeatSeqRef,
+    });
+
+    return () => stop();
+  }, [isTournamentSession, activeRunId, paused, uiPhase]);
 
   const loadChampionship = useCallback(async () => {
     try {
@@ -361,6 +462,7 @@ export default function ScoutFlightGame() {
 
   const stopGameplayMusic = useCallback(() => {
     musicStartedRef.current = false;
+    stopAllNukeAudio();
     void exitScoutFlightGameplayMusic({
       resumeMenu: isMenuMusicRoute(window.location.pathname),
       pathname: window.location.pathname,
@@ -398,6 +500,9 @@ export default function ScoutFlightGame() {
     if (!menuMode) return undefined;
     const onVisibility = () => {
       if (document.hidden) {
+        // Survival time is active gameplay time: backgrounding the app must never
+        // accrue progress toward Nuke Flight.
+        if (gameRef.current?.phase === PHASE.PLAYING) setPaused(true);
         void scoutFlightMusicEngine.pauseForBackground({ fadeMs: 400 });
       } else {
         void scoutFlightMusicEngine.resumeFromPause({ fadeMs: 600 });
@@ -443,7 +548,10 @@ export default function ScoutFlightGame() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (!gameRef.current) {
-      gameRef.current = createGame(w, h, difficultyId);
+      gameRef.current = createGame(w, h, difficultyId, {
+        practice: menuMode !== 'tournament',
+        qualityTier,
+      });
     } else {
       gameRef.current.width = w;
       gameRef.current.height = h;
@@ -454,7 +562,26 @@ export default function ScoutFlightGame() {
         applyDifficultyToScout(gameRef.current, gameRef.current.difficultyId);
       }
     }
-  }, [difficultyId, gameplayActive]);
+  }, [difficultyId, gameplayActive, menuMode, qualityTier]);
+
+  // Nuke eligibility labelling follows the selected mode. Re-seeded while idle so
+  // a mode switch can never carry practice/tournament state into the next run.
+  useEffect(() => {
+    const game = gameRef.current;
+    if (!game) return;
+    game.nukeOptions = {
+      practice: menuMode !== 'tournament',
+      qualityTier,
+      testOffsetMs: 0,
+    };
+    if (game.phase === PHASE.IDLE) {
+      attachNukeState(game, game.nukeOptions);
+      nukeViewSigRef.current = '';
+      nukeSummaryRef.current = false;
+      setNukeView(null);
+      setNukeSummary(null);
+    }
+  }, [menuMode, qualityTier]);
 
   useEffect(() => {
     if (!gameplayActive) return undefined;
@@ -503,11 +630,46 @@ export default function ScoutFlightGame() {
       setIsNewBest(game.isNewBest);
       setElapsedMs(Math.round(game.elapsed || 0));
       setCoinsGrabbed(Number(game.coinsGrabbed) || 0);
+
+      const sig = nukeViewSignature(game.nuke);
+      if (sig !== nukeViewSigRef.current) {
+        nukeViewSigRef.current = sig;
+        setNukeView(game.nuke ? toNukeView(game.nuke) : null);
+      }
+      // Captured once at death, not every frame, so the results screen is stable.
+      if (game.nuke?.hasActivated && game.phase === PHASE.GAMEOVER && !nukeSummaryRef.current) {
+        nukeSummaryRef.current = true;
+        setNukeSummary(getNukeRunSummary(game));
+      }
     }
     lastTsRef.current = ts;
 
+    const nuke = game.nuke;
+    const shake = getNukeShakeOffset(game, ts);
+
+    if (shake.x || shake.y) {
+      // Shaking the world leaves a thin margin at the canvas edge; fill it first
+      // so the shake can never smear the previous frame into view.
+      ctx.fillStyle = '#0a0618';
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Camera shake is a render-only translation; collision math never sees it.
+    ctx.save();
+    if (shake.x || shake.y) ctx.translate(shake.x, shake.y);
+
     drawBackground(ctx, w, h, ts);
-    for (const o of game.obstacles) drawObstacle(ctx, o, h, game.groundH, ts);
+    drawNukeWarningAtmosphere(ctx, w, h, ts, nuke);
+    drawNukeSky(ctx, w, h, ts, nuke);
+    drawNukeBlastWall(ctx, game, ts);
+    drawNukeShockwaves(ctx, nuke);
+    drawNukeDebris(ctx, game);
+
+    // Gameplay layer is always drawn last and at full opacity.
+    for (const o of game.obstacles) {
+      if (o.nukeDestroyed) drawCrumblingObstacle(ctx, o, h, game.groundH);
+      else drawObstacle(ctx, o, h, game.groundH, ts);
+    }
     for (const c of game.coins) drawCoin(ctx, c, ts);
 
     const s = game.scout;
@@ -537,6 +699,12 @@ export default function ScoutFlightGame() {
     for (const p of game.comboPopups) drawComboPopup(ctx, p);
 
     drawGround(ctx, w, h, game.groundH);
+
+    ctx.restore();
+
+    // Screen-space layers: never shaken, alpha-capped so nothing is hidden.
+    drawNukeVignette(ctx, w, h, nuke);
+    drawNukeFlash(ctx, w, h, nuke);
 
     if (game.phase === PHASE.PLAYING) {
       ctx.fillStyle = 'rgba(255,255,255,0.95)';
@@ -576,6 +744,45 @@ export default function ScoutFlightGame() {
     };
   }, [resize, drawFrame]);
 
+  const resetNukeUi = useCallback(() => {
+    stopAllNukeAudio();
+    nukeViewSigRef.current = '';
+    nukeSummaryRef.current = false;
+    heartbeatSeqRef.current = 0;
+    isTestRunRef.current = false;
+    setNukeView(null);
+    setNukeSummary(null);
+  }, []);
+
+  const handleNukeDevSeed = useCallback((seconds) => {
+    if (!nukeDevAllowed) return;
+    const game = gameRef.current;
+    if (!game) return;
+    if (game.phase === PHASE.IDLE) flap(game);
+    devSeedNukeClock(game, seconds);
+  }, [nukeDevAllowed]);
+
+  const handleNukeDevActivate = useCallback(() => {
+    if (!nukeDevAllowed) return;
+    const game = gameRef.current;
+    if (!game) return;
+    if (game.phase === PHASE.IDLE) flap(game);
+    devForceNukeActivation(game);
+  }, [nukeDevAllowed]);
+
+  const handleNukeDevSurvival = useCallback((seconds) => {
+    if (!nukeDevAllowed) return;
+    devSetNukeSurvival(gameRef.current, seconds);
+  }, [nukeDevAllowed]);
+
+  const handleNukeDevDeath = useCallback(() => {
+    if (!nukeDevAllowed) return;
+    const game = gameRef.current;
+    if (!game || game.nuke?.state !== NUKE_STATE.NUKE_ACTIVE) return;
+    game.phase = PHASE.GAMEOVER;
+    handleNukeRunEnd(game);
+  }, [nukeDevAllowed]);
+
   const handleDifficultySelect = useCallback((id) => {
     const saved = saveDifficulty(id);
     setDifficultyId(saved);
@@ -583,6 +790,21 @@ export default function ScoutFlightGame() {
       applyDifficultyToScout(gameRef.current, saved);
     }
   }, []);
+
+  const handleStartTestRun = useCallback(async () => {
+    if (!nukeDevAllowed) return;
+    try {
+      const result = await adminStartScoutFlightTestRun();
+      isTestRunRef.current = true;
+      setActiveRunId(result.runId);
+      setMenuMode('tournament');
+      setTournamentResult(null);
+      submitLock.current = false;
+      handleDifficultySelect('TOURNAMENT');
+    } catch (e) {
+      setTournamentError(e?.response?.data?.message || e?.message || 'Could not start test run.');
+    }
+  }, [nukeDevAllowed, handleDifficultySelect]);
 
   const handlePracticeStart = useCallback(() => {
     setMenuMode('practice');
@@ -654,6 +876,7 @@ export default function ScoutFlightGame() {
       setActiveRunId(null);
       submitLock.current = false;
       gameRef.current = resetGame(gameRef.current);
+      resetNukeUi();
       setUiPhase(PHASE.IDLE);
       setScore(0);
       setIsNewBest(false);
@@ -665,12 +888,13 @@ export default function ScoutFlightGame() {
       return;
     }
     gameRef.current = restartGame(gameRef.current);
+    resetNukeUi();
     setUiPhase(PHASE.PLAYING);
     setScore(0);
     setIsNewBest(false);
     setElapsedMs(0);
     setCoinsGrabbed(0);
-  }, [isTournamentSession, stopGameplayMusic, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+  }, [isTournamentSession, stopGameplayMusic, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod, resetNukeUi]);
 
   const handleBackToIdle = useCallback(() => {
     setPaused(false);
@@ -680,6 +904,7 @@ export default function ScoutFlightGame() {
     setActiveRunId(null);
     submitLock.current = false;
     gameRef.current = resetGame(gameRef.current);
+    resetNukeUi();
     setUiPhase(PHASE.IDLE);
     setScore(0);
     setIsNewBest(false);
@@ -688,7 +913,7 @@ export default function ScoutFlightGame() {
     void loadChampionship();
     void loadTournamentStatus();
     void loadLeaderboard(leaderboardPeriod);
-  }, [stopGameplayMusic, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod]);
+  }, [stopGameplayMusic, loadChampionship, loadTournamentStatus, loadLeaderboard, leaderboardPeriod, resetNukeUi]);
 
   useEffect(() => {
     if (uiPhase !== PHASE.GAMEOVER || !isTournamentSession || !activeRunId || submitLock.current) {
@@ -696,13 +921,25 @@ export default function ScoutFlightGame() {
     }
     submitLock.current = true;
     setSubmittingScore(true);
-    const elapsedMs = Math.round(Number(gameRef.current?.elapsed) || 0);
+    const game = gameRef.current;
+    const elapsedMs = Math.round(Number(game?.elapsed) || 0);
+    const nukeReport = getNukeRunSummary(game);
     void (async () => {
       try {
         const result = await submitScoutFlightTournamentScore({
           runId: activeRunId,
           score,
           elapsedMs,
+          baseScore: nukeReport ? nukeReport.baseScore : score,
+          nuke: nukeReport?.triggered
+            ? {
+                nukeSurvivalMs: nukeReport.nukeSurvivalMs,
+                highestMultiplier: nukeReport.highestMultiplier,
+                bonusScore: nukeReport.bonusScore,
+                obstaclesEscaped: nukeReport.obstaclesEscaped,
+                structuresDestroyed: nukeReport.structuresDestroyed,
+              }
+            : null,
         });
         setTournamentResult(result);
         setTournamentStatus(result.status || tournamentStatus);
@@ -740,6 +977,10 @@ export default function ScoutFlightGame() {
   ]);
 
   const ticketCount = Number(tournamentStatus?.ticketsOwned) || 0;
+  // The Nuke death cinematic owns the screen until it finishes; the ordinary
+  // Game Over UI waits for it.
+  const nukeCinematicActive = nukeView?.state === NUKE_STATE.NUKE_DEATH;
+  const showGameOverUi = uiPhase === PHASE.GAMEOVER && !nukeCinematicActive;
 
   return (
     <div
@@ -824,6 +1065,27 @@ export default function ScoutFlightGame() {
       >
         <canvas ref={canvasRef} className="scout-flight-canvas" />
 
+        <ScoutFlightNukeAnomaly nuke={nukeView} />
+        <ScoutFlightNukeHud nuke={nukeView} />
+        <ScoutFlightNukeActivation nuke={nukeView} />
+        <ScoutFlightNukeDeathBanner nuke={nukeView} />
+
+        {nukeDevAllowed && gameplayActive ? (
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <ScoutFlightNukeDevPanel
+              nuke={nukeView}
+              onSeedClock={handleNukeDevSeed}
+              onForceActivate={handleNukeDevActivate}
+              onSetSurvival={handleNukeDevSurvival}
+              onForceDeath={handleNukeDevDeath}
+              onStartTestRun={() => void handleStartTestRun()}
+            />
+          </div>
+        ) : null}
+
         {paused && uiPhase === PHASE.PLAYING ? (
           <div className="scout-flight-overlay scout-flight-overlay--pause">
             <p className="scout-flight-go-title">Paused</p>
@@ -906,7 +1168,7 @@ export default function ScoutFlightGame() {
           </div>
         ) : null}
 
-        {uiPhase === PHASE.GAMEOVER && isTournamentSession ? (
+        {showGameOverUi && isTournamentSession ? (
           submittingScore ? (
             <div className="scout-flight-overlay scout-flight-overlay--gameover">
               <p className="scout-flight-go-title">Verifying tournament score…</p>
@@ -915,6 +1177,7 @@ export default function ScoutFlightGame() {
             <ScoutFlightTournamentResult
               result={tournamentResult}
               score={score}
+              header={<ScoutFlightNukeResults summary={nukeSummary} verified={tournamentResult} />}
               onPlayAgain={(e) => {
                 e.stopPropagation();
                 handleRestart();
@@ -935,8 +1198,9 @@ export default function ScoutFlightGame() {
           )
         ) : null}
 
-        {uiPhase === PHASE.GAMEOVER && !isTournamentSession ? (
+        {showGameOverUi && !isTournamentSession ? (
           <div className="scout-flight-overlay scout-flight-overlay--gameover">
+            <ScoutFlightNukeResults summary={nukeSummary} verified={null} />
             <h2 className="scout-flight-go-title">Flight Ended</h2>
             <p className="scout-flight-go-mode">
               {getDifficultyConfig(difficultyId).emoji}{' '}

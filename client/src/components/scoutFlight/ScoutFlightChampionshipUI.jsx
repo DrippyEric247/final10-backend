@@ -239,12 +239,15 @@ export function ScoutFlightTournamentResult({
   score,
   onPlayAgain,
   onReturn,
+  /** Optional slot rendered above the standard stats (used by Nuke Flight). */
+  header = null,
 }) {
   if (!result) return null;
   const savvy = Number(result.savvyEarned) || 0;
   const monthlyRank = result.monthlyRank?.rank ?? result.dailyRank?.rank;
   return (
     <div className="scout-flight-overlay scout-flight-overlay--tournament-result">
+      {header}
       <h2 className="scout-flight-tournament-result__title">🏆 Tournament Complete</h2>
       <div className="scout-flight-tournament-result__stats">
         <div className="scout-flight-tournament-result__stat">

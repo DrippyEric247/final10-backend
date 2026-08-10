@@ -137,6 +137,16 @@ const scoutFlightTournamentSubmitLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many score submissions. Wait a moment.'),
 });
 
+const scoutFlightHeartbeatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().scoutFlightHeartbeat,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many heartbeats. Wait a moment.'),
+});
+
 /** Scout mission claims — per-user cap against spam clicking Complete. */
 const scoutMissionClaimLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -208,6 +218,7 @@ module.exports = {
   perkMachineSpinLimiter,
   scoutFlightTournamentStartLimiter,
   scoutFlightTournamentSubmitLimiter,
+  scoutFlightHeartbeatLimiter,
   scoutMissionClaimLimiter,
   easterEggRedeemLimiter,
   founderMessageLimiter,

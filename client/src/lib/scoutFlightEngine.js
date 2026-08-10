@@ -8,6 +8,14 @@ import {
   loadSavedDifficulty,
   DEFAULT_DIFFICULTY_ID,
 } from './scoutFlightDifficulty';
+import {
+  attachNukeState,
+  getCombinedRewardMultiplier,
+  getNukeSpeedScale,
+  handleNukeRunEnd,
+  updateNukeAfterlife,
+  updateNukeInPlay,
+} from './scoutFlightNukeEngine';
 
 export { SCOUT_FLIGHT_DIFFICULTY, getSelectableDifficulties, getDifficultyConfig, loadSavedDifficulty, saveDifficulty, applyDifficultyToScout, SCOUT_SPRITE_SIZE, loadDebugHitboxEnabled, saveDebugHitboxEnabled, isDebugHitboxAllowed } from './scoutFlightDifficulty';
 
@@ -69,6 +77,12 @@ export function createGame(width, height, difficultyId = loadSavedDifficulty(), 
   const resolvedDifficulty = difficultyId || DEFAULT_DIFFICULTY_ID;
   const simMode = Boolean(opts.simMode);
 
+  const nukeOptions = {
+    practice: Boolean(opts.practice),
+    qualityTier: opts.qualityTier || null,
+    testOffsetMs: Number(opts.nukeTestOffsetMs) || 0,
+  };
+
   const game = {
     width,
     height,
@@ -76,9 +90,14 @@ export function createGame(width, height, difficultyId = loadSavedDifficulty(), 
     scoutX,
     phase: PHASE.IDLE,
     score: 0,
+    /** Score before any Nuke multiplier. Equals `score` outside Nuke Flight. */
+    baseScore: 0,
+    /** Integration point for temporary Scout Flight pickup multipliers. */
+    runMultiplier: 1,
     best: simMode ? 0 : loadBest(),
     coinsGrabbed: 0,
     simMode,
+    nukeOptions,
     difficultyId: resolvedDifficulty,
     hitPad: HIT_PAD,
     scout: {
@@ -106,11 +125,15 @@ export function createGame(width, height, difficultyId = loadSavedDifficulty(), 
   };
 
   applyDifficultyToScout(game, resolvedDifficulty);
+  attachNukeState(game, nukeOptions);
   return game;
 }
 
 export function resetGame(game) {
-  const fresh = createGame(game.width, game.height, game.difficultyId);
+  const fresh = createGame(game.width, game.height, game.difficultyId, {
+    ...(game.nukeOptions || {}),
+    nukeTestOffsetMs: 0,
+  });
   fresh.best = Math.max(game.best, loadBest());
   return fresh;
 }
@@ -118,7 +141,10 @@ export function resetGame(game) {
 export function startGame(game) {
   game.phase = PHASE.PLAYING;
   game.score = 0;
+  game.baseScore = 0;
+  game.runMultiplier = 1;
   game.coinsGrabbed = 0;
+  attachNukeState(game, { ...(game.nukeOptions || {}), nukeTestOffsetMs: 0 });
   game.elapsed = 0;
   game.scout.y = game.height / 2 - game.scout.h / 2;
   game.scout.vy = 0;
@@ -205,41 +231,61 @@ function scoutHitsObstacle(game) {
   return false;
 }
 
+/**
+ * Credits an eligible score reward, splitting base value from Nuke bonus so the
+ * server can audit each half independently.
+ * @returns {number} the awarded (multiplied) amount
+ */
+function awardScore(game, baseAmount) {
+  const base = Math.max(0, Math.round(Number(baseAmount) || 0));
+  const multiplier = getCombinedRewardMultiplier(game);
+  const total = Math.round(base * multiplier);
+  game.baseScore = Number(game.baseScore || 0) + base;
+  game.score += total;
+  if (game.nuke && total > base) {
+    game.nuke.bonusScore += total - base;
+  }
+  return total;
+}
+
 function collectCoin(game, c) {
   c.collected = true;
-  game.score += c.value;
+  const awarded = awardScore(game, c.value);
   game.coinsGrabbed = Number(game.coinsGrabbed || 0) + 1;
   game.comboStreak += 1;
 
   game.coinPopups.push({
     x: c.x,
     y: c.y,
-    value: c.value,
+    value: awarded,
+    baseValue: c.value,
+    multiplied: awarded > c.value,
     life: 1100,
     maxLife: 1100,
     scale: 0.6,
   });
 
-  game.events.push({ type: 'coin', value: c.value, coinKey: c.type.key });
+  game.events.push({ type: 'coin', value: awarded, baseValue: c.value, coinKey: c.type.key });
 
   if (game.comboStreak >= COMBO_EVERY) {
     game.comboStreak = 0;
     game.comboCount += 1;
-    game.score += COMBO_BONUS;
+    const bonus = awardScore(game, COMBO_BONUS);
     game.comboPopups.push({
       x: c.x,
       y: c.y - 28,
       label: `COMBO ×${COMBO_EVERY}!`,
-      bonus: COMBO_BONUS,
+      bonus,
       life: 1400,
       maxLife: 1400,
     });
-    game.events.push({ type: 'combo', bonus: COMBO_BONUS, comboCount: game.comboCount });
+    game.events.push({ type: 'combo', bonus, comboCount: game.comboCount });
   }
 }
 
 function endGame(game) {
   game.phase = PHASE.GAMEOVER;
+  handleNukeRunEnd(game);
   const prevBest = game.best;
   if (!game.simMode && game.score > game.best) {
     game.best = game.score;
@@ -266,7 +312,11 @@ function updateScoutRotation(game, dtMs) {
 export function updateGame(game, dtMs) {
   game.events = [];
 
-  if (game.phase !== PHASE.PLAYING) return;
+  if (game.phase !== PHASE.PLAYING) {
+    // Nuke cinematics and settling debris still need frames after the run ends.
+    updateNukeAfterlife(game, dtMs);
+    return;
+  }
 
   game.elapsed += dtMs;
   const s = game.scout;
@@ -285,7 +335,9 @@ export function updateGame(game, dtMs) {
     s.vy = 0;
   }
 
-  const speed = game.speed;
+  // Nuke Flight scales scroll speed only. SPAWN_MS is deliberately untouched so
+  // the time budget between obstacles — and therefore feasibility — is unchanged.
+  const speed = game.speed * getNukeSpeedScale(game);
   if (game.elapsed - game.lastSpawn >= SPAWN_MS) {
     spawnObstacle(game);
     game.lastSpawn = game.elapsed;
@@ -295,7 +347,9 @@ export function updateGame(game, dtMs) {
   for (const c of game.coins) if (!c.collected) c.x -= speed;
 
   game.obstacles = game.obstacles.filter((o) => o.x + o.w > -40);
-  game.coins = game.coins.filter((c) => !c.collected || c.x + c.r > -40);
+  // Collected coins freeze in place and off-screen coins can never be reached
+  // again, so both must be dropped or a long run leaks every coin it ever spawned.
+  game.coins = game.coins.filter((c) => !c.collected && c.x + c.r > -40);
 
   const cx = s.x + s.w / 2;
   const cy = s.y + s.h / 2;
@@ -329,6 +383,8 @@ export function updateGame(game, dtMs) {
     }))
     .filter((p) => p.life > 0);
 
+  updateNukeInPlay(game, dtMs);
+
   if (scoutHitsObstacle(game)) {
     endGame(game);
   }
@@ -337,7 +393,10 @@ export function updateGame(game, dtMs) {
 export function restartGame(game) {
   const best = game.best;
   const difficultyId = game.difficultyId;
-  const next = createGame(game.width, game.height, difficultyId);
+  const next = createGame(game.width, game.height, difficultyId, {
+    ...(game.nukeOptions || {}),
+    nukeTestOffsetMs: 0,
+  });
   next.best = best;
   startGame(next);
   return next;

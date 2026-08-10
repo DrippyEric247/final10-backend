@@ -354,12 +354,42 @@ export async function startScoutFlightTournament() {
   return data;
 }
 
-export async function submitScoutFlightTournamentScore({ runId, score, elapsedMs }) {
+export async function sendScoutFlightHeartbeat(payload) {
+  const { data } = await api.post("/scout-flight/tournament/heartbeat", payload);
+  return data;
+}
+
+export async function adminStartScoutFlightTestRun() {
+  const { data } = await api.post("/scout-flight/admin/start-test-run");
+  return data;
+}
+
+export async function submitScoutFlightTournamentScore({
+  runId,
+  score,
+  elapsedMs,
+  baseScore = null,
+  nuke = null,
+}) {
   const { data } = await api.post("/scout-flight/tournament/submit", {
     runId,
     score,
     elapsedMs,
+    baseScore,
+    nuke,
   });
+  return data;
+}
+
+export async function adminGetScoutFlightNukeStats(userId = null) {
+  const { data } = await api.get("/scout-flight/admin/nuke-stats", {
+    params: userId ? { userId } : {},
+  });
+  return data;
+}
+
+export async function adminResetScoutFlightNukeStats(userId = null) {
+  const { data } = await api.post("/scout-flight/admin/reset-nuke-stats", { userId });
   return data;
 }
 

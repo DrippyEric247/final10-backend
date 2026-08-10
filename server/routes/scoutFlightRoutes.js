@@ -6,14 +6,19 @@ const { HttpError } = require('../middleware/apiErrors');
 const {
   scoutFlightTournamentStartLimiter,
   scoutFlightTournamentSubmitLimiter,
+  scoutFlightHeartbeatLimiter,
 } = require('../middleware/rateLimits');
 const {
   ScoutFlightTournamentError,
   getTournamentStatus,
   startTournamentRun,
   submitTournamentScore,
+  processRunHeartbeat,
   getLeaderboard,
   adminGrantTicket,
+  adminGetNukeStats,
+  adminResetNukeStats,
+  adminStartTestRun,
 } = require('../services/scoutFlightTournamentService');
 const {
   ScoutFlightChampionshipError,
@@ -57,6 +62,21 @@ router.post('/tournament/start', auth, scoutFlightTournamentStartLimiter, async 
   }
 });
 
+router.post('/tournament/heartbeat', auth, scoutFlightHeartbeatLimiter, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const result = await processRunHeartbeat(user, req.body || {});
+    res.json(result);
+  } catch (err) {
+    if (err instanceof ScoutFlightTournamentError) {
+      return res.status(err.status).json({ message: err.message, code: err.code });
+    }
+    console.error('[scout-flight/tournament/heartbeat]', err);
+    next(err);
+  }
+});
+
 router.post('/tournament/submit', auth, scoutFlightTournamentSubmitLimiter, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
@@ -65,6 +85,8 @@ router.post('/tournament/submit', auth, scoutFlightTournamentSubmitLimiter, asyn
       runId: req.body?.runId,
       score: req.body?.score,
       elapsedMs: req.body?.elapsedMs,
+      baseScore: req.body?.baseScore,
+      nuke: req.body?.nuke,
     });
     res.json({
       message: result.duplicate ? 'Score already submitted.' : 'Tournament run complete.',
@@ -154,6 +176,41 @@ router.post('/admin/grant-ticket', auth, requireAdminAccess(), async (req, res, 
     });
   } catch (err) {
     console.error('[scout-flight/admin/grant-ticket]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/start-test-run', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const result = await adminStartTestRun(user);
+    res.json(result);
+  } catch (err) {
+    console.error('[scout-flight/admin/start-test-run]', err);
+    next(err);
+  }
+});
+
+router.get('/admin/nuke-stats', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const targetId = String(req.query?.userId || '').trim() || req.user.id;
+    res.json(await adminGetNukeStats(targetId));
+  } catch (err) {
+    console.error('[scout-flight/admin/nuke-stats]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/reset-nuke-stats', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const targetId = String(req.body?.userId || '').trim() || req.user.id;
+    const user = await User.findById(targetId);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const result = await adminResetNukeStats(user);
+    res.json({ message: 'Nuke Flight stats reset.', ...result });
+  } catch (err) {
+    console.error('[scout-flight/admin/reset-nuke-stats]', err);
     next(err);
   }
 });

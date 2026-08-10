@@ -193,6 +193,24 @@ const userSchema = new mongoose.Schema({
       history: { type: [mongoose.Schema.Types.Mixed], default: [] },
     },
   },
+  /**
+   * Scout Flight lifetime stats. Nuke Flight Streak proof-of-completion lives
+   * here so future cosmetics, contracts, and leaderboards can read it without
+   * scanning the run collection.
+   */
+  scoutFlightStats: {
+    hasTriggeredScoutFlightNuke: { type: Boolean, default: false },
+    nukeFlightsTriggered: { type: Number, default: 0 },
+    longestSurvivalMs: { type: Number, default: 0 },
+    longestNukeSurvivalMs: { type: Number, default: 0 },
+    highestNukeMultiplier: { type: Number, default: 0 },
+    bestNukeScore: { type: Number, default: 0 },
+    totalNukeBonusSavvy: { type: Number, default: 0 },
+    firstNukeAt: { type: Date, default: null },
+    lastNukeAt: { type: Date, default: null },
+    /** Practice-mode Nuke experience is tracked separately and never pays out. */
+    practiceNukeFlights: { type: Number, default: 0 },
+  },
   /** Beta live-event placeholder inventory (Scout Flight tickets, beacons, etc.) */
   eventInventory: {
     scoutFlightTicket: { type: Number, default: 0 },
