@@ -18,6 +18,11 @@ const {
   adminGrantSavvy,
   adminGrantEgg,
   adminClearHistory,
+  adminSetNukeSpinProgress,
+  adminTriggerNukeEvent,
+  adminEndNukeEvent,
+  adminGetNukeState,
+  adminGetNukeStateForUserId,
 } = require('../services/perkMachineAdminService');
 const { SPIN_MODES, getRewardIndex } = require('../config/perkMachineRewards');
 
@@ -324,6 +329,75 @@ router.post('/admin/clear-history', auth, requireAdminAccess(), async (req, res,
     res.json({ message: 'Spin history cleared.', ...result });
   } catch (err) {
     console.error('[perk-machine/admin/clear-history]', err);
+    next(err);
+  }
+});
+
+router.get('/admin/nuke-state', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const result = await adminGetNukeState(user);
+    res.json(result);
+  } catch (err) {
+    console.error('[perk-machine/admin/nuke-state]', err);
+    next(err);
+  }
+});
+
+router.get('/admin/nuke/user/:userId', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const result = await adminGetNukeStateForUserId(req.params.userId);
+    res.json(result);
+  } catch (err) {
+    if (err.status === 404) {
+      return next(new HttpError(404, 'NOT_FOUND', err.message));
+    }
+    console.error('[perk-machine/admin/nuke/user]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/nuke/set-progress', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const count = Number(req.body?.count);
+    const result = await adminSetNukeSpinProgress(user, count, req.adminUser || user);
+    res.json({ message: `Nuke progress set to ${Math.round(count)}.`, ...result });
+  } catch (err) {
+    console.error('[perk-machine/admin/nuke/set-progress]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/nuke/trigger', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const result = await adminTriggerNukeEvent(
+      user,
+      {
+        multiplier: req.body?.multiplier,
+        durationMinutes: req.body?.durationMinutes,
+      },
+      req.adminUser || user
+    );
+    res.json({ message: 'Nuke event triggered.', ...result });
+  } catch (err) {
+    console.error('[perk-machine/admin/nuke/trigger]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/nuke/end', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const result = await adminEndNukeEvent(user, req.adminUser || user);
+    res.json({ message: 'Nuke event ended.', ...result });
+  } catch (err) {
+    console.error('[perk-machine/admin/nuke/end]', err);
     next(err);
   }
 });

@@ -178,6 +178,20 @@ const userSchema = new mongoose.Schema({
     },
     /** Spins toward next Scout Flight Tournament Ticket (resets on award). */
     ticketSpinProgress: { type: Number, default: 0 },
+    /** Perk Machine Nuke Event — lifetime progression + active timed event. */
+    nuke: {
+      lifetimeQualifyingSpins: { type: Number, default: 0 },
+      nukeEventsTriggered: { type: Number, default: 0 },
+      totalNukeBonusEarned: { type: Number, default: 0 },
+      highestNukeMultiplierAchieved: { type: Number, default: 0 },
+      lastActivationAt: { type: Date, default: null },
+      lastCompletionAt: { type: Date, default: null },
+      milestonesSeen: [{ type: String }],
+      processedSpinIds: [{ type: String }],
+      activeEvent: { type: mongoose.Schema.Types.Mixed, default: null },
+      lastRunSummary: { type: mongoose.Schema.Types.Mixed, default: null },
+      history: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    },
   },
   /** Beta live-event placeholder inventory (Scout Flight tickets, beacons, etc.) */
   eventInventory: {

@@ -6,6 +6,9 @@ import {
   adminPerkMachineGrantSavvy,
   adminPerkMachineGrantEgg,
   adminPerkMachineResetFreeSpin,
+  adminPerkMachineSetNukeProgress,
+  adminPerkMachineTriggerNuke,
+  adminPerkMachineEndNuke,
 } from '../../lib/api';
 
 const EGG_GRANT_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic'];
@@ -63,6 +66,34 @@ export default function PerkMachineAdminPanel({ onStatusRefresh }) {
         </button>
         <button type="button" disabled={busy} onClick={() => void runAction('clear', adminPerkMachineClearHistory)}>
           Clear spin history
+        </button>
+      </div>
+
+      <div className="perk-admin-label" style={{ marginTop: '0.75rem' }}>Nuke Event QA</div>
+      <div className="perk-admin-actions">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void runAction('nuke-2999', () => adminPerkMachineSetNukeProgress(2999))}
+        >
+          Set 2,999 Nuke spins
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void runAction('nuke-3000', () => adminPerkMachineSetNukeProgress(3000))}
+        >
+          Set 3,000 Nuke spins
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void runAction('nuke-trigger', () => adminPerkMachineTriggerNuke({ durationMinutes: 5 }))}
+        >
+          Trigger Nuke (5 min)
+        </button>
+        <button type="button" disabled={busy} onClick={() => void runAction('nuke-end', adminPerkMachineEndNuke)}>
+          End Nuke
         </button>
       </div>
 

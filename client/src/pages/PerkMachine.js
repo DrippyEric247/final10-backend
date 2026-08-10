@@ -26,6 +26,14 @@ import PerkMachineEnvironment from '../components/perk/PerkMachineEnvironment';
 import EggHatchery from '../components/perk/EggHatchery';
 import PerkMachineTournamentProgress from '../components/perk/PerkMachineTournamentProgress';
 import SpinHeatIndicator from '../components/perk/SpinHeatIndicator';
+import PerkMachineNukeHud from '../components/perk/PerkMachineNukeHud';
+import {
+  PerkMachineNukeActivation,
+  PerkMachineNukeAmbient,
+  PerkMachineNukeEndSequence,
+  PerkMachineNukeEndSummary,
+  PerkMachineNukeMilestoneFlash,
+} from '../components/perk/PerkMachineNukeLayer';
 import PerkRewardIndexModal from '../components/perk/PerkRewardIndexModal';
 import PerkRewardReveal from '../components/perk/PerkRewardReveal';
 import { showCallingCardUnlock } from '../lib/callingCardUnlockBus';
@@ -59,6 +67,16 @@ import {
 import { notifyInventoryUpdated } from '../hooks/useActiveBoosts';
 import '../styles/InventoryTokens.css';
 import '../styles/PerkMachine.css';
+import '../styles/PerkMachineNuke.css';
+import {
+  playPerkNukeActivationSound,
+  playPerkNukeDiscoverySound,
+  playPerkNukeEventEndSound,
+  playPerkNukeMultiplierHitSound,
+  playPerkNukeShockwaveSound,
+  stopAllNukeLoops,
+  syncNukeAmbientAudio,
+} from '../lib/perkMachineNukeSfx';
 import '../styles/EggHatchery.css';
 import '../styles/PerkRewardIndex.css';
 
@@ -292,6 +310,10 @@ export default function PerkMachine() {
   const [lastMultiplier, setLastMultiplier] = useState(null);
   const [multiplierPulse, setMultiplierPulse] = useState(false);
   const [heroReveal, setHeroReveal] = useState(null);
+  const [nukeActivationOpen, setNukeActivationOpen] = useState(false);
+  const [nukeEndSummary, setNukeEndSummary] = useState(null);
+  const [nukeEndPhase, setNukeEndPhase] = useState(null);
+  const [nukeMilestoneFlash, setNukeMilestoneFlash] = useState(null);
   const spinLock = useRef(false);
   const machinePanelRef = useRef(null);
   const toastTimer = useRef(null);
@@ -405,6 +427,11 @@ export default function PerkMachine() {
     try {
       const data = await getPerkMachineStatus();
       setStatus(data);
+      if (data?.nuke?.justEnded && data.nuke.endSummary) {
+        setNukeEndSummary(data.nuke.endSummary);
+        setNukeEndPhase('sequence');
+        void playPerkNukeEventEndSound();
+      }
       if (data && typeof data.powerMultiplierBonus === 'number') {
         setPermanentPowerBonus(data.powerMultiplierBonus);
       }
@@ -474,6 +501,33 @@ export default function PerkMachine() {
         0
     )
   );
+
+  const reducedMotion = useMemo(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  const nukeState = status?.nuke || null;
+  const nukeActive = Boolean(nukeState?.active);
+  const nukeUrgency = nukeState?.active?.urgencyPhase || 'idle';
+
+  useEffect(() => {
+    if (!nukeActive || !nukeState?.active?.expiresAt) return undefined;
+    const ms = new Date(nukeState.active.expiresAt).getTime() - Date.now();
+    if (ms <= 0) {
+      void loadStatus();
+      return undefined;
+    }
+    const id = window.setTimeout(() => void loadStatus(), ms + 400);
+    return () => window.clearTimeout(id);
+  }, [nukeActive, nukeState?.active?.expiresAt, loadStatus]);
+
+  useEffect(() => {
+    syncNukeAmbientAudio(nukeState, { reducedMotion });
+    return () => {
+      if (!nukeActive) stopAllNukeLoops();
+    };
+  }, [nukeActive, nukeState?.active?.urgencyPhase, reducedMotion, nukeState]);
 
   const paidSpinAffordability = useMemo(() => {
     const tokens = status?.tokens || {};
@@ -554,6 +608,18 @@ export default function PerkMachine() {
           Array.isArray(result.rawRewards) && result.rawRewards.length ? result.rawRewards : rewards;
         setStatus(result.status || status);
         setLastMultiplier(result.multiplier || null);
+
+        if (result.nuke?.progress?.thresholdReached || result.nuke?.progress?.activation) {
+          setNukeActivationOpen(true);
+          void playPerkNukeActivationSound();
+        } else if (result.nuke?.progress?.milestone) {
+          setNukeMilestoneFlash(result.nuke.progress.milestone);
+          void playPerkNukeDiscoverySound();
+        }
+
+        if (Number(result.nuke?.nukeBonusSavvy) > 0) {
+          void playPerkNukeMultiplierHitSound();
+        }
 
         if (result.spinHeat?.increased) {
           setSpinHeatFlash({
@@ -906,7 +972,9 @@ export default function PerkMachine() {
   const multiplier = tierLabel === 'Pro' || tierLabel === 'Premium' ? '1.50x' : '1.00x';
 
   return (
-    <div className={`perk-page ${savvySaleDisplay?.active ? 'perk-page--savvy-sale' : ''} ${multiplierPulse ? 'perk-page--multiplier-pulse' : ''}`}>
+    <div
+      className={`perk-page ${savvySaleDisplay?.active ? 'perk-page--savvy-sale' : ''} ${multiplierPulse ? 'perk-page--multiplier-pulse' : ''} ${nukeActive ? 'perk-page--nuke' : ''} ${nukeUrgency === 'final60' ? 'perk-page--nuke-final60' : ''}`}
+    >
       <div className="perk-page__glow" aria-hidden />
 
       {coinBurst > 0 ? (
@@ -970,10 +1038,15 @@ export default function PerkMachine() {
             ref={machinePanelRef}
             className={`perk-machine ${reelPhase === 'spinning' ? 'perk-machine--active' : ''} ${
               machineHover ? 'perk-machine--hover' : ''
-            }`}
+            } ${nukeActive ? 'perk-machine--nuke-mode' : ''}`}
             onMouseEnter={() => setMachineHover(true)}
             onMouseLeave={() => setMachineHover(false)}
           >
+            <PerkMachineNukeAmbient nuke={nukeState} reducedMotion={reducedMotion} />
+            <PerkMachineNukeMilestoneFlash
+              milestone={nukeMilestoneFlash}
+              onDone={() => setNukeMilestoneFlash(null)}
+            />
             <img
               src={
                 reelPhase === 'spinning'
@@ -1016,6 +1089,7 @@ export default function PerkMachine() {
           </div>
 
           <SpinHeatIndicator spinHeat={status?.spinHeat} increaseFlash={spinHeatFlash} />
+          <PerkMachineNukeHud nuke={nukeState} spinHeat={status?.spinHeat} />
 
           <div className="perk-free-timer">
             {freeReady ? (
@@ -1119,6 +1193,9 @@ export default function PerkMachine() {
                     {reward.savvyBoosted ? <span className="perk-reward-card__boost">1.5× boost</span> : null}
                     {reward.spinMultiplierApplied && reward.spinMultiplierApplied > 1 ? (
                       <span className="perk-reward-card__spin-mult">{reward.spinMultiplierApplied}× spin</span>
+                    ) : null}
+                    {reward.nukeMultiplier ? (
+                      <span className="perk-reward-card__nuke-mult">{reward.nukeMultiplier}× Nuke</span>
                     ) : null}
                   </div>
                 ))}
@@ -1327,6 +1404,30 @@ export default function PerkMachine() {
       <PerkRewardReveal reveal={heroReveal} onClose={() => setHeroReveal(null)} />
 
       <PerkRewardIndexModal open={showRewardIndex} onClose={() => setShowRewardIndex(false)} />
+
+      <PerkMachineNukeActivation
+        open={nukeActivationOpen}
+        onComplete={() => {
+          setNukeActivationOpen(false);
+          void loadStatus();
+        }}
+      />
+      <PerkMachineNukeEndSequence
+        open={nukeEndPhase === 'sequence'}
+        onComplete={() => {
+          void playPerkNukeShockwaveSound();
+          setNukeEndPhase('summary');
+        }}
+      />
+      <PerkMachineNukeEndSummary
+        summary={nukeEndPhase === 'summary' ? nukeEndSummary : null}
+        onDismiss={() => {
+          setNukeEndSummary(null);
+          setNukeEndPhase(null);
+          stopAllNukeLoops();
+          void loadStatus();
+        }}
+      />
 
       <footer className="perk-footer">
         <Final10Slogan variant="footer" />

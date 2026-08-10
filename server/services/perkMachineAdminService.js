@@ -6,6 +6,12 @@ const { auditFireAndForget } = require('./securityAuditService');
 const { emptyEggInventory, HATCHABLE_EGG_TIERS } = require('../config/perkMachineRewards');
 const { ensurePerkMachineDoc, getPerkMachineStatus } = require('./perkMachineService');
 const { creditSavvy } = require('./savvyBalanceService');
+const {
+  adminSetNukeProgress,
+  adminTriggerNuke,
+  adminEndNuke,
+  formatNukeForClient,
+} = require('./perkMachineNukeService');
 
 function buildAdminLogEntry(action, adminUser, targetUser, details = {}) {
   return {
@@ -79,9 +85,50 @@ async function adminClearHistory(user, adminUser) {
   return { status: getPerkMachineStatus(user), adminLog: log };
 }
 
+async function adminSetNukeSpinProgress(user, count, adminUser) {
+  const nuke = adminSetNukeProgress(user, count);
+  await user.save();
+  const log = logAdminPerkAction('nuke_set_progress', adminUser, user, { count });
+  return { nuke, adminLog: log };
+}
+
+async function adminTriggerNukeEvent(user, opts = {}, adminUser) {
+  const result = adminTriggerNuke(user, opts);
+  await user.save();
+  const log = logAdminPerkAction('nuke_trigger', adminUser, user, opts);
+  return { ...result, adminLog: log };
+}
+
+async function adminEndNukeEvent(user, adminUser) {
+  const result = adminEndNuke(user);
+  await user.save();
+  const log = logAdminPerkAction('nuke_end', adminUser, user);
+  return { ...result, adminLog: log };
+}
+
+async function adminGetNukeState(user) {
+  return { nuke: formatNukeForClient(user) };
+}
+
+async function adminGetNukeStateForUserId(userId) {
+  const User = require('../models/User');
+  const user = await User.findById(userId);
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+  return { userId: String(user._id), nuke: formatNukeForClient(user) };
+}
+
 module.exports = {
   adminResetFreeSpin,
   adminGrantSavvy,
   adminGrantEgg,
   adminClearHistory,
+  adminSetNukeSpinProgress,
+  adminTriggerNukeEvent,
+  adminEndNukeEvent,
+  adminGetNukeState,
+  adminGetNukeStateForUserId,
 };

@@ -1,0 +1,349 @@
+
+/* ---- Perk Machine Nuke Event ---- */
+
+.perk-page--nuke {
+  --nuke-accent: #facc15;
+  --nuke-danger: #ef4444;
+}
+
+.perk-page--nuke .perk-machine-stage {
+  position: relative;
+}
+
+.perk-page--nuke .perk-machine {
+  animation: perk-nuke-shake-soft 4s ease-in-out infinite;
+}
+
+.perk-page--nuke-final60 .perk-machine {
+  animation: perk-nuke-shake-hard 0.35s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perk-page--nuke .perk-machine,
+  .perk-page--nuke-final60 .perk-machine {
+    animation: none;
+  }
+  .perk-nuke-ambient,
+  .perk-nuke-ambient__strobe,
+  .perk-nuke-milestone {
+    animation: none !important;
+  }
+}
+
+@keyframes perk-nuke-shake-soft {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-1px, 0, 0); }
+  75% { transform: translate3d(1px, 0, 0); }
+}
+
+@keyframes perk-nuke-shake-hard {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-3px, 1px, 0); }
+  40% { transform: translate3d(3px, -1px, 0); }
+  60% { transform: translate3d(-2px, -1px, 0); }
+  80% { transform: translate3d(2px, 1px, 0); }
+}
+
+.perk-nuke-hud {
+  margin: 0.65rem 0 0.35rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.55), rgba(69, 10, 10, 0.75));
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.25);
+  text-align: center;
+}
+
+.perk-nuke-hud__banner {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fde68a;
+  font-size: 0.95rem;
+}
+
+.perk-nuke-hud__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  justify-content: center;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fecaca;
+}
+
+.perk-nuke-hud__mult { color: #fbbf24; }
+.perk-nuke-hud__warning { color: #fca5a5; width: 100%; }
+.perk-nuke-hud__timer--dominant {
+  width: 100%;
+  font-size: 1.35rem;
+  color: #fef08a;
+  text-shadow: 0 0 12px rgba(250, 204, 21, 0.65);
+}
+
+.perk-nuke-hud__heat {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.perk-nuke-ambient {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  z-index: 2;
+}
+
+.perk-nuke-ambient__strobe {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.12), transparent 55%);
+  animation: perk-nuke-strobe 2.4s linear infinite;
+}
+
+.perk-nuke-ambient--final60 .perk-nuke-ambient__strobe {
+  animation-duration: 0.8s;
+}
+
+@keyframes perk-nuke-strobe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
+.perk-nuke-activation {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.perk-nuke-activation__content {
+  text-align: center;
+  color: #fef08a;
+  position: relative;
+}
+
+.perk-nuke-activation__line {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: perk-nuke-line-in 0.8s ease forwards;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  margin: 0.35rem 0;
+}
+
+.perk-nuke-activation__line--title {
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  color: #fbbf24;
+}
+
+.perk-nuke-activation__line--subtitle {
+  font-size: clamp(1rem, 2.5vw, 1.35rem);
+}
+
+.perk-nuke-activation__rad {
+  position: absolute;
+  left: 50%;
+  top: -3rem;
+  transform: translateX(-50%);
+  font-size: 3rem;
+  opacity: 0.35;
+}
+
+@keyframes perk-nuke-line-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.perk-nuke-end-sequence {
+  position: fixed;
+  inset: 0;
+  z-index: 1199;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+}
+
+.perk-nuke-end-sequence__flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.45), transparent 70%);
+  animation: perk-nuke-end-flash 0.8s ease-in-out 3;
+}
+
+.perk-nuke-end-sequence__countdown {
+  position: relative;
+  z-index: 2;
+  font-size: clamp(2rem, 8vw, 4rem);
+  font-weight: 900;
+  color: #fef08a;
+  letter-spacing: 0.12em;
+  animation: perk-nuke-end-count 1s ease forwards;
+}
+
+.perk-nuke-end-sequence__overload {
+  position: absolute;
+  bottom: 28%;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #fca5a5;
+  opacity: 0;
+  animation: perk-nuke-end-overload 1.2s ease 0.9s forwards;
+}
+
+.perk-nuke-end-sequence__shockwave {
+  position: absolute;
+  width: 40vmin;
+  height: 40vmin;
+  border-radius: 50%;
+  border: 3px solid rgba(250, 204, 21, 0.8);
+  opacity: 0;
+  animation: perk-nuke-shockwave 1.4s ease 1.6s forwards;
+}
+
+.perk-nuke-end-sequence__impact {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  animation: perk-nuke-impact 0.35s ease 2.2s forwards;
+}
+
+@keyframes perk-nuke-end-flash {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes perk-nuke-end-count {
+  from { transform: scale(1.2); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes perk-nuke-end-overload {
+  to { opacity: 1; }
+}
+
+@keyframes perk-nuke-shockwave {
+  0% { transform: scale(0.2); opacity: 0.9; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+
+@keyframes perk-nuke-impact {
+  0% { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perk-nuke-end-sequence__flash,
+  .perk-nuke-end-sequence__shockwave,
+  .perk-nuke-end-sequence__impact {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+
+.perk-nuke-end {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.88);
+  padding: 1rem;
+}
+
+.perk-nuke-end__card {
+  width: min(420px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: linear-gradient(160deg, #1f2937, #111827);
+  padding: 1.25rem;
+  color: #e5e7eb;
+}
+
+.perk-nuke-end__title {
+  margin: 0;
+  text-align: center;
+  color: #fbbf24;
+  letter-spacing: 0.05em;
+}
+
+.perk-nuke-end__subtitle {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.perk-nuke-end__stats {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.perk-nuke-end__stats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.perk-nuke-end__dismiss {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 0.65rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(90deg, #ca8a04, #eab308);
+  color: #111827;
+}
+
+.perk-nuke-milestone {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: perk-nuke-milestone-flash 2.2s ease forwards;
+}
+
+.perk-nuke-milestone__text {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fde68a;
+  text-shadow: 0 0 16px rgba(250, 204, 21, 0.8);
+  font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+}
+
+.perk-nuke-milestone__glyph {
+  font-size: 2rem;
+  opacity: 0.85;
+}
+
+@keyframes perk-nuke-milestone-flash {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.perk-machine--nuke-mode .perk-machine__sign-savvy,
+.perk-machine--nuke-mode .perk-machine__sign-sub {
+  color: #fca5a5;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.55);
+}
+
+.perk-reward-card__nuke-mult {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fbbf24;
+}

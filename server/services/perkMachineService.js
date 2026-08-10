@@ -60,6 +60,15 @@ const {
   advanceSpinHeat,
 } = require('./spinHeatService');
 const { applySpinHeatToBaseCost } = require('../config/spinHeatConfig');
+const {
+  maybeExpireNukeEvent,
+  captureNukeEligibility,
+  applyNukeMultiplierToReward,
+  recordQualifyingNukeSpin,
+  recordNukeSpinStats,
+  formatNukeForClient,
+  ensureNukeDoc,
+} = require('./perkMachineNukeService');
 
 function ensurePerkMachineDoc(user) {
   if (!user.perkMachine || typeof user.perkMachine !== 'object') {
@@ -86,6 +95,7 @@ function ensurePerkMachineDoc(user) {
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
   if (typeof pm.spinHeatTierIndex !== 'number') pm.spinHeatTierIndex = 0;
   if (pm.spinHeatCooldownUntil === undefined) pm.spinHeatCooldownUntil = null;
+  ensureNukeDoc(pm);
   return pm;
 }
 
@@ -248,6 +258,18 @@ async function getPerkMachineStatusWithEvents(user) {
   }
 
   status.savvySale = savvySale;
+
+  const nukeExpired = maybeExpireNukeEvent(user);
+  if (nukeExpired) {
+    user.markModified('perkMachine');
+    await user.save();
+  }
+  status.nuke = formatNukeForClient(user);
+  if (nukeExpired) {
+    status.nuke.justEnded = true;
+    status.nuke.endSummary = nukeExpired;
+  }
+
   return status;
 }
 
@@ -265,6 +287,8 @@ function rewardToPayload(rewardDef) {
     baseLabel: rewardDef.baseLabel || null,
     baseAmount: rewardDef.baseAmount || null,
     spinMultiplier: rewardDef.spinMultiplier || null,
+    nukeMultiplier: rewardDef.nukeMultiplier || null,
+    nukeBonusSavvy: rewardDef.nukeBonusSavvy || null,
     tooltip: rewardDef.tooltip || null,
     multiplierValue: rewardDef.multiplierValue || null,
     eventKind: rewardDef.eventKind || null,
@@ -554,6 +578,7 @@ async function spinPerkMachine(user, options = {}) {
     const pm = ensurePerkMachineDoc(user);
     pm.lastSpinAt = new Date();
     const spinId = crypto.randomUUID();
+    const nukeSnapshot = captureNukeEligibility(user);
 
     if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
       const spendSource = savvySaleApplied ? 'perk_spin_sale_discount' : 'perk_machine_spin';
@@ -607,6 +632,7 @@ async function spinPerkMachine(user, options = {}) {
     }
     const rewards = [];
     let grantIndex = 0;
+    let totalNukeBonusSavvy = 0;
 
     for (const pick of rawPicks) {
       if (pick.type === MULTIPLIER_TYPE) {
@@ -615,8 +641,16 @@ async function spinPerkMachine(user, options = {}) {
         continue;
       }
 
-      const scaled = multiplierFactor > 1 ? scaleRewardForMultiplier(pick, multiplierFactor) : pick;
-      rewards.push(await applyReward(user, scaled, `${spinId}:${grantIndex}`));
+      let scaled = multiplierFactor > 1 ? scaleRewardForMultiplier(pick, multiplierFactor) : pick;
+      if (nukeSnapshot.active) {
+        const nukeApplied = applyNukeMultiplierToReward(scaled, nukeSnapshot.multiplier);
+        scaled = nukeApplied.reward;
+        totalNukeBonusSavvy += nukeApplied.nukeBonusSavvy || 0;
+      }
+      const granted = await applyReward(user, scaled, `${spinId}:${grantIndex}`);
+      if (scaled.nukeBonusSavvy) granted.nukeBonusSavvy = scaled.nukeBonusSavvy;
+      if (scaled.nukeMultiplier) granted.nukeMultiplier = scaled.nukeMultiplier;
+      rewards.push(granted);
       grantIndex += 1;
     }
 
@@ -677,6 +711,38 @@ async function spinPerkMachine(user, options = {}) {
       spinHeatAdvance = advanceSpinHeat(user);
     }
 
+    const combinedMultiplier =
+      nukeSnapshot.active && multiplierFactor > 1
+        ? multiplierFactor * nukeSnapshot.multiplier
+        : nukeSnapshot.active
+          ? nukeSnapshot.multiplier
+          : multiplierFactor;
+
+    if (nukeSnapshot.active) {
+      const baseSavvyEarned = savvyWon - totalNukeBonusSavvy;
+      const bestSavvy = rewards.reduce(
+        (best, r) => (Number(r.savvyGranted) > best ? Number(r.savvyGranted) : best),
+        0
+      );
+      const bestReward = rewards.find((r) => !r.multiplierRole && Number(r.savvyGranted) === bestSavvy);
+      recordNukeSpinStats(user, {
+        savvyCost: finalCost,
+        baseSavvyEarned,
+        nukeBonusEarned: totalNukeBonusSavvy,
+        combinedMultiplier,
+        bestRewardLabel: bestReward?.label || rewards.find((r) => !r.multiplierRole)?.label || null,
+      });
+    }
+
+    const nukeProgress = recordQualifyingNukeSpin(user, {
+      spinId,
+      mode,
+      savvyCostCharged: finalCost,
+      usedPaid3Token,
+      usedPaid2Token,
+      adminBypass: Boolean(options.adminBypassCost),
+    });
+
     user.markModified('perkMachine');
     await user.save();
 
@@ -691,6 +757,9 @@ async function spinPerkMachine(user, options = {}) {
       resultMessage = `Guaranteed ${usedGuaranteedMultiplier}× applied — every reward multiplied!`;
     } else if (multiplierFactor > 1 && multiplierBreakdown?.expression) {
       resultMessage = `${multiplierFactor}× multiplier activated!`;
+    }
+    if (nukeSnapshot.active && totalNukeBonusSavvy > 0) {
+      resultMessage = `☢ ${nukeSnapshot.multiplier}× NUKE MULTIPLIER — ${resultMessage}`;
     }
 
     const eggsWon = rewards
@@ -728,6 +797,9 @@ async function spinPerkMachine(user, options = {}) {
         isJackpot,
         guaranteed: usedGuaranteedMultiplier || null,
         breakdown: multiplierBreakdown,
+        nukeActive: nukeSnapshot.active,
+        nukeFactor: nukeSnapshot.active ? nukeSnapshot.multiplier : null,
+        combinedFactor: combinedMultiplier > 1 ? combinedMultiplier : null,
       },
       rewards,
       resultMessage,
@@ -750,6 +822,12 @@ async function spinPerkMachine(user, options = {}) {
             ...formatSpinHeatForClient(getSpinHeatState(user)),
             paidMultiplier: heatBeforeSpin.multiplier,
           },
+      nuke: {
+        snapshot: nukeSnapshot,
+        progress: nukeProgress,
+        nukeBonusSavvy: totalNukeBonusSavvy,
+        combinedMultiplier: combinedMultiplier > 1 ? combinedMultiplier : null,
+      },
       status: await getPerkMachineStatusWithEvents(user),
     };
   } catch (err) {

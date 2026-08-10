@@ -565,6 +565,31 @@ export async function adminPerkMachineClearHistory() {
   return data;
 }
 
+export async function adminPerkMachineSetNukeProgress(count) {
+  const { data } = await api.post("/perk-machine/admin/nuke/set-progress", { count });
+  return data;
+}
+
+export async function adminPerkMachineTriggerNuke(opts = {}) {
+  const { data } = await api.post("/perk-machine/admin/nuke/trigger", opts);
+  return data;
+}
+
+export async function adminPerkMachineEndNuke() {
+  const { data } = await api.post("/perk-machine/admin/nuke/end");
+  return data;
+}
+
+export async function adminPerkMachineGetNukeState() {
+  const { data } = await api.get("/perk-machine/admin/nuke-state");
+  return data;
+}
+
+export async function adminPerkMachineGetNukeStateForUser(userId) {
+  const { data } = await api.get(`/perk-machine/admin/nuke/user/${encodeURIComponent(userId)}`);
+  return data;
+}
+
 /** ---- Live beta events (Supply Drops, Scout Support, Savvy Sale) ---- **/
 
 export async function getLiveEventsState() {
