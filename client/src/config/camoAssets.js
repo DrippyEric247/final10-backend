@@ -221,9 +221,10 @@ export const CAMO_ASSET_OVERRIDES = {
   'camo_retail_nuke-streak_tshirt': {
     image: `${CAMO_ASSET_ROOT}/retail/tshirts/camo_nuke_streak_tshirt.jpeg`,
   },
-  /** Nuke Hoodie — private admin/owner preview art (Retail). */
+  /** Nuke Hoodie — official Nuke Collection reference art. */
   'camo_retail_nuke-streak_hoodie': {
-    image: `${CAMO_ASSET_ROOT}/retail/hoodies/camo_nuke_streak_hoodie.jpeg`,
+    image: `${CAMO_ASSET_ROOT}/retail/hoodies/nuke-hoodie.png`,
+    preview: `${CAMO_ASSET_ROOT}/retail/hoodies/nuke-hoodie.png`,
   },
   /** Tiger T-Shirt — full collectible display art (jpeg per art drop). */
   camo_retail_tiger_tshirt: {

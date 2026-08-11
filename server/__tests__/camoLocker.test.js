@@ -14,7 +14,7 @@ const { isKnownCosmeticId } = require('../data/cosmeticIds');
 describe('camo locker catalog', () => {
   test('generates the starter reward slots', () => {
     expect(CAMO_ITEMS).toHaveLength(42);
-    expect(CAMO_ITEMS.filter((i) => i.visibility === 'admin_owner')).toHaveLength(6);
+    expect(CAMO_ITEMS.filter((i) => i.visibility === 'admin_owner')).toHaveLength(5);
     expect(CAMO_CATEGORY_IDS).toEqual([
       'retail',
       'outdoor',
@@ -80,6 +80,23 @@ describe('camo locker catalog', () => {
     expect(toPercent(900, 350)).toBe(100);
     expect(toPercent(-5, 350)).toBe(0);
     expect(toPercent(5, 0)).toBe(100);
+  });
+
+  test('nuke hoodie uses 30-deal streak progress math', () => {
+    const item = getCamoItem('camo_retail_nuke-streak_hoodie');
+    expect(item).toMatchObject({
+      nukeCategoryChallenge: true,
+      threshold: 30,
+      visibility: 'public',
+    });
+
+    const inProgress = evaluateCamoRequirement(item, { nukeChallengeProgress: 12 });
+    expect(inProgress.current).toBe(12);
+    expect(inProgress.target).toBe(30);
+    expect(inProgress.progress).toBe(40);
+
+    const complete = evaluateCamoRequirement(item, { nukeChallengeProgress: 30 });
+    expect(complete.requirementsMet).toBe(true);
   });
 
   test('the first camo in every category is reachable without gates', () => {
@@ -194,7 +211,7 @@ describe('camo locker catalog', () => {
     });
   });
 
-  test('retail hoodie is private nuke streak only', () => {
+  test('retail hoodie is the public nuke collection challenge reward', () => {
     const retailHoodies = CAMO_ITEMS.filter(
       (i) => i.category === 'retail' && i.rewardType === 'hoodie'
     );
@@ -204,8 +221,10 @@ describe('camo locker catalog', () => {
       camo: 'nukeStreak',
       rewardType: 'hoodie',
       order: 7,
-      visibility: 'admin_owner',
+      visibility: 'public',
       grantOnly: true,
+      nukeCategoryChallenge: true,
+      threshold: 30,
     });
   });
 

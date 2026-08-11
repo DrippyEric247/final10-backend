@@ -239,3 +239,38 @@ describe('14 — example calculations', () => {
     expect(applySavvyMultiplier(500, u).totalSavvy).toBe(2650);
   });
 });
+
+describe('Master Collection bonus', () => {
+  beforeEach(() => {
+    isDoublePointsLive.mockReturnValue(false);
+    isTriplePointsLive.mockReturnValue(false);
+  });
+
+  it('adds +0.25× as Master Collection Bonus when mastery savvy bonus is granted', () => {
+    const u = user({
+      subscription: { tier: 'free' },
+      membershipTier: 'free',
+      masterClassifiedProgress: { savvyBonusGranted: true },
+    });
+    const state = resolveSavvyMultiplierState(u);
+    const masterBonus = state.additiveBonuses.find((b) => b.type === 'master_collection');
+    expect(masterBonus).toMatchObject({
+      label: 'Master Collection Bonus',
+      amount: 0.25,
+    });
+    expect(state.coreMultiplier).toBe(1.25);
+  });
+
+  it('respects core multiplier cap with master collection bonus', () => {
+    const u = user({
+      powerMultiplier: 2.5,
+      subscription: { tier: 'pro' },
+      savvyEcosystem: { savvyTrip: true, ezStay: true, aiGo: true },
+      dealStreak: { currentDealStreak: 10 },
+      masterClassifiedProgress: { savvyBonusGranted: true },
+    });
+    const state = resolveSavvyMultiplierState(u);
+    expect(state.capApplied).toBe(true);
+    expect(state.coreMultiplier).toBe(CORE_MULTIPLIER_CAP);
+  });
+});

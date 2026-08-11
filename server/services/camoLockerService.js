@@ -162,7 +162,8 @@ async function grantCamoUnlock(userId, itemId, source = 'camo_locker') {
   const { inv, bp } = await ensureProgressDocuments(userId);
   ensureCamoFields(inv);
   let capture = {};
-  if (isAdminOwnerOnlyItem(itemId)) {
+  const catalogItem = getCamoItem(itemId);
+  if (isAdminOwnerOnlyItem(itemId) || catalogItem?.captureAtUnlock) {
     const metrics = await loadAccountMetrics(user, bp);
     let prestige = 0;
     try {
@@ -273,6 +274,14 @@ async function getCamoLockerForUser(userId) {
   const metrics = await loadAccountMetrics(user, bp);
   const unlockMeta = readCamoUnlockMeta(inv);
   const owned = new Set(inv.unlockedItemIds || []);
+  const { buildDealStreakStatus } = require('./dealStreakService');
+  const dealStreakStatus = buildDealStreakStatus(user);
+  const nukeChallengeProgressByCategory = new Map(
+    (dealStreakStatus.nuke?.challenges || []).map((challenge) => [
+      challenge.category,
+      challenge,
+    ])
+  );
 
   const visibleItems = filterCamoItemsForUser(
     CAMO_ITEMS.filter((item) => !isNukeCamoItemId(item.id)),
@@ -281,9 +290,14 @@ async function getCamoLockerForUser(userId) {
 
   const items = visibleItems.map((item) => {
     const unlocked = owned.has(item.id);
+    const nukeChallenge = item.nukeCategoryChallenge
+      ? nukeChallengeProgressByCategory.get(item.category) || null
+      : null;
     const requirement = evaluateCamoRequirement(item, {
       categoryCount: counters[item.category] || 0,
       metrics,
+      unlocked,
+      nukeChallengeProgress: nukeChallenge?.progress ?? 0,
     });
     const meta = unlockMeta[item.id] || null;
     return {

@@ -440,7 +440,7 @@ function adminTriggerNuke(user, opts = {}) {
   nuke.nukeEventsTriggered = (nuke.nukeEventsTriggered || 0) + 1;
   nuke.lastActivationAt = event.activatedAt;
   user.markModified('perkMachine');
-  return { triggered: true, nuke: formatNukeForClient(user) };
+  return { triggered: true, nuke: formatNukeForClient(user), thresholdReached: true };
 }
 
 /** Admin: end active Nuke immediately. */

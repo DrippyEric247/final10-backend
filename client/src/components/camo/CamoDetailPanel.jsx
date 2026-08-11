@@ -65,13 +65,13 @@ export default function CamoDetailPanel({
       </button>
 
       <div className="f10-camo-detail__grid">
-        <div className={`f10-camo-detail__stage f10-camo-detail__stage--${item.rarity}`}>
+        <div className={`f10-camo-detail__stage f10-camo-detail__stage--${item.rarity} ${item.nukeCollectionItem ? 'f10-camo-detail__stage--nuke' : ''}`}>
           <CamoImage
             src={item.previewImageUrl}
             alt={item.name}
             accentColor={item.accentColor}
             loading="eager"
-            dimmed={!unlocked}
+            dimmed={!unlocked && !item.nukeCollectionItem}
             className="f10-camo-img--hero"
           />
           <span
@@ -80,7 +80,7 @@ export default function CamoDetailPanel({
             }`}
           >
             {unlocked ? (
-              'UNLOCKED'
+              item.nukeCollectionItem ? `${item.name} UNLOCKED` : 'UNLOCKED'
             ) : (
               <>
                 <Lock size={11} strokeWidth={2.5} aria-hidden /> LOCKED
@@ -90,10 +90,20 @@ export default function CamoDetailPanel({
         </div>
 
         <div className="f10-camo-detail__info">
-          <div className="f10-camo-detail__rarity">{item.rarityLabel}</div>
+          {item.collectionTag ? (
+            <div className="f10-camo-detail__collection-tag">{item.collectionTag}</div>
+          ) : (
+            <div className="f10-camo-detail__rarity">{item.rarityLabel}</div>
+          )}
           <h3 className="f10-camo-detail__title">{item.name}</h3>
+          {item.subtitle ? <div className="f10-camo-detail__subtitle">{item.subtitle}</div> : null}
+          {item.rewardScope ? (
+            <div className="f10-camo-detail__scope">{item.rewardScope}</div>
+          ) : null}
           <div className="f10-camo-detail__sub">
-            {item.categoryName} Collection · {item.collectionName}
+            {item.nukeCollectionItem
+              ? `${item.collectionName}${item.rewardScope ? '' : ''}`
+              : `${item.categoryName} Collection · ${item.collectionName}`}
           </div>
 
           {item.privateReward ? (
@@ -104,6 +114,20 @@ export default function CamoDetailPanel({
                 This reward is hidden from public locker views, search, and collection counts until
                 released.
               </p>
+            </div>
+          ) : null}
+
+          {item.associatedRewards?.length ? (
+            <div className="f10-camo-detail__section f10-camo-detail__section--associated">
+              <div className="f10-camo-detail__label">Associated Collectibles</div>
+              <ul className="f10-camo-detail__associated">
+                {item.associatedRewards.map((reward) => (
+                  <li key={reward.slot}>
+                    <strong>{reward.label}</strong>
+                    <span>{reward.note}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
 
@@ -120,7 +144,8 @@ export default function CamoDetailPanel({
                   {item.requirementText}
                   <em>
                     {' '}
-                    ({item.current.toLocaleString()} / {item.target.toLocaleString()})
+                    ({item.current.toLocaleString()} / {item.target.toLocaleString()}
+                    {item.progressLabel ? ` · ${item.progressLabel}` : ''})
                   </em>
                 </span>
               </li>

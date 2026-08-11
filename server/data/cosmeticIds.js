@@ -137,6 +137,9 @@ const CAMO_ITEM_IDS = new Set(require('../config/camoLocker').CAMO_ITEM_IDS);
 const MASTER_CLASSIFIED_ITEM_IDS = new Set(
   require('../config/masterClassifiedCollection').MASTER_CLASSIFIED_ITEM_IDS
 );
+const EGG_KEYCHAIN_ITEM_IDS = new Set(
+  require('../config/eggKeychainCollection').EGG_KEYCHAIN_ITEM_IDS
+);
 
 /** Role-based auto-unlocks (mirrors client adminCosmetics ROLE_AUTO_GRANTS). */
 const ROLE_AUTO_GRANTS = {
@@ -164,7 +167,8 @@ function isKnownCosmeticId(id) {
     TITLE_IDS.has(id) ||
     BATTLE_PASS_S1_COSMETIC_IDS.has(id) ||
     CAMO_ITEM_IDS.has(id) ||
-    MASTER_CLASSIFIED_ITEM_IDS.has(id)
+    MASTER_CLASSIFIED_ITEM_IDS.has(id) ||
+    EGG_KEYCHAIN_ITEM_IDS.has(id)
   );
 }
 
@@ -179,6 +183,7 @@ module.exports = {
   TITLE_IDS,
   BATTLE_PASS_S1_COSMETIC_IDS,
   CAMO_ITEM_IDS,
+  EGG_KEYCHAIN_ITEM_IDS,
   ROLE_AUTO_GRANTS,
   isKnownCosmeticId,
   roleAutoUnlockIds,

@@ -234,6 +234,7 @@ app.use('/api/events', require('./routes/eventsRoutes'));
 app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));
 app.use('/api/eggs', require('./routes/eggExchangeRoutes'));
 app.use('/api/egg-camo', require('./routes/eggCamoRoutes'));
+app.use('/api/egg-keychains', require('./routes/eggKeychainRoutes'));
 app.use('/api/config',      configRoutes);
 app.use('/api/points',      pointsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);

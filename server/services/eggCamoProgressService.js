@@ -173,6 +173,15 @@ async function recordLegitimateEggAcquisition(user, opts = {}) {
     await user.save();
   }
 
+  if (tier === 'mythic') {
+    try {
+      const { evaluateMythicEggKeychainGrant } = require('./eggKeychainService');
+      await evaluateMythicEggKeychainGrant(user, source);
+    } catch (err) {
+      console.error('[egg-keychains] mythic keychain grant failed', err?.message || err);
+    }
+  }
+
   return { newUnlocks, tier, quantity };
 }
 

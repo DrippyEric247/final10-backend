@@ -5,6 +5,13 @@
 const { CAMO_ITEMS } = require('./camoLocker');
 const { NUKE_CATEGORY_CONSECUTIVE_TARGET } = require('./dealStreak');
 
+function getNukeChallengeItemForCategory(categoryId) {
+  const category = String(categoryId || '').trim();
+  const nukeItems = CAMO_ITEMS.filter((item) => item.camo === 'nukeStreak' && item.category === category);
+  if (!nukeItems.length) return null;
+  return nukeItems.find((item) => item.nukeCategoryChallenge) || nukeItems[0];
+}
+
 function buildNukeCategoryChallenges(requiredConsecutiveDeals = NUKE_CATEGORY_CONSECUTIVE_TARGET) {
   const seen = new Set();
   const challenges = [];
@@ -12,18 +19,21 @@ function buildNukeCategoryChallenges(requiredConsecutiveDeals = NUKE_CATEGORY_CO
   for (const item of CAMO_ITEMS) {
     if (item.camo !== 'nukeStreak') continue;
     if (seen.has(item.category)) continue;
+
+    const challengeItem = getNukeChallengeItemForCategory(item.category);
+    if (!challengeItem) continue;
     seen.add(item.category);
 
     challenges.push(
       Object.freeze({
-        id: `${item.category}-nuke`,
-        title: `${item.categoryName} Nuke`,
-        category: item.category,
-        categoryName: item.categoryName,
+        id: `${challengeItem.category}-nuke`,
+        title: challengeItem.name || `${challengeItem.categoryName} Nuke`,
+        category: challengeItem.category,
+        categoryName: challengeItem.categoryName,
         requiredConsecutiveDeals,
         rewardType: 'camo',
-        camoItemId: item.id,
-        camoName: item.name,
+        camoItemId: challengeItem.id,
+        camoName: challengeItem.name,
         icon: '☢️',
       })
     );
@@ -67,6 +77,7 @@ function listNukeCategoryChallengeCategories() {
 module.exports = {
   NUKE_CATEGORY_CHALLENGES,
   buildNukeCategoryChallenges,
+  getNukeChallengeItemForCategory,
   getNukeCategoryChallenge,
   getNukeCategoryChallengeByCategory,
   listNukeCategoryChallengeCategories,

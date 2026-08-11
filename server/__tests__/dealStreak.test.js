@@ -27,6 +27,11 @@ describe('Deal Streak config', () => {
     expect(automotive).toBeTruthy();
     expect(automotive.camoItemId).toBe('camo_automotive_nuke-streak_gloves');
     expect(automotive.requiredConsecutiveDeals).toBe(30);
+
+    const retail = getNukeCategoryChallengeByCategory('retail');
+    expect(retail).toBeTruthy();
+    expect(retail.camoItemId).toBe('camo_retail_nuke-streak_hoodie');
+    expect(retail.camoName).toBe('NUKE HOODIE');
   });
 });
 

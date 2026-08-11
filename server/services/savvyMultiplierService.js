@@ -25,6 +25,7 @@ const {
   ecosystemAdditiveBonus,
   dealStreakAdditiveBonus,
 } = require('../config/savvyMultiplierConfig');
+const { MASTER_SAVVY_BONUS_FRACTION } = require('../config/masterClassifiedCollection');
 
 /** Display cap aligned with power bar. */
 const POWER_MULTIPLIER_CAP = 5.5;
@@ -45,8 +46,12 @@ function ensureDealStreak(user) {
 
 function readPowerMultiplier(user) {
   const base = Math.max(POWER_EARNINGS_FLOOR, Number(user?.powerMultiplier) || 1);
-  const bonus = Math.max(0, Number(user?.powerMultiplierBonus) || 0);
-  return ROUND_MULTIPLIER(Math.min(POWER_MULTIPLIER_CAP, base + bonus));
+  return ROUND_MULTIPLIER(Math.min(POWER_MULTIPLIER_CAP, base));
+}
+
+function readMasterCollectionAdditiveBonus(user) {
+  if (!user?.masterClassifiedProgress?.savvyBonusGranted) return 0;
+  return ROUND_MULTIPLIER(MASTER_SAVVY_BONUS_FRACTION);
 }
 
 function readSubscriptionAdditiveBonus(user) {
@@ -159,6 +164,16 @@ function resolveAdditiveBonuses(user) {
       label: streakInfo.label,
       amount: streakInfo.amount,
       source: `streak_${streakInfo.minStreak}+`,
+    });
+  }
+
+  const masterBonus = readMasterCollectionAdditiveBonus(user);
+  if (masterBonus > 0) {
+    bonuses.push({
+      type: 'master_collection',
+      label: 'Master Collection Bonus',
+      amount: masterBonus,
+      source: 'master_classified_mastery',
     });
   }
 

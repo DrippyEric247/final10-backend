@@ -14,6 +14,7 @@ const {
   MASTER_CLASSIFIED_ITEMS,
   MASTER_CLASSIFIED_ITEM_IDS,
   MASTER_CLASSIFIED_HERO_ASSET,
+  MASTER_CLASSIFIED_TIER,
   MASTER_SAVVY_BONUS_FRACTION,
   MASTER_BONUS_EMBLEM_ID,
   MASTER_BONUS_CALLING_CARD_ID,
@@ -306,13 +307,24 @@ async function getMasterClassifiedForUser(userId) {
   const items = MASTER_CLASSIFIED_ITEMS.map((def) => {
     const unlocked = owned.has(def.id);
     const meta = unlockMeta[def.id] || null;
+    const showAsset = revealRewards || def.previewWhenLocked;
     const base = {
       id: def.id,
       slug: def.slug,
       name: def.name,
       shortName: def.shortName,
       kind: def.kind || 'apparel',
-      assetPath: revealRewards ? def.assetPath : null,
+      assetPath: showAsset ? def.assetPath : null,
+      collection: def.collection || 'classified',
+      tier: def.tier || MASTER_CLASSIFIED_TIER,
+      camo: def.camo || null,
+      camoName: def.camoName || null,
+      tagline: def.tagline || null,
+      earnedNotBought: Boolean(def.earnedNotBought),
+      previewWhenLocked: Boolean(def.previewWhenLocked),
+      showcaseArtwork: Boolean(def.showcaseArtwork),
+      unlockRequirementLabel: def.unlockRequirementLabel || 'CLASSIFIED REQUIREMENT',
+      associatedRewards: def.associatedRewards || null,
       unlocked,
       serialNumber: meta?.serialNumber ?? null,
       unlockedAt: meta?.unlockedAt || null,

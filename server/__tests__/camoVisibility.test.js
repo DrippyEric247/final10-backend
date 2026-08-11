@@ -46,10 +46,11 @@ describe('camo visibility (admin_owner)', () => {
     expect(isAdminOwnerOnlyItem(item)).toBe(true);
   });
 
-  test('nuke hoodie is admin_owner only', () => {
+  test('nuke hoodie is publicly visible', () => {
     const item = CAMO_ITEMS.find((i) => i.id === NUKE_HOODIE_ID);
     expect(item).toBeTruthy();
-    expect(isAdminOwnerOnlyItem(item)).toBe(true);
+    expect(isAdminOwnerOnlyItem(item)).toBe(false);
+    expect(item.nukeCategoryChallenge).toBe(true);
   });
 
   test('normal users cannot view private camo items', () => {
@@ -58,7 +59,7 @@ describe('camo visibility (admin_owner)', () => {
     expect(canViewCamoItem(normal, NUKE_GLOVES_ID)).toBe(false);
     expect(canViewCamoItem(normal, NUKE_SOCKS_ID)).toBe(false);
     expect(canViewCamoItem(normal, NUKE_TSHIRT_ID)).toBe(false);
-    expect(canViewCamoItem(normal, NUKE_HOODIE_ID)).toBe(false);
+    expect(canViewCamoItem(normal, NUKE_HOODIE_ID)).toBe(true);
     expect(canViewCamoItem(normal, NUKE_SHORTS_ID)).toBe(false);
     expect(canViewCamoItem(normal, PUBLIC_ID)).toBe(true);
   });
@@ -85,14 +86,14 @@ describe('camo visibility (admin_owner)', () => {
     const admin = { role: 'admin', email: 'admin@example.com', _id: '507f1f77bcf86cd799439012' };
     const publicItems = filterCamoItemsForUser(CAMO_ITEMS, normal);
     const adminItems = filterCamoItemsForUser(CAMO_ITEMS, admin);
-    expect(publicItems).toHaveLength(36);
+    expect(publicItems).toHaveLength(37);
     expect(adminItems).toHaveLength(42);
     expect(publicItems.filter((i) => i.visibility === 'admin_owner')).toHaveLength(0);
     expect(publicItems.some((i) => i.id === NUKE_MASK_ID)).toBe(false);
     expect(publicItems.some((i) => i.id === NUKE_GLOVES_ID)).toBe(false);
     expect(publicItems.some((i) => i.id === NUKE_SOCKS_ID)).toBe(false);
     expect(publicItems.some((i) => i.id === NUKE_TSHIRT_ID)).toBe(false);
-    expect(publicItems.some((i) => i.id === NUKE_HOODIE_ID)).toBe(false);
+    expect(publicItems.some((i) => i.id === NUKE_HOODIE_ID)).toBe(true);
     expect(publicItems.some((i) => i.id === NUKE_SHORTS_ID)).toBe(false);
     expect(adminItems.some((i) => i.id === NUKE_MASK_ID)).toBe(true);
     expect(adminItems.some((i) => i.id === NUKE_GLOVES_ID)).toBe(true);
@@ -108,6 +109,6 @@ describe('camo visibility (admin_owner)', () => {
       [PUBLIC_ID, NUKE_MASK_ID, NUKE_GLOVES_ID, NUKE_SOCKS_ID, NUKE_TSHIRT_ID, NUKE_HOODIE_ID, NUKE_SHORTS_ID],
       normal
     );
-    expect(filtered).toEqual([PUBLIC_ID]);
+    expect(filtered).toEqual([PUBLIC_ID, NUKE_HOODIE_ID]);
   });
 });

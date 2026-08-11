@@ -296,6 +296,20 @@ const userSchema = new mongoose.Schema({
       },
     },
   },
+  /** Universal Quantum Egg legacy — cross-app Savvy Universe ownership */
+  quantumLegacy: {
+    unlocked: { type: Boolean, default: false },
+    unlockedAt: { type: Date, default: null },
+    discoveredAt: { type: Date, default: null },
+    achievementId: { type: String, default: null },
+    originatingApp: { type: String, default: null },
+    dealStreakAtUnlock: { type: Number, default: null },
+    profileLevelAtUnlock: { type: Number, default: null },
+    prestigeAtUnlock: { type: Number, default: null },
+    pendingReveal: { type: Boolean, default: false },
+    universal: { type: Boolean, default: true },
+    crossApp: { type: Boolean, default: true },
+  },
   /** Recent Max Supply Drop claims for profile/history */
   supplyDropClaimHistory: [
     {

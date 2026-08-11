@@ -111,6 +111,16 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
     [adminPreviewData]
   );
 
+  const previewItems = useMemo(
+    () => items.filter((item) => item.previewWhenLocked && item.imageUrl),
+    [items]
+  );
+
+  const standardItems = useMemo(
+    () => items.filter((item) => !item.previewWhenLocked || revealRewards),
+    [items, revealRewards]
+  );
+
   const artworkAdminPreview = Boolean(artworkItem?.adminPreview);
 
   if (!open) return null;
@@ -356,13 +366,30 @@ export default function ClassifiedCollectionPanel({ open, onClose, lockerSummary
                       </div>
                     </div>
                   ) : !revealRewards ? (
-                    <div className="f10-classified-rewards__classified">
-                      <Lock size={16} aria-hidden />
-                      <p>Complete all six camo families to declassify Master rewards.</p>
-                    </div>
+                    <>
+                      {previewItems.length ? (
+                        <div className="f10-classified-preview-section">
+                          <div className="f10-classified-preview-section__head">CLASSIFIED PREVIEW</div>
+                          <div className="f10-classified-rewards__grid">
+                            {previewItems.map((item) => (
+                              <ClassifiedItemCard
+                                key={item.id}
+                                item={item}
+                                locked={!item.unlocked}
+                                onOpen={openArtwork}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="f10-classified-rewards__classified">
+                        <Lock size={16} aria-hidden />
+                        <p>Complete all six camo families to declassify remaining Master rewards.</p>
+                      </div>
+                    </>
                   ) : (
                     <div className="f10-classified-rewards__grid">
-                      {items.map((item) => (
+                      {standardItems.map((item) => (
                         <ClassifiedItemCard
                           key={item.id}
                           item={item}

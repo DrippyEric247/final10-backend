@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import EggCard from './EggCard';
 import EggHatchModal from './EggHatchModal';
 import EggCamoCollectionModal from '../egg-camo/EggCamoCollectionModal';
+import EggKeychainCollectionModal from '../egg-keychain/EggKeychainCollectionModal';
 import { buildOwnedEggs } from '../../lib/eggHatchery';
 import '../../styles/EggExchange.css';
 
@@ -21,6 +22,7 @@ const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onSpinClick }) {
   const [activeEgg, setActiveEgg] = useState(null);
   const [camoOpen, setCamoOpen] = useState(false);
+  const [keychainOpen, setKeychainOpen] = useState(false);
 
   const ownedEggs = useMemo(() => buildOwnedEggs(eggInventory), [eggInventory]);
 
@@ -38,6 +40,13 @@ export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onS
         <div className="egg-hatchery__camo-entry">
           <button type="button" className="egg-hatchery__camo-btn" onClick={() => setCamoOpen(true)}>
             🎖️ EGG CAMO COLLECTION
+          </button>
+          <button
+            type="button"
+            className="egg-hatchery__camo-btn egg-hatchery__keychain-btn"
+            onClick={() => setKeychainOpen(true)}
+          >
+            🔑 EGG KEYCHAINS
           </button>
         </div>
       </header>
@@ -78,6 +87,7 @@ export default function EggHatchery({ eggInventory, onHatch, onStatusUpdate, onS
       </div>
 
       <EggCamoCollectionModal open={camoOpen} onClose={() => setCamoOpen(false)} />
+      <EggKeychainCollectionModal open={keychainOpen} onClose={() => setKeychainOpen(false)} />
     </section>
   );
 }

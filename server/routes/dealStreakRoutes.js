@@ -1,6 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
-const { getDealStreakStatusForUser, acknowledgeNukeCelebration } = require('../services/dealStreakService');
+const { getDealStreakStatusForUser, acknowledgeNukeCelebration, acknowledgeQuantumReveal } = require('../services/dealStreakService');
 
 const router = express.Router();
 
@@ -29,6 +29,20 @@ router.post('/ack-celebration', auth, async (req, res) => {
     }
     console.error('[deal-streak] ack error:', err?.message || err);
     return res.status(500).json({ ok: false, message: 'Could not acknowledge celebration.' });
+  }
+});
+
+/** POST /api/deal-streak/ack-quantum-reveal — dismiss Quantum discovery modal. */
+router.post('/ack-quantum-reveal', auth, async (req, res) => {
+  try {
+    const status = await acknowledgeQuantumReveal(req.user.id);
+    return res.json({ ok: true, ...status });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ ok: false, code: err.code, message: err.message });
+    }
+    console.error('[deal-streak] quantum ack error:', err?.message || err);
+    return res.status(500).json({ ok: false, message: 'Could not acknowledge Quantum reveal.' });
   }
 });
 

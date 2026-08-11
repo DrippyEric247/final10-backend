@@ -131,6 +131,14 @@ function buildDealStreakStatus(user) {
     contractMilestone: DEAL_STREAK_CONTRACT_MILESTONE,
     minQualifyIntervalMs: DEAL_STREAK_MIN_QUALIFY_INTERVAL_MS,
     recentHistory: (ds.streakHistory || []).slice(0, 12),
+    quantum: (() => {
+      try {
+        const { buildQuantumPublicState } = require('./quantumEggService');
+        return buildQuantumPublicState(user);
+      } catch {
+        return { visible: false, classified: true, pendingReveal: false };
+      }
+    })(),
     nuke: {
       activeCategory: ds.nuke?.activeCategory || null,
       activeStreak: Number(ds.nuke?.activeStreak) || 0,
@@ -144,6 +152,19 @@ function buildDealStreakStatus(user) {
       })),
       pendingCelebration: ds.nuke?.pendingCelebration || null,
     },
+  };
+}
+
+async function acknowledgeQuantumReveal(userId) {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new DealStreakError(404, 'USER_NOT_FOUND', 'User not found.');
+  }
+  const { acknowledgeQuantumReveal: ack } = require('./quantumEggService');
+  const quantum = await ack(user);
+  return {
+    ...buildDealStreakStatus(user),
+    quantum,
   };
 }
 
@@ -306,6 +327,15 @@ async function recordQualifyingDeal(userId, params = {}) {
     ) {
       nukeCompletion = await completeNukeChallenge(user, ds, nukeUpdate.challenge, now);
     }
+
+    if (ds.currentDealStreak >= require('../config/dealStreak').QUANTUM_NUKE_DEAL_STREAK_TARGET) {
+      try {
+        const { evaluateQuantumEggUnlock } = require('./quantumEggService');
+        await evaluateQuantumEggUnlock(user, 'secret_nuke_deal_streak');
+      } catch (err) {
+        console.error('[quantum-egg] unlock evaluation failed', err?.message || err);
+      }
+    }
   }
 
   pushStreakHistory(ds, {
@@ -386,6 +416,7 @@ module.exports = {
   recordQualifyingDeal,
   getDealStreakStatusForUser,
   acknowledgeNukeCelebration,
+  acknowledgeQuantumReveal,
   buildDealStreakStatus,
   ensureDealStreakDoc,
   updateNukeCategoryStreak,

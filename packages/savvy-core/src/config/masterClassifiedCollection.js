@@ -18,7 +18,7 @@ import {
 } from './camoLocker.js';
 
 /** Bump when items, requirements, or bonuses change. */
-export const MASTER_CLASSIFIED_VERSION = 1;
+export const MASTER_CLASSIFIED_VERSION = 2;
 
 /** Internal collection family identifier. */
 export const MASTER_CLASSIFIED_FAMILY = 'master_classified';
@@ -58,6 +58,33 @@ export const MASTER_SAVVY_BONUS_FRACTION = 0.25;
 export const MASTER_BONUS_EMBLEM_ID = 'sigil_master_classified';
 export const MASTER_BONUS_CALLING_CARD_ID = 'card_master_classified';
 export const MASTER_BONUS_LOBBY_ANIM_ID = 'lobby_anim_master_classified';
+
+/** Fusion Weave — combined Master visual treatment (Gold + Diamond + Dark Nebula). */
+export const FUSION_WEAVE_CAMO = Object.freeze({
+  id: 'fusion-weave',
+  name: 'FUSION WEAVE',
+  components: Object.freeze(['Gold', 'Diamond', 'Dark Nebula']),
+});
+
+/** Metadata slots for associated Master collectibles (capture/grant when systems exist). */
+export const MASTER_ASSOCIATED_REWARD_SLOTS = Object.freeze([
+  Object.freeze({ slot: 'master_gloves', label: 'Master Gloves', kind: 'apparel' }),
+  Object.freeze({ slot: 'master_badge', label: 'Master Badge', kind: 'emblem', cosmeticId: MASTER_BONUS_EMBLEM_ID }),
+  Object.freeze({
+    slot: 'master_calling_card',
+    label: 'Master Calling Card',
+    kind: 'calling_card',
+    cosmeticId: MASTER_BONUS_CALLING_CARD_ID,
+  }),
+  Object.freeze({ slot: 'master_outfit', label: 'Exclusive Master Outfit', kind: 'outfit' }),
+  Object.freeze({
+    slot: 'master_lobby_anim',
+    label: 'Unique Lobby Animation',
+    kind: 'lobby_animation',
+    cosmeticId: MASTER_BONUS_LOBBY_ANIM_ID,
+  }),
+  Object.freeze({ slot: 'serialNumber', label: 'Serial Number', kind: 'serial' }),
+]);
 
 export const MASTER_CLASSIFIED_COLLECTION = Object.freeze({
   id: MASTER_CLASSIFIED_FAMILY,
@@ -137,6 +164,16 @@ export const MASTER_CLASSIFIED_ITEMS = Object.freeze([
     name: 'MASTER GLOVES',
     shortName: 'GLOVES',
     assetPath: '/assets/classified/master-gloves.jpeg',
+    collection: 'classified',
+    tier: 'master',
+    camo: FUSION_WEAVE_CAMO.id,
+    camoName: FUSION_WEAVE_CAMO.name,
+    tagline: 'ONE OF ONE. EARNED, NOT BOUGHT.',
+    earnedNotBought: true,
+    previewWhenLocked: true,
+    showcaseArtwork: true,
+    unlockRequirementLabel: 'CLASSIFIED REQUIREMENT',
+    associatedRewards: MASTER_ASSOCIATED_REWARD_SLOTS,
   }),
   Object.freeze({
     id: 'master_classified_shorts',

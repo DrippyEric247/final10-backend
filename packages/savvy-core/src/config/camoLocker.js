@@ -13,7 +13,7 @@
  */
 
 /** Bump when items/thresholds change so clients can bust caches. */
-export const CAMO_CATALOG_VERSION = 15;
+export const CAMO_CATALOG_VERSION = 16;
 
 /** Item/camo visibility tiers — server must enforce; client only mirrors. */
 export const CAMO_VISIBILITY = Object.freeze({
@@ -549,6 +549,70 @@ export const CAMO_CAPTURE_FIELDS = Object.freeze([
   'username',
 ]);
 
+/**
+ * Metadata for associated collectible concepts shown on Nuke Collection reference art.
+ * Wired for capture at unlock — does not auto-grant separate reward types.
+ */
+export const NUKE_HOODIE_ASSOCIATED_REWARDS = Object.freeze([
+  Object.freeze({ slot: 'profileLevel', label: 'Level 99 Icon', note: 'Captured at unlock.' }),
+  Object.freeze({ slot: 'emblemId', label: 'Emblem', note: 'Captured at unlock.' }),
+  Object.freeze({ slot: 'callingCardId', label: 'Calling Card', note: 'Captured at unlock.' }),
+  Object.freeze({ slot: 'serialNumber', label: 'Serial Number', note: 'Unique to you. One of one.' }),
+]);
+
+/**
+ * Per-item catalog overrides keyed by full camo item ID.
+ * Used for public Nuke Collection rewards that differ from their camo tier defaults.
+ */
+export const CAMO_ITEM_OVERRIDES = Object.freeze({
+  'camo_retail_nuke-streak_hoodie': Object.freeze({
+    visibility: CAMO_VISIBILITY.public,
+    grantOnly: true,
+    nukeCategoryChallenge: true,
+    nukeCollectionItem: true,
+    name: 'NUKE HOODIE',
+    subtitle: 'Savvy Specialist',
+    collectionName: 'Nuke Collection',
+    collectionTag: 'NUKE COLLECTION',
+    rewardScope: 'UNIVERSAL REWARD',
+    about:
+      'Universal Savvy ecosystem unlock. Digital ownership only — physical merchandise redemption may follow separately.',
+    associatedRewards: NUKE_HOODIE_ASSOCIATED_REWARDS,
+    captureAtUnlock: CAMO_CAPTURE_FIELDS,
+  }),
+});
+
+function applyCamoItemOverrides(item) {
+  const override = CAMO_ITEM_OVERRIDES[item.id];
+  if (!override) return item;
+
+  const visibility = override.visibility ?? item.visibility;
+  const nukeCategoryChallenge = Boolean(override.nukeCategoryChallenge);
+  const threshold = nukeCategoryChallenge
+    ? override.nukeChallengeTarget ?? 30
+    : override.threshold ?? item.threshold;
+
+  const requirementText = nukeCategoryChallenge
+    ? `Complete a 30-deal streak in ${item.categoryName}.`
+    : override.requirementText ?? item.requirementText;
+
+  const progressLabel = nukeCategoryChallenge ? `${item.categoryName} Deal Streak` : null;
+
+  return Object.freeze({
+    ...item,
+    ...override,
+    visibility,
+    threshold,
+    requirementText,
+    progressLabel,
+    privateReward: visibility === CAMO_VISIBILITY.adminOwner,
+    grantOnly: override.grantOnly ?? item.grantOnly,
+    captureAtUnlock:
+      override.captureAtUnlock ??
+      (visibility === CAMO_VISIBILITY.adminOwner ? CAMO_CAPTURE_FIELDS : item.captureAtUnlock),
+  });
+}
+
 function buildItem(category, camo) {
   const apparel = getApparelType(category.rewardType);
   const rarity = getCamoRarity(camo.rarity);
@@ -591,7 +655,7 @@ function buildItem(category, camo) {
 function buildCategoryItems(category) {
   return getCategoryRewardTypes(category).flatMap((rewardType) =>
     getCategoryCamos(category, rewardType).map((camo) =>
-      buildItem({ ...category, rewardType }, camo)
+      applyCamoItemOverrides(buildItem({ ...category, rewardType }, camo))
     )
   );
 }
@@ -676,6 +740,10 @@ export function toPercent(current, target) {
  * @returns {{current: number, target: number, progress: number, gatesMet: boolean, gateStatus: Array<{label: string, met: boolean, current: number, min: number}>, requirementsMet: boolean}}
  */
 export function evaluateCamoRequirement(item, ctx = {}) {
+  if (item?.nukeCategoryChallenge) {
+    return evaluateNukeChallengeRequirement(item, ctx.nukeChallengeProgress, ctx.unlocked);
+  }
+
   const target = item?.threshold || 0;
   const current = Math.max(0, Number(ctx.categoryCount) || 0);
   const metrics = ctx.metrics || {};
@@ -691,6 +759,26 @@ export function evaluateCamoRequirement(item, ctx = {}) {
     gatesMet,
     gateStatus,
     requirementsMet: current >= target && gatesMet,
+  };
+}
+
+/**
+ * Resolve unlock progress for a Nuke category challenge item (30-deal streak).
+ * @param {CamoItemDefinition} item
+ * @param {number} [nukeChallengeProgress] consecutive deals in the assigned category
+ * @param {boolean} [unlocked]
+ */
+export function evaluateNukeChallengeRequirement(item, nukeChallengeProgress = 0, unlocked = false) {
+  const target = Math.max(1, Number(item?.threshold) || 30);
+  const raw = unlocked ? target : Math.max(0, Number(nukeChallengeProgress) || 0);
+  const current = Math.min(raw, target);
+  return {
+    current,
+    target,
+    progress: toPercent(current, target),
+    gatesMet: true,
+    gateStatus: Object.freeze([]),
+    requirementsMet: unlocked || raw >= target,
   };
 }
 

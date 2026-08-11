@@ -36,9 +36,11 @@ export default function NukeStreakCompleteModal({ open, celebration, onClose }) 
         </div>
         <p className="f10-nuke-complete-modal__sub">WITHOUT BREAKING CATEGORY</p>
         <div className="f10-nuke-complete-modal__unlock">
-          {categoryLabel} NUKE UNLOCKED
+          {celebration.camoName ? `${celebration.camoName} UNLOCKED` : `${categoryLabel} NUKE UNLOCKED`}
         </div>
-        <p className="f10-nuke-complete-modal__camo">{celebration.camoName || celebration.camoItemId}</p>
+        <p className="f10-nuke-complete-modal__camo">
+          {celebration.camoName || celebration.camoItemId}
+        </p>
         <button type="button" className="f10-nuke-complete-modal__close" onClick={onClose}>
           Continue
         </button>

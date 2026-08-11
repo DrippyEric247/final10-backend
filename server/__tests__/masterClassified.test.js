@@ -89,4 +89,26 @@ describe('Master Classified Collection', () => {
       expect(item.assetPath).toMatch(/^\/assets\/classified\//);
     }
   });
+
+  test('master gloves use fusion weave metadata and official artwork path', () => {
+    const gloves = MASTER_CLASSIFIED_ITEMS.find((i) => i.id === 'master_classified_gloves');
+    expect(gloves).toMatchObject({
+      slug: 'master-gloves',
+      name: 'MASTER GLOVES',
+      assetPath: '/assets/classified/master-gloves.jpeg',
+      camo: 'fusion-weave',
+      camoName: 'FUSION WEAVE',
+      previewWhenLocked: true,
+      earnedNotBought: true,
+      unlockRequirementLabel: 'CLASSIFIED REQUIREMENT',
+    });
+  });
+
+  test('master gloves are separate from automotive nuke gloves', () => {
+    const nukeGloves = CAMO_ITEMS.find((i) => i.id === 'camo_automotive_nuke-streak_gloves');
+    expect(nukeGloves).toBeTruthy();
+    expect(nukeGloves.camo).toBe('nukeStreak');
+    expect(MASTER_CLASSIFIED_ITEM_IDS).toContain('master_classified_gloves');
+    expect(MASTER_CLASSIFIED_ITEM_IDS).not.toContain(nukeGloves.id);
+  });
 });

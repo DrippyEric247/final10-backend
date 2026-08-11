@@ -12,6 +12,9 @@ export const DEAL_STREAK_CONTRACT_MILESTONE = 5;
 /** Consecutive same-category deals required for a Nuke camo challenge. */
 export const NUKE_CATEGORY_CONSECUTIVE_TARGET = 30;
 
+/** Secret overall qualifying deal streak for Quantum Egg (NOT category camo). */
+export const QUANTUM_NUKE_DEAL_STREAK_TARGET = 30;
+
 /** Max streak history entries stored on the user document. */
 export const DEAL_STREAK_HISTORY_LIMIT = 100;
 

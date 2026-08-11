@@ -223,19 +223,22 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
     [categories, selectedCategory]
   );
 
-  /** Retail Hoodies admin view merges the public outdoor ladder with the private Nuke Hoodie. */
+  /** Retail Hoodies view merges the public outdoor ladder with the Nuke Hoodie. */
   const categoryDisplayItems = useMemo(() => {
     if (!activeCategory) return [];
     const rewardTypes = getCategoryRewardTypes(activeCategory);
     const rewardType = selectedRewardType || rewardTypes[0] || activeCategory.rewardType;
-    if (activeCategory.id === 'retail' && rewardType === 'hoodie' && nukePreviewAccess) {
-      const outdoorHoodies = items
-        .filter((i) => i.category === 'outdoor' && i.rewardType === 'hoodie')
-        .sort((a, b) => a.order - b.order);
+    if (activeCategory.id === 'retail' && rewardType === 'hoodie') {
       const retailHoodies = activeCategory.items
         .filter((i) => i.rewardType === 'hoodie')
         .sort((a, b) => a.order - b.order);
-      return [...outdoorHoodies, ...retailHoodies];
+      if (nukePreviewAccess) {
+        const outdoorHoodies = items
+          .filter((i) => i.category === 'outdoor' && i.rewardType === 'hoodie')
+          .sort((a, b) => a.order - b.order);
+        return [...outdoorHoodies, ...retailHoodies];
+      }
+      return retailHoodies;
     }
     return activeCategory.items
       .filter((i) => !rewardTypes.length || i.rewardType === rewardType)
@@ -250,9 +253,11 @@ export default function SavvyCamoLocker({ open, onClose, intent }) {
       .map((typeId) => {
         const apparel = getApparelType(typeId);
         const visibleCount =
-          typeId === 'hoodie' && activeCategory.id === 'retail' && nukePreviewAccess
-            ? items.filter((i) => i.category === 'outdoor' && i.rewardType === 'hoodie').length +
-              activeCategory.items.filter((i) => i.rewardType === 'hoodie').length
+          typeId === 'hoodie' && activeCategory.id === 'retail'
+            ? (nukePreviewAccess
+                ? items.filter((i) => i.category === 'outdoor' && i.rewardType === 'hoodie').length +
+                  activeCategory.items.filter((i) => i.rewardType === 'hoodie').length
+                : activeCategory.items.filter((i) => i.rewardType === 'hoodie').length)
             : activeCategory.items.filter((i) => i.rewardType === typeId).length;
         return {
           id: typeId,

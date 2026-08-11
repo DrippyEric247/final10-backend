@@ -1,0 +1,635 @@
+/* Egg Keychain Collection — premium tall reference-sheet artwork */
+
+.f10-egg-keychain-locker {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.f10-egg-keychain-locker__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.f10-egg-keychain-locker__panel {
+  position: relative;
+  width: 100%;
+  max-width: 980px;
+  max-height: min(92vh, 920px);
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(120% 80% at 10% 0%, rgba(168, 85, 247, 0.16), transparent 55%),
+    radial-gradient(90% 60% at 90% 10%, rgba(251, 191, 36, 0.1), transparent 50%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.99));
+  border: 1px solid rgba(168, 85, 247, 0.32);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.45), 0 0 40px rgba(168, 85, 247, 0.14);
+  overflow: hidden;
+}
+
+.f10-egg-keychain-locker__handle {
+  width: 44px;
+  height: 4px;
+  margin: 10px auto 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+  touch-action: none;
+}
+
+.f10-egg-keychain-locker__header {
+  flex: 0 0 auto;
+  padding: 8px 16px 12px;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.18);
+}
+
+.f10-egg-keychain-locker__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.f10-egg-keychain-locker__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #f8fafc;
+}
+
+.f10-egg-keychain-locker__tagline {
+  margin: 6px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #fbbf24;
+  line-height: 1.45;
+}
+
+.f10-egg-keychain-locker__stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.f10-egg-keychain-locker__body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.f10-egg-keychain-locker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.f10-egg-keychain-locker__loading {
+  padding: 32px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.f10-egg-keychain-locker__stream-note {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.f10-egg-keychain-locker__footer {
+  flex: 0 0 auto;
+  padding: 10px 16px 18px;
+  border-top: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.f10-egg-keychain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.35);
+  text-align: left;
+  color: inherit;
+  overflow: hidden;
+}
+
+.f10-egg-keychain-card.is-clickable {
+  cursor: pointer;
+}
+
+.f10-egg-keychain-card.is-clickable:hover {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.f10-egg-keychain-card--quantum {
+  border-color: rgba(251, 191, 36, 0.35);
+  background:
+    radial-gradient(120% 80% at 20% 0%, rgba(168, 85, 247, 0.12), transparent 55%),
+    rgba(0, 0, 0, 0.35);
+}
+
+.f10-egg-keychain-card--classified {
+  border-color: rgba(148, 163, 184, 0.25);
+  cursor: default;
+}
+
+.f10-egg-keychain-card__classified-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  color: #94a3b8;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.98));
+}
+
+.f10-egg-keychain-card__classified-mark span {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+}
+
+.f10-egg-keychain-card__classified-req {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.f10-egg-keychain-card--quantum .f10-egg-keychain-card__rarity {
+  color: #fbbf24;
+}
+
+.f10-egg-keychain-artwork--quantum .f10-egg-keychain-artwork__panel {
+  width: min(100%, 680px);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.f10-egg-keychain-artwork--quantum .f10-egg-keychain-artwork__rarity {
+  color: #fbbf24;
+}
+
+.f10-quantum-reveal-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.f10-quantum-reveal-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+.f10-quantum-reveal-modal__panel {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 24px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(168, 85, 247, 0.25), transparent 60%),
+    linear-gradient(180deg, #0a0a12, #050508);
+  text-align: center;
+  box-shadow: 0 0 60px rgba(168, 85, 247, 0.25);
+}
+
+.f10-quantum-reveal-modal__glitch {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #f87171;
+}
+
+.f10-quantum-reveal-modal__signal {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #c084fc;
+}
+
+.f10-quantum-reveal-modal__title {
+  margin: 16px 0 0;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #fbbf24;
+}
+
+.f10-quantum-reveal-modal__tagline {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #e9d5ff;
+}
+
+.f10-quantum-reveal-modal__tagline--alt {
+  margin-top: 4px;
+}
+
+.f10-quantum-reveal-modal__sub {
+  margin: 14px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.f10-quantum-reveal-modal__close {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(168, 85, 247, 0.2);
+  color: #f8fafc;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.f10-egg-keychain-card--nuke {
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.08);
+}
+
+.f10-egg-keychain-card__thumb--landscape {
+  aspect-ratio: 16 / 10;
+}
+
+.f10-egg-keychain-card--nuke .f10-egg-keychain-card__rarity {
+  color: #c084fc;
+}
+
+.f10-egg-keychain-artwork--nuke .f10-egg-keychain-artwork__panel {
+  width: min(100%, 640px);
+  border-color: rgba(168, 85, 247, 0.45);
+}
+
+.f10-egg-keychain-artwork--nuke .f10-egg-keychain-artwork__rarity {
+  color: #c084fc;
+}
+
+.f10-egg-keychain-artwork__frame--landscape {
+  max-height: min(52vh, 420px);
+}
+
+.f10-egg-keychain-artwork__frame--landscape .f10-egg-keychain-artwork__img {
+  max-height: min(52vh, 420px);
+}
+
+.f10-egg-keychain-artwork__earned-tagline {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fbbf24;
+}
+
+.f10-egg-keychain-artwork__secondary-tagline {
+  margin: 8px 0 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #a855f7;
+  text-align: center;
+}
+
+.f10-egg-keychain-card__thumb {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: #050508;
+  overflow: hidden;
+}
+
+.f10-egg-keychain-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.f10-egg-keychain-card__img.is-preview {
+  opacity: 0.88;
+  filter: saturate(0.92);
+}
+
+.f10-egg-keychain-card__lock,
+.f10-egg-keychain-card__owned {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.f10-egg-keychain-card__lock {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.f10-egg-keychain-card__owned {
+  background: rgba(168, 85, 247, 0.25);
+  color: #e9d5ff;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+}
+
+.f10-egg-keychain-card__zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #f8fafc;
+}
+
+.f10-egg-keychain-card__meta {
+  padding: 0 12px 12px;
+}
+
+.f10-egg-keychain-card__meta h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.f10-egg-keychain-card__rarity {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #a855f7;
+}
+
+.f10-egg-keychain-card__serial {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #fbbf24;
+  letter-spacing: 0.06em;
+}
+
+/* Full artwork modal */
+.f10-egg-keychain-artwork {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+}
+
+.f10-egg-keychain-artwork__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.f10-egg-keychain-artwork__panel {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: min(94vh, 900px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  background: linear-gradient(180deg, #0a0a12 0%, #050508 100%);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.f10-egg-keychain-artwork__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(0, 0, 0, 0.45);
+  color: #f8fafc;
+}
+
+.f10-egg-keychain-artwork__head {
+  padding-right: 40px;
+  margin-bottom: 12px;
+}
+
+.f10-egg-keychain-artwork__collection {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #94a3b8;
+}
+
+.f10-egg-keychain-artwork__head h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+}
+
+.f10-egg-keychain-artwork__rarity {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #a855f7;
+}
+
+.f10-egg-keychain-artwork__locked-badge,
+.f10-egg-keychain-artwork__acquired {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.f10-egg-keychain-artwork__locked-badge {
+  color: #fbbf24;
+}
+
+.f10-egg-keychain-artwork__acquired {
+  color: #c4b5fd;
+}
+
+.f10-egg-keychain-artwork__requirement {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.f10-egg-keychain-artwork__serial {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+}
+
+.f10-egg-keychain-artwork__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  max-height: min(62vh, 640px);
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(251, 191, 36, 0.18);
+}
+
+.f10-egg-keychain-artwork__img {
+  width: 100%;
+  height: auto;
+  max-height: min(62vh, 640px);
+  object-fit: contain;
+  object-position: center;
+}
+
+.f10-egg-keychain-artwork__history {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.f10-egg-keychain-artwork__history h4 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #f8fafc;
+}
+
+.f10-egg-keychain-artwork__history dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 11px;
+}
+
+.f10-egg-keychain-artwork__history dt {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.f10-egg-keychain-artwork__history dd {
+  margin: 0;
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.f10-egg-keychain-artwork__stream {
+  margin: 10px 0 0;
+  font-size: 10px;
+  color: #a855f7;
+  letter-spacing: 0.04em;
+}
+
+.f10-egg-keychain-artwork__preview-note,
+.f10-egg-keychain-artwork__tagline {
+  margin: 12px 0 0;
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.f10-egg-keychain-artwork__tagline {
+  color: #fbbf24;
+  letter-spacing: 0.06em;
+}
+
+.f10-egg-keychain-artwork__done {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.egg-hatchery__keychain-btn {
+  margin-left: 8px;
+}
+
+@media (max-width: 480px) {
+  .f10-egg-keychain-locker__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .f10-egg-keychain-artwork__panel {
+    width: 100%;
+    max-height: 96vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .f10-egg-keychain-artwork__frame {
+    max-height: min(58vh, 560px);
+  }
+
+  .f10-egg-keychain-artwork__img {
+    max-height: min(58vh, 560px);
+  }
+}

@@ -524,6 +524,18 @@ export async function acknowledgeEggCamoCelebrations(camoIds) {
   return data;
 }
 
+/* ---------------- Egg Keychain Collection (premium collectibles) ---------------- */
+
+export async function getEggKeychainCollection() {
+  const { data } = await api.get("/egg-keychains/me");
+  return data;
+}
+
+export async function acknowledgeQuantumReveal() {
+  const { data } = await api.post("/deal-streak/ack-quantum-reveal");
+  return data;
+}
+
 /** Admin Nuke Monitor — summary dashboard cards. */
 export async function getNukeMonitorSummary(params = {}) {
   const { data } = await api.get("/admin/nuke-monitor/summary", { params });

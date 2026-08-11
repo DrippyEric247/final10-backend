@@ -754,6 +754,15 @@ async function spinPerkMachine(user, options = {}) {
     user.markModified('perkMachine');
     await user.save();
 
+    if (nukeProgress?.thresholdReached) {
+      try {
+        const { evaluateNukeEggKeychainGrant } = require('./eggKeychainService');
+        await evaluateNukeEggKeychainGrant(user, 'nuke_event_activation');
+      } catch (err) {
+        console.error('[egg-keychains] nuke keychain grant failed', err?.message || err);
+      }
+    }
+
     const { fireContractTrigger } = require('./contractHooks');
     fireContractTrigger(userId, 'perk_machine_spin');
 

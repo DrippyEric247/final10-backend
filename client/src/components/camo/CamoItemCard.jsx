@@ -40,7 +40,7 @@ export default function CamoItemCard({ item, onOpenDetail, onPreview, showCatego
     <div
       className={`f10-camo-card f10-camo-card--${item.rarity} ${
         unlocked ? 'f10-camo-card--unlocked' : 'f10-camo-card--locked'
-      }`}
+      } ${item.nukeCollectionItem ? 'f10-camo-card--nuke' : ''}`}
       style={{ '--camo-accent': item.accentColor, '--camo-accent-alt': item.accentColorAlt }}
     >
       <button
@@ -53,11 +53,13 @@ export default function CamoItemCard({ item, onOpenDetail, onPreview, showCatego
           src={item.imageUrl}
           alt={item.name}
           accentColor={item.accentColor}
-          dimmed={!unlocked}
+          dimmed={!unlocked && !item.nukeCollectionItem}
         />
 
         {unlocked ? (
-          <span className="f10-camo-card__badge f10-camo-card__badge--unlocked">UNLOCKED</span>
+          <span className="f10-camo-card__badge f10-camo-card__badge--unlocked">
+            {item.nukeCollectionItem ? `${item.name} UNLOCKED` : 'UNLOCKED'}
+          </span>
         ) : (
           <span className="f10-camo-card__badge f10-camo-card__badge--locked">
             <Lock size={11} strokeWidth={2.5} aria-hidden /> LOCKED
@@ -76,11 +78,19 @@ export default function CamoItemCard({ item, onOpenDetail, onPreview, showCatego
       </button>
 
       <div className="f10-camo-card__body">
-        <div className="f10-camo-card__rarity">{item.rarityLabel}</div>
-        <div className="f10-camo-card__name">{item.camoName}</div>
+        {item.collectionTag ? (
+          <div className="f10-camo-card__collection-tag">{item.collectionTag}</div>
+        ) : (
+          <div className="f10-camo-card__rarity">{item.rarityLabel}</div>
+        )}
+        <div className="f10-camo-card__name">{item.name}</div>
+        {item.subtitle ? <div className="f10-camo-card__subtitle">{item.subtitle}</div> : null}
+        {item.rewardScope ? (
+          <div className="f10-camo-card__scope">{item.rewardScope}</div>
+        ) : null}
         <div className="f10-camo-card__type">
-          {showCategory ? `${item.categoryName} · ` : ''}
-          {item.rewardTypeName}
+          {showCategory && !item.nukeCollectionItem ? `${item.categoryName} · ` : ''}
+          {item.nukeCollectionItem ? item.collectionName : item.rewardTypeName}
         </div>
 
         {unlocked ? (
@@ -98,7 +108,7 @@ export default function CamoItemCard({ item, onOpenDetail, onPreview, showCatego
             </div>
             <div className="f10-camo-card__req">
               {item.current.toLocaleString()} / {item.target.toLocaleString()}{' '}
-              {item.categoryName} Deals
+              {item.progressLabel || `${item.categoryName} Deals`}
             </div>
           </>
         )}

@@ -435,6 +435,82 @@
   gap: 11px;
 }
 
+.f10-camo-card--nuke {
+  border-color: color-mix(in srgb, #eab308 45%, transparent);
+  background: linear-gradient(170deg, rgba(234, 179, 8, 0.12), transparent 58%), var(--camo-panel-2);
+}
+
+.f10-camo-card__collection-tag,
+.f10-camo-detail__collection-tag,
+.f10-camo-preview__collection-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #eab308;
+  text-transform: uppercase;
+}
+
+.f10-camo-card__subtitle,
+.f10-camo-detail__subtitle,
+.f10-camo-preview__subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #f8fafc;
+  text-transform: uppercase;
+}
+
+.f10-camo-card__scope,
+.f10-camo-detail__scope {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #cbd5e1;
+  text-transform: uppercase;
+}
+
+.f10-camo-detail__stage--nuke {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(234, 179, 8, 0.16), transparent 55%),
+    radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.12), transparent 45%),
+    var(--camo-panel);
+}
+
+.f10-camo-detail__associated {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.f10-camo-detail__associated li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(234, 179, 8, 0.18);
+}
+
+.f10-camo-detail__associated strong {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #fde68a;
+  text-transform: uppercase;
+}
+
+.f10-camo-detail__associated span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.f10-camo-card--locked.f10-camo-card--nuke .f10-camo-img--dim {
+  opacity: 0.92;
+}
+
 .f10-camo-card {
   display: flex;
   flex-direction: column;

@@ -78,17 +78,24 @@ export default function CamoPreviewModal({ item, onClose, onHowToEarn }) {
         </div>
 
         <div className="f10-camo-preview__info">
-          <div className="f10-camo-preview__rarity">{item.rarityLabel}</div>
+          {item.collectionTag ? (
+            <div className="f10-camo-preview__collection-tag">{item.collectionTag}</div>
+          ) : (
+            <div className="f10-camo-preview__rarity">{item.rarityLabel}</div>
+          )}
           <h3 className="f10-camo-preview__title">{item.name}</h3>
+          {item.subtitle ? <div className="f10-camo-preview__subtitle">{item.subtitle}</div> : null}
           <div className="f10-camo-preview__sub">
-            {item.categoryName} Collection · {item.rewardTypeName}
+            {item.nukeCollectionItem
+              ? `${item.collectionName} · ${item.rewardScope || 'Universal Reward'}`
+              : `${item.categoryName} Collection · ${item.rewardTypeName}`}
           </div>
 
           <div className="f10-camo-preview__progress">
             <div className="f10-camo-preview__progress-head">
               <span>
                 {item.current.toLocaleString()} / {item.target.toLocaleString()}{' '}
-                {item.categoryName} Deals
+                {item.progressLabel || `${item.categoryName} Deals`}
               </span>
               <strong>{item.progress}% Complete</strong>
             </div>

@@ -1,13 +1,20 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, ZoomIn } from 'lucide-react';
+import { Lock, X, ZoomIn } from 'lucide-react';
+import { MASTER_CLASSIFIED_DISPLAY_NAME } from '@savvy/core/config/masterClassifiedCollection';
 
 /**
  * Full poster artwork viewer — object-fit contain, no crop.
  * @param {{ item: object|null, onClose: () => void, adminPreview?: boolean, summary?: object|null, unlockRequirement?: string }} props
  */
-export default function ClassifiedArtworkModal({ item, onClose, adminPreview = false, summary = null, unlockRequirement = '' }) {
+export default function ClassifiedArtworkModal({
+  item,
+  onClose,
+  adminPreview = false,
+  summary = null,
+  unlockRequirement = '',
+}) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.();
@@ -18,10 +25,15 @@ export default function ClassifiedArtworkModal({ item, onClose, adminPreview = f
 
   if (!item?.imageUrl) return null;
 
+  const lockedPreview = !item.unlocked && !adminPreview;
+  const collectionLabel = item.collection === 'classified' ? MASTER_CLASSIFIED_DISPLAY_NAME : item.categoryName;
+
   return createPortal(
     <AnimatePresence>
       <motion.div
-        className={`f10-classified-artwork ${adminPreview ? 'f10-classified-artwork--admin' : ''}`}
+        className={`f10-classified-artwork ${adminPreview ? 'f10-classified-artwork--admin' : ''} ${
+          lockedPreview ? 'f10-classified-artwork--locked-preview' : ''
+        }`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -46,15 +58,32 @@ export default function ClassifiedArtworkModal({ item, onClose, adminPreview = f
             <X size={18} strokeWidth={2.4} />
           </button>
           <div className="f10-classified-artwork__head">
-            <h3>
-              {adminPreview ? `CLASSIFIED MASTER ${item.name}` : item.name}
-            </h3>
+            <div className="f10-classified-artwork__collection">{collectionLabel}</div>
+            <h3>{adminPreview ? `CLASSIFIED MASTER ${item.name}` : item.name}</h3>
+            {item.subtitle || item.tagline ? (
+              <span className="f10-classified-artwork__tagline">{item.subtitle || item.tagline}</span>
+            ) : null}
             {adminPreview ? (
               <>
                 <span className="f10-classified-artwork__admin-kicker">ADMIN PREVIEW ONLY</span>
                 <span className="f10-classified-artwork__admin-status">
                   Collection Status: {item.collectionStatus || (summary?.mastered ? 'MASTERED' : 'LOCKED / NOT EARNED')}
                 </span>
+              </>
+            ) : lockedPreview ? (
+              <>
+                <span className="f10-classified-artwork__camo">{item.camoName || 'FUSION WEAVE'}</span>
+                <span className="f10-classified-artwork__locked-badge">
+                  <Lock size={11} strokeWidth={2.5} aria-hidden /> LOCKED
+                </span>
+                <span className="f10-classified-artwork__requirement">
+                  Requirement: {item.unlockRequirementLabel || 'CLASSIFIED REQUIREMENT'}
+                </span>
+              </>
+            ) : item.unlocked ? (
+              <>
+                <span className="f10-classified-artwork__camo">{item.camoName || 'FUSION WEAVE'} ACQUIRED</span>
+                <span className="f10-classified-artwork__unlocked-badge">{item.name} UNLOCKED</span>
               </>
             ) : (
               <span>Fusion Weave · Gold · Diamond · Dark Nebula</span>
@@ -126,6 +155,9 @@ export default function ClassifiedArtworkModal({ item, onClose, adminPreview = f
               YOUR SERIAL · #{String(item.serialNumber).padStart(4, '0')}
             </div>
           ) : null}
+          {lockedPreview && item.earnedNotBought ? (
+            <p className="f10-classified-artwork__earned-note">Digital unlock only — earned, not bought.</p>
+          ) : null}
           <button type="button" className="f10-camo-btn--ghost f10-classified-artwork__done" onClick={onClose}>
             {adminPreview ? 'CLOSE PREVIEW' : 'CLOSE'}
           </button>
@@ -138,17 +170,26 @@ export default function ClassifiedArtworkModal({ item, onClose, adminPreview = f
 
 /** Compact card thumbnail for reward list. */
 export function ClassifiedItemCard({ item, locked, onOpen }) {
-  const canOpen = Boolean(item?.imageUrl) && !locked;
+  const canPreviewLocked = Boolean(item?.previewWhenLocked && item?.imageUrl);
+  const canOpen = Boolean(item?.imageUrl) && (!locked || canPreviewLocked);
+
   return (
     <button
       type="button"
-      className={`f10-classified-item ${locked ? 'is-locked' : 'is-unlocked'} ${canOpen ? 'is-clickable' : ''}`}
+      className={`f10-classified-item ${locked ? 'is-locked' : 'is-unlocked'} ${
+        canOpen ? 'is-clickable' : ''
+      } ${item?.showcaseArtwork ? 'is-showcase' : ''}`}
       onClick={() => canOpen && onOpen?.(item)}
       disabled={!canOpen}
     >
       <div className="f10-classified-item__thumb">
         {item?.imageUrl ? (
-          <img src={item.imageUrl} alt="" className="f10-classified-item__img" loading="lazy" />
+          <img
+            src={item.imageUrl}
+            alt=""
+            className={`f10-classified-item__img ${locked && canPreviewLocked ? 'is-preview' : ''}`}
+            loading="lazy"
+          />
         ) : (
           <div className="f10-classified-item__classified-mark" aria-hidden>
             ?
@@ -159,15 +200,23 @@ export function ClassifiedItemCard({ item, locked, onOpen }) {
             <ZoomIn size={14} />
           </span>
         ) : null}
+        {locked && canPreviewLocked ? (
+          <span className="f10-classified-item__locked-pill">
+            <Lock size={10} aria-hidden /> LOCKED
+          </span>
+        ) : null}
       </div>
       <div className="f10-classified-item__body">
-        <div className="f10-classified-item__name">{item?.shortName || item?.name}</div>
+        <div className="f10-classified-item__name">{item?.name || item?.shortName}</div>
+        {item?.camoName ? <div className="f10-classified-item__camo">{item.camoName}</div> : null}
         {item?.kind === 'shoe_ticket' && item?.shoeTicketState ? (
           <div className="f10-classified-item__state">{item.shoeTicketState}</div>
         ) : item?.unlocked && item?.serialNumber != null ? (
           <div className="f10-classified-item__serial">#{String(item.serialNumber).padStart(4, '0')}</div>
         ) : locked ? (
-          <div className="f10-classified-item__state">CLASSIFIED</div>
+          <div className="f10-classified-item__state">
+            {item?.unlockRequirementLabel || 'CLASSIFIED'}
+          </div>
         ) : null}
       </div>
     </button>

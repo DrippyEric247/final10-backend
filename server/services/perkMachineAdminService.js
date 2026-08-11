@@ -95,6 +95,14 @@ async function adminSetNukeSpinProgress(user, count, adminUser) {
 async function adminTriggerNukeEvent(user, opts = {}, adminUser) {
   const result = adminTriggerNuke(user, opts);
   await user.save();
+  if (result?.thresholdReached || result?.triggered) {
+    try {
+      const { evaluateNukeEggKeychainGrant } = require('./eggKeychainService');
+      await evaluateNukeEggKeychainGrant(user, 'nuke_event_admin_trigger');
+    } catch (err) {
+      console.error('[egg-keychains] nuke keychain grant failed', err?.message || err);
+    }
+  }
   const log = logAdminPerkAction('nuke_trigger', adminUser, user, opts);
   return { ...result, adminLog: log };
 }

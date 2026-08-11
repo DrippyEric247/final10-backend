@@ -11,7 +11,7 @@ const {
 
 const CAMO_VISIBILITY = Object.freeze({ public: 'public', adminOwner: 'admin_owner' });
 
-const MASTER_CLASSIFIED_VERSION = 1;
+const MASTER_CLASSIFIED_VERSION = 2;
 const MASTER_CLASSIFIED_FAMILY = 'master_classified';
 const MASTER_CLASSIFIED_TIER = 'MASTER';
 const MASTER_CLASSIFIED_DISPLAY_NAME = 'CLASSIFIED COLLECTION';
@@ -108,6 +108,15 @@ const MASTER_CLASSIFIED_ITEMS = Object.freeze([
     name: 'MASTER GLOVES',
     shortName: 'GLOVES',
     assetPath: '/assets/classified/master-gloves.jpeg',
+    collection: 'classified',
+    tier: 'master',
+    camo: 'fusion-weave',
+    camoName: 'FUSION WEAVE',
+    tagline: 'ONE OF ONE. EARNED, NOT BOUGHT.',
+    earnedNotBought: true,
+    previewWhenLocked: true,
+    showcaseArtwork: true,
+    unlockRequirementLabel: 'CLASSIFIED REQUIREMENT',
   }),
   Object.freeze({
     id: 'master_classified_shorts',

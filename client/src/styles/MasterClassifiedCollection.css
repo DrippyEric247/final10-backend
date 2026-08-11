@@ -287,6 +287,10 @@
   opacity: 0.72;
 }
 
+.f10-classified-item.is-showcase.is-locked {
+  opacity: 1;
+}
+
 .f10-classified-item__thumb {
   position: relative;
   border-radius: 8px;
@@ -387,6 +391,99 @@
   font-size: 0.95rem;
   letter-spacing: 0.1em;
   color: var(--classified-gold);
+}
+
+.f10-classified-artwork__collection {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--classified-purple);
+  text-transform: uppercase;
+}
+
+.f10-classified-artwork__tagline,
+.f10-classified-artwork__camo,
+.f10-classified-artwork__requirement,
+.f10-classified-artwork__earned-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.f10-classified-artwork__camo {
+  color: #fde68a;
+  text-transform: uppercase;
+}
+
+.f10-classified-artwork__locked-badge,
+.f10-classified-artwork__unlocked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.f10-classified-artwork__locked-badge {
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.25);
+}
+
+.f10-classified-artwork__unlocked-badge {
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.25);
+}
+
+.f10-classified-preview-section {
+  margin-bottom: 14px;
+}
+
+.f10-classified-preview-section__head {
+  margin-bottom: 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--classified-gold);
+}
+
+.f10-classified-item.is-showcase.is-locked {
+  border-color: rgba(168, 85, 247, 0.45);
+}
+
+.f10-classified-item__img.is-preview {
+  opacity: 0.98;
+}
+
+.f10-classified-item__locked-pill {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #fecaca;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.f10-classified-item__camo {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: #fde68a;
+  text-transform: uppercase;
 }
 
 .f10-classified-artwork__head span {

@@ -7,7 +7,7 @@
  * `packages/savvy-core` asserts parity on every ID and threshold.
  */
 
-const CAMO_CATALOG_VERSION = 15;
+const CAMO_CATALOG_VERSION = 16;
 const CAMO_ID_PREFIX = 'camo';
 
 const CAMO_RARITY_RANKS = Object.freeze({
@@ -110,6 +110,28 @@ const CAMO_GATES = Object.freeze({
   nukeStreak: Object.freeze([]),
 });
 
+const CAMO_ITEM_OVERRIDES = Object.freeze({
+  'camo_retail_nuke-streak_hoodie': Object.freeze({
+    visibility: 'public',
+    grantOnly: true,
+    nukeCategoryChallenge: true,
+    nukeCollectionItem: true,
+    name: 'NUKE HOODIE',
+    threshold: 30,
+    captureAtUnlock: true,
+  }),
+});
+
+function applyCamoItemOverrides(item) {
+  const override = CAMO_ITEM_OVERRIDES[item.id];
+  if (!override) return item;
+  return Object.freeze({
+    ...item,
+    ...override,
+    privateReward: (override.visibility ?? item.visibility) === 'admin_owner',
+  });
+}
+
 function slug(value) {
   return String(value || '')
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
@@ -147,19 +169,21 @@ const CAMO_ITEMS = Object.freeze(
   CAMO_CATEGORIES.flatMap((category) =>
     getCategoryRewardTypes(category).flatMap((rewardType) =>
       getCategoryCamos(category, rewardType).map((camo) =>
-        Object.freeze({
-          id: buildCamoItemId(category.id, camo.id, rewardType),
-          camo: camo.id,
-          category: category.id,
-          rewardType,
-          rarity: camo.rarity,
-          rarityRank: CAMO_RARITY_RANKS[camo.rarity] || 1,
-          order: camo.order,
-          threshold: camo.threshold,
-          gates: CAMO_GATES[camo.id] || Object.freeze([]),
-          visibility: camo.visibility || 'public',
-          grantOnly: Boolean(camo.grantOnly),
-        })
+        applyCamoItemOverrides(
+          Object.freeze({
+            id: buildCamoItemId(category.id, camo.id, rewardType),
+            camo: camo.id,
+            category: category.id,
+            rewardType,
+            rarity: camo.rarity,
+            rarityRank: CAMO_RARITY_RANKS[camo.rarity] || 1,
+            order: camo.order,
+            threshold: camo.threshold,
+            gates: CAMO_GATES[camo.id] || Object.freeze([]),
+            visibility: camo.visibility || 'public',
+            grantOnly: Boolean(camo.grantOnly),
+          })
+        )
       )
     )
   )
@@ -200,6 +224,10 @@ function toPercent(current, target) {
  * @param {{categoryCount?: number, metrics?: Record<string, number>}} ctx
  */
 function evaluateCamoRequirement(item, ctx = {}) {
+  if (item?.nukeCategoryChallenge) {
+    return evaluateNukeChallengeRequirement(item, ctx.nukeChallengeProgress, ctx.unlocked);
+  }
+
   const target = item?.threshold || 0;
   const raw = Math.max(0, Number(ctx.categoryCount) || 0);
   const metrics = ctx.metrics || {};
@@ -215,6 +243,20 @@ function evaluateCamoRequirement(item, ctx = {}) {
     gatesMet,
     gateStatus,
     requirementsMet: raw >= target && gatesMet,
+  };
+}
+
+function evaluateNukeChallengeRequirement(item, nukeChallengeProgress = 0, unlocked = false) {
+  const target = Math.max(1, Number(item?.threshold) || 30);
+  const raw = unlocked ? target : Math.max(0, Number(nukeChallengeProgress) || 0);
+  const current = Math.min(raw, target);
+  return {
+    current,
+    target,
+    progress: toPercent(current, target),
+    gatesMet: true,
+    gateStatus: Object.freeze([]),
+    requirementsMet: unlocked || raw >= target,
   };
 }
 
@@ -234,5 +276,6 @@ module.exports = {
   isValidCamoCategory,
   getCamoItem,
   evaluateCamoRequirement,
+  evaluateNukeChallengeRequirement,
   toPercent,
 };

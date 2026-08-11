@@ -33,6 +33,16 @@
       "require": "./src/config/masterClassifiedCollection.js",
       "default": "./src/config/masterClassifiedCollection.js"
     },
+    "./config/eggKeychainCollection": {
+      "import": "./src/config/eggKeychainCollection.js",
+      "require": "./src/config/eggKeychainCollection.js",
+      "default": "./src/config/eggKeychainCollection.js"
+    },
+    "./config/quantumEgg": {
+      "import": "./src/config/quantumEgg.js",
+      "require": "./src/config/quantumEgg.js",
+      "default": "./src/config/quantumEgg.js"
+    },
     "./config/contracts": {
       "import": "./src/config/contracts/index.js",
       "require": "./src/config/contracts/index.js",
