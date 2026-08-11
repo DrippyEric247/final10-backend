@@ -89,6 +89,7 @@ const userSchema = new mongoose.Schema({
   /** Savvy Perk Machine — spins, egg inventory, tokens */
   perkMachine: {
     lastFreeSpinDay: { type: String, default: null },
+    /** Last completed Perk Machine spin — authoritative for spin cooldown + heat inactivity reset. */
     lastSpinAt: { type: Date, default: null },
     /** Atomic spin lock — cleared after spin completes or TTL expires. */
     spinLockUntil: { type: Date, default: null },

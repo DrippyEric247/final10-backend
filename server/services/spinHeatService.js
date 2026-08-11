@@ -5,6 +5,8 @@ const {
   SPIN_HEAT_MULTIPLIERS,
   SPIN_HEAT_MAX,
   SPIN_HEAT_COOLDOWN_MS,
+  PERK_SPIN_HEAT_RESET_MINUTES,
+  PERK_SPIN_HEAT_RESET_MS,
   applySpinHeatToBaseCost,
 } = require('../config/spinHeatConfig');
 
@@ -13,11 +15,46 @@ function ensureSpinHeatFields(pm) {
   if (pm.spinHeatCooldownUntil === undefined) pm.spinHeatCooldownUntil = null;
 }
 
+function resetSpinHeatToNormal(pm) {
+  pm.spinHeatTierIndex = 0;
+  pm.spinHeatCooldownUntil = null;
+}
+
+function getLastPerkSpinAtMs(pm) {
+  if (!pm?.lastSpinAt) return null;
+  const ts = new Date(pm.lastSpinAt).getTime();
+  return Number.isNaN(ts) ? null : ts;
+}
+
 /**
- * Reset heat to 1x when max-heat cooldown has elapsed.
+ * Reset heat to 1x after PERK_SPIN_HEAT_RESET_MINUTES without a completed Perk Machine spin.
+ * Uses perkMachine.lastSpinAt as the authoritative lastPerkSpinAt timestamp.
  * @returns {boolean} whether a reset was applied
  */
-function maybeResetSpinHeat(user) {
+function maybeResetSpinHeatFromInactivity(user) {
+  const pm = user?.perkMachine;
+  if (!pm) return false;
+  ensureSpinHeatFields(pm);
+
+  const lastSpinAtMs = getLastPerkSpinAtMs(pm);
+  if (lastSpinAtMs == null) return false;
+
+  if (Date.now() - lastSpinAtMs < PERK_SPIN_HEAT_RESET_MS) return false;
+
+  const hasHeatState =
+    (Number(pm.spinHeatTierIndex) || 0) > 0 || pm.spinHeatCooldownUntil != null;
+  if (!hasHeatState) return false;
+
+  resetSpinHeatToNormal(pm);
+  return true;
+}
+
+/**
+ * Reset heat to 1x when max-heat cap cooldown has elapsed (anti-abuse cap behavior).
+ * Separate from inactivity reset — applies while the user may still be actively spinning at 10x.
+ * @returns {boolean} whether a reset was applied
+ */
+function maybeResetSpinHeatFromCapCooldown(user) {
   const pm = user?.perkMachine;
   if (!pm) return false;
   ensureSpinHeatFields(pm);
@@ -26,9 +63,18 @@ function maybeResetSpinHeat(user) {
   const until = new Date(pm.spinHeatCooldownUntil).getTime();
   if (Number.isNaN(until) || Date.now() < until) return false;
 
-  pm.spinHeatTierIndex = 0;
-  pm.spinHeatCooldownUntil = null;
+  resetSpinHeatToNormal(pm);
   return true;
+}
+
+/**
+ * Apply any elapsed inactivity or cap-cooldown resets.
+ * @returns {boolean} whether a reset was applied
+ */
+function maybeResetSpinHeat(user) {
+  const inactivityReset = maybeResetSpinHeatFromInactivity(user);
+  const capReset = maybeResetSpinHeatFromCapCooldown(user);
+  return inactivityReset || capReset;
 }
 
 function getSpinHeatState(user) {
@@ -47,6 +93,13 @@ function getSpinHeatState(user) {
     isMax && cooldownUntil && !Number.isNaN(cooldownUntil.getTime()) && cooldownUntil.getTime() > Date.now();
   const msUntilReset = cooldownActive ? Math.max(0, cooldownUntil.getTime() - Date.now()) : 0;
 
+  const lastSpinAtMs = getLastPerkSpinAtMs(pm);
+  const msSinceLastSpin = lastSpinAtMs != null ? Math.max(0, Date.now() - lastSpinAtMs) : null;
+  const msUntilInactivityReset =
+    lastSpinAtMs != null && multiplier > 1
+      ? Math.max(0, PERK_SPIN_HEAT_RESET_MS - (Date.now() - lastSpinAtMs))
+      : null;
+
   return {
     tierIndex,
     multiplier,
@@ -56,7 +109,19 @@ function getSpinHeatState(user) {
       ? cooldownUntil.toISOString()
       : null,
     msUntilReset,
+    lastPerkSpinAt: lastSpinAtMs != null ? new Date(lastSpinAtMs).toISOString() : null,
+    msSinceLastSpin,
+    inactivityResetMinutes: PERK_SPIN_HEAT_RESET_MINUTES,
+    msUntilInactivityReset,
   };
+}
+
+function formatInactivityResetLabel(minutes) {
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
 }
 
 function formatSpinHeatForClient(state) {
@@ -67,6 +132,11 @@ function formatSpinHeatForClient(state) {
     cooldownActive: state.cooldownActive,
     cooldownUntil: state.cooldownUntil,
     msUntilReset: state.msUntilReset,
+    lastPerkSpinAt: state.lastPerkSpinAt,
+    inactivityResetMinutes: state.inactivityResetMinutes,
+    inactivityHint: `Spin Heat cools back to normal after ${formatInactivityResetLabel(
+      state.inactivityResetMinutes
+    )} without spinning.`,
     label:
       state.isMax && state.cooldownActive
         ? `MAX HEAT — Resets in ${formatHeatCountdown(state.msUntilReset)}`
@@ -131,10 +201,14 @@ function resolveHeatAdjustedSavvyCost(baseSavvy, user) {
 
 module.exports = {
   maybeResetSpinHeat,
+  maybeResetSpinHeatFromInactivity,
+  maybeResetSpinHeatFromCapCooldown,
   getSpinHeatState,
   formatSpinHeatForClient,
   formatHeatCountdown,
   advanceSpinHeat,
   resolveHeatAdjustedSavvyCost,
   ensureSpinHeatFields,
+  resetSpinHeatToNormal,
+  getLastPerkSpinAtMs,
 };

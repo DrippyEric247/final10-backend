@@ -10,6 +10,11 @@ const SPIN_HEAT_MAX = 10;
 /** Cooldown after first reaching max heat — then pricing resets to 1x. */
 const SPIN_HEAT_COOLDOWN_MS = 60 * 60 * 1000;
 
+/** Inactivity window — heat resets to 1x after this many minutes without a completed spin. */
+const PERK_SPIN_HEAT_RESET_MINUTES = 60;
+
+const PERK_SPIN_HEAT_RESET_MS = PERK_SPIN_HEAT_RESET_MINUTES * 60 * 1000;
+
 const SPIN_HEAT_BASE_COSTS = Object.freeze({
   paid_1: 20,
   paid_2: 40,
@@ -37,6 +42,8 @@ module.exports = {
   SPIN_HEAT_MULTIPLIERS,
   SPIN_HEAT_MAX,
   SPIN_HEAT_COOLDOWN_MS,
+  PERK_SPIN_HEAT_RESET_MINUTES,
+  PERK_SPIN_HEAT_RESET_MS,
   SPIN_HEAT_BASE_COSTS,
   getSpinHeatMultiplierForTierIndex,
   applySpinHeatToBaseCost,

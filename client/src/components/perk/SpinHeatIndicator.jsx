@@ -50,6 +50,11 @@ export default function SpinHeatIndicator({ spinHeat, increaseFlash }) {
       {isMax && !cooldownActive ? (
         <span className="perk-spin-heat__note">Maximum heat pricing — spins remain available.</span>
       ) : null}
+      {spinHeat.inactivityHint ? (
+        <span className="perk-spin-heat__note perk-spin-heat__note--inactivity">
+          {spinHeat.inactivityHint}
+        </span>
+      ) : null}
       {increaseFlash?.increased ? (
         <div className="perk-spin-heat__flash" aria-live="assertive">
           <span>SPIN HEAT INCREASED</span>
