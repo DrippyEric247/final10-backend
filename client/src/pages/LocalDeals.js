@@ -19,7 +19,6 @@ import { recordSearchSignal } from '../lib/sellerTrendEngine';
 import { api } from '../lib/api';
 import {
   DEV_SUBSCRIPTION_TOOLS_EVENT,
-  formatTierMultiplierLabel,
   getAdvantageTier,
   getBestMoveBoostedCap,
   getEffectiveSubscriptionTier,
