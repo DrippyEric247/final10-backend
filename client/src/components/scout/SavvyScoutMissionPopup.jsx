@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { SCOUT_MISSION_POPUP_EVENT } from "../../lib/savvyScoutMissions";
 import Final10Slogan from "../branding/Final10Slogan";
 import "../../styles/SavvyScoutMissions.css";
@@ -42,14 +41,9 @@ export default function SavvyScoutMissionPopupHost({ onOpenMissions }) {
         <p className="scout-mission-popup__sub">{popup.scoutLine}</p>
       ) : null}
       <div className="scout-mission-popup__actions">
-        {popup.ctaPath ? (
-          <Link to={popup.ctaPath} className="scout-mission-popup__btn scout-mission-popup__btn--primary">
-            View mission
-          </Link>
-        ) : null}
         <button
           type="button"
-          className="scout-mission-popup__btn"
+          className="scout-mission-popup__btn scout-mission-popup__btn--primary"
           onClick={() => {
             setPopup(null);
             onOpenMissions?.();
