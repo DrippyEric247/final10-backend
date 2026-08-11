@@ -82,9 +82,9 @@ export const POWER_TIERS = [
 export const POWER_UX = {
   /** Native tooltip on the power readout */
   BAR_TOOLTIP:
-    "Do actions → gain Power → climb tiers. Saves, scans, deals, and promos all count.",
+    "Power Multiplier — Battle Pass progress and egg bonuses. Separate from your Savvy earnings multiplier.",
   /** Always-visible one-liner under the bar */
-  BAR_HINT_LINE: "Do actions → gain Power → earn more",
+  BAR_HINT_LINE: "Power Multiplier — climb tiers with activity",
   /** Shown as “1.5x — You're Active” */
   TIER_TAGLINE_BY_KEY: {
     base: "Keep going",

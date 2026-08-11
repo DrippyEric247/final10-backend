@@ -672,6 +672,11 @@ export async function estimateDealRewards(listings = []) {
   return data;
 }
 
+export async function getSavvyMultiplier() {
+  const { data } = await api.get("/savvy/multiplier");
+  return data;
+}
+
 export async function markDealRewardClickout({ listingId, listing = {} }) {
   const { data } = await api.post("/deals/reward-clickout", { listingId, listing });
   return data;

@@ -172,7 +172,7 @@ export default function UniversalBoostProgressBar() {
         tierUpFlash ? " f10-ubp--tier-up" : ""
       }`}
       role="region"
-      aria-label="Final10 Power level and boost multiplier"
+      aria-label="Power Multiplier progress bar"
     >
       {tierUpFlash ? (
         <div className="f10-ubp-tier-burst" aria-hidden />
@@ -183,6 +183,7 @@ export default function UniversalBoostProgressBar() {
         </div>
       ) : null}
       <div className="f10-ubp-stack">
+        <div className="f10-ubp-kicker">Power Multiplier</div>
         <div className="f10-ubp-inner container" title={tooltip}>
           <PowerBar
             currentTier={currentTierValue}

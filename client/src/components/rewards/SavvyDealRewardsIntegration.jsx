@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { computeSavvyReward } from './SavvyRewardBadge';
-import { useFinal10Power } from '../../context/Final10PowerContext';
-import { getDevFeatureTests, isDev } from '../../lib/devOverride';
+import { useSavvyMultiplier } from '../../hooks/useSavvyMultiplier';
 import {
   DEV_SUBSCRIPTION_TOOLS_EVENT,
   getEffectiveSubscriptionTier,
-  getTierMultiplier,
 } from '../../lib/tierMultiplier';
 import {
   buildMockSavvyBreakdown,
@@ -16,6 +14,7 @@ import { applyBetaRewardUnlock, getBetaRewardsActiveLabel } from '../../lib/beta
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import '../../styles/savvy-deal-rewards.css';
 import WhyPickedPanel from '../ai/WhyPickedPanel';
+import SavvyMultiplierBreakdown from '../wallet/SavvyMultiplierBreakdown';
 
 function useTweenTo(target, startVal, durationMs = 640) {
   const safe = Number.isFinite(target) ? Math.max(0, Math.round(target)) : 0;
@@ -44,17 +43,6 @@ function useTweenTo(target, startVal, durationMs = 640) {
   }, [safe, durationMs]);
 
   return v;
-}
-
-function useUserMultiplier() {
-  const { snapshot } = useFinal10Power();
-  const value = Number(snapshot?.currentMultiplier);
-  const powerMult = Number.isFinite(value) && value > 0 ? value : 1;
-  let tierMult = getTierMultiplier();
-  if (isDev && getDevFeatureTests().premiumBadges && getEffectiveSubscriptionTier() === 'free') {
-    tierMult = getTierMultiplier('core');
-  }
-  return Math.max(1, powerMult * tierMult);
 }
 
 function formatSavvy(n) {
@@ -115,7 +103,7 @@ export default function SavvyDealRewardsIntegration({
   const confidenceScore = Number(item.confidenceScore ?? decision?.confidenceScore) || 0;
   const aiConfidence = Number(item.aiConfidence ?? trustResult.aiConfidence) || trustScore;
 
-  const contextMult = useUserMultiplier();
+  const savvyMultiplier = useSavvyMultiplier();
   const listingMult =
     listingMultiplierOverride != null && Number.isFinite(Number(listingMultiplierOverride))
       ? Math.max(0, Number(listingMultiplierOverride))
@@ -160,8 +148,7 @@ export default function SavvyDealRewardsIntegration({
     subscriptionTier,
   ]);
 
-  const effectiveMult =
-    (listingMult ?? contextMult) * (mockModel.ecosystemActive ? mockModel.ecosystemMult : 1);
+  const effectiveMult = listingMult ?? savvyMultiplier.effectiveMultiplier;
 
   const rawReward = useMemo(
     () =>
@@ -227,8 +214,11 @@ export default function SavvyDealRewardsIntegration({
             <span className="sdr-savvy-amt sdr-savvy-amt--beta-est">{formatSavvy(reward.boosted)}</span>
           ) : null}
           {!rewardsLocked && effectiveMult > 1.02 ? (
-            <span className="sdr-mult sdr-mult-shimmer" title="Tier power + ecosystem synergy (mock)">
-              ⚡ {multLabel} BONUS ACTIVE
+            <span
+              className="sdr-mult sdr-mult-shimmer"
+              title="Server-authoritative final Savvy earnings multiplier"
+            >
+              ⚡ {multLabel} FINAL MULTIPLIER
             </span>
           ) : null}
         </div>
@@ -243,13 +233,19 @@ export default function SavvyDealRewardsIntegration({
           </div>
         ) : null}
 
-        {mockModel.ecosystemActive ? (
+        {savvyMultiplier.additiveBonuses?.some((b) => b.type === 'ecosystem') ? (
           <div className="sdr-eco sdr-eco-glow">
             <span className="sdr-eco__icon" aria-hidden>
               🌐
             </span>
             <span className="sdr-eco__text">SAVVY ECOSYSTEM BONUS ACTIVE</span>
-            <span className="sdr-eco__mult">{mockModel.ecosystemMult.toFixed(1)}× multiplier</span>
+            <span className="sdr-eco__mult">
+              +
+              {savvyMultiplier.additiveBonuses
+                .find((b) => b.type === 'ecosystem')
+                ?.amount.toFixed(2)}
+              × to core earnings
+            </span>
           </div>
         ) : null}
       </div>
@@ -329,14 +325,8 @@ export default function SavvyDealRewardsIntegration({
             <span>Trust-adjusted pool</span>
             <span>{mockModel.subtotalAdditive.toLocaleString()} Savvy</span>
           </div>
-          <div className="sdr-breakdown__mults">
-            <span>Active multipliers</span>
-            <span>
-              Power {(listingMult ?? contextMult).toFixed(2)}×
-              {mockModel.ecosystemActive ? ` · Ecosystem ${mockModel.ecosystemMult.toFixed(1)}×` : ''}
-            </span>
-          </div>
-          <div className="sdr-breakdown__note">Mock projection — syncs when rewards API is connected.</div>
+          <SavvyMultiplierBreakdown compact className="sdr-breakdown__mult-panel" />
+          <div className="sdr-breakdown__note">Reward uses the same server multiplier as your wallet and payout.</div>
         </div>
       ) : null}
 

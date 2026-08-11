@@ -55,6 +55,7 @@ const EGG_HATCH_POOLS = Object.freeze({
     { id: 'hatch_bp_tier_skip_1', type: 'bp_tier_skip', quantity: 1, label: 'Battle Pass Tier Skip', icon: '⏭️', rarity: 'legendary', weight: 8 },
   ],
   legendary: [
+    { id: 'hatch_mythic_savvy_3x_5h', type: 'timed_savvy_multiplier', multiplierValue: 3, durationMs: 5 * HOUR, label: 'Mythic 3× Savvy Earnings (5 Hours)', icon: '🌈', rarity: 'mythic', weight: 8 },
     { id: 'hatch_guaranteed_3x', type: 'guaranteed_multiplier', multiplierValue: 3, label: 'Guaranteed 3× Next Spin', icon: '🌟', rarity: 'legendary', weight: 12 },
     { id: 'hatch_double_supply_drop', type: 'supply_drop_double', label: 'Max Supply Drop (Double Value)', icon: '📦', rarity: 'legendary', weight: 10 },
     { id: 'hatch_savvy_sale_1h', type: 'timed_event_token', eventKind: 'savvySale', durationMs: DURATIONS.ONE_HOUR, label: '1-Hour Savvy Sale Token', icon: '🏷️', rarity: 'legendary', weight: 12 },

@@ -26,6 +26,7 @@ import {
   getTierForQuickSnipesBoost,
   setCurrentSubscriptionTier,
 } from '../lib/tierMultiplier';
+import { useSavvyMultiplier } from '../hooks/useSavvyMultiplier';
 import {
   formatBestMoveUsageLine,
   getBestMoveUpgradePrompt,
@@ -205,6 +206,7 @@ const LocalDeals = () => {
   const hasSearchContext = Boolean(query || categoryId);
 
   const subscriptionTier = getEffectiveSubscriptionTier();
+  const { effectiveMultiplier } = useSavvyMultiplier();
   const quickSnipesBoostTier = getTierForQuickSnipesBoost();
   const tierInfo = getAdvantageTier(subscriptionTier);
   const tierLabel = isBetaTester() ? FOUNDING_TESTER_BADGE : tierInfo.label;
@@ -742,7 +744,7 @@ const LocalDeals = () => {
           <div className="mt-3 text-xs text-slate-300">
             <span className="f10-best-move-usage">{formatBestMoveUsageLine(quickSnipesBoostTier)}</span>
             <span className="mx-2 opacity-50">·</span>
-            ⚡ {tierLabel} · {formatTierMultiplierLabel(subscriptionTier)} Savvy
+            ⚡ {tierLabel} · {effectiveMultiplier.toFixed(2)}× Savvy earnings multiplier
           </div>
           {getBestMoveUpgradePrompt(quickSnipesBoostTier) ? (
             <p className="f10-best-move-upgrade-hint">{getBestMoveUpgradePrompt(quickSnipesBoostTier)}</p>

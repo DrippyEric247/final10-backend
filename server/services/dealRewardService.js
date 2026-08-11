@@ -5,13 +5,11 @@
 
 const SavvyRewardLog = require('../models/SavvyRewardLog');
 const DealRewardState = require('../models/DealRewardState');
-const { applyTierEventMultiplier } = require('../lib/pointsEventMultipliers');
-const { normalizeTier } = require('../config/subscriptionPlans');
-const { getTierConfigForUser } = require('./betaTesterService');
 const {
-  isDoublePointsLive,
-  isTriplePointsLive,
-} = require('../services/eventActivationService');
+  applySavvyMultiplier,
+  clearExpiredSavvyBoosts,
+  resolveSavvyMultiplierState,
+} = require('./savvyMultiplierService');
 
 const LOW_TRUST_THRESHOLD = 55;
 const HIGH_TRUST_THRESHOLD = 80;
@@ -45,27 +43,17 @@ function deriveBaseSavvy(listing) {
 }
 
 function readUserPowerMultiplier(user) {
-  const tierCfg = getTierConfigForUser(user);
-  return Math.max(1, Number(tierCfg?.multiplier) || 1);
+  return resolveSavvyMultiplierState(user).effectiveMultiplier;
 }
 
 function readActiveEventMultiplier(user) {
-  const tier = normalizeTier(user?.subscription?.tier || user?.membershipTier || 'free');
-  if (isTriplePointsLive()) {
-    return {
-      eventKey: 'triple_points',
-      eventLabel: 'Triple Points',
-      multiplier: applyTierEventMultiplier(3, tier),
-    };
-  }
-  if (isDoublePointsLive()) {
-    return {
-      eventKey: 'double_points',
-      eventLabel: 'Double Points',
-      multiplier: applyTierEventMultiplier(2, tier),
-    };
-  }
-  return { eventKey: null, eventLabel: null, multiplier: 1 };
+  const state = resolveSavvyMultiplierState(user);
+  const global = state.specialMultipliers.find((s) => s.type === 'global_event');
+  return {
+    eventKey: global?.source || null,
+    eventLabel: global?.label || null,
+    multiplier: global?.multiplier || 1,
+  };
 }
 
 async function readRewardState(userId, listingId) {
@@ -107,6 +95,8 @@ async function estimateDealReward(user, listing) {
     };
   }
 
+  clearExpiredSavvyBoosts(user);
+
   const baseRaw = deriveBaseSavvy(listing);
   const baseSavvy = Math.max(0, Math.round(baseRaw * trustMult));
   if (baseSavvy <= 0) {
@@ -118,12 +108,8 @@ async function estimateDealReward(user, listing) {
     };
   }
 
-  const userMult = readUserPowerMultiplier(user);
-  const event = readActiveEventMultiplier(user);
-  const preEventTotal = Math.round(baseSavvy * userMult);
-  const eventBonus =
-    event.multiplier > 1 ? Math.max(0, Math.round(preEventTotal * (event.multiplier - 1))) : 0;
-  const totalSavvy = preEventTotal + eventBonus;
+  const payout = applySavvyMultiplier(baseSavvy, user);
+  const multiplierState = payout.state;
 
   let state = 'eligible';
   if (user?._id && listingId) {
@@ -132,20 +118,33 @@ async function estimateDealReward(user, listing) {
     else if (tracked === 'pending') state = 'pending';
   }
 
+  const showEventBreakdown =
+    multiplierState.specialMultipliers.length > 0 &&
+    multiplierState.specialCombined > 1;
+
   return {
     listingId,
     state,
     eligible: state !== 'not_eligible',
     trustTier: tier,
     baseSavvy,
-    userMultiplier: userMult,
-    preEventTotal,
-    eventKey: event.eventKey,
-    eventLabel: event.eventLabel,
-    eventMultiplier: event.multiplier,
-    eventBonus,
-    totalSavvy,
-    showEventBreakdown: event.multiplier > 1,
+    userMultiplier: multiplierState.effectiveMultiplier,
+    effectiveMultiplier: multiplierState.effectiveMultiplier,
+    coreMultiplier: multiplierState.coreMultiplier,
+    powerMultiplier: multiplierState.powerMultiplier,
+    additiveBonuses: multiplierState.additiveBonuses,
+    specialMultipliers: multiplierState.specialMultipliers,
+    capApplied: multiplierState.capApplied,
+    preEventTotal: payout.coreSavvy,
+    coreSavvy: payout.coreSavvy,
+    eventKey: multiplierState.eventKey,
+    eventLabel: multiplierState.eventLabel,
+    eventMultiplier: multiplierState.specialCombined,
+    eventBonus: payout.specialBonusSavvy,
+    specialBonusSavvy: payout.specialBonusSavvy,
+    totalSavvy: payout.totalSavvy,
+    multiplierComponents: multiplierState.additiveBonuses,
+    showEventBreakdown,
   };
 }
 

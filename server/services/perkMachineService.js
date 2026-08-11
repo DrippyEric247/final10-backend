@@ -429,6 +429,14 @@ async function applyReward(user, rewardDef, spinId) {
       Math.round(((Number(user.powerMultiplierBonus) || 0) + bonus) * 100) / 100;
     granted.permanentBonus = bonus;
     granted.powerMultiplierBonus = user.powerMultiplierBonus;
+  } else if (rewardDef.type === 'timed_savvy_multiplier') {
+    const { activateMythicSavvyMultiplier } = require('./savvyMultiplierService');
+    const durationMs = Number(rewardDef.durationMs) || 5 * 60 * 60 * 1000;
+    const multiplier = Math.max(1, Number(rewardDef.multiplierValue) || 3);
+    const boost = activateMythicSavvyMultiplier(user, { durationMs, multiplier });
+    granted.savvyEarningsMultiplier = multiplier;
+    granted.savvyEarningsExpiresAt = boost.expiresAt;
+    user.markModified('savvyEarningBoosts');
   } else if (rewardDef.type === 'timed_event_token') {
     const token = {
       id: crypto.randomUUID(),

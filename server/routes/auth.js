@@ -73,6 +73,7 @@ const {
   applyFounderAdminAuthOverride,
 } = require('../lib/founderAdminAccess');
 const { serializeMembershipForClient } = require('../lib/membershipFields');
+const { resolveSavvyMultiplierState } = require('../services/savvyMultiplierService');
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
@@ -162,6 +163,7 @@ function serializeAuthMePayload(user) {
       badge: sub.badge || '',
     },
     savvyPoints: Number(user.savvyPoints || 0),
+    savvyMultiplier: resolveSavvyMultiplierState(user),
     flipBestScoreEver:
       user.flipBestScoreEver != null && Number.isFinite(Number(user.flipBestScoreEver))
         ? Math.round(Number(user.flipBestScoreEver) * 10) / 10
@@ -611,6 +613,11 @@ router.get('/me', authMeLimiter, auth, async (req, res, next) => {
     await ensureFounderAdminRole(user);
     if (user.betaTester || user.foundingAccess) {
       await tryAssignFounderSlot(user);
+    }
+
+    const { clearExpiredSavvyBoosts } = require('../services/savvyMultiplierService');
+    if (clearExpiredSavvyBoosts(user)) {
+      await user.save();
     }
 
     return res.json(serializeAuthMePayload(user));

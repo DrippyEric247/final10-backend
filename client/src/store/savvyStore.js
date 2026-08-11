@@ -12,6 +12,7 @@ import React, {
   useState,
 } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useSavvyMultiplier } from "../hooks/useSavvyMultiplier";
 import { reconcileSavvyBalance } from "../lib/reconcileSavvyBalance";
 import { ApiCoolingDownError } from "../lib/apiRequestGate";
 import {
@@ -164,11 +165,12 @@ export function SavvyPointsProvider({ children }) {
 
   void walletTick;
   const wallet = getWalletSnapshot();
+  const savvyMultiplier = useSavvyMultiplier();
 
-  const multiplier = useMemo(() => {
-    const streak = wallet.streak || 0;
-    return 1 + Math.min(1.45, streak * 0.06);
-  }, [wallet.streak]);
+  const multiplier = useMemo(
+    () => Math.max(1, Number(savvyMultiplier.effectiveMultiplier) || 1),
+    [savvyMultiplier.effectiveMultiplier]
+  );
 
   const savvyPoints = useMemo(() => {
     if (!user) return 0;

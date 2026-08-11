@@ -357,6 +357,20 @@ const userSchema = new mongoose.Schema({
 
   /** Permanent bonus added to the app-wide top multiplier bar (from egg hatches). */
   powerMultiplierBonus: { type: Number, default: 0 },
+  /** Connected Savvy ecosystem apps — drives additive earnings bonus. */
+  savvyEcosystem: {
+    savvyTrip: { type: Boolean, default: false },
+    ezStay: { type: Boolean, default: false },
+    aiGo: { type: Boolean, default: false },
+  },
+  /** Timed Savvy earnings boosts (Mythic 3×, etc.) — server authoritative. */
+  savvyEarningBoosts: {
+    mythic3x: {
+      multiplier: { type: Number },
+      activatedAt: { type: Date },
+      expiresAt: { type: Date },
+    },
+  },
 
   // ---- referrals ----
   referralCode: { type: String, unique: true },                 // the code they share (we set to their _id as string)

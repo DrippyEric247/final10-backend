@@ -15,6 +15,7 @@ import { openContractsHub } from "../../lib/contractsBus";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { SCOUT_COPY } from "../../config/savvyScoutBranding";
 import ActiveBoostsBar from "../inventory/ActiveBoostsBar";
+import SavvyMultiplierBreakdown from "./SavvyMultiplierBreakdown";
 import { useActiveBoosts } from "../../hooks/useActiveBoosts";
 import "../../styles/SavvyWalletBubble.css";
 
@@ -216,9 +217,10 @@ function WalletBody({
               transition={{ duration: 0.2, delay: 0.09 }}
             >
               <div className="savvy-wallet-meta-row">
-                <span className="savvy-wallet-meta-k">Multiplier</span>
+                <span className="savvy-wallet-meta-k">Final multiplier</span>
                 <span className={`savvy-wallet-meta-v ${multFlash ? "is-hot" : ""}`}>{multLabel}</span>
               </div>
+              <SavvyMultiplierBreakdown compact className="savvy-wallet-mult-breakdown" />
               <div className="savvy-wallet-meta-row">
                 <span className="savvy-wallet-meta-k">Streak</span>
                 <span className="savvy-wallet-meta-v">
@@ -733,7 +735,7 @@ export default function SavvyWalletBubble() {
 
             <div className="savvy-wallet-meta">
               <div className="savvy-wallet-meta-row">
-                <span className="savvy-wallet-meta-k">Multiplier</span>
+                <span className="savvy-wallet-meta-k">Savvy multiplier</span>
                 <span className={`savvy-wallet-meta-v ${multFlash ? "is-hot" : ""}`}>{multLabel}</span>
               </div>
               <motion.div

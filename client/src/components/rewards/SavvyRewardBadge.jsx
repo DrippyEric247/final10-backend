@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SavvyPointsIcon } from "./SavvyPointsIcon";
-import { useFinal10Power } from "../../context/Final10PowerContext";
-import { getDevFeatureTests, isDev } from "../../lib/devOverride";
-import { getEffectiveSubscriptionTier, getTierMultiplier } from "../../lib/tierMultiplier";
+import { useSavvyMultiplier } from "../../hooks/useSavvyMultiplier";
 import {
   applyBetaRewardUnlock,
   getBetaRewardsActiveLabel,
@@ -163,19 +161,11 @@ function useTweenedNumber(target, durationMs = 520) {
 }
 
 /**
- * Read the user's active Savvy multiplier from the global Final10 Power
- * context. Falls back to `1` (no boost) when the context isn't mounted —
- * lets the badge keep working in isolated stories/tests.
+ * Read the user's authoritative Savvy earnings multiplier from the server.
  */
 function useUserMultiplier() {
-  const { snapshot } = useFinal10Power();
-  const value = Number(snapshot?.currentMultiplier);
-  const powerMult = Number.isFinite(value) && value > 0 ? value : 1;
-  let tierMult = getTierMultiplier();
-  if (isDev && getDevFeatureTests().premiumBadges && getEffectiveSubscriptionTier() === "free") {
-    tierMult = getTierMultiplier("core");
-  }
-  return Math.max(1, powerMult * tierMult);
+  const { effectiveMultiplier } = useSavvyMultiplier();
+  return Math.max(1, Number(effectiveMultiplier) || 1);
 }
 
 /**
