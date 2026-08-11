@@ -3,9 +3,17 @@ const BetaCommunityVote = require('../models/BetaCommunityVote');
 const BetaCommunityReview = require('../models/BetaCommunityReview');
 const BetaCommunityMembershipFeedback = require('../models/BetaCommunityMembershipFeedback');
 const User = require('../models/User');
+const SavvyTransaction = require('../models/SavvyTransaction');
 const { isBetaMode } = require('../config/betaMode');
 const { grantSavvyReward } = require('./savvyRewardService');
 const { utcDayKey } = require('../config/savvyRewards');
+const {
+  FEATURE_VOTE_REWARD_TYPE,
+  FEATURE_VOTE_REWARD_SOURCE,
+  featureVoteIdempotencyKey,
+  legacyFeatureVoteIdempotencyKey,
+  resolveFeatureVoteRewardSavvy,
+} = require('../config/featureVoting');
 
 const DEFAULT_TOPICS = [
   { id: 'quick_snipes_improvements', label: 'Quick Snipes Improvements', emoji: '⚡', active: true, sortOrder: 1 },
@@ -119,7 +127,10 @@ async function getPublicSnapshot(userId = null) {
 
   return {
     betaMode: isBetaMode(),
-    rewards: config.rewards || {},
+    rewards: {
+      ...(config.rewards?.toObject?.() || config.rewards || {}),
+      voteSavvy: resolveFeatureVoteRewardSavvy(config.rewards),
+    },
     scoutLines: config.scoutLines || [],
     topics,
     shippedItems,
@@ -155,26 +166,63 @@ async function castVote(user, topicId) {
     return { ok: false, code: 'ALREADY_VOTED', message: 'You already voted on this topic.' };
   }
 
-  await BetaCommunityVote.create({ userId: user._id, topicId });
-
-  const voteSavvy = Math.max(0, Math.round(Number(config.rewards?.voteSavvy) || 15));
-  let reward = null;
-  if (voteSavvy > 0) {
-    reward = await grantSavvyReward(user, {
-      rewardType: 'beta_community_vote',
-      amount: voteSavvy,
-      idempotencyKey: `beta_community_vote:${user._id}:${topicId}`,
-      note: `Community vote: ${topic.label}`,
-      meta: { topicId },
-    });
+  try {
+    await BetaCommunityVote.create({ userId: user._id, topicId });
+  } catch (err) {
+    if (err?.code === 11000) {
+      return { ok: false, code: 'ALREADY_VOTED', message: 'You already voted on this topic.' };
+    }
+    throw err;
   }
 
+  const voteSavvy = resolveFeatureVoteRewardSavvy(config.rewards);
+  let reward = null;
+
+  try {
+    if (voteSavvy > 0) {
+      reward = await grantSavvyReward(user, {
+        rewardType: FEATURE_VOTE_REWARD_TYPE,
+        amount: voteSavvy,
+        baseAmount: voteSavvy,
+        multiplier: 1,
+        idempotencyKey: featureVoteIdempotencyKey(user._id, topicId),
+        note: 'Feature Vote',
+        meta: {
+          topicId,
+          topicTitle: topic.label,
+          source: FEATURE_VOTE_REWARD_SOURCE,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      if (!reward?.granted && !reward?.duplicate) {
+        await BetaCommunityVote.deleteOne({ userId: user._id, topicId });
+        return {
+          ok: false,
+          code: 'REWARD_FAILED',
+          message: 'Your vote could not be rewarded. Please try again.',
+        };
+      }
+    }
+  } catch (err) {
+    await BetaCommunityVote.deleteOne({ userId: user._id, topicId });
+    throw err;
+  }
+
+  const freshUser = await User.findById(user._id).select('savvyPoints pointsBalance').lean();
+  const savvyBalance = Math.round(
+    Number(reward?.newBalance ?? freshUser?.savvyPoints ?? user.savvyPoints) || 0
+  );
+
   const snapshot = await getPublicSnapshot(user._id);
+  const rewardGranted = Boolean(reward?.granted || reward?.duplicate);
+
   return {
     ok: true,
-    reward: reward?.granted
-      ? { amount: voteSavvy, newBalance: reward.newBalance }
+    reward: rewardGranted && voteSavvy > 0
+      ? { amount: voteSavvy, newBalance: savvyBalance, granted: Boolean(reward?.granted) }
       : null,
+    savvyBalance,
     snapshot,
   };
 }
@@ -346,6 +394,41 @@ async function listMembershipFeedback(opts = {}) {
   return listSectionFeedback({ ...opts, section: 'membership' });
 }
 
+/**
+ * Find votes recorded without a matching feature-vote Savvy transaction (current or legacy key).
+ * Safe one-time reconciliation candidate — does not grant automatically.
+ */
+async function findUnrewardedFeatureVotes({ limit = 500 } = {}) {
+  const cap = Math.min(2000, Math.max(1, Number(limit) || 500));
+  const votes = await BetaCommunityVote.find({})
+    .sort({ createdAt: 1 })
+    .limit(cap)
+    .lean();
+
+  const unrewarded = [];
+  for (const vote of votes) {
+    const keys = [
+      featureVoteIdempotencyKey(vote.userId, vote.topicId),
+      legacyFeatureVoteIdempotencyKey(vote.userId, vote.topicId),
+    ];
+    const txn = await SavvyTransaction.findOne({
+      idempotencyKey: { $in: keys },
+      status: 'completed',
+      amount: { $gt: 0 },
+    })
+      .select('_id')
+      .lean();
+    if (!txn) {
+      unrewarded.push({
+        userId: String(vote.userId),
+        topicId: vote.topicId,
+        votedAt: vote.createdAt,
+      });
+    }
+  }
+  return unrewarded;
+}
+
 module.exports = {
   getOrSeedConfig,
   getPublicSnapshot,
@@ -357,6 +440,7 @@ module.exports = {
   listSectionFeedback,
   adminUpdateConfig,
   adminAddTopic,
+  findUnrewardedFeatureVotes,
   DEFAULT_TOPICS,
   DEFAULT_SHIPPED,
 };

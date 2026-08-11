@@ -53,6 +53,11 @@
       "require": "./src/config/scoutBranding.js",
       "default": "./src/config/scoutBranding.js"
     },
+    "./config/featureVoting": {
+      "import": "./src/config/featureVoting.js",
+      "require": "./src/config/featureVoting.js",
+      "default": "./src/config/featureVoting.js"
+    },
     "./events/universeEvents": {
       "import": "./src/events/universeEvents.js",
       "require": "./src/events/universeEvents.js",

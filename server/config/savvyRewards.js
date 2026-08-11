@@ -14,6 +14,7 @@ const SAVVY_REWARD_TYPES = Object.freeze({
   SCOUT_FLIGHT_TOURNAMENT: 'scout_flight_tournament',
   SCOUT_FLIGHT_CHAMPIONSHIP: 'scout_flight_championship',
   SCOUT_FLIGHT_NUKE: 'scout_flight_nuke',
+  FEATURE_VOTE: 'feature_vote_reward',
 });
 
 const REWARDS = Object.freeze({

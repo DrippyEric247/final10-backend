@@ -46,6 +46,7 @@ const TX_LABELS = {
   watch_item: "Watch Item",
   daily_login: "Daily Login",
   scout_mission: "Scout Mission",
+  feature_vote_reward: "Feature Vote",
   generic: "Reward",
 };
 

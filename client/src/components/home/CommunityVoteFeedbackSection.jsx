@@ -7,6 +7,8 @@ import {
   submitBetaCommunityReview,
 } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { syncFeatureVoteRewardFromResponse } from '../../lib/featureVoteRewardSync';
+import { FEATURE_VOTE_REWARD_SAVVY } from '@savvy/core/config/featureVoting';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import { SavvyPointsIcon } from '../rewards/SavvyPointsIcon';
 import '../../styles/CommunityVoteFeedback.css';
@@ -15,7 +17,7 @@ const SCOUT_IMG = '/assets/perk-machine/savvy-scout-alive.png';
 
 const FALLBACK_SNAPSHOT = {
   betaMode: true,
-  rewards: { voteSavvy: 15, reviewSavvy: 25 },
+  rewards: { voteSavvy: FEATURE_VOTE_REWARD_SAVVY, reviewSavvy: 25 },
   scoutLines: [
     'Operator, every vote helps improve the Savvy Universe.',
     'Your feedback today builds tomorrow\'s features.',
@@ -88,7 +90,7 @@ function StarRating({ value, onChange, disabled }) {
 }
 
 export default function CommunityVoteFeedbackSection() {
-  const { user } = useAuth();
+  const { user, patchUser } = useAuth();
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [scoutIdx, setScoutIdx] = useState(0);
@@ -140,8 +142,11 @@ export default function CommunityVoteFeedbackSection() {
       const res = await castBetaCommunityVote(topicId);
       if (res?.snapshot) setSnapshot(res.snapshot);
       else await load();
+
+      const currentBalance = Math.max(0, Math.round(Number(user?.savvyPoints) || 0));
       if (res?.reward?.amount) {
-        setStatus(`Vote recorded! +${res.reward.amount} Savvy added to your wallet.`);
+        syncFeatureVoteRewardFromResponse(patchUser, res, currentBalance);
+        setStatus(`Vote cast — +${res.reward.amount} Savvy earned`);
       } else {
         setStatus('Vote recorded — thanks for shaping Final10!');
       }
@@ -194,7 +199,7 @@ export default function CommunityVoteFeedbackSection() {
   }
 
   const reviewedToday = Boolean(data.user?.reviewedToday);
-  const voteReward = data.rewards?.voteSavvy ?? 15;
+  const voteReward = data.rewards?.voteSavvy ?? FEATURE_VOTE_REWARD_SAVVY;
   const reviewReward = data.rewards?.reviewSavvy ?? 25;
 
   return (
