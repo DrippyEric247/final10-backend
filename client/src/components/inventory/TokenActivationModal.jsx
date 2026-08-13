@@ -1,4 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  INVENTORY_USE_MODAL_Z_INDEX,
+  lockPageScrollForInventoryModal,
+  unlockPageScrollForInventoryModal,
+} from '../../lib/inventoryUseFlow';
 import '../../styles/InventoryTokens.css';
 
 export default function TokenActivationModal({
@@ -7,17 +13,40 @@ export default function TokenActivationModal({
   count = 0,
   activating = false,
   isActive = false,
+  confirmButtonLabel,
   onConfirm,
   onCancel,
 }) {
+  useEffect(() => {
+    if (!open) return undefined;
+
+    lockPageScrollForInventoryModal();
+
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !activating) onCancel?.();
+    };
+    window.addEventListener('keydown', onKey, true);
+
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      unlockPageScrollForInventoryModal();
+    };
+  }, [open, activating, onCancel]);
+
   if (!open || !def) return null;
 
-  return (
+  const primaryLabel =
+    confirmButtonLabel ||
+    def.confirmButtonLabel ||
+    (activating ? 'Activating…' : isActive ? 'Extend +30m' : 'Activate Token');
+
+  const modal = (
     <div
       className="f10-token-modal"
       role="dialog"
       aria-modal="true"
       aria-label={def.confirmTitle}
+      style={{ zIndex: INVENTORY_USE_MODAL_Z_INDEX }}
       onClick={() => !activating && onCancel?.()}
     >
       <div className="f10-token-modal__card" onClick={(e) => e.stopPropagation()}>
@@ -26,7 +55,9 @@ export default function TokenActivationModal({
         </div>
         <h3 className="f10-token-modal__title">{def.confirmTitle}</h3>
         <p className="f10-token-modal__body">{def.confirmBody}</p>
-        <p className="f10-token-modal__count">You have {count} available.</p>
+        {count > 0 ? (
+          <p className="f10-token-modal__count">You have {count} available.</p>
+        ) : null}
         {isActive ? (
           <p className="f10-token-modal__extend">Using another extends the timer by 30 minutes.</p>
         ) : null}
@@ -42,13 +73,16 @@ export default function TokenActivationModal({
           <button
             type="button"
             className="f10-token-modal__btn f10-token-modal__btn--primary"
-            disabled={activating || count < 1}
+            disabled={activating || (def.requiresStock !== false && count < 1)}
             onClick={onConfirm}
           >
-            {activating ? 'Activating…' : isActive ? 'Extend +30m' : 'Activate Token'}
+            {primaryLabel}
           </button>
         </div>
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return modal;
+  return createPortal(modal, document.body);
 }

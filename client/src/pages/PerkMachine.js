@@ -57,8 +57,14 @@ import { SavvySalePerkBadge } from '../components/events/SavvySaleBanner';
 import TokenActivationModal from '../components/inventory/TokenActivationModal';
 import {
   INVENTORY_TOKEN_DEFS,
+  INVENTORY_USE_KIND,
+  buildHatchEventUseConfirmation,
+  buildMaxSupplyDropUseConfirmation,
+  buildTierSkipUseConfirmation,
+  buildTokenUseConfirmation,
   isBoostActiveForDef,
 } from '../lib/inventoryTokens';
+import { beginInventoryUseConfirmation } from '../lib/inventoryUseFlow';
 import { celebrateBattlePassXp, emitProgressionCelebration } from '../lib/progressionCelebrationBus';
 import {
   createActivationIdempotencyKey,
@@ -173,7 +179,7 @@ function formatRemaining(ms) {
 }
 
 /** Panel for hatch-earned usable rewards: timed tokens, supply drops, tier skips. */
-function HatchRewardsInventory({ status, onActivateEvent, onMaxSupplyDrop, onTierSkip, busy }) {
+function HatchRewardsInventory({ status, onRequestUse, busy }) {
   const tokens = status?.tokens || {};
   const timedTokens = Array.isArray(status?.timedEventTokens) ? status.timedEventTokens : [];
   const activeEvents = Array.isArray(status?.personalEvents) ? status.personalEvents : [];
@@ -226,7 +232,7 @@ function HatchRewardsInventory({ status, onActivateEvent, onMaxSupplyDrop, onTie
               type="button"
               className="perk-hatch-inv__use"
               disabled={busy}
-              onClick={() => void onActivateEvent(t.id)}
+              onClick={() => onRequestUse?.(buildHatchEventUseConfirmation(t))}
             >
               Activate
             </button>
@@ -244,7 +250,7 @@ function HatchRewardsInventory({ status, onActivateEvent, onMaxSupplyDrop, onTie
               type="button"
               className="perk-hatch-inv__use"
               disabled={busy}
-              onClick={() => void onMaxSupplyDrop()}
+              onClick={() => onRequestUse?.(buildMaxSupplyDropUseConfirmation(maxSupplyDrop))}
             >
               Deploy
             </button>
@@ -259,7 +265,7 @@ function HatchRewardsInventory({ status, onActivateEvent, onMaxSupplyDrop, onTie
               type="button"
               className="perk-hatch-inv__use"
               disabled={busy}
-              onClick={() => void onTierSkip()}
+              onClick={() => onRequestUse?.(buildTierSkipUseConfirmation(tierSkips))}
             >
               Skip Tier
             </button>
@@ -824,6 +830,10 @@ export default function PerkMachine() {
 
   const tokenActivating = Boolean(activatingKey);
 
+  const openInventoryConfirmation = useCallback((item) => {
+    beginInventoryUseConfirmation(setActivationItem, item);
+  }, []);
+
   const handleActivate = useCallback(
     async (def) => {
       if (!def || activatingKey) return;
@@ -909,50 +919,66 @@ export default function PerkMachine() {
     [patchUser]
   );
 
-  const handleActivateEvent = useCallback(
-    async (tokenId) => {
-      if (activating) return;
+  const handleConfirmActivation = useCallback(async () => {
+    const item = activationItem;
+    if (!item || tokenActivating || activating) return;
+
+    const closeModal = () => setActivationItem(null);
+
+    if (item.useKind === INVENTORY_USE_KIND.HATCH_EVENT) {
       setActivating(true);
       try {
-        const result = await activatePerkEventToken(tokenId);
+        const result = await activatePerkEventToken(item.tokenId);
         applyUseResult(result);
+        closeModal();
         showConfirm(result?.message || 'Event activated');
       } catch (e) {
         showConfirm(e?.response?.data?.message || e?.message || 'Activation failed.', 'error');
       } finally {
         setActivating(false);
       }
-    },
-    [activating, applyUseResult, showConfirm]
-  );
-
-  const handleMaxSupplyDrop = useCallback(async () => {
-    if (activating) return;
-    setActivating(true);
-    try {
-      const result = await activateMaxSupplyDropToken();
-      applyUseResult(result);
-      showConfirm(result?.message || 'Max Supply Drop deployed');
-    } catch (e) {
-      showConfirm(e?.response?.data?.message || e?.message || 'Activation failed.', 'error');
-    } finally {
-      setActivating(false);
+      return;
     }
-  }, [activating, applyUseResult, showConfirm]);
 
-  const handleTierSkip = useCallback(async () => {
-    if (activating) return;
-    setActivating(true);
-    try {
-      const result = await redeemBattlePassTierSkip();
-      applyUseResult(result);
-      showConfirm(result?.message || 'Battle Pass tier skipped');
-    } catch (e) {
-      showConfirm(e?.response?.data?.message || e?.message || 'Tier skip failed.', 'error');
-    } finally {
-      setActivating(false);
+    if (item.useKind === INVENTORY_USE_KIND.MAX_SUPPLY_DROP) {
+      setActivating(true);
+      try {
+        const result = await activateMaxSupplyDropToken();
+        applyUseResult(result);
+        closeModal();
+        showConfirm(result?.message || 'Max Supply Drop deployed');
+      } catch (e) {
+        showConfirm(e?.response?.data?.message || e?.message || 'Activation failed.', 'error');
+      } finally {
+        setActivating(false);
+      }
+      return;
     }
-  }, [activating, applyUseResult, showConfirm]);
+
+    if (item.useKind === INVENTORY_USE_KIND.TIER_SKIP) {
+      setActivating(true);
+      try {
+        const result = await redeemBattlePassTierSkip();
+        applyUseResult(result);
+        closeModal();
+        showConfirm(result?.message || 'Battle Pass tier skipped');
+      } catch (e) {
+        showConfirm(e?.response?.data?.message || e?.message || 'Tier skip failed.', 'error');
+      } finally {
+        setActivating(false);
+      }
+      return;
+    }
+
+    await handleActivate(item);
+  }, [
+    activationItem,
+    tokenActivating,
+    activating,
+    applyUseResult,
+    showConfirm,
+    handleActivate,
+  ]);
 
   const scrollToMachine = useCallback(() => {
     machinePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1293,8 +1319,12 @@ export default function PerkMachine() {
                       <button
                         type="button"
                         className="perk-inv-item__use"
-                        disabled={count < 1 || (tokenActivating && !isBusy)}
-                        onClick={() => setActivationItem({ ...def, count, isActive })}
+                        disabled={count < 1 || ((tokenActivating || activating) && !isBusy)}
+                        onClick={() =>
+                          openInventoryConfirmation(
+                            buildTokenUseConfirmation(def, { count, isActive })
+                          )
+                        }
                       >
                         {isBusy ? 'Activating…' : isActive && def.boostKey ? 'Extend +30m' : 'Use'}
                       </button>
@@ -1353,10 +1383,8 @@ export default function PerkMachine() {
 
       <HatchRewardsInventory
         status={status}
-        onActivateEvent={handleActivateEvent}
-        onMaxSupplyDrop={handleMaxSupplyDrop}
-        onTierSkip={handleTierSkip}
-        busy={activating}
+        onRequestUse={openInventoryConfirmation}
+        busy={activating || tokenActivating}
       />
 
       {showAdmin ? (
@@ -1367,10 +1395,11 @@ export default function PerkMachine() {
         open={Boolean(activationItem)}
         def={activationItem}
         count={activationItem?.count || 0}
-        activating={tokenActivating}
+        activating={tokenActivating || activating}
         isActive={Boolean(activationItem?.isActive)}
-        onCancel={() => !tokenActivating && setActivationItem(null)}
-        onConfirm={() => activationItem && void handleActivate(activationItem)}
+        confirmButtonLabel={activationItem?.confirmButtonLabel}
+        onCancel={() => !(tokenActivating || activating) && setActivationItem(null)}
+        onConfirm={() => void handleConfirmActivation()}
       />
 
       {ticketUnlock ? (

@@ -1,5 +1,12 @@
 /** Client mirror of server inventory token definitions. */
 
+export const INVENTORY_USE_KIND = Object.freeze({
+  TOKEN: 'token',
+  HATCH_EVENT: 'hatch_event',
+  MAX_SUPPLY_DROP: 'max_supply_drop',
+  TIER_SKIP: 'tier_skip',
+});
+
 export const INVENTORY_TOKEN_DEFS = Object.freeze([
   {
     itemType: 'battle_pass_xp_token',
@@ -91,4 +98,56 @@ export function isBoostActiveForDef(status, def) {
   );
   if (!boost?.expiresAt) return false;
   return new Date(boost.expiresAt).getTime() > Date.now();
+}
+
+export function buildTokenUseConfirmation(def, { count, isActive }) {
+  return {
+    useKind: INVENTORY_USE_KIND.TOKEN,
+    itemType: def.itemType,
+    ...def,
+    count,
+    isActive,
+    requiresStock: true,
+  };
+}
+
+export function buildHatchEventUseConfirmation(token) {
+  const label = token?.label || 'Event Token';
+  return {
+    useKind: INVENTORY_USE_KIND.HATCH_EVENT,
+    tokenId: token.id,
+    icon: token.icon || '🎁',
+    label,
+    confirmTitle: `Activate ${label}?`,
+    confirmBody: 'This will start your timed personal event immediately.',
+    confirmButtonLabel: 'Activate',
+    count: 1,
+    requiresStock: false,
+  };
+}
+
+export function buildMaxSupplyDropUseConfirmation(count) {
+  return {
+    useKind: INVENTORY_USE_KIND.MAX_SUPPLY_DROP,
+    icon: '📦',
+    label: 'Max Supply Drop Token',
+    confirmTitle: 'Deploy Max Supply Drop?',
+    confirmBody: 'Deploys a supply drop reward on your next eligible spin.',
+    confirmButtonLabel: 'Deploy',
+    count: Math.max(1, Number(count) || 1),
+    requiresStock: true,
+  };
+}
+
+export function buildTierSkipUseConfirmation(count) {
+  return {
+    useKind: INVENTORY_USE_KIND.TIER_SKIP,
+    icon: '⏭️',
+    label: 'Battle Pass Tier Skip',
+    confirmTitle: 'Skip Battle Pass Tier?',
+    confirmBody: 'Instantly advance one tier on your Battle Pass track.',
+    confirmButtonLabel: 'Skip Tier',
+    count: Math.max(1, Number(count) || 1),
+    requiresStock: true,
+  };
 }
