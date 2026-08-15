@@ -504,27 +504,24 @@ router.post('/grant-premium-subscription', requireOwnerAccess, async (req, res) 
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Grant premium subscription
-    user.membershipTier = 'premium';
-    user.isPremium = true;
-    
-    const subscriptionEnd = new Date();
-    subscriptionEnd.setMonth(subscriptionEnd.getMonth() + durationMonths);
-    
-    user.subscriptionExpires = subscriptionEnd;
-    user.subscriptionEnd = subscriptionEnd;
-    
-    // Add to audit trail
-    user.ownerGrants = user.ownerGrants || [];
-    user.ownerGrants.push({
-      type: 'premium_subscription',
-      amount: durationMonths,
-      reason: reason,
-      grantedBy: req.superAdmin.username,
-      grantedAt: new Date()
+    const { applyOwnerMembershipGrant } = require('../services/subscriptionWriteService');
+    const updated = await applyOwnerMembershipGrant(userId, 'premium', durationMonths, {
+      subscriptionEnd: null,
+      ownerGrants: [
+        ...(Array.isArray(user.ownerGrants) ? user.ownerGrants : []),
+        {
+          type: 'premium_subscription',
+          amount: durationMonths,
+          reason,
+          grantedBy: req.superAdmin.username,
+          grantedAt: new Date(),
+        },
+      ],
     });
-    
-    await user.save();
+
+    if (!updated) {
+      return res.status(404).json({ message: 'User not found' });
+    }
     
     console.log(`⭐ Owner granted ${durationMonths}-month premium subscription to user ${user.username} (${userId})`);
     
@@ -532,11 +529,11 @@ router.post('/grant-premium-subscription', requireOwnerAccess, async (req, res) 
       success: true,
       message: `Successfully granted ${durationMonths}-month premium subscription to ${user.username}`,
       user: {
-        id: user._id,
-        username: user.username,
-        membershipTier: user.membershipTier,
-        isPremium: user.isPremium,
-        subscriptionExpires: user.subscriptionExpires
+        id: updated._id,
+        username: updated.username,
+        membershipTier: updated.membershipTier,
+        isPremium: updated.isPremium,
+        subscriptionExpires: updated.subscriptionExpires
       }
     });
     

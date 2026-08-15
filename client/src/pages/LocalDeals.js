@@ -31,8 +31,11 @@ import {
   getBestMoveUpgradePrompt,
   readBestMoveUsage,
   subscribeBestMoveUsage,
-  tryConsumeBestMoveCredit,
+  consumeBestMoveCreditServer,
+  refreshBestMoveUsageFromServer,
+  applyServerBestMoveUsage,
 } from '../lib/bestMoveUsage';
+import { syncServerEntitlementsFromApiPayload } from '../lib/entitlementCache';
 import { isBetaTester, FOUNDING_TESTER_BADGE } from '../lib/betaTesterAccess';
 import { useScoutScanRegistration } from '../hooks/useScoutScanRegistration';
 import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trackBetaTesterUsage } from '../lib/analytics';
@@ -229,8 +232,12 @@ const LocalDeals = () => {
     setBoostedUsed(usage.used);
   }), []);
 
+  useEffect(() => {
+    void refreshBestMoveUsageFromServer();
+  }, []);
+
   /** Consumes one boosted credit when capped; returns whether boosted mode is on. */
-  const tryConsumeBoostedCredit = useCallback(() => {
+  const tryConsumeBoostedCredit = useCallback(async () => {
     if (isBetaTester()) {
       setBoostedActive(true);
       trackBetaTesterUsage("best_move_boost", { unlimited: true });
@@ -239,16 +246,18 @@ const LocalDeals = () => {
     const tier = getTierForQuickSnipesBoost();
     const cap = getBestMoveBoostedCap(tier);
     if (!Number.isFinite(cap)) {
-      setBoostedActive(true);
-      return true;
+      const result = await consumeBestMoveCreditServer();
+      setBoostedActive(Boolean(result.ok));
+      return Boolean(result.ok);
     }
-    const { used } = readBestMoveUsage();
-    const remaining = Math.max(0, cap - used);
+    const usage = readBestMoveUsage();
+    const remaining = Math.max(0, (usage.cap ?? cap) - usage.used);
     if (remaining <= 0) {
       setBoostedActive(false);
       return false;
     }
-    if (tryConsumeBestMoveCredit(tier)) {
+    const result = await consumeBestMoveCreditServer();
+    if (result.ok) {
       setBoostedUsed(readBestMoveUsage().used);
       setBoostedActive(true);
       return true;
@@ -257,13 +266,13 @@ const LocalDeals = () => {
     return false;
   }, []);
 
-  const runBoostedSearch = (raw, opts = {}) => {
+  const runBoostedSearch = async (raw, opts = {}) => {
     const { preserveCategory = false, loadingMessage = null } = opts;
     const q = String(raw || '').trim();
     if (!q) return;
     if (!preserveCategory) setCategoryId('');
     setHuntLaneLoadingMessage(loadingMessage);
-    if (tryConsumeBoostedCredit()) {
+    if (await tryConsumeBoostedCredit()) {
       setQuery(q);
       trackLocalDealsSearch(q);
       recordSearchSignal(q);
@@ -343,16 +352,18 @@ const LocalDeals = () => {
     searchInputUserEditedRef.current = false;
     setSearchInput(q);
     if (mode === 'best_move') {
-      if (tryConsumeBoostedCredit()) {
-        setQuery(q);
-        trackQuickSnipeSearch({ mode: 'best_move', queryLen: q.length, source: 'url_redirect' });
-        trackLocalDealsSearch(q);
-        recordSearchSignal(q);
-        emitTourAction('quickSnipes', { query: q, source: 'search_redirect' });
-      } else {
-        setPendingBoostQuery(q);
-        setBoostExhaustedOpen(true);
-      }
+      void tryConsumeBoostedCredit().then((allowed) => {
+        if (allowed) {
+          setQuery(q);
+          trackQuickSnipeSearch({ mode: 'best_move', queryLen: q.length, source: 'url_redirect' });
+          trackLocalDealsSearch(q);
+          recordSearchSignal(q);
+          emitTourAction('quickSnipes', { query: q, source: 'search_redirect' });
+        } else {
+          setPendingBoostQuery(q);
+          setBoostExhaustedOpen(true);
+        }
+      });
     } else {
       setBoostedActive(false);
       setQuery(q);
@@ -369,23 +380,20 @@ const LocalDeals = () => {
       try {
         const { data } = await api.get('/entitlements/me');
         if (cancelled) return;
-        const rawTier = String(data?.premiumTier || '').toLowerCase();
-        if (!data?.isPremium) {
-          setCurrentSubscriptionTier('free');
-          bumpTier();
-          return;
-        }
-        if (rawTier.includes('pro') || rawTier.includes('14')) {
+        syncServerEntitlementsFromApiPayload(data);
+        if (data?.bestMoveUsage) applyServerBestMoveUsage(data.bestMoveUsage);
+        const effective = String(data?.effectivePlan || data?.plan || '').toLowerCase();
+        if (effective === 'pro') {
           setCurrentSubscriptionTier('pro');
           bumpTier();
           return;
         }
-        if (rawTier.includes('elite') || rawTier.includes('35')) {
-          setCurrentSubscriptionTier('elite');
+        if (effective === 'premium') {
+          setCurrentSubscriptionTier('core');
           bumpTier();
           return;
         }
-        setCurrentSubscriptionTier('core');
+        setCurrentSubscriptionTier('free');
         bumpTier();
       } catch {
         if (!cancelled) {

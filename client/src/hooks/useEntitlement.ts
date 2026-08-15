@@ -3,6 +3,20 @@ import { api } from "../lib/api";
 import { parseApiError } from "../lib/apiErrorParsing";
 import { getDevEntitlementOverlay, isDev } from "../lib/devOverride";
 import { normalizeSubscriptionTier, setCurrentSubscriptionTier } from "../lib/tierMultiplier";
+import { syncServerEntitlementsFromApiPayload } from "../lib/entitlementCache";
+import { applyServerBestMoveUsage } from "../lib/bestMoveUsage";
+
+export type FeatureLimits = {
+  bestMovesPerDay: number;
+  alertLimit: number;
+  alertSpeedTier: string;
+  alertsSpeed?: string;
+  scanPriority?: string;
+  advancedBestMove?: boolean;
+  sellerInsights?: boolean;
+  eventBonusPct?: number;
+  subscriptionMultiplier?: number;
+};
 
 export type EntitlementMe = {
   isPremium: boolean;
@@ -12,6 +26,16 @@ export type EntitlementMe = {
   cancelAtPeriodEnd: boolean;
   trialEndsAt: string | null;
   provider: string;
+  basePlan?: "free" | "premium" | "pro";
+  effectivePlan?: "free" | "premium" | "pro";
+  plan?: "free" | "premium" | "pro";
+  entitlementSource?: string;
+  source?: string;
+  expiresAt?: string | null;
+  featureLimits?: FeatureLimits;
+  features?: FeatureLimits;
+  displayTier?: string;
+  tier?: string;
   foundingTesterAccess?: boolean;
   isBetaTester?: boolean;
   betaTester?: boolean;
@@ -59,6 +83,10 @@ export function useEntitlement(enabled: boolean): UseEntitlementResult {
     try {
       const { data: d } = await api.get<EntitlementMe>("/entitlements/me");
       setData(d);
+      syncServerEntitlementsFromApiPayload(d);
+      if ((d as EntitlementMe & { bestMoveUsage?: Record<string, unknown> })?.bestMoveUsage) {
+        applyServerBestMoveUsage((d as EntitlementMe & { bestMoveUsage?: Record<string, unknown> }).bestMoveUsage);
+      }
       const direct = String((d as EntitlementMe & { tier?: string })?.tier || "").toLowerCase();
       const normalized =
         direct === "core" || direct === "pro" || direct === "elite" || direct === "free"
@@ -68,6 +96,7 @@ export function useEntitlement(enabled: boolean): UseEntitlementResult {
     } catch (e: unknown) {
       setError(parseApiError(e).message);
       setData(null);
+      syncServerEntitlementsFromApiPayload(null);
       setCurrentSubscriptionTier("free");
     } finally {
       setLoading(false);

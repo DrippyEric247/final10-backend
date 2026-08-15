@@ -74,6 +74,8 @@ const {
 } = require('../lib/founderAdminAccess');
 const { serializeMembershipForClient } = require('../lib/membershipFields');
 const { resolveSavvyMultiplierState } = require('../services/savvyMultiplierService');
+const { getEntitlementByUserId } = require('../services/premiumEntitlementService');
+const { resolveUserEntitlements } = require('../services/userEntitlementService');
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
@@ -117,16 +119,17 @@ function serializeAuthUserPayload(user) {
   });
 }
 
-function serializeAuthMePayload(user) {
+function serializeAuthMePayload(user, entitlementDoc = null) {
   const membership = serializeMembershipForClient(user);
   const sub = user.subscription && typeof user.subscription === 'object' ? user.subscription : {};
+  const canonical = resolveUserEntitlements(user, entitlementDoc);
   return {
     ...serializeAuthUserPayload(user),
     ...membership,
     points: user.points,
     referralCode: user.referralCode,
     referredBy: user.referredBy || null,
-    premiumTier: user.premiumTier || user.membershipTier || 'free',
+    premiumTier: canonical.premiumTier || user.premiumTier || user.membershipTier || 'free',
     leaderboardScore: user.leaderboardScore ?? 0,
     currentStreak: user.loginStreakDays ?? user.currentStreak ?? 0,
     loginStreakDays: user.loginStreakDays ?? 0,
@@ -178,6 +181,14 @@ function serializeAuthMePayload(user) {
     earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice || null,
     betaAccessExpiresAt: user.betaAccessExpiresAt || null,
     foundingTesterAccess: foundingTesterActiveFor(user),
+    entitlements: {
+      basePlan: canonical.basePlan,
+      effectivePlan: canonical.effectivePlan,
+      entitlementSource: canonical.entitlementSource,
+      expiresAt: canonical.expiresAt,
+      featureLimits: canonical.featureLimits,
+      displayTier: canonical.displayTier,
+    },
   };
 }
 
@@ -209,8 +220,9 @@ async function handleSignup(req, res, next) {
     let signupBonus = 100;
     let membershipTier = 'free';
     let subscriptionExpires = null;
+    const isWelcomeSignup = referralCode === 'welcome';
 
-    if (referralCode === 'welcome') {
+    if (isWelcomeSignup) {
       signupBonus = 500;
       membershipTier = 'premium';
       subscriptionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -233,9 +245,14 @@ async function handleSignup(req, res, next) {
       points: signupBonus,
       lastActive: new Date(),
       referralCodeUsed: referralCode || null,
-      membershipTier,
-      subscriptionExpires,
+      membershipTier: isWelcomeSignup ? 'free' : membershipTier,
+      subscriptionExpires: isWelcomeSignup ? null : subscriptionExpires,
     });
+
+    if (isWelcomeSignup) {
+      const { applyWelcomePromoGrant } = require('../services/subscriptionWriteService');
+      await applyWelcomePromoGrant(user._id, subscriptionExpires);
+    }
 
     user.referralCode = user._id.toString();
 
@@ -620,7 +637,8 @@ router.get('/me', authMeLimiter, auth, async (req, res, next) => {
       await user.save();
     }
 
-    return res.json(serializeAuthMePayload(user));
+    const ent = await getEntitlementByUserId(req.user._id || req.user.id);
+    return res.json(serializeAuthMePayload(user, ent));
   } catch (err) {
     return next(err);
   }

@@ -48,33 +48,14 @@ const {
   serializeMembershipForClient,
   normalizeMembershipTier,
 } = require('../lib/membershipFields');
+const { toLegacyMeResponse } = require('./userEntitlementService');
 
 function hasFoundingTesterAccess(user) {
   return checkBetaTester(user);
 }
 
 function buildBetaModeEntitlement(user) {
-  return {
-    isPremium: true,
-    premiumStatus: 'active',
-    premiumTier: 'elite',
-    tier: 'elite',
-    plan: 'pro',
-    subscriptionTier: 'elite',
-    membershipTier: 'pro',
-    currentPeriodEnd: null,
-    cancelAtPeriodEnd: false,
-    trialEndsAt: null,
-    provider: 'beta_mode',
-    foundingTesterAccess: false,
-    isBetaTester: false,
-    betaTester: Boolean(user?.betaTester),
-    foundingAccess: Boolean(user?.foundingAccess),
-    betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
-    betaMode: true,
-    betaModeProAccess: true,
-    entitlements: { pro: true, premium: true, core: true, elite: true },
-  };
+  return toLegacyMeResponse(user, null);
 }
 
 async function getEntitlementByUserId(userId) {
@@ -116,105 +97,10 @@ function membershipFieldsForEntitlements(user) {
  * Public payload for GET /api/entitlements/me
  */
 function toMeResponse(doc, user = null) {
-  if (hasBetaProAccess(user)) {
-    const payload = buildBetaModeEntitlement(user);
-    return {
-      ...payload,
-      creatorMonetization: monetizationFromEntitlement(doc),
-    };
-  }
-
-  const founding = hasFoundingTesterAccess(user);
-  if (founding) {
-    return {
-      isPremium: true,
-      premiumStatus: 'active',
-      premiumTier: 'elite',
-      tier: 'elite',
-      plan: 'pro',
-      subscriptionTier: 'elite',
-      membershipTier: 'pro',
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      trialEndsAt: null,
-      provider: 'beta',
-      creatorMonetization: monetizationFromEntitlement(doc),
-      foundingTesterAccess: true,
-      isBetaTester: true,
-      betaTester: Boolean(user?.betaTester),
-      foundingAccess: Boolean(user?.foundingAccess),
-      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
-      betaMode: isBetaMode(),
-      betaModeProAccess: false,
-      entitlements: { pro: true, premium: true, core: true, elite: true },
-    };
-  }
-
-  const fromUser = membershipFieldsForEntitlements(user);
-  if (fromUser) {
-    return {
-      ...fromUser,
-      cancelAtPeriodEnd: false,
-      trialEndsAt: null,
-      creatorMonetization: monetizationFromEntitlement(doc),
-      foundingTesterAccess: false,
-      isBetaTester: false,
-      betaTester: Boolean(user?.betaTester),
-      foundingAccess: Boolean(user?.foundingAccess),
-      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
-    };
-  }
-
-  if (!doc) {
-    return {
-      isPremium: false,
-      premiumStatus: 'inactive',
-      premiumTier: 'free',
-      tier: 'free',
-      plan: 'free',
-      subscriptionTier: 'free',
-      membershipTier: 'free',
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      trialEndsAt: null,
-      provider: 'stripe',
-      creatorMonetization: monetizationFromEntitlement(null),
-      foundingTesterAccess: false,
-      isBetaTester: false,
-      betaTester: Boolean(user?.betaTester),
-      foundingAccess: Boolean(user?.foundingAccess),
-      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
-      betaMode: isBetaMode(),
-      betaModeProAccess: false,
-      entitlements: { pro: false, premium: false, core: false, elite: false },
-    };
-  }
-  const isPremium = premiumStatusGrantsBattlePassAccess(doc);
-  const pt = doc.premiumTier || 'free';
+  const payload = toLegacyMeResponse(user, doc);
   return {
-    isPremium,
-    premiumStatus: doc.premiumStatus,
-    premiumTier: pt,
-    tier: isPremium ? (pt === 'elite' ? 'elite' : pt === 'premium' ? 'core' : 'core') : 'free',
-    plan: pt,
-    subscriptionTier: pt,
-    membershipTier: pt === 'elite' ? 'pro' : pt === 'premium' ? 'premium' : 'free',
-    currentPeriodEnd: doc.currentPeriodEnd || null,
-    cancelAtPeriodEnd: Boolean(doc.cancelAtPeriodEnd),
-    trialEndsAt: doc.trialEndsAt || null,
-    provider: doc.provider || 'stripe',
+    ...payload,
     creatorMonetization: monetizationFromEntitlement(doc),
-    foundingTesterAccess: false,
-    isBetaTester: false,
-    betaTester: Boolean(user?.betaTester),
-    foundingAccess: Boolean(user?.foundingAccess),
-      betaAccessExpiresAt: user?.betaAccessExpiresAt || null,
-    entitlements: {
-      pro: isPremium && pt === 'elite',
-      premium: isPremium,
-      core: isPremium,
-      elite: isPremium && pt === 'elite',
-    },
   };
 }
 

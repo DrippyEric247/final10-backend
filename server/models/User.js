@@ -618,6 +618,13 @@ const userSchema = new mongoose.Schema({
     searchesToday: { type: Number, default: 0 },
     lastSearchReset: { type: Date, default: Date.now }
   },
+
+  /** Server-authoritative Best Move daily usage (Wave 2 closure). */
+  bestMoveUsage: {
+    day: { type: String, default: null },
+    usedToday: { type: Number, default: 0 },
+    lastUsedAt: { type: Date, default: null },
+  },
   
   // search limits per tier
   dailySearchLimit: { type: Number, default: 5 },   // free users get 5 searches per day

@@ -1,26 +1,17 @@
 /**
- * Seller-premium access scaffolding.
- *
- * Structure-only per the spec — we don't charge anyone here, we just
- * define the tier model, the feature catalog, and the gate helper so
- * the dashboard / alert UI can light up upgrade prompts without
- * needing a billing backend wired up yet.
- *
- * When a real subscription exists this module gains:
- *   - real entitlement read (SSR or auth context)
- *   - webhook sync on tier changes
- *   - analytics for gate views / conversion
- * Today it's intentionally minimal.
+ * Seller-premium access — reads canonical server entitlements (Wave 2 closure).
  */
+
+import { getAuthoritativeEffectivePlan } from "./entitlementCache";
 
 export type SellerTier = "free" | "pro";
 
 export type PremiumFeatureId =
-  | "advanced_alerts"     // push + smart timing windows
-  | "deep_insights"       // multi-week trend curves, comp benchmarks
-  | "unlimited_alerts"    // free tier caps alerts to 3
-  | "early_access_categories" // emerging categories before GA
-  | "auto_flip_unlimited"; // full auto-flip list + live refresh
+  | "advanced_alerts"
+  | "deep_insights"
+  | "unlimited_alerts"
+  | "early_access_categories"
+  | "auto_flip_unlimited";
 
 export type PremiumFeature = {
   id: PremiumFeatureId;
@@ -56,48 +47,27 @@ export const PREMIUM_FEATURES: ReadonlyArray<PremiumFeature> = [
   },
 ];
 
-const TIER_STORAGE_KEY = "f10_seller_tier_v1";
 const FREE_ALERT_CAP = 3;
 
-/**
- * Read the local tier. Real auth integration will replace this with a
- * server-supplied entitlement; the UI only ever calls `getSellerTier`
- * so swapping the impl later is a one-liner.
- */
 export function getSellerTier(): SellerTier {
-  if (typeof window === "undefined") return "free";
-  try {
-    const raw = window.localStorage.getItem(TIER_STORAGE_KEY);
-    return raw === "pro" ? "pro" : "free";
-  } catch {
-    return "free";
-  }
+  const plan = getAuthoritativeEffectivePlan();
+  return plan === "pro" ? "pro" : "free";
 }
 
-/** Dev / QA helper. Not exposed anywhere in the production UI yet. */
-export function setSellerTier(tier: SellerTier): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(TIER_STORAGE_KEY, tier);
-    window.dispatchEvent(new CustomEvent("f10:seller-tier-updated"));
-  } catch {
-    /* ignore */
-  }
+/** Dev-only local override removed from production authorization path. */
+export function setSellerTier(_tier: SellerTier): void {
+  /* no-op — server entitlements are authoritative */
 }
 
 export function isPremiumSeller(): boolean {
   return getSellerTier() === "pro";
 }
 
-/**
- * The gate. Returns `{ allowed, reason }` so components don't have to
- * branch on tier strings.
- */
 export function canUseFeature(id: PremiumFeatureId): { allowed: boolean; reason: string } {
   if (isPremiumSeller()) return { allowed: true, reason: "" };
   return {
     allowed: false,
-    reason: "This insight is part of Seller Pro — coming soon.",
+    reason: "This insight is part of Seller Pro — upgrade to Pro for access.",
   };
 }
 

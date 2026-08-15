@@ -420,10 +420,16 @@ export default function BattlePassPage() {
 
   const premiumUnlocked = useMemo(() => {
     if (!authToken) return progress.premium;
-    if (entitlement.raw != null) return Boolean(entitlement.isPremium);
+    if (entitlement.raw != null) {
+      const plan = String(entitlement.effectivePlan || entitlement.plan || "").toLowerCase();
+      if (plan === "premium" || plan === "pro") return true;
+      return Boolean(entitlement.isPremium);
+    }
     return Boolean(progression.state?.battlePass?.premiumUnlocked);
   }, [
     authToken,
+    entitlement.effectivePlan,
+    entitlement.plan,
     entitlement.isPremium,
     entitlement.raw,
     progression.state?.battlePass?.premiumUnlocked,

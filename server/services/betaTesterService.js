@@ -1,4 +1,4 @@
-const { getTierConfig, normalizeTier } = require('../config/subscriptionPlans');
+const { getTierConfig } = require('../config/subscriptionPlans');
 const { BETA_UNLIMITED, BETA_FEEDBACK_SAVVY_BONUS } = require('../config/betaTester');
 const {
   isBetaMode,
@@ -6,6 +6,8 @@ const {
   getBetaModeAccessOverrides,
   getBetaProTier,
 } = require('../config/betaMode');
+const { resolveUserEntitlements, buildFeatureLimits } = require('./userEntitlementService');
+const { planToSubscriptionTierId } = require('../config/canonicalPlans');
 
 function isBetaTester(user) {
   if (!user) return false;
@@ -19,22 +21,24 @@ function isBetaTester(user) {
   return new Date(user.betaAccessExpiresAt) > new Date();
 }
 
-function readUserTier(user) {
-  if (hasBetaProAccess(user)) return getBetaProTier();
-  return normalizeTier(user?.subscription?.tier || user?.membershipTier || 'free');
+function readUserTier(user, entitlementDoc = null) {
+  const resolved = resolveUserEntitlements(user, entitlementDoc);
+  return planToSubscriptionTierId(resolved.effectivePlan);
 }
 
 /** Tier config with unlimited caps when beta tester or global beta mode is active. */
-function getTierConfigForUser(user) {
+function getTierConfigForUser(user, entitlementDoc = null) {
+  const resolved = resolveUserEntitlements(user, entitlementDoc);
+  const tierId = planToSubscriptionTierId(resolved.effectivePlan);
+  const base = getTierConfig(tierId);
+
   if (hasBetaProAccess(user)) {
-    const base = getTierConfig(getBetaProTier());
     return {
       ...base,
       ...getBetaModeAccessOverrides(),
       ...BETA_UNLIMITED,
     };
   }
-  const base = getTierConfig(readUserTier(user));
   if (!isBetaTester(user)) return base;
   return {
     ...base,
@@ -42,6 +46,12 @@ function getTierConfigForUser(user) {
     label: 'Founding Tester',
     alertsSpeed: 'priority',
   };
+}
+
+/** Feature limits from canonical entitlement resolver. */
+function getFeatureLimitsForUser(user, entitlementDoc = null) {
+  const resolved = resolveUserEntitlements(user, entitlementDoc);
+  return resolved.features;
 }
 
 async function logBetaUsage(userId, action, meta = {}) {
@@ -61,8 +71,10 @@ module.exports = {
   isBetaTester,
   readUserTier,
   getTierConfigForUser,
+  getFeatureLimitsForUser,
   logBetaUsage,
   BETA_FEEDBACK_SAVVY_BONUS,
   hasBetaProAccess,
   isBetaMode,
+  buildFeatureLimits,
 };

@@ -2,6 +2,8 @@ const express = require('express');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { creditSavvy } = require('../services/savvyBalanceService');
+const { applyVerifiedPaidSubscription } = require('../services/subscriptionWriteService');
+const { PLAN } = require('../config/canonicalPlans');
 const {
   SUBSCRIPTION_TIERS,
   YEARLY_BONUS,
@@ -22,10 +24,11 @@ function nextRenewalDate(billing) {
   return d;
 }
 
-function legacyMembershipForTier(tier) {
-  if (tier === 'free') return 'free';
-  if (tier === 'core') return 'premium';
-  return 'pro';
+function canonicalPlanFromRequestedTier(tier) {
+  const normalized = normalizeTier(tier);
+  if (normalized === 'pro') return PLAN.PRO;
+  if (normalized === 'core') return PLAN.PREMIUM;
+  return PLAN.FREE;
 }
 
 router.get('/plans', auth, async (_req, res) => {
@@ -93,7 +96,8 @@ router.post('/', auth, async (req, res) => {
   }
 
   const renewalDate = nextRenewalDate(billing);
-  user.subscription = {
+  const canonicalPlan = canonicalPlanFromRequestedTier(requestedTier);
+  const subscriptionObject = {
     tier: requestedTier,
     billing,
     multiplier,
@@ -103,11 +107,21 @@ router.post('/', auth, async (req, res) => {
     earlyAdopter: bonusGranted ? YEARLY_BONUS.earlyAdopter : Boolean(user.subscription?.earlyAdopter),
     badge: bonusGranted ? YEARLY_BONUS.badge : String(user.subscription?.badge || ''),
   };
-  user.membershipTier = legacyMembershipForTier(requestedTier);
-  user.premiumTier = user.membershipTier;
-  user.isPremium = requestedTier !== 'free';
-  user.subscriptionExpires = renewalDate;
-  await user.save();
+
+  await applyVerifiedPaidSubscription(user._id, {
+    plan: canonicalPlan,
+    expiresAt: renewalDate,
+    provider: 'dev_subscribe',
+    subscriptionObject,
+  });
+
+  if (earlyAdopterLocked) {
+    await User.findByIdAndUpdate(user._id, {
+      earlyAdopterLocked: true,
+      earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice,
+      badges: user.badges,
+    });
+  }
 
   await User.findByIdAndUpdate(user._id, {
     $push: {
@@ -124,6 +138,8 @@ router.post('/', auth, async (req, res) => {
     },
   });
 
+  const fresh = await User.findById(user._id);
+
   return res.json({
     ok: true,
     priceCharged: price,
@@ -133,16 +149,16 @@ router.post('/', auth, async (req, res) => {
       tier: requestedTier.toUpperCase(),
       billing,
       multiplier,
-      earlyAdopter: Boolean(user.subscription.earlyAdopter),
+      earlyAdopter: Boolean(subscriptionObject.earlyAdopter),
       renewalDate,
       alertsMax: tierConfig.alertsMax,
       alertsSpeed: tierConfig.alertsSpeed,
       bestMovesPerDay: tierConfig.bestMovesPerDay,
     },
-    savvyPoints: user.savvyPoints,
-    badges: user.badges || [],
-    earlyAdopterLocked: Boolean(user.earlyAdopterLocked),
-    earlyAdopterOriginalPrice: user.earlyAdopterOriginalPrice || null,
+    savvyPoints: fresh?.savvyPoints,
+    badges: fresh?.badges || [],
+    earlyAdopterLocked: Boolean(fresh?.earlyAdopterLocked),
+    earlyAdopterOriginalPrice: fresh?.earlyAdopterOriginalPrice || null,
   });
 });
 

@@ -308,15 +308,8 @@ async function grantGrandReward(user, progress) {
 
   const proEnd = new Date();
   proEnd.setUTCDate(proEnd.getUTCDate() + GRAND_REWARD.proDays);
-  const currentEnd = user.subscriptionExpires ? new Date(user.subscriptionExpires) : null;
-  const hasBetter =
-    user.membershipTier === 'pro' && currentEnd && currentEnd > proEnd;
-  if (!hasBetter) {
-    user.membershipTier = 'pro';
-    user.premiumTier = 'pro';
-    user.isPremium = true;
-    user.subscriptionExpires = proEnd;
-  }
+  const { applyTemporaryProGrant } = require('./subscriptionWriteService');
+  await applyTemporaryProGrant(user, { expiresAt: proEnd, source: 'founding_tester' });
 
   if (!Array.isArray(user.badges)) user.badges = [];
   if (!user.badges.includes(GRAND_REWARD.badge)) user.badges.push(GRAND_REWARD.badge);

@@ -1,6 +1,13 @@
 import { normalizeSubscriptionTier, setCurrentSubscriptionTier } from './tierMultiplier';
+import { syncServerEntitlementsFromApiPayload } from './entitlementCache';
 
 function pickClientTier(user, entitlements) {
+  const effective = entitlements?.effectivePlan || entitlements?.plan;
+  if (effective) {
+    if (effective === 'pro') return 'pro';
+    if (effective === 'premium') return 'core';
+    return 'free';
+  }
   const direct =
     entitlements?.tier ||
     user?.tier ||
@@ -41,9 +48,15 @@ export async function hydrateMembershipFromApi(user, fetchEntitlements) {
   if (typeof fetchEntitlements === 'function') {
     try {
       ent = await fetchEntitlements();
+      syncServerEntitlementsFromApiPayload(ent);
     } catch {
       ent = null;
+      syncServerEntitlementsFromApiPayload(null);
     }
+  }
+
+  if (user?.entitlements) {
+    syncServerEntitlementsFromApiPayload(user);
   }
 
   const tier = syncSubscriptionTierFromUser(user, ent);

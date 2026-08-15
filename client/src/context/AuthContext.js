@@ -10,6 +10,8 @@ import {
   resetAuthMeBootstrap,
 } from "../lib/api";
 import { hydrateMembershipFromApi } from "../lib/membershipSync";
+import { clearServerEntitlements } from "../lib/entitlementCache";
+import { clearServerBestMoveUsageCache } from "../lib/bestMoveUsage";
 import { parseApiError, userSafeErrorMessage } from "../lib/apiErrorParsing";
 import { getDevSavvyPointsOffset, isDev, FINAL10_DEV_OVERRIDE_EVENT } from "../lib/devOverride";
 import { getEquippedCallingCardId, getEquippedEmblemId } from "../lib/customizationCatalog";
@@ -226,6 +228,8 @@ export function AuthProvider({ children }) {
     setAuthToken(null);
     setError("");
     setServerPowerMultiplier(null);
+    clearServerEntitlements();
+    clearServerBestMoveUsageCache();
     // Clear any additional auth-related data
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('token');

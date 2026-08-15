@@ -33,9 +33,13 @@ router.post('/', auth, async (req, res) => {
     context = {},
   } = req.body;
   if (!name || !Array.isArray(keywords)) return res.status(400).json({ message: 'Invalid payload' });
-  const user = await User.findById(req.user.id).select('subscription membershipTier betaTester foundingAccess betaAccessExpiresAt');
+  const user = await User.findById(req.user.id).select(
+    'subscription membershipTier premiumTier isPremium premium referralCodeUsed foundingTesterProgramCompleted betaTester foundingAccess betaAccessExpiresAt subscriptionExpires membershipExpiresAt'
+  );
   if (!user) return res.status(404).json({ message: 'User not found' });
-  const tierCfg = getTierConfigForUser(user);
+  const { getEntitlementByUserId } = require('../services/premiumEntitlementService');
+  const ent = await getEntitlementByUserId(req.user.id);
+  const tierCfg = getTierConfigForUser(user, ent);
   const existingCount = await Alert.countDocuments({ user: req.user.id });
   if (Number.isFinite(tierCfg.alertsMax) && existingCount >= tierCfg.alertsMax) {
     return res.status(403).json({

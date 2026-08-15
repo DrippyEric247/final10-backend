@@ -6,6 +6,11 @@ import {
 } from "./devOverride";
 import { isBetaTester, getScoutMissionTier } from "./betaTesterAccess";
 import { DAILY_LOGIN_BASE_SAVVY } from "../config/savvyRewards";
+import {
+  canonicalPlanToClientTier,
+  getAuthoritativeEffectivePlan,
+  getAuthoritativeFeatureLimits,
+} from "./entitlementCache";
 
 const TIER_STORAGE_KEY = "f10_subscription_tier_v1";
 
@@ -182,7 +187,7 @@ export function clearDevSubscriptionTierOverride() {
   saveFinal10DevOverride({ subscription: null });
 }
 
-/** Tier used for caps, gating, and dev tools (prefers dev override when enabled). */
+/** Tier used for caps, gating, and dev tools (server entitlements win in production). */
 export function getEffectiveSubscriptionTier() {
   if (isBetaTester()) return "elite";
   if (isNonProductionBuild() && getDevSimulateExpiredSubscription()) {
@@ -190,6 +195,13 @@ export function getEffectiveSubscriptionTier() {
   }
   const dev = getDevSubscriptionTierOverride();
   if (dev) return dev;
+
+  const serverPlan = getAuthoritativeEffectivePlan();
+  if (serverPlan) {
+    return canonicalPlanToClientTier(serverPlan);
+  }
+
+  if (!isNonProductionBuild()) return "free";
   return getCurrentSubscriptionTier();
 }
 
@@ -256,11 +268,19 @@ export function buildDailyLoginReward(baseReward = DAILY_LOGIN_BASE_SAVVY, tier 
 }
 
 export function getBestMoveBoostedCap(tier = getEffectiveSubscriptionTier()) {
+  const limits = getAuthoritativeFeatureLimits();
+  if (limits && Number.isFinite(limits.bestMovesPerDay)) {
+    return limits.bestMovesPerDay;
+  }
   if (isBetaTester()) return Number.POSITIVE_INFINITY;
   return getAdvantageTier(tier).bestMoveBoostedPerDay;
 }
 
 export function getAlertLimit(tier = getEffectiveSubscriptionTier()) {
+  const limits = getAuthoritativeFeatureLimits();
+  if (limits && Number.isFinite(limits.alertLimit)) {
+    return limits.alertLimit;
+  }
   if (isBetaTester()) return Number.POSITIVE_INFINITY;
   return getAdvantageTier(tier).alertsMax;
 }

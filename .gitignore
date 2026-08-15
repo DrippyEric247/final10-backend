@@ -62,3 +62,6 @@ ehthumbs.db
 # Local tooling
 .cursor/
 .claude/
+
+# Generated audit output (not used by app, tests, or deployment)
+scripts/audit-live-output.json

@@ -6,7 +6,15 @@ const { logPaymentFailure } = require('../services/structuredLog');
 const { validateRequest } = require('../middleware/validateRequest');
 const schemas = require('../validation/schemas');
 const { HttpError } = require('../middleware/apiErrors');
-const { ensureEntitlementRow } = require('../services/premiumEntitlementService');
+const {
+  ensureEntitlementRow,
+  getEntitlementByUserId,
+} = require('../services/premiumEntitlementService');
+const {
+  applyVerifiedPaidSubscription,
+  revokePaidSubscription,
+} = require('../services/subscriptionWriteService');
+const { resolveUserEntitlements } = require('../services/userEntitlementService');
 
 const router = express.Router();
 
@@ -150,12 +158,15 @@ router.post('/confirm-payment', auth, async (req, res) => {
     const subscriptionExpires = new Date();
     subscriptionExpires.setMonth(subscriptionExpires.getMonth() + 1);
 
-    // Update user to premium (idempotent per paymentIntentId)
+    await applyVerifiedPaidSubscription(user._id, {
+      plan: 'premium',
+      expiresAt: subscriptionExpires,
+      provider: 'legacy_payment_intent',
+    });
+
     await User.findByIdAndUpdate(user._id, {
-      membershipTier: 'premium',
-      subscriptionExpires: subscriptionExpires,
       lastProcessedPremiumPaymentIntentId: paymentIntentId,
-      $inc: { points: 100 }, // Bonus points for upgrading
+      $inc: { points: 100 },
     });
 
     // Log the transaction (you might want to create a PaymentLog model)
@@ -183,15 +194,22 @@ router.get('/subscription-status', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const isPremium = user.membershipTier === 'premium' && 
-                     user.subscriptionExpires && 
-                     new Date(user.subscriptionExpires) > new Date();
+    const ent = await getEntitlementByUserId(req.user.id);
+    const resolved = resolveUserEntitlements(user, ent);
 
     res.json({
-      isPremium,
-      membershipTier: user.membershipTier,
-      subscriptionExpires: user.subscriptionExpires,
-      daysRemaining: isPremium ? Math.ceil((new Date(user.subscriptionExpires) - new Date()) / (1000 * 60 * 60 * 24)) : 0
+      isPremium: resolved.isPremium,
+      membershipTier: resolved.membershipTier,
+      effectivePlan: resolved.effectivePlan,
+      basePlan: resolved.basePlan,
+      subscriptionExpires: ent?.currentPeriodEnd || user.subscriptionExpires,
+      daysRemaining:
+        resolved.isPremium && (ent?.currentPeriodEnd || user.subscriptionExpires)
+          ? Math.ceil(
+              (new Date(ent?.currentPeriodEnd || user.subscriptionExpires) - new Date()) /
+                (1000 * 60 * 60 * 24)
+            )
+          : 0,
     });
 
   } catch (error) {
@@ -211,10 +229,7 @@ router.post('/cancel-subscription', auth, async (req, res) => {
 
     // For now, just set subscription to expire at end of current period
     // In a full implementation, you'd cancel the Stripe subscription
-    await User.findByIdAndUpdate(user._id, {
-      membershipTier: 'free',
-      subscriptionExpires: null
-    });
+    await revokePaidSubscription(user._id, { provider: 'legacy_payment_intent' });
 
     res.json({ message: 'Subscription cancelled successfully' });
 
