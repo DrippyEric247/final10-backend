@@ -1,8 +1,8 @@
 const User = require('../models/User');
-const SavvyPoint = require('../models/SavvyPoint');
 const { sendAlertMatchEmail } = require('./emailService');
 const { auditAlertDelivery } = require('./auditLogger');
 const { isProduction } = require('../config/envValidation');
+const { grantSavvyReward } = require('./savvyRewardService');
 
 function isAlertEmailDefaultEnabled() {
   const raw = process.env.ALERT_EMAIL_DEFAULT;
@@ -127,17 +127,19 @@ async function deliverAlertMatch(userId, auction, alert) {
   }
 
   try {
-    await SavvyPoint.awardPoints(
-      userId,
-      5,
-      'alert_trigger',
-      `Alert "${alert.name}" found a match!`,
-      auction._id,
-      'Auction',
-      1
-    );
+    const alertUser = await User.findById(userId);
+    if (alertUser) {
+      await grantSavvyReward(alertUser, {
+        rewardType: 'alert_trigger',
+        amount: 5,
+        baseAmount: 5,
+        idempotencyKey: `alert_trigger:${userId}:${auction._id}`,
+        note: `Alert "${alert.name}" found a match!`,
+        meta: { relatedId: String(auction._id), relatedType: 'Auction' },
+      });
+    }
   } catch (err) {
-    console.warn('[alertDelivery] points award failed:', err.message);
+    console.warn('[alertDelivery] savvy award failed:', err.message);
   }
 
   console.log(

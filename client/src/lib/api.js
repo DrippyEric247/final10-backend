@@ -679,6 +679,14 @@ export async function getProfileProgress() {
   return data?.progress || null;
 }
 
+export async function calculateSavvyRewardPreview({ baseAmount, source, rewardType }) {
+  const { data } = await api.post('/savvy/calculate-reward', {
+    baseAmount,
+    source: source || rewardType,
+  });
+  return data;
+}
+
 export async function estimateDealRewards(listings = []) {
   const { data } = await api.post("/deals/reward-estimate", { listings });
   return data;

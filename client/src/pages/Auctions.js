@@ -2167,6 +2167,7 @@ export default function Auctions() {
                   saveDataFtue={idx === 0}
                   childrenFooter={
                     <SavvyRewardBadge
+                      listingId={item.itemId != null ? String(item.itemId) : undefined}
                       trustScore={trust.trustScore}
                       price={displayPrice}
                       savings={savings}

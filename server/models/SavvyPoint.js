@@ -60,12 +60,16 @@ savvyPointSchema.statics.awardPoints = async function(userId, points, type, note
     await savvyPoint.save();
 
     if (type === 'alert_trigger') {
-      const { creditSavvy } = require('../services/savvyBalanceService');
+      const User = require('./User');
+      const user = await User.findById(userId);
+      const { grantSavvyReward } = require('../services/savvyRewardService');
+      const base = Math.round(Number(points) || 0);
       const ref = relatedId ? String(relatedId) : 'alert';
-      await creditSavvy(userId, {
-        amount: amt,
-        source: 'alert_trigger',
-        idempotencyKey: `alert_trigger:${userId}:${ref}:${amt}`,
+      await grantSavvyReward(user, {
+        rewardType: 'alert_trigger',
+        amount: base,
+        baseAmount: base,
+        idempotencyKey: `alert_trigger:${userId}:${ref}`,
         note,
         meta: { relatedId: ref, relatedType },
       });

@@ -8,7 +8,6 @@ const User = require('../models/User');
 const SavvyShop = require('../models/SavvyShop');
 const SavvyShopProduct = require('../models/SavvyShopProduct');
 const SavvyShopEngagementLog = require('../models/SavvyShopEngagementLog');
-const PointsLedger = require('../models/PointsLedger');
 const { creditSavvy } = require('./savvyBalanceService');
 const { getCreatorMonetizationProfile } = require('./creatorEliteAccessService');
 
@@ -79,22 +78,6 @@ async function awardCreatorPoints(userId, amount, idempotencyKey, source, shopId
   const { award, capped } = await applyCreatorDailyCap(user, amount, profile.dailySavvyCap);
   if (award <= 0) {
     return { awarded: 0, capped: capped || amount, duplicate: false };
-  }
-
-  try {
-    await PointsLedger.create({
-      userId: user._id,
-      type: 'earn',
-      amount: award,
-      source,
-      refId: shopId ? String(shopId) : '',
-      idempotencyKey,
-    });
-  } catch (err) {
-    if (err?.code === 11000) {
-      return { awarded: 0, capped: 0, duplicate: true };
-    }
-    throw err;
   }
 
   const credit = await creditSavvy(user, {

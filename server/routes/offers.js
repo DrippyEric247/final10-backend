@@ -3,8 +3,8 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const OfferInteraction = require("../models/OfferInteraction");
 const User = require("../models/User");
-const PointsLedger = require("../models/PointsLedger");
 const BusinessOffer = require("../models/BusinessOffer");
+const { creditSavvy } = require("../services/savvyBalanceService");
 
 const router = express.Router();
 
@@ -196,20 +196,17 @@ router.post("/:id/claim", auth, async (req, res) => {
       const user = await User.findById(req.user._id);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      user.pointsBalance = (user.pointsBalance || 0) + totalReward;
-      user.lifetimePointsEarned = (user.lifetimePointsEarned || 0) + totalReward;
-      await user.save();
-
-      await PointsLedger.create({
-        userId: user._id,
-        type: "earn",
+      const idempotencyKey = `offer_claim_${user._id}_${offerId}`;
+      const credit = await creditSavvy(user, {
         amount: totalReward,
         source: "offer_claim_reward",
-        refId: offerId,
-        idempotencyKey: `offer_claim_${user._id}_${offerId}`,
-      }).catch((err) => {
-        if (err?.code !== 11000) throw err;
+        idempotencyKey,
+        meta: { offerId, clickReward, claimReward },
       });
+
+      if (credit.granted) {
+        await user.save();
+      }
     }
 
     const businessOffer = await BusinessOffer.findById(offerId).catch(() => null);

@@ -117,6 +117,7 @@ export default function OfferCard({
           trustScore={offer.trustScore}
           price={offer.price}
           savings={offer.savings}
+          rewardSource="offer_claim_reward"
           live
         />
 

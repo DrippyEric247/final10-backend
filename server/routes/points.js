@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 
 const User = require('../models/User');
 const Points = require('../models/PointsLedger');
+const SavvyTransaction = require('../models/SavvyTransaction');
 const CFG = require('../config/points');
 const { debitSavvy } = require('../services/savvyBalanceService');
 const {
@@ -29,10 +30,34 @@ router.get('/me', auth, async (req, res) => {
   const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const recent = await Points.find({ userId: user._id })
+  const recentLedger = await Points.find({ userId: user._id })
     .sort({ createdAt: -1 })
     .limit(25)
     .lean();
+
+  const recentTransactions = await SavvyTransaction.find({
+    userId: user._id,
+    status: 'completed',
+  })
+    .sort({ createdAt: -1 })
+    .limit(25)
+    .lean();
+
+  const recent = recentTransactions.map((row) => ({
+    _id: row._id,
+    userId: row.userId,
+    type: row.amount >= 0 ? 'earn' : 'spend',
+    amount: Math.abs(row.amount),
+    signedAmount: row.amount,
+    source: row.source,
+    refId: row.meta?.listingId || row.meta?.offerId || row.rewardType || null,
+    idempotencyKey: row.idempotencyKey,
+    balanceBefore: row.balanceBefore,
+    balanceAfter: row.balanceAfter,
+    meta: row.meta,
+    createdAt: row.createdAt,
+    ledger: 'SavvyTransaction',
+  }));
 
   res.json({
     pointsBalance: user.pointsBalance ?? 0,
@@ -40,6 +65,8 @@ router.get('/me', auth, async (req, res) => {
     lifetimePointsEarned: user.lifetimePointsEarned ?? 0,
     badges: user.badges ?? [],
     recent,
+    recentLedger,
+    recentTransactions,
     trial: user.trial ?? { isActive: false },
     savvyCredits: serializeCreditState(user),
   });
@@ -59,26 +86,6 @@ router.post('/redeem', auth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     if ((user.pointsBalance ?? 0) < pts) return res.status(400).json({ error: 'Insufficient points' });
 
-    // create ledger row (idempotent)
-    try {
-      await Points.create({
-        userId: user._id,
-        type: 'redeem',
-        amount: pts,
-        source: 'auction_redeem',
-        refId: auctionId || 'n/a',
-        idempotencyKey,
-      });
-    } catch (e) {
-      if (e?.code === 11000) {
-        // duplicate idempotencyKey -> treat as success
-        const discountUSD = pts * CFG.DISCOUNT_RATIO;
-        return res.json({ ok: true, idempotent: true, discountUSD, newBalance: user.pointsBalance - pts });
-      }
-      throw e;
-    }
-
-    // update spendable balance via canonical service
     const spend = await debitSavvy(user, {
       amount: pts,
       source: 'auction_redeem',

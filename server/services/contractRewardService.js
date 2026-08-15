@@ -31,12 +31,23 @@ async function grantContractReward(user, { contract, periodKey, reward }) {
 
   if (type === 'savvy' || type === 'savvy_coins') {
     const amount = Math.max(1, Math.round(Number(reward.amount) || 0));
+    const multiplierEligible =
+      reward.multiplierEligible === true || reward.rewardClass === 'earning';
     const result = await grantSavvyReward(user, {
       rewardType: 'contract_reward',
       amount,
+      baseAmount: amount,
       idempotencyKey: `${idempotencyBase}:savvy`,
       note: `Contract: ${contract.title}`,
-      meta: { contractId: contract.id, periodKey, appId: contract.appId, rewardType: type },
+      meta: {
+        contractId: contract.id,
+        periodKey,
+        appId: contract.appId,
+        rewardType: type,
+        policySource: 'contract_config',
+        multiplierEligible,
+        rewardClass: multiplierEligible ? 'earning' : 'fixed',
+      },
     });
     return {
       granted: Boolean(result.granted),

@@ -57,8 +57,20 @@ describe('2 — power affects payouts', () => {
     const state = resolveSavvyMultiplierState(
       user({ powerMultiplier: 1.5, powerMultiplierBonus: 0 })
     );
+    expect(state.powerMultiplier).toBe(1.5);
     expect(state.coreMultiplier).toBe(1.85); // 1.5 + 0.35 pro
     expect(applySavvyMultiplier(500, user({ powerMultiplier: 1.5 })).totalSavvy).toBe(925);
+  });
+
+  it('includes powerMultiplierBonus in earnings (matches top-bar power)', () => {
+    const u = user({
+      powerMultiplier: 1,
+      powerMultiplierBonus: 1.7,
+      subscription: { tier: 'free' },
+      membershipTier: 'free',
+    });
+    expect(resolveSavvyMultiplierState(u).effectiveMultiplier).toBe(2.7);
+    expect(applySavvyMultiplier(100, u).totalSavvy).toBe(270);
   });
 });
 

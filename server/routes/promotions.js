@@ -5,7 +5,6 @@ const PromotedListing = require('../models/PromotedListing');
 const PromotionPackage = require('../models/PromotionPackage');
 const PromotionPayment = require('../models/PromotionPayment');
 const User = require('../models/User');
-const PointsLedger = require('../models/PointsLedger');
 const { creditSavvy } = require('../services/savvyBalanceService');
 const auth = require('../middleware/auth');
 
@@ -359,16 +358,6 @@ router.post('/watch/:listingId', async (req, res) => {
         idempotencyKey: `watch_listing_${user._id}_${listingId}`,
         meta: { refId: listingId },
       });
-      await PointsLedger.create({
-        userId: user._id,
-        type: 'earn',
-        amount: WATCH_SAVVY_BONUS,
-        source: 'watch_listing',
-        refId: listingId,
-        idempotencyKey: `watch_listing_${user._id}_${listingId}`,
-      }).catch((err) => {
-        if (err?.code !== 11000) throw err;
-      });
 
       setImmediate(() => {
         try {
@@ -618,16 +607,6 @@ router.post('/private-offers/:offerId/claim', async (req, res) => {
       meta: { refId: offerId },
     });
     await user.save();
-    await PointsLedger.create({
-      userId: user._id,
-      type: 'earn',
-      amount: BUYER_CLAIM_OFFER_SAVVY,
-      source: 'private_offer_claim',
-      refId: offerId,
-      idempotencyKey: `private_offer_claim_${user._id}_${offerId}`,
-    }).catch((err) => {
-      if (err?.code !== 11000) throw err;
-    });
 
     activeOffer.conversions = Number(activeOffer.conversions || 0) + 1;
     promotion.watcherActivity.push({ user: user._id, action: 'claim_offer', at: new Date() });
@@ -642,16 +621,6 @@ router.post('/private-offers/:offerId/claim', async (req, res) => {
         meta: { refId: offerId },
       });
       await seller.save();
-      await PointsLedger.create({
-        userId: seller._id,
-        type: 'earn',
-        amount: SELLER_CONVERSION_SAVVY,
-        source: 'private_offer_conversion',
-        refId: offerId,
-        idempotencyKey: `private_offer_conversion_${seller._id}_${offerId}_${user._id}`,
-      }).catch((err) => {
-        if (err?.code !== 11000) throw err;
-      });
     }
 
     return res.json({

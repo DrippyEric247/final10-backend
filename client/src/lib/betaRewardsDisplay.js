@@ -40,6 +40,7 @@ export function getBetaRewardsCompactLabel(user = null, entitlement = null) {
 
 /**
  * During beta, low/unverified tiers render as medium-trust estimates with positive copy.
+ * Amounts are resolved server-side by SavvyRewardBadge — this only adjusts lock state.
  */
 export function applyBetaRewardUnlock({
   reward,
@@ -47,7 +48,6 @@ export function applyBetaRewardUnlock({
   trustScore,
   price,
   savings,
-  multiplier,
 }) {
   const wouldLock = isRewardsLockedTier(reward.tier);
   if (!wouldLock) {
@@ -61,10 +61,9 @@ export function applyBetaRewardUnlock({
     trustScore: BETA_REWARD_DISPLAY_TRUST_SCORE,
     price,
     savings,
-    multiplier,
   });
   return {
-    reward: unlocked,
+    reward: { ...reward, ...unlocked, tier: 'medium' },
     rewardsLocked: false,
     betaUnlocked: true,
     betaLabel: getBetaRewardsActiveLabel(),

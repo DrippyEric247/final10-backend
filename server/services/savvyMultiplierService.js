@@ -26,6 +26,7 @@ const {
   dealStreakAdditiveBonus,
 } = require('../config/savvyMultiplierConfig');
 const { MASTER_SAVVY_BONUS_FRACTION } = require('../config/masterClassifiedCollection');
+const { getRewardPolicy, REWARD_CLASS } = require('../config/savvyRewardPolicy');
 
 /** Display cap aligned with power bar. */
 const POWER_MULTIPLIER_CAP = 5.5;
@@ -44,9 +45,20 @@ function ensureDealStreak(user) {
   return user.dealStreak;
 }
 
+/**
+ * Power earnings base = server powerMultiplier + permanent egg/perk bonus.
+ * Matches client final10PowerEngine: clamp(serverMult + permanentBonus, 1, MAX).
+ */
+function readPowerMultiplierBonus(user) {
+  const raw = Number(user?.powerMultiplierBonus) || 0;
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return ROUND_MULTIPLIER(Math.min(5, raw));
+}
+
 function readPowerMultiplier(user) {
   const base = Math.max(POWER_EARNINGS_FLOOR, Number(user?.powerMultiplier) || 1);
-  return ROUND_MULTIPLIER(Math.min(POWER_MULTIPLIER_CAP, base));
+  const bonus = readPowerMultiplierBonus(user);
+  return ROUND_MULTIPLIER(Math.min(POWER_MULTIPLIER_CAP, base + bonus));
 }
 
 function readMasterCollectionAdditiveBonus(user) {
@@ -223,6 +235,10 @@ function resolveSpecialMultipliers(user) {
 }
 
 function resolveCoreMultiplier(user) {
+  const powerMultiplierBase = ROUND_MULTIPLIER(
+    Math.max(POWER_EARNINGS_FLOOR, Number(user?.powerMultiplier) || 1)
+  );
+  const powerMultiplierBonus = readPowerMultiplierBonus(user);
   const powerMultiplier = readPowerMultiplier(user);
   const additiveBonuses = resolveAdditiveBonuses(user);
   const additiveSum = ROUND_MULTIPLIER(
@@ -234,6 +250,8 @@ function resolveCoreMultiplier(user) {
 
   return {
     powerMultiplier,
+    powerMultiplierBase,
+    powerMultiplierBonus,
     additiveBonuses,
     additiveSum,
     uncappedCore: uncapped,
@@ -252,6 +270,8 @@ function resolveSavvyMultiplierState(user) {
 
   return {
     powerMultiplier: core.powerMultiplier,
+    powerMultiplierBase: core.powerMultiplierBase,
+    powerMultiplierBonus: core.powerMultiplierBonus,
     additiveBonuses: core.additiveBonuses,
     coreMultiplier: core.coreMultiplier,
     uncappedCore: core.uncappedCore,
@@ -300,6 +320,86 @@ function applySavvyMultiplier(baseSavvy, user) {
     eventMultiplier: state.specialCombined,
     eventKey: state.eventKey,
     eventLabel: state.eventLabel,
+  };
+}
+
+/**
+ * Authoritative payout resolver — applies reward policy then multiplier when eligible.
+ */
+function resolveAuthoritativeSavvyPayout(user, baseAmount, source, options = {}) {
+  clearExpiredSavvyBoosts(user);
+  const policy = getRewardPolicy(source, options);
+  const base = Math.max(0, Math.round(Number(baseAmount) || 0));
+  const multiplierState = resolveSavvyMultiplierState(user);
+
+  if (!policy.multiplierEligible || base <= 0) {
+    return {
+      source: policy.source,
+      rewardClass: policy.rewardClass,
+      multiplierEligible: false,
+      reason: policy.reason,
+      baseAmount: base,
+      appliedMultiplier: 1,
+      effectiveMultiplier: multiplierState.effectiveMultiplier,
+      finalAmount: base,
+      breakdown: {
+        powerMultiplier: multiplierState.powerMultiplier,
+        powerMultiplierBase: multiplierState.powerMultiplierBase,
+        powerMultiplierBonus: multiplierState.powerMultiplierBonus,
+        coreMultiplier: multiplierState.coreMultiplier,
+        effectiveMultiplier: multiplierState.effectiveMultiplier,
+        specialCombined: multiplierState.specialCombined,
+        additiveBonuses: multiplierState.additiveBonuses,
+        specialMultipliers: multiplierState.specialMultipliers,
+        capApplied: multiplierState.capApplied,
+      },
+    };
+  }
+
+  const payout = applySavvyMultiplier(base, user);
+  return {
+    source: policy.source,
+    rewardClass: policy.rewardClass,
+    multiplierEligible: true,
+    reason: policy.reason,
+    baseAmount: payout.baseSavvy,
+    appliedMultiplier: payout.effectiveMultiplier,
+    effectiveMultiplier: payout.effectiveMultiplier,
+    finalAmount: payout.totalSavvy,
+    coreSavvy: payout.coreSavvy,
+    specialBonusSavvy: payout.specialBonusSavvy,
+    breakdown: {
+      powerMultiplier: payout.state.powerMultiplier,
+      powerMultiplierBase: payout.state.powerMultiplierBase,
+      powerMultiplierBonus: payout.state.powerMultiplierBonus,
+      coreMultiplier: payout.coreMultiplier,
+      effectiveMultiplier: payout.effectiveMultiplier,
+      specialCombined: payout.specialCombined,
+      additiveBonuses: payout.state.additiveBonuses,
+      specialMultipliers: payout.state.specialMultipliers,
+      capApplied: payout.capApplied,
+    },
+  };
+}
+
+/**
+ * Authoritative Savvy reward calculation for previews and payouts.
+ * Respects FIXED vs EARNING reward policy per source.
+ */
+function calculateSavvyReward(user, baseAmount, options = {}) {
+  const source = options.source || options.rewardType || 'unknown';
+  const payout = resolveAuthoritativeSavvyPayout(user, baseAmount, source, options);
+  return {
+    source: payout.source,
+    rewardClass: payout.rewardClass,
+    multiplierEligible: payout.multiplierEligible,
+    reason: payout.reason,
+    baseAmount: payout.baseAmount,
+    multiplier: payout.appliedMultiplier,
+    appliedMultiplier: payout.appliedMultiplier,
+    effectiveMultiplier: payout.effectiveMultiplier,
+    finalAmount: payout.finalAmount,
+    breakdown: payout.breakdown,
   };
 }
 
@@ -366,6 +466,10 @@ function readActiveEvent(user) {
 module.exports = {
   POWER_MULTIPLIER_CAP,
   readPowerMultiplier,
+  readPowerMultiplierBonus,
+  calculateSavvyReward,
+  resolveAuthoritativeSavvyPayout,
+  REWARD_CLASS,
   readSubscriptionTierMultiplier,
   readActiveEvent,
   resolveDealEffectiveMultiplier,

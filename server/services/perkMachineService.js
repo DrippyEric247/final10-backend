@@ -313,21 +313,20 @@ async function applyReward(user, rewardDef, spinId) {
     const baseAmount = Number(rewardDef.baseAmount ?? rewardDef.amount) || 0;
     const spinMult = Number(rewardDef.spinMultiplier) || 1;
     const scaledBase = Number(rewardDef.amount) || baseAmount;
-    const savvyMult = getSavvyMultiplier(user);
-    const amount = Math.round(scaledBase * savvyMult);
     const result = await grantSavvyReward(user, {
       rewardType: 'perk_machine',
-      amount,
+      amount: scaledBase,
       baseAmount: scaledBase,
-      multiplier: savvyMult,
-      idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${amount}:${spinMult}`,
-      note: `Perk Machine — ${rewardDef.label}${savvyMult > 1 ? ' (1.5× boost)' : ''}${spinMult > 1 ? ` (${spinMult}× spin)` : ''}`,
-      meta: { spinId, source: 'perk_machine', multiplier: savvyMult, spinMultiplier: spinMult },
+      idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${scaledBase}:${spinMult}`,
+      note: `Perk Machine — ${rewardDef.label}${spinMult > 1 ? ` (${spinMult}× spin)` : ''}`,
+      meta: { spinId, source: 'perk_machine', spinMultiplier: spinMult },
     });
     granted.savvyGranted = result.amount;
-    granted.savvyBoosted = savvyMult > 1;
+    granted.savvyBoosted = false;
     granted.spinMultiplierApplied = spinMult > 1 ? spinMult : null;
     granted.newBalance = result.newBalance;
+    granted.rewardClass = result.rewardClass;
+    granted.multiplierEligible = result.multiplierEligible;
     if (rewardDef.baseAmount != null) {
       granted.baseAmount = rewardDef.baseAmount;
       granted.baseLabel = rewardDef.baseLabel || `+${rewardDef.baseAmount} Savvy`;

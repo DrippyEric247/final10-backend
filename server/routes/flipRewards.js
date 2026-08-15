@@ -4,7 +4,6 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const FlipTrackedListing = require('../models/FlipTrackedListing');
 const SavvyFlipRewardLog = require('../models/SavvyFlipRewardLog');
-const PointsLedger = require('../models/PointsLedger');
 const { getEntitlementByUserId } = require('../services/premiumEntitlementService');
 const { creditSavvy } = require('../services/savvyBalanceService');
 const {
@@ -62,16 +61,6 @@ async function creditSavvyWithCap(
   if (typeof userDoc.bumpWeeklyStat === 'function') {
     await userDoc.bumpWeeklyStat('savvyEarned', award);
   }
-  await PointsLedger.create({
-    userId: userDoc._id,
-    type: 'earn',
-    amount: award,
-    source,
-    refId: refId || '',
-    idempotencyKey,
-  }).catch((err) => {
-    if (err?.code !== 11000) throw err;
-  });
   await SavvyFlipRewardLog.create({
     userId: userDoc._id,
     kind: source === 'flip_listing_bonus' ? 'listing_bonus' : 'sale_stack',

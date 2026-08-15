@@ -7,7 +7,6 @@ const Alert = require('../models/Alert');
 const ProjectAlert = require('../models/ProjectAlert');
 const BuildWarsEntry = require('../models/BuildWarsEntry');
 const BuildWarsVote = require('../models/BuildWarsVote');
-const PointsLedger = require('../models/PointsLedger');
 const { creditSavvy } = require('../services/savvyBalanceService');
 const BW = require('../config/buildWars');
 const {
@@ -19,19 +18,6 @@ const {
 
 async function grantSavvyPoints(userId, amount, source, idempotencyKey) {
   if (!amount || amount <= 0) return { granted: false, amount: 0 };
-  try {
-    await PointsLedger.create({
-      userId,
-      type: 'earn',
-      amount,
-      source,
-      refId: BW.EVENT_ID,
-      idempotencyKey,
-    });
-  } catch (e) {
-    if (e?.code === 11000) return { granted: false, amount: 0, duplicate: true };
-    throw e;
-  }
   const result = await creditSavvy(userId, {
     amount,
     source,

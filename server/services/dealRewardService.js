@@ -6,9 +6,9 @@
 const SavvyRewardLog = require('../models/SavvyRewardLog');
 const DealRewardState = require('../models/DealRewardState');
 const {
-  applySavvyMultiplier,
   clearExpiredSavvyBoosts,
   resolveSavvyMultiplierState,
+  resolveAuthoritativeSavvyPayout,
 } = require('./savvyMultiplierService');
 
 const LOW_TRUST_THRESHOLD = 55;
@@ -108,8 +108,8 @@ async function estimateDealReward(user, listing) {
     };
   }
 
-  const payout = applySavvyMultiplier(baseSavvy, user);
-  const multiplierState = payout.state;
+  const payout = resolveAuthoritativeSavvyPayout(user, baseSavvy, 'deal_purchase');
+  const multiplierState = resolveSavvyMultiplierState(user);
 
   let state = 'eligible';
   if (user?._id && listingId) {
@@ -128,21 +128,24 @@ async function estimateDealReward(user, listing) {
     eligible: state !== 'not_eligible',
     trustTier: tier,
     baseSavvy,
+    rewardClass: payout.rewardClass,
+    multiplierEligible: payout.multiplierEligible,
+    appliedMultiplier: payout.appliedMultiplier,
     userMultiplier: multiplierState.effectiveMultiplier,
-    effectiveMultiplier: multiplierState.effectiveMultiplier,
+    effectiveMultiplier: payout.appliedMultiplier,
     coreMultiplier: multiplierState.coreMultiplier,
     powerMultiplier: multiplierState.powerMultiplier,
     additiveBonuses: multiplierState.additiveBonuses,
     specialMultipliers: multiplierState.specialMultipliers,
     capApplied: multiplierState.capApplied,
-    preEventTotal: payout.coreSavvy,
-    coreSavvy: payout.coreSavvy,
+    preEventTotal: payout.coreSavvy ?? Math.round(baseSavvy * multiplierState.coreMultiplier),
+    coreSavvy: payout.coreSavvy ?? Math.round(baseSavvy * multiplierState.coreMultiplier),
     eventKey: multiplierState.eventKey,
     eventLabel: multiplierState.eventLabel,
     eventMultiplier: multiplierState.specialCombined,
-    eventBonus: payout.specialBonusSavvy,
-    specialBonusSavvy: payout.specialBonusSavvy,
-    totalSavvy: payout.totalSavvy,
+    eventBonus: payout.specialBonusSavvy ?? Math.max(0, payout.finalAmount - (payout.coreSavvy || 0)),
+    specialBonusSavvy: payout.specialBonusSavvy ?? Math.max(0, payout.finalAmount - (payout.coreSavvy || 0)),
+    totalSavvy: payout.finalAmount,
     multiplierComponents: multiplierState.additiveBonuses,
     showEventBreakdown,
   };
@@ -241,10 +244,15 @@ async function confirmVerifiedDealPurchase(user, { listingId, listing = {} }) {
   const { grantSavvyReward } = require('./savvyRewardService');
   const grant = await grantSavvyReward(user, {
     rewardType: 'deal_purchase',
-    amount: pending.totalSavvy || estimate.totalSavvy || 0,
+    baseAmount: estimate.baseSavvy,
+    amount: estimate.baseSavvy,
     idempotencyKey,
     note: 'Verified deal purchase',
-    meta: { listingId: id, source: 'deal_purchase_confirm' },
+    meta: {
+      listingId: id,
+      source: 'deal_purchase_confirm',
+      clickoutTotalSavvy: pending.totalSavvy,
+    },
   });
 
   pending.status = 'claimed';

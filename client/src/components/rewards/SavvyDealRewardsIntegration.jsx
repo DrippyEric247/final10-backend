@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { computeSavvyReward } from './SavvyRewardBadge';
 import { useSavvyMultiplier } from '../../hooks/useSavvyMultiplier';
+import { useDealRewardEstimate } from '../../hooks/useDealRewardEstimate';
 import {
   DEV_SUBSCRIPTION_TOOLS_EVENT,
   getEffectiveSubscriptionTier,
@@ -109,16 +109,27 @@ export default function SavvyDealRewardsIntegration({
       ? Math.max(0, Number(listingMultiplierOverride))
       : undefined;
 
+  const listingId = item.itemId != null ? String(item.itemId) : '';
+  const dealSnapshot = useMemo(
+    () =>
+      listingId
+        ? {
+            listingId,
+            trustScore,
+            price,
+            savings,
+            estimatedPointsEarned: basePoints,
+            baseSavvy: basePoints,
+          }
+        : null,
+    [listingId, trustScore, price, savings, basePoints]
+  );
+  const { estimate: dealEstimate } = useDealRewardEstimate(dealSnapshot || {});
+
   const mockModel = useMemo(() => {
-    const pre = computeSavvyReward({
-      baseSavvy: basePoints,
-      trustScore,
-      price,
-      savings,
-      multiplier: 1,
-    });
+    const preBase = dealEstimate?.baseSavvy ?? Math.max(0, Math.round(Number(basePoints) || 0));
     return buildMockSavvyBreakdown({
-      baseAfterTrust: pre.baseAfterTrust,
+      baseAfterTrust: preBase,
       trustScore,
       bidCount,
       marketValue,
@@ -133,6 +144,7 @@ export default function SavvyDealRewardsIntegration({
       subscriptionTier,
     });
   }, [
+    dealEstimate?.baseSavvy,
     basePoints,
     trustScore,
     bidCount,
@@ -150,39 +162,44 @@ export default function SavvyDealRewardsIntegration({
 
   const effectiveMult = listingMult ?? savvyMultiplier.effectiveMultiplier;
 
-  const rawReward = useMemo(
-    () =>
-      computeSavvyReward({
-        baseSavvy: basePoints,
-        trustScore,
-        price,
-        savings,
-        multiplier: effectiveMult,
-      }),
-    [basePoints, trustScore, price, savings, effectiveMult]
-  );
+  const reward = useMemo(() => {
+    if (dealEstimate && dealEstimate.eligible !== false && dealEstimate.state !== 'not_eligible') {
+      return {
+        tier: dealEstimate.trustTier || 'medium',
+        baseAfterTrust: dealEstimate.baseSavvy ?? 0,
+        boosted: dealEstimate.totalSavvy ?? 0,
+        final: dealEstimate.totalSavvy ?? 0,
+        userMultiplier: dealEstimate.appliedMultiplier ?? dealEstimate.effectiveMultiplier ?? 1,
+        multiplierEligible: dealEstimate.multiplierEligible !== false,
+      };
+    }
+    return {
+      tier: 'medium',
+      baseAfterTrust: Math.max(0, Math.round(Number(basePoints) || 0)),
+      boosted: Math.max(0, Math.round(Number(basePoints) || 0)),
+      final: Math.max(0, Math.round(Number(basePoints) || 0)),
+      userMultiplier: 1,
+      multiplierEligible: false,
+    };
+  }, [dealEstimate, basePoints]);
 
-  const { reward, rewardsLocked, betaUnlocked, betaLabel } = useMemo(() => {
+  const displayReward = useMemo(() => {
     const resolved = applyBetaRewardUnlock({
-      reward: rawReward,
+      reward,
       baseSavvy: basePoints,
       trustScore,
       price,
       savings,
-      multiplier: effectiveMult,
     });
-    return {
-      reward: resolved.reward,
-      rewardsLocked: resolved.rewardsLocked,
-      betaUnlocked: resolved.betaUnlocked,
-      betaLabel: resolved.betaLabel,
-    };
-  }, [rawReward, basePoints, trustScore, price, savings, effectiveMult]);
+    return resolved;
+  }, [reward, basePoints, trustScore, price, savings]);
+
+  const { reward: resolvedReward, rewardsLocked, betaUnlocked, betaLabel } = displayReward;
 
   const betaRewardsLabel = betaLabel || getBetaRewardsActiveLabel();
 
   const walletBefore = readMockWalletBalance();
-  const walletAfter = walletBefore + reward.boosted;
+  const walletAfter = walletBefore + resolvedReward.boosted;
   const tweenWallet = useTweenTo(walletAfter, walletBefore);
 
   const streak = readMockStreak();
@@ -205,15 +222,15 @@ export default function SavvyDealRewardsIntegration({
           {savingsLabel ? <span className="sdr-save">{savingsLabel}</span> : <span className="sdr-save sdr-save--muted">Savvy rewards</span>}
           {!rewardsLocked ? (
             <span className={`sdr-savvy-amt sdr-glow-pulse${betaUnlocked ? ' sdr-savvy-amt--beta' : ''}`}>
-              {betaUnlocked ? `✨ ${betaRewardsLabel}` : `💎 ${formatSavvy(reward.boosted)}`}
+              {betaUnlocked ? `✨ ${betaRewardsLabel}` : `💎 ${formatSavvy(resolvedReward.boosted)}`}
             </span>
           ) : (
             <span className="sdr-savvy-amt sdr-savvy-amt--locked">💎 Rewards locked</span>
           )}
           {!rewardsLocked && betaUnlocked ? (
-            <span className="sdr-savvy-amt sdr-savvy-amt--beta-est">{formatSavvy(reward.boosted)}</span>
+            <span className="sdr-savvy-amt sdr-savvy-amt--beta-est">{formatSavvy(resolvedReward.boosted)}</span>
           ) : null}
-          {!rewardsLocked && effectiveMult > 1.02 ? (
+          {!rewardsLocked && effectiveMult > 1.02 && resolvedReward.multiplierEligible !== false ? (
             <span
               className="sdr-mult sdr-mult-shimmer"
               title="Server-authoritative final Savvy earnings multiplier"

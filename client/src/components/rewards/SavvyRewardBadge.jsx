@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SavvyPointsIcon } from "./SavvyPointsIcon";
-import { useSavvyMultiplier } from "../../hooks/useSavvyMultiplier";
+import { useDealRewardEstimate } from "../../hooks/useDealRewardEstimate";
+import { useSavvyRewardPreview } from "../../hooks/useSavvyRewardPreview";
 import {
   applyBetaRewardUnlock,
   getBetaRewardsActiveLabel,
   getBetaRewardsCompactLabel,
+  BETA_REWARD_DISPLAY_TRUST_SCORE,
+  isRewardsLockedTier,
+  shouldShowRewardsLocked,
 } from "../../lib/betaRewardsDisplay";
 
 /**
@@ -64,15 +68,8 @@ function deriveBaseSavvy({ baseSavvy, price, savings }) {
 }
 
 /**
- * Pure computation hook — expose so cards that need the number outside the
- * visual badge (e.g. a "gem burst" animation) can stay consistent.
- *
- * Returned shape:
- *  - `base`: raw, un-adjusted base Savvy from the caller.
- *  - `baseAfterTrust`: the listing-trust adjusted base (this is the "+113"
- *    number users see before any user-multiplier boost).
- *  - `boosted`: `baseAfterTrust * userMultiplier`, rounded.
- *  - `final`: alias of `boosted` (kept for backwards compatibility).
+ * Trust-tier base derivation only — multiplier/final amounts come from server preview.
+ * @deprecated for payout totals — use server estimate hooks instead.
  */
 export function computeSavvyReward({
   baseSavvy,
@@ -84,18 +81,20 @@ export function computeSavvyReward({
   const tier = getRewardTrustTier(trustScore);
   const base = deriveBaseSavvy({ baseSavvy, price, savings });
   const trustMult = TRUST_REWARD_MULTIPLIER[tier];
-  const userMult = Math.max(0, Number(multiplier) || 1);
   const baseAfterTrust = Math.max(0, Math.round(base * trustMult));
-  const boosted = Math.max(0, Math.round(baseAfterTrust * userMult));
   return {
     tier,
     base,
     baseAfterTrust,
-    boosted,
-    final: boosted,
+    boosted: baseAfterTrust,
+    final: baseAfterTrust,
     trustMultiplier: trustMult,
-    userMultiplier: userMult,
+    userMultiplier: 1,
   };
+}
+
+function buildTrustOnlyReward({ baseSavvy, trustScore, price, savings }) {
+  return computeSavvyReward({ baseSavvy, trustScore, price, savings, multiplier: 1 });
 }
 
 const TIER_CLASSES = {
@@ -161,56 +160,94 @@ function useTweenedNumber(target, durationMs = 520) {
 }
 
 /**
- * Read the user's authoritative Savvy earnings multiplier from the server.
- */
-function useUserMultiplier() {
-  const { effectiveMultiplier } = useSavvyMultiplier();
-  return Math.max(1, Number(effectiveMultiplier) || 1);
-}
-
-/**
  * @param {{
- *   baseSavvy?: number,   // caller-computed base (pre-trust) Savvy
- *   trustScore: number,   // 0–100
- *   price?: number,       // fallback for auto-computing base
- *   savings?: number,     // fallback for auto-computing base
- *   multiplier?: number,  // explicit override; otherwise pulled from context
- *   live?: boolean,       // use "Earn" instead of "Est. earn" prefix
- *   compact?: boolean,    // chip-style (single line, smaller)
+ *   listingId?: string,
+ *   rewardSource?: string,
+ *   baseSavvy?: number,
+ *   trustScore: number,
+ *   price?: number,
+ *   savings?: number,
+ *   multiplier?: number,
+ *   live?: boolean,
+ *   compact?: boolean,
  *   className?: string,
- *   showIcon?: boolean,   // default true
+ *   showIcon?: boolean,
  * }} props
  */
 export default function SavvyRewardBadge({
+  listingId,
+  rewardSource = "deal_purchase",
   baseSavvy,
   trustScore,
   price,
   savings,
-  multiplier,
+  multiplier: _multiplierOverride,
   live = false,
   compact = false,
   className = "",
   showIcon = true,
 }) {
-  const contextMultiplier = useUserMultiplier();
-  // Caller may pass an explicit override (e.g. promo cards). Otherwise we
-  // read the user's live multiplier from global state.
-  const effectiveMultiplier =
-    multiplier != null && Number.isFinite(Number(multiplier))
-      ? Math.max(0, Number(multiplier))
-      : contextMultiplier;
+  const tier = getRewardTrustTier(trustScore);
+  const rewardsLockedLocal = isRewardsLockedTier(tier);
+  const betaPreviewUnlock = rewardsLockedLocal && !shouldShowRewardsLocked(tier);
+  const effectiveTrustScore = betaPreviewUnlock ? BETA_REWARD_DISPLAY_TRUST_SCORE : trustScore;
 
-  const rawReward = useMemo(
-    () =>
-      computeSavvyReward({
-        baseSavvy,
-        trustScore,
-        price,
-        savings,
-        multiplier: effectiveMultiplier,
-      }),
-    [baseSavvy, trustScore, price, savings, effectiveMultiplier]
+  const dealSnapshot = useMemo(() => {
+    const id = String(listingId || "").trim();
+    if (!id) return null;
+    return {
+      listingId: id,
+      trustScore: effectiveTrustScore,
+      price,
+      savings,
+      estimatedPointsEarned: baseSavvy,
+      baseSavvy,
+    };
+  }, [listingId, effectiveTrustScore, price, savings, baseSavvy]);
+
+  const { estimate: dealEstimate, loading: dealLoading } = useDealRewardEstimate(dealSnapshot || {});
+
+  const trustOnlyBase = useMemo(
+    () => buildTrustOnlyReward({ baseSavvy, trustScore: effectiveTrustScore, price, savings }).baseAfterTrust,
+    [baseSavvy, effectiveTrustScore, price, savings]
   );
+
+  const previewBase = dealEstimate?.baseSavvy ?? trustOnlyBase ?? Math.round(Number(baseSavvy) || 0);
+  const previewSource = dealSnapshot ? "deal_purchase" : rewardSource;
+
+  const { preview: sourcePreview, loading: previewLoading } = useSavvyRewardPreview(
+    !dealSnapshot && previewBase > 0 && !rewardsLockedLocal
+      ? { baseAmount: previewBase, source: previewSource }
+      : null
+  );
+
+  const serverReward = useMemo(() => {
+    if (dealEstimate && dealEstimate.eligible !== false && dealEstimate.state !== "not_eligible") {
+      return {
+        tier: getRewardTrustTier(effectiveTrustScore),
+        baseAfterTrust: dealEstimate.baseSavvy ?? previewBase,
+        boosted: dealEstimate.totalSavvy ?? previewBase,
+        final: dealEstimate.totalSavvy ?? previewBase,
+        userMultiplier: dealEstimate.appliedMultiplier ?? dealEstimate.effectiveMultiplier ?? 1,
+        multiplierEligible: dealEstimate.multiplierEligible !== false,
+        rewardClass: dealEstimate.rewardClass || "earning",
+      };
+    }
+    if (sourcePreview) {
+      return {
+        tier: getRewardTrustTier(effectiveTrustScore),
+        baseAfterTrust: sourcePreview.baseAmount ?? previewBase,
+        boosted: sourcePreview.finalAmount ?? previewBase,
+        final: sourcePreview.finalAmount ?? previewBase,
+        userMultiplier: sourcePreview.appliedMultiplier ?? 1,
+        multiplierEligible: Boolean(sourcePreview.multiplierEligible),
+        rewardClass: sourcePreview.rewardClass || "fixed",
+      };
+    }
+    return buildTrustOnlyReward({ baseSavvy, trustScore: effectiveTrustScore, price, savings });
+  }, [dealEstimate, sourcePreview, effectiveTrustScore, previewBase, baseSavvy, price, savings]);
+
+  const rawReward = serverReward;
 
   const { reward, rewardsLocked, betaUnlocked, betaLabel } = useMemo(
     () => {
@@ -220,7 +257,6 @@ export default function SavvyRewardBadge({
         trustScore,
         price,
         savings,
-        multiplier: effectiveMultiplier,
       });
       return {
         reward: resolved.reward,
@@ -229,8 +265,10 @@ export default function SavvyRewardBadge({
         betaLabel: resolved.betaLabel,
       };
     },
-    [rawReward, baseSavvy, trustScore, price, savings, effectiveMultiplier]
+    [rawReward, baseSavvy, trustScore, price, savings]
   );
+
+  const loading = dealLoading || previewLoading;
 
   const tweenedBoosted = useTweenedNumber(reward.boosted);
   const tierClass = TIER_CLASSES[reward.tier] || TIER_CLASSES.medium;
@@ -239,7 +277,11 @@ export default function SavvyRewardBadge({
   const betaFullLabel = betaLabel || getBetaRewardsActiveLabel();
   // Treat values within 1% of 1.0x as "no boost" so floating-point noise
   // doesn't flicker the boost suffix on/off.
-  const hasBoost = !rewardsLocked && reward.userMultiplier > 1.01;
+  const hasBoost =
+    !rewardsLocked &&
+    !loading &&
+    reward.multiplierEligible !== false &&
+    reward.userMultiplier > 1.01;
   const baseLabel = rewardsLocked
     ? "🔒 Rewards locked"
     : betaUnlocked

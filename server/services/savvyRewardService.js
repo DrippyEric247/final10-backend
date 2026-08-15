@@ -8,6 +8,8 @@ const {
 const { normalizeTier } = require('../config/subscriptionPlans');
 const { auditRewardGrant } = require('./auditLogger');
 const { creditSavvy, debitSavvy } = require('./savvyBalanceService');
+const { resolveAuthoritativeSavvyPayout } = require('./savvyMultiplierService');
+const { REWARD_CLASS } = require('../config/savvyRewardPolicy');
 
 function readTier(user) {
   return normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
@@ -43,9 +45,14 @@ async function grantSavvyReward(user, {
   idempotencyKey,
   note,
   meta = {},
+  /** Server ignores client-supplied eligibility; only meta from trusted server config (e.g. contracts). */
+  multiplierEligible: _ignoredMultiplierEligible,
+  rewardClass: _ignoredRewardClass,
+  applyRewardPolicy = true,
 }) {
-  const savvyAmount = Math.round(Number(amount) || 0);
-  if (!savvyAmount || savvyAmount <= 0) {
+  const source = rewardType || meta.source || 'unknown';
+  const base = Math.round(Number(baseAmount || amount) || 0);
+  if (!base || base <= 0) {
     return {
       granted: false,
       amount: 0,
@@ -57,6 +64,32 @@ async function grantSavvyReward(user, {
     throw new Error('grantSavvyReward requires idempotencyKey');
   }
 
+  const policyOptions = {
+    rewardType,
+    multiplierEligible:
+      meta.contractId != null || meta.policySource === 'contract_config'
+        ? meta.multiplierEligible
+        : undefined,
+    rewardClass:
+      meta.contractId != null || meta.policySource === 'contract_config'
+        ? meta.rewardClass
+        : undefined,
+  };
+
+  const payout = applyRewardPolicy
+    ? resolveAuthoritativeSavvyPayout(user, base, source, policyOptions)
+    : {
+        baseAmount: base,
+        finalAmount: base,
+        appliedMultiplier: 1,
+        effectiveMultiplier: 1,
+        rewardClass: REWARD_CLASS.FIXED,
+        multiplierEligible: false,
+        reason: 'policy_bypass',
+      };
+
+  const savvyAmount = payout.finalAmount;
+
   const result = await creditSavvy(user, {
     amount: savvyAmount,
     source: rewardType || 'grant',
@@ -65,11 +98,18 @@ async function grantSavvyReward(user, {
     note,
     meta: {
       ...meta,
-      baseAmount,
-      multiplier,
+      source,
+      rewardClass: payout.rewardClass,
+      multiplierEligible: payout.multiplierEligible,
+      baseAmount: payout.baseAmount,
+      appliedMultiplier: payout.appliedMultiplier,
+      effectiveMultiplier: payout.effectiveMultiplier,
+      finalAmount: payout.finalAmount,
+      multiplier: payout.appliedMultiplier,
       streakBonus,
       streakDays,
       tier: readTier(user),
+      policyReason: payout.reason,
     },
   });
 
@@ -105,13 +145,17 @@ async function grantSavvyReward(user, {
       userId: user._id,
       rewardType,
       amount: savvyAmount,
-      baseAmount,
-      multiplier,
+      baseAmount: payout.baseAmount,
+      multiplier: payout.appliedMultiplier,
       streakBonus,
       streakDays,
       tier: readTier(user),
       idempotencyKey,
-      meta,
+      meta: {
+        ...meta,
+        rewardClass: payout.rewardClass,
+        multiplierEligible: payout.multiplierEligible,
+      },
     });
   } catch (e) {
     if (e?.code !== 11000) {
@@ -119,21 +163,25 @@ async function grantSavvyReward(user, {
     }
   }
 
-  try {
-    const pointType =
-      rewardType === SAVVY_REWARD_TYPES.STREAK_BONUS || rewardType === 'beta_feedback'
-        ? 'bonus'
-        : rewardType === SAVVY_REWARD_TYPES.DAILY_LOGIN
-          ? 'daily_login'
-          : 'bonus';
-    await SavvyPoint.create({
-      user_id: user._id,
-      type: pointType,
-      amount: savvyAmount,
-      note: note || `${rewardType} +${savvyAmount}`,
-    });
-  } catch (err) {
-    console.warn('[savvyReward] SavvyPoint ledger write failed:', err?.message);
+  // Legacy audit row (non-blocking; SavvyTransaction is authoritative).
+  // SavvyPoint writes are legacy-only — set SAVVY_LEGACY_POINT_LEDGER=1 to enable.
+  if (process.env.SAVVY_LEGACY_POINT_LEDGER === '1') {
+    try {
+      const pointType =
+        rewardType === SAVVY_REWARD_TYPES.STREAK_BONUS || rewardType === 'beta_feedback'
+          ? 'bonus'
+          : rewardType === SAVVY_REWARD_TYPES.DAILY_LOGIN
+            ? 'daily_login'
+            : 'bonus';
+      await SavvyPoint.create({
+        user_id: user._id,
+        type: pointType,
+        amount: savvyAmount,
+        note: note || `${rewardType} +${savvyAmount}`,
+      });
+    } catch (err) {
+      console.warn('[savvyReward] SavvyPoint ledger write failed:', err?.message);
+    }
   }
 
   if (process.env.NODE_ENV !== 'production') {
@@ -148,6 +196,11 @@ async function grantSavvyReward(user, {
   return {
     granted: true,
     amount: savvyAmount,
+    baseAmount: payout.baseAmount,
+    appliedMultiplier: payout.appliedMultiplier,
+    effectiveMultiplier: payout.effectiveMultiplier,
+    rewardClass: payout.rewardClass,
+    multiplierEligible: payout.multiplierEligible,
     duplicate: false,
     newBalance: result.newBalance,
     balanceBefore: result.balanceBefore,
@@ -251,4 +304,6 @@ module.exports = {
   claimDailyLoginReward,
   updateLoginStreak,
   readTier,
+  getRewardPolicy: require('../config/savvyRewardPolicy').getRewardPolicy,
+  REWARD_CLASS: require('../config/savvyRewardPolicy').REWARD_CLASS,
 };
