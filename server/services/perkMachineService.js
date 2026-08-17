@@ -95,8 +95,15 @@ function ensurePerkMachineDoc(user) {
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
   if (typeof pm.spinHeatTierIndex !== 'number') pm.spinHeatTierIndex = 0;
   if (pm.spinHeatCooldownUntil === undefined) pm.spinHeatCooldownUntil = null;
+  if (pm.freePerkSpinUntil === undefined) pm.freePerkSpinUntil = null;
   ensureNukeDoc(pm);
   return pm;
+}
+
+function isFreePerkSpinHourActive(user) {
+  const pm = ensurePerkMachineDoc(user);
+  if (!pm.freePerkSpinUntil) return false;
+  return new Date(pm.freePerkSpinUntil).getTime() > Date.now();
 }
 
 function readTier(user) {
@@ -200,6 +207,8 @@ function getPerkMachineStatus(user) {
     scoutUpgrades: Number(pm.scoutUpgrades) || 0,
     nextSpinGuaranteedMultiplier: Number(pm.nextSpinGuaranteedMultiplier) || 0,
     nextSupplyDropDouble: Boolean(pm.nextSupplyDropDouble),
+    freePerkSpinUntil: pm.freePerkSpinUntil || null,
+    freePerkSpinHourActive: isFreePerkSpinHourActive(user),
     powerMultiplierBonus: Math.round((Number(user.powerMultiplierBonus) || 0) * 100) / 100,
     timedEventTokens: serializeTimedEventTokens(user),
     personalEvents: serializePersonalEvents(user),
@@ -258,6 +267,18 @@ async function getPerkMachineStatusWithEvents(user) {
   }
 
   status.savvySale = savvySale;
+
+  if (isFreePerkSpinHourActive(user)) {
+    for (const key of ['paid_1', 'paid_2', 'paid_3']) {
+      const base = status.spinCosts[key]?.baseSavvy ?? status.spinCosts[key]?.savvy ?? 0;
+      status.spinCosts[key] = {
+        ...status.spinCosts[key],
+        savvy: 0,
+        originalSavvy: base,
+        freePerkHourApplied: true,
+      };
+    }
+  }
 
   const nukeExpired = maybeExpireNukeEvent(user);
   if (nukeExpired) {
@@ -463,6 +484,75 @@ async function applyReward(user, rewardDef, spinId) {
   } else if (rewardDef.type === 'bp_tier_skip') {
     pm.tokens.battlePassTierSkip = Number(pm.tokens.battlePassTierSkip || 0) + qty;
     granted.tierSkipsGranted = qty;
+  } else if (rewardDef.type === 'bp_tier_skip_bulk') {
+    const tiers = Math.max(1, Number(rewardDef.tiers) || Number(rewardDef.quantity) || 1);
+    const { applyBattlePassTierSkip } = require('./battlePassSkipService');
+    const skipResult = await applyBattlePassTierSkip(user, tiers, {
+      idempotencyKey: `bp_skip_bulk:${user._id}:${spinId}`,
+      source: rewardDef.id || 'mythic_bp_skip_20',
+    });
+    granted.tierSkipsGranted = skipResult.tiersApplied || 0;
+    granted.battlePassSkip = skipResult;
+    if (skipResult.converted) {
+      granted.savvyGranted = skipResult.savvyGranted || 0;
+      granted.label = 'Battle Pass Complete — +2,000 Savvy';
+      granted.convertedFromBpSkip = true;
+    }
+  } else if (rewardDef.type === 'login_streak_advance') {
+    const advanceDays = Math.max(1, Number(rewardDef.days) || 1);
+    const { advanceLoginStreakProgress } = require('./dailyStreakService');
+    const advance = await advanceLoginStreakProgress(user, advanceDays, {
+      idempotencyKey: `login_skip:${user._id}:${spinId}`,
+      source: rewardDef.id || 'login_streak_skip',
+    });
+    granted.loginStreakAdvance = advance;
+    granted.daysAdvanced = advanceDays;
+    if (advance.savvyGranted) {
+      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + advance.savvyGranted;
+    }
+  } else if (rewardDef.type === 'free_perk_spin_hour') {
+    const durationMs = Number(rewardDef.durationMs) || 60 * 60 * 1000;
+    const now = Date.now();
+    const currentUntil = pm.freePerkSpinUntil
+      ? new Date(pm.freePerkSpinUntil).getTime()
+      : 0;
+    const base = currentUntil > now ? currentUntil : now;
+    pm.freePerkSpinUntil = new Date(base + durationMs);
+    granted.freePerkSpinUntil = pm.freePerkSpinUntil;
+    granted.freePerkSpinHour = true;
+  } else if (rewardDef.type === 'egg_haul') {
+    const { grantEggHaul } = require('./eggHaulService');
+    const haul = await grantEggHaul(user, `egg_haul:${user._id}:${spinId}`);
+    granted.eggHaul = haul;
+    granted.totalEggsGranted = haul.totalEggs || 0;
+  } else if (rewardDef.type === 'easter_challenge_activator') {
+    const { activateEasterChallenge } = require('./easterChallengeService');
+    const challengeId = rewardDef.challengeId || 'wave3_placeholder';
+    const activation = await activateEasterChallenge(user, challengeId, {
+      idempotencyKey: `easter_activate:${user._id}:${spinId}`,
+      adminBypass: Boolean(rewardDef.adminBypass),
+    });
+    granted.easterChallenge = activation;
+    if (activation.fallbackRequired && activation.slotOccupied) {
+      const { grantSavvyReward } = require('./savvyRewardService');
+      const { REWARD_CLASS } = require('../config/savvyRewardPolicy');
+      const fallback = await grantSavvyReward(user, {
+        rewardType: 'easter_challenge',
+        amount: 5000,
+        baseAmount: 5000,
+        idempotencyKey: `easter_fallback:${user._id}:${spinId}`,
+        note: 'Easter challenge slot occupied — Savvy fallback',
+        meta: {
+          rewardClass: REWARD_CLASS.FIXED,
+          multiplierEligible: false,
+          fallbackReason: 'slot_occupied',
+          activeChallengeId: activation.activeChallengeId,
+        },
+      });
+      granted.easterChallengeFallback = true;
+      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + (fallback.amount || 0);
+      granted.label = 'Challenge Slot Occupied — +5,000 Savvy';
+    }
   } else if (rewardDef.type === 'supply_drop') {
     const drop = await createSupplyDrop({
       scope: 'user',
@@ -521,6 +611,7 @@ async function spinPerkMachine(user, options = {}) {
     let usedPaid3Token = false;
     let usedPaid2Token = false;
     let usedExtraFreeSpin = false;
+    let freePerkHourApplied = false;
 
     const savvySale = await getActiveSavvySale();
 
@@ -564,6 +655,19 @@ async function spinPerkMachine(user, options = {}) {
         originalSavvyCost = heatBase;
         savvySaleApplied = true;
         savvySaleSavings = heatBase - discounted;
+      }
+
+      if (
+        mode !== SPIN_MODES.FREE &&
+        isFreePerkSpinHourActive(user) &&
+        savvyCost > 0 &&
+        !options.adminBypassCost
+      ) {
+        originalSavvyCost = savvyCost;
+        savvyCost = 0;
+        freePerkHourApplied = true;
+        savvySaleApplied = false;
+        savvySaleSavings = 0;
       }
 
       const balance = Math.round(Number(user.savvyPoints) || 0);
@@ -1022,4 +1126,6 @@ module.exports = {
   canUseFreeSpin,
   serializeEggInventory,
   serializeHistory,
+  applyReward,
+  isFreePerkSpinHourActive,
 };

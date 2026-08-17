@@ -33,6 +33,7 @@ function ensureDailyStreakDoc(user) {
   if (typeof ds.legacyLoyalistUnlocked !== 'boolean') ds.legacyLoyalistUnlocked = false;
   if (typeof ds.shieldsConsumed !== 'number') ds.shieldsConsumed = 0;
   if (!ds.streakShieldActiveUntil) ds.streakShieldActiveUntil = null;
+  if (!Array.isArray(ds.loginSkipHistory)) ds.loginSkipHistory = [];
   return ds;
 }
 
@@ -565,6 +566,109 @@ function activateStreakShieldProtection(user) {
   };
 }
 
+/**
+ * Advance login streak progression by N eligible days (NOT calendar timestamps).
+ * Grants newly crossed milestones exactly once; idempotent per idempotencyKey.
+ */
+async function advanceLoginStreakProgress(user, days, options = {}) {
+  const advanceDays = Math.max(1, Math.round(Number(days) || 1));
+  const idempotencyKey = String(options.idempotencyKey || '').trim();
+  const source = String(options.source || 'login_streak_skip').trim();
+
+  if (!idempotencyKey) {
+    throw new Error('advanceLoginStreakProgress requires idempotencyKey');
+  }
+
+  const ds = ensureDailyStreakDoc(user);
+  const prior = (ds.loginSkipHistory || []).find((h) => h.idempotencyKey === idempotencyKey);
+  if (prior) {
+    return {
+      advanced: false,
+      duplicate: true,
+      fromStreak: prior.fromStreak,
+      toStreak: prior.toStreak,
+      daysAdvanced: prior.days,
+      milestonesGranted: prior.milestonesGranted || [],
+    };
+  }
+
+  const fromStreak = Math.max(0, Number(user.loginStreakDays) || 0);
+  const toStreak = fromStreak + advanceDays;
+  syncStreakFields(user, toStreak);
+
+  const milestonesGranted = [];
+  let totalSavvy = 0;
+  let grants = {
+    savvy: 0,
+    scoutEggs: null,
+    scoutShields: 0,
+    callingCards: [],
+    badges: [],
+  };
+
+  for (let day = fromStreak + 1; day <= toStreak; day += 1) {
+    const milestone = findMilestoneForDay(day);
+    if (!milestone) continue;
+    if (ds.claimedMilestoneDays.includes(milestone.day)) continue;
+
+    if (milestone.savvy > 0) {
+      const milestoneKey = `streak_skip_milestone:${user._id}:${milestone.day}:${idempotencyKey}`;
+      const grant = await grantSavvyReward(user, {
+        rewardType: STREAK_REWARD_TYPE,
+        amount: milestone.savvy,
+        streakDays: day,
+        idempotencyKey: milestoneKey,
+        note: `Login streak skip — day ${day} +${milestone.savvy} Savvy`,
+        meta: { milestoneDay: day, source, skipIdempotencyKey: idempotencyKey },
+      });
+      if (grant.granted) {
+        totalSavvy += grant.amount;
+        grants.savvy += grant.amount;
+      }
+    }
+
+    grants = await grantMilestoneInventory(user, milestone, grants);
+    milestonesGranted.push({
+      day: milestone.day,
+      label: milestone.label,
+      savvy: milestone.savvy || 0,
+    });
+  }
+
+  const hiddenResult = await applyHiddenAchievements(user, toStreak, grants, utcDayKey(), {
+    adminRunId: null,
+  });
+  grants = hiddenResult.grants;
+  totalSavvy += hiddenResult.savvyGranted || 0;
+
+  ds.loginSkipHistory.push({
+    idempotencyKey,
+    source,
+    days: advanceDays,
+    fromStreak,
+    toStreak,
+    milestonesGranted,
+    at: new Date(),
+  });
+  if (ds.loginSkipHistory.length > 50) {
+    ds.loginSkipHistory = ds.loginSkipHistory.slice(-50);
+  }
+
+  user.markModified('dailyStreak');
+
+  return {
+    advanced: true,
+    duplicate: false,
+    fromStreak,
+    toStreak,
+    daysAdvanced: advanceDays,
+    milestonesGranted,
+    savvyGranted: totalSavvy,
+    grants,
+    hiddenUnlocked: hiddenResult.unlocked || [],
+  };
+}
+
 module.exports = {
   claimDailyStreak,
   getStreakStatus,
@@ -575,4 +679,5 @@ module.exports = {
   clearTodayClaimLock,
   adminGrantMilestoneRewards,
   activateStreakShieldProtection,
+  advanceLoginStreakProgress,
 };

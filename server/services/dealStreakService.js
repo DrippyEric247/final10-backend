@@ -318,6 +318,14 @@ async function recordQualifyingDeal(userId, params = {}) {
       contractTriggered = true;
     }
 
+    let eggMilestoneGrant = null;
+    try {
+      const { evaluateDealStreakEggMilestones } = require('./dealStreakEggMilestoneService');
+      eggMilestoneGrant = await evaluateDealStreakEggMilestones(user, ds.currentDealStreak);
+    } catch (err) {
+      console.error('[deal-streak] egg milestone grant failed', err?.message || err);
+    }
+
     nukeUpdate = updateNukeCategoryStreak(ds, category, now);
 
     if (
@@ -369,6 +377,7 @@ async function recordQualifyingDeal(userId, params = {}) {
     counted,
     skipReason,
     contractTriggered,
+    eggMilestoneGrant,
     nukeCompletion,
     nukeUpdate,
     category,

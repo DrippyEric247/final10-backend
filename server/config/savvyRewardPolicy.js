@@ -54,6 +54,8 @@ const FIXED_SOURCES = new Set([
   'event_reward',
   'egg_exchange',
   'egg_hatch_token',
+  'mythic_bp_skip_conversion',
+  'easter_challenge',
   // Business offers (flat offer math, not deal multiplier pipeline)
   'offer_claim_reward',
   'private_offer_claim',

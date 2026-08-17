@@ -85,6 +85,42 @@ const userSchema = new mongoose.Schema({
     legacyLoyalistUnlocked: { type: Boolean, default: false },
     shieldsConsumed: { type: Number, default: 0 },
     streakShieldActiveUntil: { type: Date, default: null },
+    loginSkipHistory: {
+      type: [
+        {
+          idempotencyKey: String,
+          source: String,
+          days: Number,
+          fromStreak: Number,
+          toStreak: Number,
+          milestonesGranted: mongoose.Schema.Types.Mixed,
+          at: Date,
+        },
+      ],
+      default: [],
+    },
+  },
+  /** Easter Egg Challenge — active objective state (hidden challenges stay admin-only). */
+  easterChallenge: {
+    activeChallengeId: { type: String, default: null },
+    activeChallengeStartedAt: { type: Date, default: null },
+    activeChallengeExpiresAt: { type: Date, default: null },
+    activeChallengeProgress: { type: Number, default: 0 },
+    activeChallengeTarget: { type: Number, default: 0 },
+    activeChallengeObjective: { type: String, default: null },
+    completedChallengeIds: [{ type: String }],
+    claimedChallengeIds: [{ type: String }],
+    activationHistory: {
+      type: [
+        {
+          idempotencyKey: String,
+          challengeId: String,
+          activatedAt: Date,
+          expiresAt: Date,
+        },
+      ],
+      default: [],
+    },
   },
   /** Savvy Perk Machine — spins, egg inventory, tokens */
   perkMachine: {
@@ -118,8 +154,22 @@ const userSchema = new mongoose.Schema({
       paid2Spin: { type: Number, default: 0 },
       /** Max Supply Drop activation tokens. */
       maxSupplyDrop: { type: Number, default: 0 },
-      /** Battle Pass tier skip tokens. */
+  // Battle Pass tier skip tokens.
       battlePassTierSkip: { type: Number, default: 0 },
+    },
+    /** Mythic free Perk Machine hour — paid spins cost 0 Savvy while active. */
+    freePerkSpinUntil: { type: Date, default: null },
+    /** Egg Haul grant audit trail (idempotency). */
+    eggHaulGrants: {
+      type: [
+        {
+          idempotencyKey: String,
+          grantedAt: Date,
+          distribution: mongoose.Schema.Types.Mixed,
+          totalEggs: Number,
+        },
+      ],
+      default: [],
     },
     /** Timed boosts activated from inventory tokens: { [key]: { activatedAt, expiresAt } } */
     activeBoosts: { type: mongoose.Schema.Types.Mixed, default: {} },
