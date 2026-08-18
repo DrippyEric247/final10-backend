@@ -5,6 +5,10 @@ const alertMatchSchema = new mongoose.Schema(
     auction: { type: mongoose.Schema.Types.ObjectId, ref: 'Auction', required: true },
     matchedAt: { type: Date, default: Date.now },
     reason: { type: String, default: '' },
+    inAppSentAt: { type: Date, default: null },
+    emailSentAt: { type: Date, default: null },
+    savvyGrantedAt: { type: Date, default: null },
+    deliveryKey: { type: String, default: null },
   },
   { _id: true }
 );
@@ -22,6 +26,18 @@ const alertSchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "triggered", "paused"], default: "active", index: true },
     context: { type: mongoose.Schema.Types.Mixed, default: {} },
     isActive: { type: Boolean, default: true },
+    /** Server time when alert becomes eligible for first scan (Wave 5). */
+    eligibleAt: { type: Date, default: null },
+    /** Server time when alert is next due for scanning (Wave 5). */
+    nextScanAt: { type: Date, default: null },
+    lastScannedAt: { type: Date, default: null },
+    effectiveSpeedTier: { type: String, default: 'standard' },
+    speedLabel: { type: String, default: 'Standard' },
+    /** Short-lived scan claim to reduce duplicate worker processing. */
+    scanClaimedAt: { type: Date, default: null },
+    scanClaimExpiresAt: { type: Date, default: null },
+    /** Opaque token — only the claim holder may finalize scan for this alert. */
+    scanClaimToken: { type: String, default: null },
     lastTriggeredAt: { type: Date },
     matches: [alertMatchSchema],
     triggerCount: { type: Number, default: 0 },
@@ -99,6 +115,9 @@ alertSchema.methods.explainAuctionMismatch = function explainAuctionMismatch(auc
 
   return null;
 };
+
+alertSchema.index({ isActive: 1, nextScanAt: 1, eligibleAt: 1 });
+alertSchema.index({ user: 1, isActive: 1 });
 
 module.exports = mongoose.model('Alert', alertSchema);
 

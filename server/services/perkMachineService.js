@@ -470,6 +470,17 @@ async function applyReward(user, rewardDef, spinId) {
     granted.timedTokenId = token.id;
     granted.eventKind = token.kind;
     granted.durationMs = token.durationMs;
+  } else if (rewardDef.type === 'faster_alert_perk') {
+    const { grantFasterAlertPerk } = require('./alertTimingService');
+    const { FASTER_ALERT_PERK } = require('../config/alertSpeedConfig');
+    const durationMs = Number(rewardDef.durationMs) || FASTER_ALERT_PERK.defaultDurationMs;
+    const perkSource = String(spinId || '').startsWith('hatch:') ? 'egg_hatch' : 'perk_machine';
+    const perkResult = await grantFasterAlertPerk(user._id, durationMs, perkSource, {
+      idempotencyKey: `faster_alert:${user._id}:${spinId}:${rewardDef.id}`,
+    });
+    granted.fasterAlertPerk = true;
+    granted.fasterAlertExpiresAt = perkResult.expiresAt;
+    granted.fasterAlertIdempotent = Boolean(perkResult.idempotent);
   } else if (rewardDef.type === 'supply_drop_token') {
     pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + qty;
     granted.supplyDropTokensGranted = qty;

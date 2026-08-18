@@ -45,6 +45,7 @@ const EGG_HATCH_POOLS = Object.freeze({
     { id: 'hatch_streak_shield_5', type: 'streak_shield', quantity: 5, label: '5 Streak Shields', icon: '🛡️', rarity: 'rare', weight: 10 },
     { id: 'hatch_free_spin_5', type: 'egg', eggTier: 'extraFreeSpin', quantity: 5, label: '5 Free Perk Machine Spins', icon: '🎰', rarity: 'rare', weight: 10 },
     { id: 'hatch_supply_drop_token_1', type: 'supply_drop_token', quantity: 1, label: 'Max Supply Drop Token', icon: '📦', rarity: 'rare', weight: 8 },
+    { id: 'hatch_faster_alert_1h', type: 'faster_alert_perk', durationMs: DURATIONS.ONE_HOUR, label: '1-Hour Faster Alerts', icon: '🔔', rarity: 'rare', weight: 10 },
   ],
   epic: [
     { id: 'hatch_double_xp_10m', type: 'timed_event_token', eventKind: 'doubleXp', durationMs: DURATIONS.TEN_MIN, label: '10-Minute Double XP Token', icon: '⚡', rarity: 'rare', weight: 14 },

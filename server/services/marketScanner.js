@@ -268,12 +268,35 @@ class MarketScanner {
 
   async checkAlerts(auction, context = {}) {
     const { auditAlertScan } = require('./auditLogger');
+    const {
+      isAlertEligibleForScan,
+      resolveAlertSpeedProfile,
+      scheduleAfterScan,
+    } = require('./alertTimingService');
+    const { deliveryKey } = require('./alertDeliveryService');
     let newMatches = 0;
 
     try {
-      const alerts = await Alert.find({ isActive: true });
+      const query = { isActive: true };
+      if (Array.isArray(context.alertIds) && context.alertIds.length) {
+        query._id = { $in: context.alertIds };
+      }
+
+      const alerts = await Alert.find(query);
 
       for (const alert of alerts) {
+        if (!isAlertEligibleForScan(alert)) {
+          auditAlertScan({
+            phase: 'match_skipped_not_due',
+            alertId: String(alert._id),
+            alertName: alert.name,
+            eligibleAt: alert.eligibleAt,
+            nextScanAt: alert.nextScanAt,
+            source: context.source || null,
+          });
+          continue;
+        }
+
         const mismatch = alert.explainAuctionMismatch(auction);
         if (mismatch) {
           if (context.source === 'lane_sweep') {
@@ -291,10 +314,29 @@ class MarketScanner {
           continue;
         }
 
-        const already = (alert.matches || []).some(
-          (m) => String(m.auction) === String(auction._id)
+        const dKey = deliveryKey(alert._id, auction._id);
+        const updated = await Alert.findOneAndUpdate(
+          {
+            _id: alert._id,
+            isActive: true,
+            matches: { $not: { $elemMatch: { auction: auction._id } } },
+          },
+          {
+            $push: {
+              matches: {
+                auction: auction._id,
+                matchedAt: new Date(),
+                reason: 'Matches alert criteria',
+                deliveryKey: dKey,
+              },
+            },
+            $inc: { triggerCount: 1 },
+            $set: { lastTriggeredAt: new Date(), status: 'triggered' },
+          },
+          { new: true }
         );
-        if (already) {
+
+        if (!updated) {
           auditAlertScan({
             phase: 'match_skipped_duplicate',
             alertId: String(alert._id),
@@ -306,15 +348,6 @@ class MarketScanner {
           continue;
         }
 
-        alert.matches.push({
-          auction: auction._id,
-          matchedAt: new Date(),
-          reason: 'Matches alert criteria',
-        });
-
-        alert.triggerCount = Number(alert.triggerCount || 0) + 1;
-        alert.lastTriggeredAt = new Date();
-        await alert.save();
         newMatches += 1;
 
         console.log(
@@ -332,7 +365,19 @@ class MarketScanner {
           minConfidence: alert.minConfidence,
         });
 
-        await this.sendAlertNotification(alert.user, auction, alert);
+        const matchEntry = updated.matches[updated.matches.length - 1];
+        await this.sendAlertNotification(alert.user, auction, updated, matchEntry?._id);
+
+        try {
+          const profile = await resolveAlertSpeedProfile(alert.user);
+          const scanPatch = scheduleAfterScan(updated, profile);
+          await Alert.updateOne({ _id: alert._id }, {
+            $set: scanPatch,
+            $unset: { scanClaimedAt: 1, scanClaimExpiresAt: 1, scanClaimToken: 1 },
+          });
+        } catch {
+          /* non-blocking schedule update */
+        }
       }
     } catch (error) {
       console.error('[SavvyScout] Error checking alerts:', error);
@@ -342,10 +387,10 @@ class MarketScanner {
     return { newMatches };
   }
 
-  async sendAlertNotification(userId, auction, alert) {
+  async sendAlertNotification(userId, auction, alert, matchSubdocId) {
     try {
       const { deliverAlertMatch } = require('./alertDeliveryService');
-      await deliverAlertMatch(userId, auction, alert);
+      await deliverAlertMatch(userId, auction, alert, matchSubdocId);
     } catch (error) {
       console.error('Error sending alert notification:', error);
     }

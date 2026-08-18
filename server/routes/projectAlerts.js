@@ -267,36 +267,39 @@ router.post('/:id/spawn-missing-alerts', auth, async (req, res, next) => {
     const project = await ProjectAlert.findOne({ _id: req.params.id, user: req.user.id });
     if (!project) return res.status(404).json({ message: 'Not found' });
 
-    let existingAlerts = await Alert.countDocuments({ user: req.user.id });
-    const alertsMax = cfg.alertsMax;
-    const created = [];
+      const { createAlertAuthoritative, countActiveAlerts } = require('../services/alertCreationService');
+      const { getEntitlementByUserId } = require('../services/premiumEntitlementService');
 
-    for (const item of project.items) {
-      if (item.status !== 'watching' || item.linkedAlertId) continue;
-      if (alertsMax != null && Number.isFinite(alertsMax) && existingAlerts >= alertsMax) break;
+      const ent = await getEntitlementByUserId(req.user.id);
+      let existingAlerts = await countActiveAlerts(req.user.id);
+      const alertsMax = cfg.alertsMax;
+      const created = [];
 
-      const keywords =
-        item.keywords && item.keywords.length
-          ? item.keywords
-          : item.title.split(/\s+/).filter(Boolean).slice(0, 8);
+      for (const item of project.items) {
+        if (item.status !== 'watching' || item.linkedAlertId) continue;
+        if (alertsMax != null && Number.isFinite(alertsMax) && existingAlerts >= alertsMax) break;
 
-      const alert = await Alert.create({
-        user: req.user.id,
-        name: `${project.name} • ${item.title}`.slice(0, 120),
-        keywords,
-        maxPrice: cfg.projectPriceTargetsPerItem ? item.targetPrice : project.budget,
-        minConfidence: Math.max(70, project.trustRequirement || 70),
-        sources: ['ebay'],
-        persona: 'buyer',
-        kind: 'project_part',
-        status: 'active',
-        context: {
-          projectAlertId: String(project._id),
-          projectItemId: String(item._id),
-          alertsSpeed: cfg.alertsSpeed,
-          subscriptionTier: tier,
-        },
-      });
+        const keywords =
+          item.keywords && item.keywords.length
+            ? item.keywords
+            : item.title.split(/\s+/).filter(Boolean).slice(0, 8);
+
+        const alert = await createAlertAuthoritative(req.user.id, user, ent, {
+          name: `${project.name} • ${item.title}`.slice(0, 120),
+          keywords,
+          maxPrice: cfg.projectPriceTargetsPerItem ? item.targetPrice : project.budget,
+          minConfidence: Math.max(70, project.trustRequirement || 70),
+          sources: ['ebay'],
+          persona: 'buyer',
+          kind: 'project_part',
+          status: 'active',
+          context: {
+            projectAlertId: String(project._id),
+            projectItemId: String(item._id),
+            alertsSpeed: cfg.alertsSpeed,
+            subscriptionTier: tier,
+          },
+        });
       item.linkedAlertId = alert._id;
       existingAlerts += 1;
       created.push(alert._id);
