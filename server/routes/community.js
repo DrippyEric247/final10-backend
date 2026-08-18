@@ -181,15 +181,8 @@ router.post('/claim-reward', auth, async (req, res) => {
       meta: { completedGoal },
     });
     
-    // Add subscription months
-    const currentDate = new Date();
-    const subscriptionEnd = user.subscriptionEnd ? new Date(user.subscriptionEnd) : currentDate;
-    if (subscriptionEnd < currentDate) {
-      subscriptionEnd.setTime(currentDate.getTime());
-    }
-    subscriptionEnd.setMonth(subscriptionEnd.getMonth() + reward.subscription);
-    user.subscriptionEnd = subscriptionEnd;
-    user.isPremium = true;
+    const { extendMembershipMonths } = require('../services/subscriptionWriteService');
+    await extendMembershipMonths(user._id, reward.subscription, 'premium');
     
     // Mark as claimed
     user.hasClaimedCommunityReward = true;

@@ -30,6 +30,7 @@ const {
   assertCanViewCamoItem,
 } = require('./camoVisibilityService');
 const { NUKE_COLLECTION, NUKE_REQUIREMENTS } = require('../config/nukeCollection');
+const { resolveLoginStreak, resolveSavvyBalance } = require('../lib/dataAuthority');
 
 /** Hard ceiling on how much a single category counter can move per day. */
 const DAILY_CATEGORY_CAP = 40;
@@ -95,9 +96,9 @@ async function loadAccountMetrics(user, bp) {
   }
   return {
     profileLevel,
-    currentStreak: Math.max(0, Number(user?.currentStreak) || 0),
+    currentStreak: resolveLoginStreak(user),
     battlePassTier: Math.max(0, Number(bp?.tier) || 0),
-    savvyPoints: Math.max(0, Number(user?.savvyPoints) || 0),
+    savvyPoints: resolveSavvyBalance(user),
   };
 }
 

@@ -4,6 +4,7 @@ const { sendAlertMatchEmail } = require('./emailService');
 const { auditAlertDelivery } = require('./auditLogger');
 const { isProduction } = require('../config/envValidation');
 const { grantSavvyReward } = require('./savvyRewardService');
+const { resolveSavvyBalance } = require('../lib/dataAuthority');
 
 function isAlertEmailDefaultEnabled() {
   const raw = process.env.ALERT_EMAIL_DEFAULT;
@@ -130,7 +131,7 @@ async function deliverAlertMatch(userId, auction, alert, matchSubdocId = null) {
           trustScore: auction.trustScore ?? auction.sellerFeedbackPercent,
           rankedAbovePercent: auction.rankedAbovePercent,
           shippingStatus: auction.shippingStatus || 'See listing for shipping',
-          savvyBalance: user.savvyPoints ?? user.pointsBalance ?? 0,
+          savvyBalance: resolveSavvyBalance(user),
           userLevel: user.membershipTier || user.subscription?.tier || 'Explorer',
           baseReward: 5,
         },

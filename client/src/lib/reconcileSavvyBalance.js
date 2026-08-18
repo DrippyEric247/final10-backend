@@ -28,7 +28,7 @@ export async function reconcileSavvyBalance(patchUser, opts = {}) {
   inflight = (async () => {
     try {
       const me = await getMyPoints();
-      const serverBalance = Math.max(0, Math.round(Number(me?.pointsBalance ?? me?.savvyPoints) || 0));
+      const serverBalance = Math.max(0, Math.round(Number(me?.savvyPoints ?? me?.pointsBalance) || 0));
       const current = Math.max(0, Math.round(Number(opts.currentBalance) || 0));
 
       if (current !== serverBalance && current > serverBalance) {

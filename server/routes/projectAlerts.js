@@ -22,14 +22,13 @@ async function assertProjectEnabled(user) {
     const cfg = getTierConfigForUser(user);
     return { tier: 'elite', cfg };
   }
-  const tier = normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
   const cfg = projectCaps(user);
   if (!cfg.projectAlertsEnabled) {
     const err = new Error('Project alerts require a Core or higher subscription');
     err.status = 403;
     throw err;
   }
-  return { tier, cfg };
+  return { tier: cfg.id || cfg.label || 'free', cfg };
 }
 
 router.get('/', auth, async (req, res, next) => {

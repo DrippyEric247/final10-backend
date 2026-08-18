@@ -1,10 +1,12 @@
 const express = require('express');
 const Auction = require('../models/Auction');
 const User = require('../models/User');
-const SavvyPoint = require('../models/SavvyPoint');
 const auth = require('../middleware/auth');
 const { searchRateLimit, incrementSearchCount } = require('../middleware/searchRateLimit');
 const AuctionAggregator = require('../services/AuctionAggregator');
+const { grantSavvyReward } = require('../services/savvyRewardService');
+const { debitSavvy, InsufficientSavvyError } = require('../services/savvyBalanceService');
+const { resolveSavvyBalance, resolveEntitlementsForUserId, isFreeEffectivePlan } = require('../lib/dataAuthority');
 
 const router = express.Router();
 const auctionAggregator = new AuctionAggregator();
@@ -261,9 +263,11 @@ router.post('/:id/bid', auth, async (req, res) => {
       return res.status(400).json({ message: 'Bid must be higher than current bid' });
     }
 
-    // Check if user has sufficient points for bidding (premium feature)
+    // Check if user has sufficient Savvy for bidding (free tier fee)
     const user = await User.findById(req.user.id);
-    if (user.membershipTier === 'free' && user.savvyPoints < 10) {
+    const entitlements = await resolveEntitlementsForUserId(req.user.id, user);
+    const isFreeTier = isFreeEffectivePlan(entitlements);
+    if (isFreeTier && resolveSavvyBalance(user) < 10) {
       return res.status(400).json({ 
         message: 'Insufficient Savvy Points. You need at least 10 points to place a bid.' 
       });
@@ -291,24 +295,31 @@ router.post('/:id/bid', auth, async (req, res) => {
 
     await auction.save();
 
-    // Award points for bidding
-    await SavvyPoint.awardPoints(
-      req.user.id,
-      5,
-      'bid',
-      `Bid placed on "${auction.title}"`,
-      auction._id,
-      'Auction',
-      1
-    );
+    const bidKey = `${auction._id}:${req.user.id}:${bid.timestamp.getTime()}`;
 
-    // Deduct points for free users
-    if (user.membershipTier === 'free') {
-      await SavvyPoint.redeemPoints(
-        req.user.id,
-        10,
-        'Bid placement fee'
-      );
+    await grantSavvyReward(user, {
+      rewardType: 'auction_bid',
+      amount: 5,
+      baseAmount: 5,
+      idempotencyKey: `auction_bid_reward:${bidKey}`,
+      note: `Bid placed on "${auction.title}"`,
+      meta: { auctionId: String(auction._id), relatedType: 'Auction' },
+    });
+
+    if (isFreeTier) {
+      try {
+        await debitSavvy(user, {
+          amount: 10,
+          source: 'auction_bid_fee',
+          idempotencyKey: `auction_bid_fee:${bidKey}`,
+          meta: { auctionId: String(auction._id), feeType: 'free_tier_bid' },
+        });
+      } catch (err) {
+        if (err instanceof InsufficientSavvyError) {
+          return res.status(400).json({ message: 'Insufficient Savvy Points for bid fee.' });
+        }
+        throw err;
+      }
     }
 
     // Emit real-time update
@@ -494,7 +505,8 @@ router.post('/watch-ad', auth, async (req, res) => {
 
     // Check if user can watch ads (allow premium users for daily tasks)
     const adStatus = user.canWatchAd();
-    if (!adStatus.canWatch && user.membershipTier === 'free') {
+    const entitlements = await resolveEntitlementsForUserId(req.user.id, user);
+    if (!adStatus.canWatch && isFreeEffectivePlan(entitlements)) {
       return res.status(400).json({
         message: 'Cannot watch more ads today',
         error: 'AD_LIMIT_REACHED',
@@ -840,16 +852,14 @@ router.post('/', auth, async (req, res) => {
 
     await auction.save();
 
-    // Award points for creating auction
-    await SavvyPoint.awardPoints(
-      req.user.id,
-      20,
-      'auction_creation',
-      `Created auction "${title}"`,
-      auction._id,
-      'Auction',
-      1
-    );
+    await grantSavvyReward(req.user, {
+      rewardType: 'auction_creation',
+      amount: 20,
+      baseAmount: 20,
+      idempotencyKey: `auction_create:${auction._id}`,
+      note: `Created auction "${title}"`,
+      meta: { auctionId: String(auction._id), relatedType: 'Auction' },
+    });
 
     res.status(201).json({ 
       message: 'Auction created successfully',

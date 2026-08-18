@@ -206,6 +206,78 @@ async function applyWelcomePromoGrant(userId, expiresAt) {
   return User.findByIdAndUpdate(userId, { $set }, { new: true });
 }
 
+function entitlementDocToCanonicalPlan(entitlementDoc) {
+  if (!entitlementDoc || !premiumStatusGrantsBattlePassAccess(entitlementDoc)) {
+    return PLAN.FREE;
+  }
+  const tier = String(entitlementDoc.premiumTier || '').toLowerCase();
+  if (tier === 'elite' || tier === 'vip') return PLAN.PRO;
+  if (tier === 'premium') return PLAN.PREMIUM;
+  return PLAN.PREMIUM;
+}
+
+/**
+ * Mirror PremiumEntitlement onto legacy User compat fields (Wave 6).
+ * Called after Stripe webhook writes so resolver + legacy readers stay aligned.
+ */
+async function syncLegacyUserFieldsFromEntitlement(userId, entitlementDoc) {
+  const plan = entitlementDocToCanonicalPlan(entitlementDoc);
+  const $set = buildLegacyUserCompatSet(plan, {
+    expiresAt: entitlementDoc?.currentPeriodEnd || null,
+    isLifetime: plan !== PLAN.FREE && !entitlementDoc?.currentPeriodEnd,
+  });
+  return User.findByIdAndUpdate(userId, { $set }, { new: true });
+}
+
+/**
+ * Owner lifetime Pro grant — writes PE + legacy compat in one path.
+ */
+async function applyLifetimeMembershipGrant(userId, plan = PLAN.PRO, extraSet = {}) {
+  const canonical = normalizeCanonicalPlan(plan);
+  await applyPremiumEntitlementPaidPlan(userId, canonical, {
+    expiresAt: null,
+    provider: 'owner',
+  });
+  const $set = {
+    ...buildLegacyUserCompatSet(canonical, { isLifetime: true }),
+    ...extraSet,
+  };
+  const user = await User.findByIdAndUpdate(userId, { $set }, { new: true });
+  if (user) {
+    await syncEntitlementFromOwnerMembership(userId, user);
+  }
+  return user;
+}
+
+/**
+ * Extend paid membership by N months (community rewards, promos).
+ */
+async function extendMembershipMonths(userId, months, plan = PLAN.PREMIUM, extraSet = {}) {
+  const canonical = normalizeCanonicalPlan(plan);
+  const user = await User.findById(userId);
+  if (!user) return null;
+
+  const now = new Date();
+  const base =
+    user.subscriptionExpires && new Date(user.subscriptionExpires) > now
+      ? new Date(user.subscriptionExpires)
+      : now;
+  const expires = new Date(base);
+  expires.setMonth(expires.getMonth() + Math.max(1, Number(months) || 1));
+
+  await applyPremiumEntitlementPaidPlan(userId, canonical, {
+    expiresAt: expires,
+    provider: 'promo',
+  });
+
+  const $set = {
+    ...buildLegacyUserCompatSet(canonical, { expiresAt: expires }),
+    subscriptionEnd: expires,
+    ...extraSet,
+  };
+  return User.findByIdAndUpdate(userId, { $set }, { new: true });
+}
+
 function isPaidEntitlementActive(entitlementDoc) {
   return premiumStatusGrantsBattlePassAccess(entitlementDoc);
 }
@@ -218,6 +290,10 @@ module.exports = {
   applyTemporaryProGrant,
   applyWelcomePromoGrant,
   applyPremiumEntitlementPaidPlan,
+  applyLifetimeMembershipGrant,
+  extendMembershipMonths,
+  syncLegacyUserFieldsFromEntitlement,
+  entitlementDocToCanonicalPlan,
   isPaidEntitlementActive,
   canonicalPlanToPremiumEntitlementTier,
 };

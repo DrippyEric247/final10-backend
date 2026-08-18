@@ -15,6 +15,7 @@ const {
   revokePaidSubscription,
 } = require('../services/subscriptionWriteService');
 const { resolveUserEntitlements } = require('../services/userEntitlementService');
+const { grantSavvyReward } = require('../services/savvyRewardService');
 
 const router = express.Router();
 
@@ -46,7 +47,10 @@ router.post('/create-payment-intent', auth, async (req, res) => {
     }
 
     // Check if user already has active premium
-    if (user.membershipTier === 'premium' && user.subscriptionExpires && new Date(user.subscriptionExpires) > new Date()) {
+    const ent = await getEntitlementByUserId(req.user.id);
+    const resolved = resolveUserEntitlements(user, ent);
+
+    if (resolved.effectivePlan !== 'free' && user.subscriptionExpires && new Date(user.subscriptionExpires) > new Date()) {
       return res.status(400).json({ 
         message: 'You already have an active premium subscription',
         currentExpiry: user.subscriptionExpires
@@ -166,7 +170,15 @@ router.post('/confirm-payment', auth, async (req, res) => {
 
     await User.findByIdAndUpdate(user._id, {
       lastProcessedPremiumPaymentIntentId: paymentIntentId,
-      $inc: { points: 100 },
+    });
+
+    await grantSavvyReward(user, {
+      rewardType: 'premium_signup_bonus',
+      amount: 100,
+      baseAmount: 100,
+      idempotencyKey: `premium_payment_bonus:${paymentIntentId}`,
+      note: 'Premium subscription signup bonus',
+      meta: { paymentIntentId, source: 'confirm_payment' },
     });
 
     // Log the transaction (you might want to create a PaymentLog model)

@@ -55,7 +55,9 @@ describeReal('Economy integrity (Phase 1)', () => {
     const u = await reloadUser();
     const txnSum = await sumCompletedTransactions(user._id);
     expect(u.savvyPoints).toBe(txnSum);
-    expect(u.pointsBalance).toBe(u.savvyPoints);
+    if (process.env.SAVVY_MIRROR_POINTS_BALANCE === '1') {
+      expect(u.pointsBalance).toBe(u.savvyPoints);
+    }
   }
 
   it('credits via creditSavvy and writes SavvyTransaction', async () => {

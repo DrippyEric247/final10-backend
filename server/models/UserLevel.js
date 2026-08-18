@@ -172,9 +172,21 @@ userLevelSchema.methods.awardXP = async function awardXP(xpAmount, source = 'tas
       type: prestiged && levelsGained === 0 ? 'prestige_up' : 'level_up',
     });
 
-    await mongoose.model('User').findByIdAndUpdate(this.userId, {
-      $inc: { points: totalReward },
-    });
+    if (totalReward > 0) {
+      const User = mongoose.model('User');
+      const user = await User.findById(this.userId);
+      if (user) {
+        const { grantSavvyReward } = require('../services/savvyRewardService');
+        await grantSavvyReward(user, {
+          rewardType: 'level_up',
+          amount: totalReward,
+          baseAmount: totalReward,
+          idempotencyKey: `level_up:${this.userId}:${after.level}:${after.prestige}`,
+          note: `Level up reward (L${after.level})`,
+          meta: { level: after.level, prestige: after.prestige, source: 'user_level' },
+        });
+      }
+    }
 
     await this.checkMilestones(after);
   }
@@ -218,9 +230,19 @@ userLevelSchema.methods.checkMilestones = async function checkMilestones(derived
         reward: milestone.reward,
       });
       newMilestones.push(milestone);
-      await mongoose.model('User').findByIdAndUpdate(this.userId, {
-        $inc: { points: milestone.reward },
-      });
+      const User = mongoose.model('User');
+      const user = await User.findById(this.userId);
+      if (user) {
+        const { grantSavvyReward } = require('../services/savvyRewardService');
+        await grantSavvyReward(user, {
+          rewardType: 'level_milestone',
+          amount: milestone.reward,
+          baseAmount: milestone.reward,
+          idempotencyKey: `level_milestone:${this.userId}:${milestone.level}`,
+          note: `Milestone: ${milestone.name}`,
+          meta: { milestone: milestone.name, level: milestone.level, source: 'user_level' },
+        });
+      }
     }
   }
 

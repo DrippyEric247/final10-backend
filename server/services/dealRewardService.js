@@ -4,6 +4,7 @@
  */
 
 const SavvyRewardLog = require('../models/SavvyRewardLog');
+const SavvyTransaction = require('../models/SavvyTransaction');
 const DealRewardState = require('../models/DealRewardState');
 const {
   clearExpiredSavvyBoosts,
@@ -56,15 +57,25 @@ function readActiveEventMultiplier(user) {
   };
 }
 
+function dealPurchaseIdempotencyKey(userId, listingId) {
+  return `deal_purchase:${userId}:${listingId}`;
+}
+
+async function isDealPurchaseClaimed(userId, listingId) {
+  const idempotencyKey = dealPurchaseIdempotencyKey(userId, listingId);
+  const tx = await SavvyTransaction.findOne({ idempotencyKey, status: 'completed' }).lean();
+  if (tx) return true;
+
+  // Historical compatibility — pre-Wave 6 rewards logged in SavvyRewardLog
+  const legacy = await SavvyRewardLog.findOne({ userId, idempotencyKey }).lean();
+  return Boolean(legacy);
+}
+
 async function readRewardState(userId, listingId) {
   const id = String(listingId || '').trim();
   if (!id) return 'not_eligible';
 
-  const claimed = await SavvyRewardLog.findOne({
-    userId,
-    idempotencyKey: `deal_purchase:${userId}:${id}`,
-  }).lean();
-  if (claimed) return 'claimed';
+  if (await isDealPurchaseClaimed(userId, id)) return 'claimed';
 
   const pending = await DealRewardState.findOne({
     userId,
@@ -232,14 +243,7 @@ async function confirmVerifiedDealPurchase(user, { listingId, listing = {} }) {
   }
 
   const estimate = await estimateDealReward(user, { ...listing, listingId: id });
-  const idempotencyKey = `deal_purchase:${user._id}:${id}`;
-
-  const existingLog = await SavvyRewardLog.findOne({ userId: user._id, idempotencyKey }).lean();
-  if (existingLog) {
-    pending.status = 'claimed';
-    await pending.save();
-    return { estimate, alreadyClaimed: true, granted: false };
-  }
+  const idempotencyKey = dealPurchaseIdempotencyKey(user._id, id);
 
   const { grantSavvyReward } = require('./savvyRewardService');
   const grant = await grantSavvyReward(user, {
@@ -257,7 +261,17 @@ async function confirmVerifiedDealPurchase(user, { listingId, listing = {} }) {
 
   pending.status = 'claimed';
   await pending.save();
-  await user.save();
+
+  if (grant.duplicate || !grant.granted) {
+    return {
+      estimate: { ...estimate, state: 'claimed' },
+      alreadyClaimed: true,
+      granted: false,
+      duplicate: Boolean(grant.duplicate),
+      amount: grant.amount || 0,
+      newBalance: grant.newBalance,
+    };
+  }
 
   const categoryRaw =
     listing.category ||

@@ -106,8 +106,10 @@ function isFreePerkSpinHourActive(user) {
   return new Date(pm.freePerkSpinUntil).getTime() > Date.now();
 }
 
+const { planTierForMultiplier } = require('../lib/dataAuthority');
+
 function readTier(user) {
-  return normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
+  return planTierForMultiplier(user);
 }
 
 function formatTierLabel(tier) {

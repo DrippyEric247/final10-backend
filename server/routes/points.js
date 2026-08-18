@@ -8,6 +8,7 @@ const Points = require('../models/PointsLedger');
 const SavvyTransaction = require('../models/SavvyTransaction');
 const CFG = require('../config/points');
 const { debitSavvy } = require('../services/savvyBalanceService');
+const { resolveSavvyBalance } = require('../lib/dataAuthority');
 const {
   serializeCreditState,
   convertSavvyToCredits,
@@ -21,7 +22,7 @@ router.get('/', auth, async (req, res) => {
   const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ error: 'User not found' });
   
-  res.json({ points: user.pointsBalance || 0 });
+  res.json({ points: resolveSavvyBalance(user) });
 });
 
 // ---- GET /api/points/me ----
@@ -59,9 +60,10 @@ router.get('/me', auth, async (req, res) => {
     ledger: 'SavvyTransaction',
   }));
 
+  const canonicalBalance = resolveSavvyBalance(user);
   res.json({
-    pointsBalance: user.pointsBalance ?? 0,
-    savvyPoints: user.savvyPoints ?? user.pointsBalance ?? 0,
+    pointsBalance: canonicalBalance,
+    savvyPoints: canonicalBalance,
     lifetimePointsEarned: user.lifetimePointsEarned ?? 0,
     badges: user.badges ?? [],
     recent,
@@ -84,7 +86,8 @@ router.post('/redeem', auth, async (req, res) => {
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    if ((user.pointsBalance ?? 0) < pts) return res.status(400).json({ error: 'Insufficient points' });
+    const balance = resolveSavvyBalance(user);
+    if (balance < pts) return res.status(400).json({ error: 'Insufficient points' });
 
     const spend = await debitSavvy(user, {
       amount: pts,

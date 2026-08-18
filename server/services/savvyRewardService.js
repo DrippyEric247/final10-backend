@@ -11,8 +11,10 @@ const { creditSavvy, debitSavvy } = require('./savvyBalanceService');
 const { resolveAuthoritativeSavvyPayout } = require('./savvyMultiplierService');
 const { REWARD_CLASS } = require('../config/savvyRewardPolicy');
 
+const { planTierForMultiplier } = require('../lib/dataAuthority');
+
 function readTier(user) {
-  return normalizeTier(user.subscription?.tier || user.membershipTier || 'free');
+  return planTierForMultiplier(user);
 }
 
 function updateLoginStreak(user, today = utcDayKey()) {

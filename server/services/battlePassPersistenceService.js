@@ -84,13 +84,22 @@ async function applyMissionGrantPayload(user, inventory, bpDoc, payload, idempot
   }
 }
 
-function applyTrackTierReward(reward, user, inventory, bp, claimedSet, claimKey) {
+async function applyTrackTierReward(reward, user, inventory, bp, claimedSet, claimKey) {
   if (!reward) return;
   claimedSet.add(claimKey);
   switch (reward.type) {
     case 'points': {
       const n = Number(reward.value) || 0;
-      user.points = (user.points || 0) + n;
+      if (n > 0) {
+        await grantSavvyReward(user, {
+          rewardType: 'battle_pass_tier',
+          amount: n,
+          baseAmount: n,
+          idempotencyKey: `battle_pass_tier:${user._id}:${claimKey}`,
+          note: 'Battle Pass tier Savvy reward',
+          meta: { claimKey, source: 'battle_pass_tier' },
+        });
+      }
       break;
     }
     case 'emblem':

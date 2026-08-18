@@ -5,6 +5,9 @@ const { ingestYouTube } = require('../services/youtube');
 const { ingestReddit } = require('../services/reddit');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const crypto = require('crypto');
+const { grantSavvyReward } = require('../services/savvyRewardService');
+const { resolveSavvyBalance, resolveEntitlementsForUserId, isPaidEffectivePlan } = require('../lib/dataAuthority');
 const Auction = require('../models/Auction');
 const marketScanner = require('../services/marketScanner');
 const AuctionAggregator = require('../services/AuctionAggregator');
@@ -53,12 +56,27 @@ router.post('/submit', auth, async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ message: 'User not found' });
 
-  user.points = (user.points || 0) + 100; // bonus for posting a win
+  const urlHash = crypto.createHash('sha256').update(String(url)).digest('hex').slice(0, 24);
+  const grant = await grantSavvyReward(user, {
+    rewardType: 'social_post',
+    amount: 100,
+    baseAmount: 100,
+    idempotencyKey: `feed_submit:${user._id}:${urlHash}`,
+    note: `Social post: ${url}`,
+    meta: { url, source: 'feed_submit' },
+  });
+
   user.history = user.history || [];
-  user.history.unshift({ type: 'bonus', amount: 100, note: `Social post: ${url}` });
+  user.history.unshift({ type: 'bonus', amount: grant.amount || 100, note: `Social post: ${url}` });
   await user.save();
 
-  return res.json({ message: 'Verified post. +100 Savvy Points added!', newBalance: user.points });
+  return res.json({
+    message: grant.duplicate
+      ? 'Post already rewarded.'
+      : 'Verified post. +100 Savvy Points added!',
+    newBalance: grant.newBalance ?? resolveSavvyBalance(user),
+    duplicate: Boolean(grant.duplicate),
+  });
 });
 
 // GET /api/feed/product-feed - TikTok-like product feed with AI scanning
@@ -229,7 +247,8 @@ router.post('/refresh-scanner', auth, async (req, res) => {
   try {
     // Check if user has permission (admin or premium)
     const user = await User.findById(req.user.id);
-    if (!user || (user.membershipTier !== 'premium' && user.membershipTier !== 'pro')) {
+    const entitlements = await resolveEntitlementsForUserId(req.user.id, user);
+    if (!user || !isPaidEffectivePlan(entitlements)) {
       return res.status(403).json({ message: 'Premium subscription required' });
     }
     

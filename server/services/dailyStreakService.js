@@ -353,7 +353,6 @@ async function claimDailyStreak(user) {
       },
       $inc: {
         'dailyTasks.pointsEarned': REWARDS.daily_login.legacyPoints,
-        points: REWARDS.daily_login.legacyPoints,
       },
     },
     { new: true }

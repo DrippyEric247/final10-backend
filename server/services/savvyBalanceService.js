@@ -7,6 +7,10 @@ const User = require('../models/User');
 const SavvyTransaction = require('../models/SavvyTransaction');
 const { auditRewardGrant } = require('./auditLogger');
 const { shouldEmitBattlePassProgress } = require('../config/battlePassTrust');
+const { resolveSavvyBalance } = require('../lib/dataAuthority');
+
+/** Legacy mirror — opt-in only; canonical balance is User.savvyPoints. */
+const MIRROR_POINTS_BALANCE = process.env.SAVVY_MIRROR_POINTS_BALANCE === '1';
 
 class InsufficientSavvyError extends Error {
   constructor(balance, required) {
@@ -26,7 +30,9 @@ function resolveUserId(userOrId) {
 function syncUserDocFromDb(userOrId, dbUser) {
   if (!userOrId || !dbUser || typeof userOrId !== 'object' || !userOrId._id) return;
   userOrId.savvyPoints = Math.round(Number(dbUser.savvyPoints) || 0);
-  userOrId.pointsBalance = Math.round(Number(dbUser.pointsBalance) || 0);
+  userOrId.pointsBalance = MIRROR_POINTS_BALANCE
+    ? Math.round(Number(dbUser.pointsBalance) || 0)
+    : userOrId.savvyPoints;
   userOrId.lifetimePointsEarned = Math.round(Number(dbUser.lifetimePointsEarned) || 0);
 }
 
@@ -112,27 +118,19 @@ async function adjustSavvyBalance(userOrId, {
 
   let updated;
   if (amt > 0) {
-    updated = await User.findOneAndUpdate(
-      { _id: userId },
-      {
-        $inc: {
-          savvyPoints: amt,
-          pointsBalance: amt,
-          lifetimePointsEarned: amt,
-        },
-      },
-      { new: true }
-    );
+    const creditInc = {
+      savvyPoints: amt,
+      lifetimePointsEarned: amt,
+    };
+    if (MIRROR_POINTS_BALANCE) creditInc.pointsBalance = amt;
+    updated = await User.findOneAndUpdate({ _id: userId }, { $inc: creditInc }, { new: true });
   } else {
     const debit = Math.abs(amt);
+    const debitInc = { savvyPoints: -debit };
+    if (MIRROR_POINTS_BALANCE) debitInc.pointsBalance = -debit;
     updated = await User.findOneAndUpdate(
       { _id: userId, savvyPoints: { $gte: debit } },
-      {
-        $inc: {
-          savvyPoints: -debit,
-          pointsBalance: -debit,
-        },
-      },
+      { $inc: debitInc },
       { new: true }
     );
 
@@ -142,12 +140,11 @@ async function adjustSavvyBalance(userOrId, {
         { $set: { status: 'failed', meta: { ...meta, reason: 'insufficient_savvy' } } }
       );
       const user = await User.findById(userId).lean();
-      const balance = Math.round(Number(user?.savvyPoints) || 0);
+      const balance = resolveSavvyBalance(user);
       throw new InsufficientSavvyError(balance, debit);
     }
 
-    // Prevent pointsBalance going negative (legacy sync)
-    if (Number(updated.pointsBalance) < 0) {
+    if (MIRROR_POINTS_BALANCE && Number(updated.pointsBalance) < 0) {
       await User.updateOne({ _id: userId }, { $set: { pointsBalance: 0 } });
       updated.pointsBalance = 0;
     }

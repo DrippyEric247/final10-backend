@@ -3,6 +3,7 @@ const {
   upsertFromStripeSubscription,
   markEntitlementStatus,
 } = require('../services/premiumEntitlementService');
+const { syncLegacyUserFieldsFromEntitlement } = require('../services/subscriptionWriteService');
 const { reconcileBattlePassPremiumFromEntitlement } = require('../services/battlePassPersistenceService');
 const { logPaymentFailure } = require('../services/structuredLog');
 const { withStripeEventIdempotency } = require('../services/stripeWebhookIdempotency');
@@ -21,7 +22,8 @@ async function handleSubscriptionRecord(subscription) {
     return;
   }
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
-  await upsertFromStripeSubscription(userId, subscription, customerId);
+  const entitlement = await upsertFromStripeSubscription(userId, subscription, customerId);
+  await syncLegacyUserFieldsFromEntitlement(userId, entitlement);
   await reconcileBattlePassPremiumFromEntitlement(userId);
 }
 
@@ -34,7 +36,8 @@ async function processStripeEvent(event) {
         const userId = getStripeUserId(session.metadata) || getStripeUserId(sub.metadata);
         if (!userId) break;
         const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
-        await upsertFromStripeSubscription(userId, sub, customerId);
+        const entitlement = await upsertFromStripeSubscription(userId, sub, customerId);
+        await syncLegacyUserFieldsFromEntitlement(userId, entitlement);
         await reconcileBattlePassPremiumFromEntitlement(userId);
         break;
       }

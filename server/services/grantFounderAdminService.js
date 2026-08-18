@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { tryAssignFounderSlot } = require('./foundingBetaService');
+const { applyOwnerMembershipGrant } = require('./subscriptionWriteService');
 
 const FULL_ADMIN_PERMISSIONS = {
   canManageShield: true,
@@ -18,9 +19,6 @@ async function applyFounderAdminGrant(user, { grantedBy = 'system', reason = 'Fo
   user.betaTester = true;
   user.foundingAccess = true;
   user.betaAccessExpiresAt = null;
-  if (user.membershipTier === 'free') user.membershipTier = 'pro';
-  if (user.premiumTier === 'free') user.premiumTier = 'pro';
-  user.isPremium = true;
 
   user.ownerGrants = user.ownerGrants || [];
   user.ownerGrants.push({
@@ -32,8 +30,13 @@ async function applyFounderAdminGrant(user, { grantedBy = 'system', reason = 'Fo
   });
 
   await user.save();
+  const { resolveUserEntitlements } = require('../services/userEntitlementService');
+  const resolved = resolveUserEntitlements(user, null);
+  if (resolved.effectivePlan === 'free') {
+    await applyOwnerMembershipGrant(user._id, 'pro', 0);
+  }
   await tryAssignFounderSlot(user);
-  return user;
+  return User.findById(user._id);
 }
 
 function toFounderAdminPayload(user) {

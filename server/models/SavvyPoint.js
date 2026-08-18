@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const savvyPointSchema = new mongoose.Schema({
   user_id: {
@@ -46,74 +47,87 @@ const savvyPointSchema = new mongoose.Schema({
 savvyPointSchema.index({ user_id: 1, createdAt: -1 });
 savvyPointSchema.index({ type: 1 });
 
-// Static method to award points
+// Static method to award points — canonical Savvy wallet (Wave 6)
 savvyPointSchema.statics.awardPoints = async function(userId, points, type, note, relatedId = null, relatedType = null, multiplier = 1) {
-  try {
-    const amt = Math.round((Number(points) || 0) * (Number(multiplier) || 1));
+  const amt = Math.round((Number(points) || 0) * (Number(multiplier) || 1));
+  if (amt <= 0) {
+    return null;
+  }
 
+  const User = require('./User');
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const ref = relatedId ? String(relatedId) : type;
+  const { grantSavvyReward } = require('../services/savvyRewardService');
+  await grantSavvyReward(user, {
+    rewardType: type || 'legacy_award',
+    amount: amt,
+    baseAmount: Math.round(Number(points) || 0),
+    idempotencyKey: `savvy_point_award:${userId}:${type}:${ref}:${amt}`,
+    note,
+    meta: { relatedId: ref, relatedType, legacySavvyPoint: true },
+  });
+
+  if (process.env.SAVVY_LEGACY_POINT_LEDGER === '1') {
     const savvyPoint = new this({
       user_id: userId,
-      type: type,
+      type,
       amount: amt,
-      note: note
+      note,
     });
     await savvyPoint.save();
-
-    if (type === 'alert_trigger') {
-      const User = require('./User');
-      const user = await User.findById(userId);
-      const { grantSavvyReward } = require('../services/savvyRewardService');
-      const base = Math.round(Number(points) || 0);
-      const ref = relatedId ? String(relatedId) : 'alert';
-      await grantSavvyReward(user, {
-        rewardType: 'alert_trigger',
-        amount: base,
-        baseAmount: base,
-        idempotencyKey: `alert_trigger:${userId}:${ref}`,
-        note,
-        meta: { relatedId: ref, relatedType },
-      });
-      return savvyPoint;
-    }
-
-    const User = require('./User');
-    await User.findByIdAndUpdate(userId, { $inc: { points: amt } });
-    
     return savvyPoint;
-  } catch (error) {
-    throw error;
   }
+
+  return { user_id: userId, type, amount: amt, note, legacy: true };
 };
 
-// Static method to redeem points
+// Static method to redeem points — canonical debitSavvy (Wave 6)
 savvyPointSchema.statics.redeemPoints = async function(userId, points, note) {
+  const spend = Math.round(Number(points) || 0);
+  if (spend <= 0) {
+    throw new Error('Invalid redemption amount');
+  }
+
+  const User = require('./User');
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const { debitSavvy, InsufficientSavvyError } = require('../services/savvyBalanceService');
+  const idempotencyKey = `savvy_point_redeem:${userId}:${crypto.createHash('sha256').update(String(note || '')).digest('hex').slice(0, 16)}:${spend}`;
+
   try {
-    const User = require('./User');
-    
-    // Check if user has enough points
-    const user = await User.findById(userId);
-    if (!user || user.points < points) {
+    await debitSavvy(user, {
+      amount: spend,
+      source: 'legacy_redeem',
+      idempotencyKey,
+      note,
+      meta: { legacySavvyPoint: true },
+    });
+  } catch (err) {
+    if (err instanceof InsufficientSavvyError) {
       throw new Error('Insufficient points');
     }
-    
-    // Create redemption record
+    throw err;
+  }
+
+  if (process.env.SAVVY_LEGACY_POINT_LEDGER === '1') {
     const savvyPoint = new this({
       user_id: userId,
       type: 'redemption',
-      amount: -points,
-      note: note
+      amount: -spend,
+      note,
     });
     await savvyPoint.save();
-    
-    // Update user's total points
-    await User.findByIdAndUpdate(userId, {
-      $inc: { points: -points }
-    });
-    
     return savvyPoint;
-  } catch (error) {
-    throw error;
   }
+
+  return { user_id: userId, type: 'redemption', amount: -spend, note, legacy: true };
 };
 
 module.exports = mongoose.model('SavvyPoint', savvyPointSchema);

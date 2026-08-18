@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 const { getTierConfig, normalizeTier, normalizeBilling } = require('../config/subscriptionPlans');
 
+function userHasPaidSearchBypass(user) {
+  const { resolveUserEntitlements } = require('../services/userEntitlementService');
+  const resolved = resolveUserEntitlements(user, null);
+  return resolved.effectivePlan !== 'free';
+}
+
 const userSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -676,6 +682,14 @@ const userSchema = new mongoose.Schema({
     lastUsedAt: { type: Date, default: null },
   },
 
+  /** Wave 6 — tracks one-time/backfill normalization without altering gameplay. */
+  dataNormalization: {
+    version: { type: Number, default: 0 },
+    lastRunAt: { type: Date, default: null },
+    source: { type: String, default: null },
+    flags: { type: [String], default: [] },
+  },
+
   /** Client-reported Scout action rate limits (Wave 4). */
   scoutClientActionDaily: {
     day: { type: String, default: null },
@@ -800,8 +814,8 @@ userSchema.methods.canSearch = function() {
     return { canSearch: true, remaining: 'unlimited' };
   }
   
-  // Premium and Pro users have unlimited searches
-  if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
+  // Paid subscribers have unlimited searches
+  if (userHasPaidSearchBypass(this)) {
     return { canSearch: true, remaining: 'unlimited' };
   }
   
@@ -842,8 +856,8 @@ userSchema.methods.incrementSearchCount = function() {
     return;
   }
   
-  // Don't increment for premium users
-  if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
+  // Don't increment for paid subscribers
+  if (userHasPaidSearchBypass(this)) {
     return;
   }
   
@@ -867,9 +881,9 @@ userSchema.methods.upgradeToPremium = function(durationMonths = 1) {
 
 // Method to check if subscription is active
 userSchema.methods.isSubscriptionActive = function() {
-  if (this.membershipTier === 'free') return false;
-  if (!this.subscriptionExpires) return true; // Legacy premium users
-  return new Date() < this.subscriptionExpires;
+  const { resolveUserEntitlements } = require('../services/userEntitlementService');
+  const resolved = resolveUserEntitlements(this, null);
+  return resolved.effectivePlan !== 'free';
 };
 
 // Method to check if user can watch ads
@@ -879,8 +893,8 @@ userSchema.methods.canWatchAd = function() {
     return { canWatch: false, reason: 'Founding testers already have full unlimited access' };
   }
   
-  // Premium users don't need to watch ads
-  if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
+  // Paid subscribers don't need to watch ads
+  if (userHasPaidSearchBypass(this)) {
     return { canWatch: false, reason: 'Premium users have unlimited searches' };
   }
   
@@ -917,9 +931,8 @@ userSchema.methods.completeAdWatch = function() {
     this.adWatching.lastAdReset = new Date();
   }
   
-  // For premium users, allow ad watching for daily tasks but don't give search benefits
-  if (this.membershipTier === 'premium' || this.membershipTier === 'pro') {
-    // Just increment the counter for daily task tracking
+  // Paid subscribers may watch ads for daily tasks without search benefits
+  if (userHasPaidSearchBypass(this)) {
     this.adWatching.adsWatchedToday += 1;
     return this.save();
   }
@@ -1032,9 +1045,7 @@ userSchema.methods.getDailyTasks = function() {
   const allCompleted = Object.values(tasks).every(task => task.completed);
   if (allCompleted && !this.dailyTasks.allTasksCompleted) {
     this.dailyTasks.allTasksCompleted = true;
-    this.dailyTasks.pointsEarned += 1000; // Bonus points
-    this.points += 1000;
-    // Note: We don't save here to avoid async issues, the caller should save if needed
+    this.dailyTasks.pointsEarned += 1000;
   }
   
   return {
@@ -1045,6 +1056,19 @@ userSchema.methods.getDailyTasks = function() {
   };
 };
 
+userSchema.methods.grantAllTasksBonusIfEligible = async function grantAllTasksBonusIfEligible() {
+  this.resetDailyTasks();
+  const summary = this.getDailyTasks();
+  if (!summary.allTasksCompleted) return null;
+  const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+  return grantDailyTaskSavvy(this, {
+    amount: 1000,
+    taskKey: 'all_tasks_complete',
+    rewardType: 'daily_task_bonus',
+    note: 'All daily tasks completed bonus',
+  });
+};
+
 // Method to complete daily login task (Savvy grants via savvyRewardService)
 userSchema.methods.completeDailyLogin = async function() {
   const { claimDailyLoginReward } = require('../services/savvyRewardService');
@@ -1053,7 +1077,10 @@ userSchema.methods.completeDailyLogin = async function() {
 };
 
 userSchema.methods.getSubscriptionTierConfig = function() {
-  const tier = normalizeTier(this.subscription?.tier || this.membershipTier || 'free');
+  const { resolveUserEntitlements } = require('../services/userEntitlementService');
+  const { planToSubscriptionTierId } = require('../config/canonicalPlans');
+  const resolved = resolveUserEntitlements(this, null);
+  const tier = planToSubscriptionTierId(resolved.effectivePlan);
   const billing = normalizeBilling(this.subscription?.billing || 'monthly');
   const cfg = getTierConfig(tier);
   return { ...cfg, tier, billing };
@@ -1066,11 +1093,17 @@ userSchema.methods.completeSearchTask = async function() {
   if (!this.dailyTasks.completed.searchProduct) {
     this.dailyTasks.completed.searchProduct = true;
     this.dailyTasks.pointsEarned += 25;
-    this.points += 25;
+    const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+    await grantDailyTaskSavvy(this, {
+      amount: 25,
+      taskKey: 'search_product',
+      note: 'Daily task: search product',
+    });
     
     // Award XP for search task
     await this.awardXP(15, 'search_task');
     await this.updateLevelStats('totalSearches');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }
@@ -1083,22 +1116,27 @@ userSchema.methods.trackAdForTask = async function() {
   
   // Check if user can watch ads (for daily task purposes)
   const adCheck = this.canWatchAd();
-  if (!adCheck.canWatch && this.membershipTier !== 'premium' && this.membershipTier !== 'pro') {
+  if (!adCheck.canWatch && !userHasPaidSearchBypass(this)) {
     throw new Error(adCheck.reason);
   }
   
   if (this.dailyTasks.completed.watchAds < 5) {
     this.dailyTasks.completed.watchAds += 1;
     
-    // Award points when reaching milestones
     if (this.dailyTasks.completed.watchAds === 5) {
       this.dailyTasks.pointsEarned += 50;
-      this.points += 50;
+      const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+      await grantDailyTaskSavvy(this, {
+        amount: 50,
+        taskKey: 'watch_ads_5',
+        note: 'Daily task: watch 5 ads',
+      });
     }
     
     // Award XP for watching ads
     await this.awardXP(10, 'ad_watch');
     await this.updateLevelStats('totalAdsWatched');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }
@@ -1115,12 +1153,18 @@ userSchema.methods.trackAppShare = async function() {
     // Award points when reaching milestones
     if (this.dailyTasks.completed.shareApp === 3) {
       this.dailyTasks.pointsEarned += 300;
-      this.points += 300;
+      const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+      await grantDailyTaskSavvy(this, {
+        amount: 300,
+        taskKey: 'share_app_3',
+        note: 'Daily task: share app 3 times',
+      });
     }
     
     // Award XP for sharing app
     await this.awardXP(20, 'app_share');
     await this.updateLevelStats('totalShares');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }
@@ -1134,11 +1178,17 @@ userSchema.methods.trackProductShare = async function() {
   if (this.dailyTasks.completed.shareProduct < 1) {
     this.dailyTasks.completed.shareProduct += 1;
     this.dailyTasks.pointsEarned += 75;
-    this.points += 75;
+    const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+    await grantDailyTaskSavvy(this, {
+      amount: 75,
+      taskKey: 'share_product',
+      note: 'Daily task: share product',
+    });
     
     // Award XP for sharing product
     await this.awardXP(15, 'product_share');
     await this.updateLevelStats('totalShares');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }
@@ -1152,11 +1202,17 @@ userSchema.methods.completeSocialPost = async function() {
   if (!this.dailyTasks.completed.socialPost) {
     this.dailyTasks.completed.socialPost = true;
     this.dailyTasks.pointsEarned += 300;
-    this.points += 300;
+    const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+    await grantDailyTaskSavvy(this, {
+      amount: 300,
+      taskKey: 'social_post',
+      note: 'Daily task: social post',
+    });
     
     // Award XP for social media post
     await this.awardXP(30, 'social_post');
     await this.updateLevelStats('totalSocialPosts');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }
@@ -1170,11 +1226,17 @@ userSchema.methods.completeVideoScannerTask = async function() {
   if (!this.dailyTasks.completed.useVideoScanner) {
     this.dailyTasks.completed.useVideoScanner = true;
     this.dailyTasks.pointsEarned += 20;
-    this.points += 20;
+    const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+    await grantDailyTaskSavvy(this, {
+      amount: 20,
+      taskKey: 'video_scanner',
+      note: 'Daily task: video scanner',
+    });
     
     // Award XP for using video scanner
     await this.awardXP(10, 'video_scanner');
     await this.updateLevelStats('totalVideoScans');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }
@@ -1188,11 +1250,17 @@ userSchema.methods.completeLocalDealsTask = async function() {
   if (!this.dailyTasks.completed.searchLocalDeals) {
     this.dailyTasks.completed.searchLocalDeals = true;
     this.dailyTasks.pointsEarned += 25;
-    this.points += 25;
+    const { grantDailyTaskSavvy } = require('../lib/dataAuthority/dailyTaskSavvy');
+    await grantDailyTaskSavvy(this, {
+      amount: 25,
+      taskKey: 'local_deals',
+      note: 'Daily task: local deals search',
+    });
     
     // Award XP for searching local deals
     await this.awardXP(12, 'local_deals_search');
     await this.updateLevelStats('totalLocalDealsSearches');
+    await this.grantAllTasksBonusIfEligible();
     
     return this.save();
   }

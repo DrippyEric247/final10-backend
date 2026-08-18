@@ -205,14 +205,10 @@ function canSelfServeBattlePassPremiumUnlock(user, entitlementLean) {
   if (premiumStatusGrantsBattlePassAccess(entitlementLean)) {
     return { ok: true, reason: 'entitlement_subscription' };
   }
-  if (user.membershipTier === 'premium' || user.membershipTier === 'pro') {
-    return { ok: true, reason: 'membership_tier' };
-  }
-  if (user.isPremium) {
-    return { ok: true, reason: 'is_premium' };
-  }
-  if (user.subscriptionExpires && new Date(user.subscriptionExpires) > new Date()) {
-    return { ok: true, reason: 'active_subscription' };
+  const { resolveUserEntitlements } = require('./userEntitlementService');
+  const resolved = resolveUserEntitlements(user, entitlementLean);
+  if (resolved.effectivePlan !== 'free') {
+    return { ok: true, reason: 'resolved_entitlement' };
   }
   return { ok: false, reason: 'no_entitlement' };
 }

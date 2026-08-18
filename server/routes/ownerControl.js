@@ -334,9 +334,7 @@ router.post('/grant-points', requireOwnerAccess, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Grant Savvy via canonical balance service
-    user.points += points;
-
+    // Grant Savvy via canonical balance service (legacy User.points is not mutated)
     await creditSavvy(user, {
       amount: points,
       source: 'owner_grant',
@@ -391,36 +389,32 @@ router.post('/grant-lifetime-subscription', requireOwnerAccess, async (req, res)
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    // Grant lifetime subscription
-    user.membershipTier = 'pro';
-    user.isPremium = true;
-    user.subscriptionExpires = null; // null = lifetime
-    user.subscriptionEnd = null; // null = lifetime
-    
-    // Add to audit trail
-    user.ownerGrants = user.ownerGrants || [];
-    user.ownerGrants.push({
-      type: 'lifetime_subscription',
-      amount: null,
-      reason: reason,
-      grantedBy: req.superAdmin.username,
-      grantedAt: new Date()
+
+    const { applyLifetimeMembershipGrant } = require('../services/subscriptionWriteService');
+    const updated = await applyLifetimeMembershipGrant(userId, 'pro', {
+      ownerGrants: [
+        ...(user.ownerGrants || []),
+        {
+          type: 'lifetime_subscription',
+          amount: null,
+          reason,
+          grantedBy: req.superAdmin.username,
+          grantedAt: new Date(),
+        },
+      ],
     });
     
-    await user.save();
-    
-    console.log(`👑 Owner granted lifetime subscription to user ${user.username} (${userId})`);
+    console.log(`👑 Owner granted lifetime subscription to user ${updated.username} (${userId})`);
     
     res.json({
       success: true,
-      message: `Successfully granted lifetime subscription to ${user.username}`,
+      message: `Successfully granted lifetime subscription to ${updated.username}`,
       user: {
-        id: user._id,
-        username: user.username,
-        membershipTier: user.membershipTier,
-        isPremium: user.isPremium,
-        subscriptionExpires: user.subscriptionExpires
+        id: updated._id,
+        username: updated.username,
+        membershipTier: updated.membershipTier,
+        isPremium: updated.isPremium,
+        subscriptionExpires: updated.subscriptionExpires
       }
     });
     
@@ -446,36 +440,37 @@ router.post('/revoke-lifetime-subscription', requireOwnerAccess, async (req, res
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    // Revoke lifetime subscription
-    user.membershipTier = 'free';
-    user.isPremium = false;
-    user.subscriptionExpires = new Date(); // Set to past date
-    user.subscriptionEnd = new Date(); // Set to past date
-    
-    // Add to audit trail
-    user.ownerGrants = user.ownerGrants || [];
-    user.ownerGrants.push({
-      type: 'revoke_lifetime_subscription',
-      amount: null,
-      reason: reason,
-      grantedBy: req.superAdmin.username,
-      grantedAt: new Date()
+
+    const { revokePaidSubscription } = require('../services/subscriptionWriteService');
+    const updated = await revokePaidSubscription(userId, { provider: 'owner' });
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        subscriptionEnd: new Date(),
+        ownerGrants: [
+          ...(user.ownerGrants || []),
+          {
+            type: 'revoke_lifetime_subscription',
+            amount: null,
+            reason,
+            grantedBy: req.superAdmin.username,
+            grantedAt: new Date(),
+          },
+        ],
+      },
     });
+    const finalUser = await User.findById(userId);
     
-    await user.save();
-    
-    console.log(`🚫 Owner revoked lifetime subscription from user ${user.username} (${userId})`);
+    console.log(`🚫 Owner revoked lifetime subscription from user ${finalUser.username} (${userId})`);
     
     res.json({
       success: true,
-      message: `Successfully revoked lifetime subscription from ${user.username}`,
+      message: `Successfully revoked lifetime subscription from ${finalUser.username}`,
       user: {
-        id: user._id,
-        username: user.username,
-        membershipTier: user.membershipTier,
-        isPremium: user.isPremium,
-        subscriptionExpires: user.subscriptionExpires
+        id: finalUser._id,
+        username: finalUser.username,
+        membershipTier: finalUser.membershipTier,
+        isPremium: finalUser.isPremium,
+        subscriptionExpires: finalUser.subscriptionExpires
       }
     });
     
