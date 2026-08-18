@@ -528,6 +528,15 @@ function markMissionClaimedLocally(state, def) {
 }
 
 async function syncMissionActionToServer(trigger, increment = 1) {
+  const serverOnly = new Set([
+    'create_alert',
+    'add_watchlist',
+    'save_deal',
+    'savvy_earned_today',
+    'battle_pass_tier_up',
+    'scan_complete',
+  ]);
+  if (serverOnly.has(String(trigger || '').trim())) return;
   try {
     await apiRecordScoutMissionAction({ trigger, increment });
     await syncScoutMissionProgressFromServer();

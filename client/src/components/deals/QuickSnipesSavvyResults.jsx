@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { emitPowerToast } from '../../lib/final10PowerFeedback';
 import { trackQuickSnipeAction } from '../../lib/analytics';
-import { recordScoutMissionAction } from '../../lib/savvyScoutMissions';
+import promotionService from '../../services/promotionService';
+import { hasAuthTokenForRanking } from '../../lib/serverListingRanking';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import QuickSnipeSavvyRewards from './QuickSnipeSavvyRewards';
 import { getConfidenceLabel, rankQuickSnipeListings } from '../../lib/quickSnipesBestMove';
@@ -485,16 +486,25 @@ export default function QuickSnipesSavvyResults({
     };
   }, [ranked, displayFallback]);
 
-  const saveAlert = useCallback((item, alertQuery = '') => {
+  const saveAlert = useCallback(async (item, alertQuery = '') => {
     try {
+      const id = String(item.itemId ?? '');
       const key = 'f10_quick_snipe_alerts_v1';
       const raw = JSON.parse(localStorage.getItem(key) || '[]');
-      const id = String(item.itemId ?? '');
       if (raw.some((x) => String(x.id) === id)) {
         setBanner('Already watching this deal in Saved Alerts.');
         window.setTimeout(() => setBanner(''), 2800);
         return;
       }
+
+      if (hasAuthTokenForRanking()) {
+        await promotionService.watchListing(id, {
+          title: String(item.title || '').slice(0, 120),
+          image: String(item.imageUrl || item.image || ''),
+          url: String(resolveDirectItemUrl(item) || ''),
+        });
+      }
+
       raw.unshift({
         id,
         title: String(item.title || '').slice(0, 120),
@@ -503,7 +513,6 @@ export default function QuickSnipesSavvyResults({
       });
       localStorage.setItem(key, JSON.stringify(raw.slice(0, 40)));
       trackQuickSnipeAction('save_alert', { itemId: id });
-      recordScoutMissionAction('save_deal', { pathname: '/local-deals' });
       emitPowerToast(8, 'Deal alert saved to your dock.');
       setBanner('Saved to Savvy Deal Alerts.');
       window.setTimeout(() => setBanner(''), 2800);

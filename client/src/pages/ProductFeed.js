@@ -8,6 +8,10 @@ import { SCOUT_LABELS, SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import ListingIntentAnchor from "../components/ListingIntentAnchor";
 import SavvyRewardCoinBadge from "../components/rewards/SavvyRewardCoinBadge";
 import { evaluateTrustScore, trustScoreInputFromListing } from "../lib/trustScoreEngine";
+import {
+  mergeServerRanksIntoListings,
+  useServerListingRanks,
+} from "../lib/serverListingRanking";
 import { groupByBestMove } from "../lib/listingSectionsEngine";
 import ListingSections, { MoveTierBadge } from "../components/listings/ListingSections";
 import ListingCardImage from "../components/listings/ListingCardImage";
@@ -327,6 +331,7 @@ export default function ProductFeed() {
     () => (data?.pages ? data.pages.flatMap((p) => p.items || []) : []) || [],
     [data]
   );
+  const { rankById: feedRankById } = useServerListingRanks(items);
 
   // Smart alerts: evaluate every new batch of listings. The engine's internal
   // daily cap + per-item dedupe make this safe to call on every refresh.
@@ -353,9 +358,21 @@ export default function ProductFeed() {
   }, [data]);
 
   const sortedItems = useMemo(() => {
-    const enriched = items.map((it) => {
+    const rankedBase = mergeServerRanksIntoListings(items, feedRankById);
+    const enriched = rankedBase.map((it) => {
       const feedPrice =
         Number(it.currentPrice ?? it.price ?? it.buyNowPrice ?? it.currentBidPrice) || null;
+      const feedSavings =
+        Number(it.marketValue) > 0 && feedPrice
+          ? Math.max(0, Number(it.marketValue) - feedPrice)
+          : 0;
+      if (it.serverRanked) {
+        return {
+          ...it,
+          feedPrice,
+          feedSavings,
+        };
+      }
       const baseIn = trustScoreInputFromListing(it);
       const trust = evaluateTrustScore({
         ...baseIn,
@@ -363,10 +380,6 @@ export default function ProductFeed() {
         price: feedPrice ?? baseIn.price,
         seller: it.seller || it.sellerUsername || baseIn.seller,
       });
-      const feedSavings =
-        Number(it.marketValue) > 0 && feedPrice
-          ? Math.max(0, Number(it.marketValue) - feedPrice)
-          : 0;
       return {
         ...it,
         feedPrice,
@@ -386,7 +399,7 @@ export default function ProductFeed() {
       return bExposure - aExposure;
     });
     return enriched;
-  }, [items]);
+  }, [items, feedRankById]);
 
   const smartCartItems = useMemo(
     () => smartCartIds

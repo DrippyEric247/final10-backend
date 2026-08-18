@@ -16,6 +16,7 @@ import {
   setEquippedCallingCardId,
   setEquippedEmblemId,
   unlockCallingCardForDev,
+  resolveCosmeticUnlockState,
 } from "../lib/customizationCatalog";
 import { showCallingCardUnlock } from "../lib/callingCardUnlockBus";
 import PerkRewardReveal from "../components/perk/PerkRewardReveal";
@@ -96,31 +97,35 @@ export default function Customization() {
 
   const serverUnlockReady = cos.useServer && !cos.loading && cos.data;
 
-  // Union of server-known unlocks and local progression. This lets cosmetics
-  // driven entirely by client signals (Savvy Offers / Business Offers cards)
-  // unlock for authed users even before the server schema catches up.
+  // Authenticated users: server CosmeticInventory is the only ownership source.
   const emblemUnlocked = useMemo(
     () => {
       void syncTick;
       return EMBLEMS.reduce((acc, e) => {
-        const local = e.check();
-        acc[e.id] = serverUnlockReady ? cos.unlockedSet.has(e.id) || local : local;
+        acc[e.id] = resolveCosmeticUnlockState(e, {
+          useServer: cos.useServer,
+          serverUnlockReady,
+          unlockedSet: cos.unlockedSet,
+        });
         return acc;
       }, {});
     },
-    [syncTick, serverUnlockReady, cos.unlockedSet]
+    [syncTick, serverUnlockReady, cos.unlockedSet, cos.useServer]
   );
 
   const cardUnlocked = useMemo(
     () => {
       void syncTick;
       return CALLING_CARDS.reduce((acc, c) => {
-        const local = c.check();
-        acc[c.id] = serverUnlockReady ? cos.unlockedSet.has(c.id) || local : local;
+        acc[c.id] = resolveCosmeticUnlockState(c, {
+          useServer: cos.useServer,
+          serverUnlockReady,
+          unlockedSet: cos.unlockedSet,
+        });
         return acc;
       }, {});
     },
-    [syncTick, serverUnlockReady, cos.unlockedSet]
+    [syncTick, serverUnlockReady, cos.unlockedSet, cos.useServer]
   );
 
   const loadoutEmblemId = previewEmblemId ?? equippedEmblem;

@@ -1040,3 +1040,24 @@ export function findEmblem(id) {
 export function findCallingCard(id) {
   return CALLING_CARDS.find((c) => c.id === id) || CALLING_CARDS[0];
 }
+
+/**
+ * Wave 4 — separate display/progress from authoritative ownership.
+ * Authenticated users: only server inventory counts as owned.
+ */
+export function resolveCosmeticUnlockState(entry, opts = {}) {
+  const {
+    useServer = false,
+    serverUnlockReady = false,
+    unlockedSet = new Set(),
+  } = opts;
+  if (useServer) {
+    return serverUnlockReady ? unlockedSet.has(entry.id) : false;
+  }
+  return entry.check();
+}
+
+/** Local progression counters are display-only hints — never ownership for authed users. */
+export function isLocalCosmeticProgressOnly() {
+  return typeof window !== "undefined" && Boolean(localStorage.getItem("f10_token"));
+}

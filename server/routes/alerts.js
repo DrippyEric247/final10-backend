@@ -92,7 +92,10 @@ router.post('/', auth, async (req, res) => {
   setImmediate(() => {
     try {
       const { recordScoutMissionTrigger } = require('../services/scoutMissionProgressService');
-      void recordScoutMissionTrigger(req.user.id, 'create_alert');
+      void recordScoutMissionTrigger(req.user.id, 'create_alert', {
+        source: 'server',
+        dedupeKey: `create_alert:${String(alert._id)}`,
+      });
     } catch (_e) {
       /* non-blocking */
     }

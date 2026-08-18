@@ -362,7 +362,19 @@ router.post('/watch/:listingId', async (req, res) => {
       setImmediate(() => {
         try {
           const { recordScoutMissionTrigger } = require('../services/scoutMissionProgressService');
-          void recordScoutMissionTrigger(user._id, 'add_watchlist');
+          const { periodKeyForMission, getMissionById } = require('../config/scoutMissions');
+          const saveMission = getMissionById('save_deal');
+          const watchMission = getMissionById('add_watchlist');
+          const savePeriod = saveMission ? periodKeyForMission(saveMission) : todayKey();
+          const watchPeriod = watchMission ? periodKeyForMission(watchMission) : savePeriod;
+          void recordScoutMissionTrigger(user._id, 'save_deal', {
+            source: 'server',
+            dedupeKey: `save_deal:${listingId}:${savePeriod}`,
+          });
+          void recordScoutMissionTrigger(user._id, 'add_watchlist', {
+            source: 'server',
+            dedupeKey: `add_watchlist:${listingId}:${watchPeriod}`,
+          });
         } catch (_e) {
           /* non-blocking */
         }

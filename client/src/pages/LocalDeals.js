@@ -38,7 +38,7 @@ import {
 import { syncServerEntitlementsFromApiPayload } from '../lib/entitlementCache';
 import { isBetaTester, FOUNDING_TESTER_BADGE } from '../lib/betaTesterAccess';
 import { useScoutScanRegistration } from '../hooks/useScoutScanRegistration';
-import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked, trackBetaTesterUsage } from '../lib/analytics';
+import { trackQuickSnipeAction, trackQuickSnipeSearch, trackUpgradeClicked } from '../lib/analytics';
 import LoadingState from '../components/ui/states/LoadingState';
 import ErrorState from '../components/ui/states/ErrorState';
 import EmptyState from '../components/ui/states/EmptyState';
@@ -53,6 +53,11 @@ import {
 } from '../lib/quickSnipesBestMove';
 import { isBestMoveDisplayable } from '../lib/bestMoveListingValidation';
 import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
+import {
+  applyServerRankToListing,
+  listingKey,
+  useServerListingRanks,
+} from '../lib/serverListingRanking';
 import DealSearchModeSelector from '../components/deals/DealSearchModeSelector';
 import DealPhilosophyBanner from '../components/navigation/DealPhilosophyBanner';
 import { listingModeForSearchMode, readPersistedSearchMode, writePersistedSearchMode } from '../lib/dealSearchMode';
@@ -238,11 +243,6 @@ const LocalDeals = () => {
 
   /** Consumes one boosted credit when capped; returns whether boosted mode is on. */
   const tryConsumeBoostedCredit = useCallback(async () => {
-    if (isBetaTester()) {
-      setBoostedActive(true);
-      trackBetaTesterUsage("best_move_boost", { unlimited: true });
-      return true;
-    }
     const tier = getTierForQuickSnipesBoost();
     const cap = getBestMoveBoostedCap(tier);
     if (!Number.isFinite(cap)) {
@@ -424,9 +424,27 @@ const LocalDeals = () => {
     wasListingsLoadingRef.current = listings.isLoading;
   }, [listings.isLoading]);
 
+  const sourceItems = useMemo(
+    () => listings.data?.normalizedItems || [],
+    [listings.data?.normalizedItems]
+  );
+  const { rankById: serverRankById } = useServerListingRanks(sourceItems);
+
   const allItems = useMemo(() => {
-    const sourceItems = listings.data?.normalizedItems || [];
     return sourceItems.map((item) => {
+      const rankRow = serverRankById?.get(listingKey(item));
+      if (rankRow) {
+        return applyServerRankToListing(
+          {
+            ...item,
+            source: item.source || 'ebay',
+            marketValue: item.marketValue ?? item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? null,
+            shippingCost: item.shippingCost ?? 0,
+          },
+          rankRow
+        );
+      }
+
       const baseTrustInput = trustScoreInputFromListing(item);
       const trust = evaluateTrustScore({
         ...baseTrustInput,
@@ -467,23 +485,31 @@ const LocalDeals = () => {
         safeToRecommend: trust.safeToRecommend,
       };
     });
-  }, [listings.data?.normalizedItems]);
+  }, [sourceItems, serverRankById]);
 
   const visibleItems = useMemo(() => {
     const sorted = [...allItems];
     let next;
     if (mode === 'best_move') {
       const weight = { buy_now_better: 4, auction_better: 3, wait_and_watch: 2, pass: 1 };
-      sorted.sort(
-        (a, b) =>
-          (weight[b.recommendationType] || 0) - (weight[a.recommendationType] || 0) ||
-          (Number(b.trustScore) || 0) - (Number(a.trustScore) || 0) ||
-          (boostedActive
-            ? ((subscriptionTier === 'pro' || subscriptionTier === 'elite' ? 22 : subscriptionTier === 'core' ? 10 : 0) + (Number(b.trustScore) || 0) / 12)
-              - ((subscriptionTier === 'pro' || subscriptionTier === 'elite' ? 22 : subscriptionTier === 'core' ? 10 : 0) + (Number(a.trustScore) || 0) / 12)
-            : 0) ||
-          (Number(b.confidenceScore) || 0) - (Number(a.confidenceScore) || 0)
-      );
+      if (sorted.some((x) => x.serverRanked)) {
+        sorted.sort(
+          (a, b) =>
+            (Number(a.rankPosition) || 999) - (Number(b.rankPosition) || 999) ||
+            (Number(b.rankScore) || 0) - (Number(a.rankScore) || 0)
+        );
+      } else {
+        sorted.sort(
+          (a, b) =>
+            (weight[b.recommendationType] || 0) - (weight[a.recommendationType] || 0) ||
+            (Number(b.trustScore) || 0) - (Number(a.trustScore) || 0) ||
+            (boostedActive
+              ? ((subscriptionTier === 'pro' || subscriptionTier === 'elite' ? 22 : subscriptionTier === 'core' ? 10 : 0) + (Number(b.trustScore) || 0) / 12)
+                - ((subscriptionTier === 'pro' || subscriptionTier === 'elite' ? 22 : subscriptionTier === 'core' ? 10 : 0) + (Number(a.trustScore) || 0) / 12)
+              : 0) ||
+            (Number(b.confidenceScore) || 0) - (Number(a.confidenceScore) || 0)
+        );
+      }
       next = showPass ? sorted : sorted.filter((x) => x.recommendationType !== 'pass');
     } else {
       next = sorted;

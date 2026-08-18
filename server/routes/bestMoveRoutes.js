@@ -25,6 +25,27 @@ router.get('/usage', auth, async (req, res, next) => {
 router.post('/consume', auth, async (req, res, next) => {
   try {
     const userId = req.user._id || req.user.id;
+
+    // Ignore client-supplied quota/plan spoof fields — server resolves entitlements only.
+    if (
+      req.body &&
+      (req.body.plan != null ||
+        req.body.remaining != null ||
+        req.body.cap != null ||
+        req.body.used != null)
+    ) {
+      const { auditFireAndForget } = require('../services/securityAuditService');
+      auditFireAndForget('BEST_MOVE_SPOOF_IGNORED', {
+        userId,
+        meta: {
+          keys: Object.keys(req.body || {}).filter((k) =>
+            ['plan', 'remaining', 'cap', 'used', 'effectivePlan'].includes(k)
+          ),
+        },
+        severity: 'warn',
+      });
+    }
+
     const result = await consumeBestMoveCredit(userId);
     if (!result.ok) {
       return next(

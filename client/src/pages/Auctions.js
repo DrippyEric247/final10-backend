@@ -23,7 +23,11 @@ import {
 import { POWER } from "../lib/final10PowerConfig";
 import { recordBattlePassXp } from "../lib/battlePassEngine";
 import { triggerActionReward } from "../lib/rewardEngine";
-import { recordScoutMissionAction } from "../lib/savvyScoutMissions";
+import promotionService from "../services/promotionService";
+import {
+  mergeServerRanksIntoListings,
+  useServerListingRanks,
+} from "../lib/serverListingRanking";
 import { emitBattlePassAction } from "../lib/battlePassActionBus";
 import PlaceBidModal from "../components/ebay/PlaceBidModal";
 import GlobalSmartSearch from "../components/search/GlobalSmartSearch";
@@ -146,6 +150,17 @@ const AUCTIONS_INTENT_FIELD_MAP = {
 };
 
 function extractAuctionRankSignals(item) {
+  if (item?.serverRanked) {
+    const displayPrice =
+      toNumber(item.buyNowPrice) ?? toNumber(item.currentBid) ?? toNumber(item.price);
+    return {
+      trustScore: Number(item.trustScore) || 0,
+      trustLevel: item.trustLevel,
+      price: displayPrice,
+      marketValue: item.marketValue,
+      secondsRemaining: item.timeRemaining,
+    };
+  }
   const trust = evaluateAuctionListingTrust(item);
   const displayPrice =
     toNumber(item.buyNowPrice) ?? toNumber(item.currentBid) ?? toNumber(item.price);
@@ -266,6 +281,11 @@ export default function Auctions() {
   }, [marketSearchKeywords, smartIntent.categories]);
 
   const [sniperItems, setSniperItems] = useState([]);
+  const { rankById: auctionRankById } = useServerListingRanks(sniperItems);
+  const rankedSniperItems = useMemo(
+    () => mergeServerRanksIntoListings(sniperItems, auctionRankById),
+    [sniperItems, auctionRankById]
+  );
   const [loading, setLoading] = useState(true);
   const [searchMarketPending, setSearchMarketPending] = useState(false);
   const [error, setError] = useState("");
@@ -655,7 +675,7 @@ export default function Auctions() {
     }
   }, [watchlistIds, bonusExpiresAt]);
 
-  const toggleWatchlist = (item, clickOrigin) => {
+  const toggleWatchlist = async (item, clickOrigin) => {
     const id = String(item.id || "");
     if (!id) return;
     const willAdd = !watchlistIds.includes(id);
@@ -712,8 +732,18 @@ export default function Auctions() {
         recordBattlePassXp("save_item");
         triggerActionReward("save_item");
       }
-      recordScoutMissionAction("save_deal", { pathname: "/auctions" });
-      recordScoutMissionAction("add_watchlist", { pathname: "/auctions" });
+      if (authUser) {
+        try {
+          await promotionService.watchListing(id, {
+            title: String(item.title || ""),
+            image: getBestListingImageUrl(item) || "",
+            url: String(item.url || item.itemWebUrl || ""),
+            sellerId: String(item.sellerId || item.seller || ""),
+          });
+        } catch {
+          /* local watchlist UI still updates; scout progress requires server save */
+        }
+      }
     }
     setWatchlistIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -723,7 +753,8 @@ export default function Auctions() {
 
   const auctionsItemPool = useMemo(
     () =>
-      sniperItems.map((item) => {
+      rankedSniperItems.map((item) => {
+        if (item.serverRanked) return item;
         const trust = evaluateAuctionListingTrust(item);
         return {
           ...item,
@@ -735,7 +766,7 @@ export default function Auctions() {
           safeToRecommend: trust.safeToRecommend,
         };
       }),
-    [sniperItems]
+    [rankedSniperItems]
   );
 
   const baseVisibleItems = watchlistOnly

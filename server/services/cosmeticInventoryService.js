@@ -172,7 +172,7 @@ async function equipCosmetic(userId, type, itemId, options = {}) {
     });
     const err = new Error('Cosmetic is locked for this account');
     err.status = 403;
-    err.code = 'COSMETIC_LOCKED';
+    err.code = 'COSMETIC_NOT_OWNED';
     throw err;
   }
 

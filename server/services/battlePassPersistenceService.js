@@ -475,11 +475,17 @@ async function processBattlePassEvent(userId, seasonId, rawEvent, options = {}) 
       } = require('./scoutMissionProgressService');
       const { fireContractProgressionEvent } = require('./contractHooks');
       const { recordQualifyingDealFromProgressionEvent } = require('./dealStreakHooks');
-      void recordScoutProgressFromProgressionEvent(userId, event.type);
+      void recordScoutProgressFromProgressionEvent(userId, event.type, event.id);
       fireContractProgressionEvent(userId, event.type);
       recordQualifyingDealFromProgressionEvent(userId, event);
       if (Number(bp.tier) > tierBefore) {
-        void recordScoutMissionTrigger(userId, 'battle_pass_tier_up');
+        const { periodKeyForMission, getMissionById } = require('../config/scoutMissions');
+        const mission = getMissionById('battle_pass_tier');
+        const periodKey = mission ? periodKeyForMission(mission) : `season-${new Date().getFullYear()}`;
+        void recordScoutMissionTrigger(userId, 'battle_pass_tier_up', {
+          source: 'server',
+          dedupeKey: `battle_pass_tier_up:${bp.tier}:${periodKey}`,
+        });
       }
     } catch (_e) {
       /* non-blocking */

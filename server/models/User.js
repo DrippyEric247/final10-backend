@@ -675,6 +675,18 @@ const userSchema = new mongoose.Schema({
     usedToday: { type: Number, default: 0 },
     lastUsedAt: { type: Date, default: null },
   },
+
+  /** Client-reported Scout action rate limits (Wave 4). */
+  scoutClientActionDaily: {
+    day: { type: String, default: null },
+    counts: { type: mongoose.Schema.Types.Mixed, default: {} },
+    idempotencyKeys: { type: [String], default: [] },
+  },
+
+  /** Processed Scout dedupe keys — prevents hook + retry double-count (Wave 4). */
+  scoutActionDedupe: {
+    keys: { type: [String], default: [] },
+  },
   
   // search limits per tier
   dailySearchLimit: { type: Number, default: 5 },   // free users get 5 searches per day

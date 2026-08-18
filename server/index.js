@@ -325,6 +325,7 @@ app.use('/api/camo-locker', require('./routes/camoLockerRoutes'));
 app.use('/api/admin/nuke-monitor', require('./routes/nukeMonitorRoutes'));
 app.use('/api/entitlements', entitlementRoutes);
 app.use('/api/best-moves', require('./routes/bestMoveRoutes'));
+app.use('/api/listings', require('./routes/listingRankingRoutes'));
 app.use('/api/offers', offersRoutes);
 app.use('/api/business-offers', businessOffersRoutes);
 app.use('/api/creators', creatorRoutes);

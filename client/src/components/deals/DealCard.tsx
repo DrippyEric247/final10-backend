@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { Clock, ExternalLink, Sparkles } from 'lucide-react';
 import { evaluateBestMove } from '../../lib/bestMoveEngine';
+import { bestMoveDecisionFromServerItem } from '../../lib/serverListingRanking';
 import type { BestMoveResult } from '../../types/bestMove';
 import { evaluateTrustScore, getTrustSummary, trustScoreInputFromListing } from '../../lib/trustScoreEngine';
 import type { TrustScoreResult } from '../../types/trustScore';
@@ -794,25 +795,36 @@ export function DealCard({
   boostedPower = false,
   hideCreateAlert = false,
 }: DealCardProps) {
-  const trustResult: TrustScoreResult = evaluateTrustScore(
-    trustScoreInputFromListing(item as unknown as Record<string, unknown>),
-  );
+  const preRanked = Boolean((item as DealListing & { serverRanked?: boolean }).serverRanked);
+  const trustResult = (preRanked
+    ? {
+        trustScore: Number(item.trustScore) || 0,
+        trustLevel: (item.trustLevel as TrustScoreResult['trustLevel']) || 'medium',
+        aiConfidence: Number(item.aiConfidence) || 0,
+        savvyWarningHeadline: item.savvyWarningHeadline || null,
+        savvyVerifiedSeller: Boolean(item.savvyVerifiedSeller),
+        safeToRecommend: item.safeToRecommend !== false,
+      }
+    : evaluateTrustScore(
+        trustScoreInputFromListing(item as unknown as Record<string, unknown>),
+      )) as TrustScoreResult;
 
-  const computed =
-    decision ||
-    evaluateBestMove({
-      currentBid: item.currentBidPrice,
-      buyNowPrice: item.buyNowPrice,
-      marketValue: item.marketValue,
-      marketConfidence: item.marketConfidence,
-      trustScore: trustResult.trustScore,
-      bidCount: item.bidCount,
-      secondsRemaining: item.secondsRemaining,
-      condition: item.condition,
-      shippingCost: item.shippingCost,
-      isAuction: item.isAuction,
-      isBuyNow: item.isBuyNow,
-    });
+  const computed = (decision ||
+    (preRanked && item.recommendationType
+      ? bestMoveDecisionFromServerItem(item)
+      : evaluateBestMove({
+          currentBid: item.currentBidPrice,
+          buyNowPrice: item.buyNowPrice,
+          marketValue: item.marketValue,
+          marketConfidence: item.marketConfidence,
+          trustScore: trustResult.trustScore,
+          bidCount: item.bidCount,
+          secondsRemaining: item.secondsRemaining,
+          condition: item.condition,
+          shippingCost: item.shippingCost,
+          isAuction: item.isAuction,
+          isBuyNow: item.isBuyNow,
+        }))) as BestMoveResult;
 
   if (hidePass && computed.bestMove === 'pass') return null;
 

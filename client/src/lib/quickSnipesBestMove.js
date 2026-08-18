@@ -18,6 +18,13 @@ import {
   normalizeBestMoveListing,
   validateBestMoveListing,
 } from './bestMoveListingValidation';
+import {
+  applyServerRankToListing,
+  hasAuthTokenForRanking,
+  indexServerRankResults,
+  listingKey,
+  rankListingsOnServer,
+} from './serverListingRanking';
 
 const LOG_PREFIX = '[QuickSnipesBestMove]';
 
@@ -63,6 +70,16 @@ export function getConfidenceLabel(confidenceScore) {
 /** Enrich raw eBay listing with trust + Best Move decision (same shape as LocalDeals). */
 export function enrichQuickSnipeItem(item) {
   const normalized = normalizeBestMoveListing(item) || item;
+  if (normalized.serverRanked) {
+    return {
+      ...normalized,
+      bestMoveDecision: {
+        dealScore: normalized.dealScore,
+        recommendationType: normalized.recommendationType,
+        confidenceScore: normalized.confidenceScore ?? normalized.dealScore,
+      },
+    };
+  }
   const baseTrustInput = trustScoreInputFromListing(normalized);
   const trust = evaluateTrustScore({
     ...baseTrustInput,
@@ -348,6 +365,17 @@ async function fetchCuratedLane(query, category, attemptIndex = 0, limit = BETA_
   return { items, curated };
 }
 
+async function maybeServerRankItems(items) {
+  if (!hasAuthTokenForRanking() || !Array.isArray(items) || !items.length) return items;
+  const payload = await rankListingsOnServer(items);
+  if (!payload?.results?.length) return items;
+  const map = indexServerRankResults(payload.results);
+  return items.map((item) => {
+    const row = map.get(listingKey(item));
+    return row ? applyServerRankToListing(item, row) : item;
+  });
+}
+
 /**
  * Resolve the best move for Quick Snipes with multi-lane fallback.
  */
@@ -361,8 +389,11 @@ export async function resolveQuickSnipesBestMove({
   const laneCategory = resolveLaneCategory(category, q);
   qsLog('query_start', { query: q, category: laneCategory, primaryRawCount: primaryItems.length });
 
-  const tryPick = (items, source, isFallback) => {
-    const ranked = rankQuickSnipeListings(items, liveTick);
+  const serverPrimary = await maybeServerRankItems(primaryItems);
+
+  const tryPick = async (items, source, isFallback) => {
+    const rankedItems = await maybeServerRankItems(items);
+    const ranked = rankQuickSnipeListings(rankedItems, liveTick);
     qsLog('filter_stats', {
       query: q,
       category: laneCategory,
@@ -379,8 +410,8 @@ export async function resolveQuickSnipesBestMove({
     });
   };
 
-  if (primaryItems.length > 0) {
-    const ranked = rankQuickSnipeListings(primaryItems, liveTick);
+  if (serverPrimary.length > 0) {
+    const ranked = rankQuickSnipeListings(serverPrimary, liveTick);
     const extraordinary = ranked.find((row) => row.extraordinary);
     if (extraordinary) {
       const pick = pickValidatedBestMove([extraordinary], FALLBACK_SOURCES.QUICK_SNIPES, {
@@ -393,7 +424,7 @@ export async function resolveQuickSnipesBestMove({
         return pick;
       }
     }
-    const relaxed = tryPick(primaryItems, FALLBACK_SOURCES.QUICK_SNIPES_RELAXED, true);
+    const relaxed = await tryPick(serverPrimary, FALLBACK_SOURCES.QUICK_SNIPES_RELAXED, true);
     if (relaxed) {
       qsLog('final_pick', { query: q, source: relaxed.source, isFallback: true, title: relaxed.item?.title });
       return relaxed;
@@ -404,7 +435,7 @@ export async function resolveQuickSnipesBestMove({
     if (q) {
       try {
         const auctionItems = await fetchAuctionsLane(q);
-        const pick = tryPick(auctionItems, FALLBACK_SOURCES.AUCTIONS, true);
+        const pick = await tryPick(auctionItems, FALLBACK_SOURCES.AUCTIONS, true);
         if (pick) {
           qsLog('final_pick', { query: q, source: pick.source, fallbackSource: 'auctions', title: pick.item?.title });
           return pick;
@@ -416,7 +447,7 @@ export async function resolveQuickSnipesBestMove({
 
     try {
       const trendingItems = await fetchTrendingLane(q, laneCategory);
-      const pick = tryPick(trendingItems, FALLBACK_SOURCES.TRENDING, true);
+      const pick = await tryPick(trendingItems, FALLBACK_SOURCES.TRENDING, true);
       if (pick) {
         qsLog('final_pick', { query: q, source: pick.source, fallbackSource: 'trending', title: pick.item?.title });
         return pick;
@@ -429,7 +460,7 @@ export async function resolveQuickSnipesBestMove({
     for (let i = 0; i < fallbackQueries.length; i += 1) {
       try {
         const { items: curatedItems, curated } = await fetchCuratedLane(q, laneCategory, i);
-        const pick = tryPick(curatedItems, FALLBACK_SOURCES.CURATED, true);
+        const pick = await tryPick(curatedItems, FALLBACK_SOURCES.CURATED, true);
         if (pick) {
           qsLog('final_pick', {
             query: q,
