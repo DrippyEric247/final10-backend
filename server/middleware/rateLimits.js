@@ -3,6 +3,11 @@ const { rateLimitSkipDev } = require('../lib/rateLimitDevBypass');
 const { isBetaMode } = require('../config/betaMode');
 const { getRouteRateCaps } = require('../config/betaMode');
 const { getSoftBusyMessage } = require('./marketplaceScanLimiter');
+const {
+  distributedRateLimitMiddleware,
+  useDistributedRateLimits,
+} = require('../lib/distributedRateLimit');
+const { RATE_LIMIT_CLASSIFICATION } = require('../lib/rateLimitClassification');
 
 function caps() {
   return getRouteRateCaps();
@@ -17,6 +22,28 @@ function betaRateLimitMessage(fallback) {
     };
   }
   return typeof fallback === 'string' ? { code: 'RATE_LIMIT', message: fallback } : fallback;
+}
+
+/**
+ * Production: Mongo-backed shared counter. Dev / no Mongo: in-memory limiter only.
+ */
+function composeSecurityLimiter(name, inMemoryLimiter, opts = {}) {
+  const category = RATE_LIMIT_CLASSIFICATION[name] || opts.category || 'SECURITY';
+  const distributed = distributedRateLimitMiddleware({
+    name,
+    category,
+    windowMs: opts.windowMs,
+    max: opts.max,
+    keyGenerator: opts.keyGenerator,
+    message: opts.message,
+  });
+  return function composedRateLimit(req, res, next) {
+    distributed(req, res, (err) => {
+      if (err) return next(err);
+      if (useDistributedRateLimits()) return next();
+      return inMemoryLimiter(req, res, next);
+    });
+  };
 }
 
 /** True for GET /api/auth/me (profile hydrate — not a credential guess). */
@@ -38,7 +65,7 @@ const authMeLimiter = rateLimit({
   },
 });
 
-const authLoginLimiter = rateLimit({
+const authLoginLimiterMemory = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
   standardHeaders: true,
@@ -48,7 +75,7 @@ const authLoginLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
-const authSignupLimiter = rateLimit({
+const authSignupLimiterMemory = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 15,
   standardHeaders: true,
@@ -57,14 +84,158 @@ const authSignupLimiter = rateLimit({
   message: { code: 'RATE_LIMIT', message: 'Too many signup attempts from this IP.' },
 });
 
+const authPasswordResetLimiterMemory = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  message: { code: 'RATE_LIMIT', message: 'Too many password reset attempts.' },
+});
+
+const authPasswordResetSubmitLimiterMemory = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  message: { code: 'RATE_LIMIT', message: 'Too many reset attempts. Try again later.' },
+});
+
+const perkMachineSpinLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().perkMachineSpin,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many spins. Wait a moment before trying again.'),
+});
+
+const scoutMissionClaimLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().scoutMissionClaim,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many claim attempts. Slow down.'),
+});
+
+const scoutFlightTournamentStartLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().scoutFlightTournamentStart,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many tournament starts. Wait a moment.'),
+});
+
+const scoutFlightTournamentSubmitLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().scoutFlightTournamentSubmit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many score submissions. Wait a moment.'),
+});
+
+const ebayBidLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().ebayBid,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  message: () => betaRateLimitMessage('Too many bid attempts from your session. Pause briefly and retry.'),
+});
+
+const authLoginLimiter = composeSecurityLimiter('authLoginLimiter', authLoginLimiterMemory, {
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Too many login attempts. Try again later.',
+});
+
+const authSignupLimiter = composeSecurityLimiter('authSignupLimiter', authSignupLimiterMemory, {
+  windowMs: 60 * 60 * 1000,
+  max: 15,
+  message: 'Too many signup attempts from this IP.',
+});
+
+const authPasswordResetLimiter = composeSecurityLimiter(
+  'authForgotPasswordLimiter',
+  authPasswordResetLimiterMemory,
+  {
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    message: 'Too many password reset attempts.',
+  }
+);
+
+const authPasswordResetSubmitLimiter = composeSecurityLimiter(
+  'authResetPasswordLimiter',
+  authPasswordResetSubmitLimiterMemory,
+  {
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Too many reset attempts. Try again later.',
+  }
+);
+
+const perkMachineSpinLimiter = composeSecurityLimiter('perkMachineSpinLimiter', perkMachineSpinLimiterMemory, {
+  windowMs: 60 * 1000,
+  max: () => caps().perkMachineSpin,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: 'Too many spins. Wait a moment before trying again.',
+});
+
+const scoutMissionClaimLimiter = composeSecurityLimiter(
+  'scoutMissionClaimLimiter',
+  scoutMissionClaimLimiterMemory,
+  {
+    windowMs: 60 * 1000,
+    max: () => caps().scoutMissionClaim,
+    keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+    message: 'Too many claim attempts. Slow down.',
+  }
+);
+
+const scoutFlightTournamentStartLimiter = composeSecurityLimiter(
+  'scoutFlightTournamentStartLimiter',
+  scoutFlightTournamentStartLimiterMemory,
+  {
+    windowMs: 60 * 1000,
+    max: () => caps().scoutFlightTournamentStart,
+    keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+    message: 'Too many tournament starts. Wait a moment.',
+  }
+);
+
+const scoutFlightTournamentSubmitLimiter = composeSecurityLimiter(
+  'scoutFlightTournamentSubmitLimiter',
+  scoutFlightTournamentSubmitLimiterMemory,
+  {
+    windowMs: 60 * 1000,
+    max: () => caps().scoutFlightTournamentSubmit,
+    keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+    message: 'Too many score submissions. Wait a moment.',
+  }
+);
+
+const ebayBidLimiter = composeSecurityLimiter('ebayBidLimiter', ebayBidLimiterMemory, {
+  windowMs: 60 * 1000,
+  max: () => caps().ebayBid,
+  message: 'Too many bid attempts from your session. Pause briefly and retry.',
+});
+
 const progressionEventsLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: () => caps().progressionEvents,
   standardHeaders: true,
   legacyHeaders: false,
   skip: rateLimitSkipDev,
-  message: () =>
-    betaRateLimitMessage('Too many progression events. Slow down.'),
+  message: () => betaRateLimitMessage('Too many progression events. Slow down.'),
 });
 
 /** @deprecated Route entry gate — live scans counted in marketplaceScanLimiter only. */
@@ -77,16 +248,6 @@ const ebaySearchLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many marketplace searches right now.'),
 });
 
-const ebayBidLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: () => caps().ebayBid,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  message: () => betaRateLimitMessage('Too many bid attempts from your session. Pause briefly and retry.'),
-});
-
-/** Browse-backed seller trends runs several internal searches — keep separate from product search. */
 const ebaySellerTrendsLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: () => caps().ebaySellerTrends,
@@ -96,7 +257,6 @@ const ebaySellerTrendsLimiter = rateLimit({
   message: () => betaRateLimitMessage('Seller trend refresh limit reached. Try again in a minute.'),
 });
 
-/** True Market Value comp lookups — heavier than search, so bucketed separately. */
 const marketValueLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: () => caps().marketValue,
@@ -104,37 +264,6 @@ const marketValueLimiter = rateLimit({
   legacyHeaders: false,
   skip: rateLimitSkipDev,
   message: () => betaRateLimitMessage('Too many market value lookups.'),
-});
-
-/** Perk Machine spins — per-user cap to blunt double-tap / parallel request abuse. */
-const perkMachineSpinLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: () => caps().perkMachineSpin,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: () => betaRateLimitMessage('Too many spins. Wait a moment before trying again.'),
-});
-
-const scoutFlightTournamentStartLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: () => caps().scoutFlightTournamentStart,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: () => betaRateLimitMessage('Too many tournament starts. Wait a moment.'),
-});
-
-const scoutFlightTournamentSubmitLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: () => caps().scoutFlightTournamentSubmit,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: () => betaRateLimitMessage('Too many score submissions. Wait a moment.'),
 });
 
 const scoutFlightHeartbeatLimiter = rateLimit({
@@ -147,18 +276,6 @@ const scoutFlightHeartbeatLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many heartbeats. Wait a moment.'),
 });
 
-/** Scout mission claims — per-user cap against spam clicking Complete. */
-const scoutMissionClaimLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: () => caps().scoutMissionClaim,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
-  message: () => betaRateLimitMessage('Too many claim attempts. Slow down.'),
-});
-
-/** Easter egg redemptions — per-user cap. */
 const easterEggRedeemLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: () => caps().easterEggRedeem,
@@ -169,27 +286,6 @@ const easterEggRedeemLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many redemption attempts. Try again shortly.'),
 });
 
-/** POST /api/auth/forgot-password — limit reset email requests per IP */
-const authPasswordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  message: { code: 'RATE_LIMIT', message: 'Too many password reset attempts.' },
-});
-
-/** POST /api/auth/reset-password — limit token submission guesses */
-const authPasswordResetSubmitLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitSkipDev,
-  message: { code: 'RATE_LIMIT', message: 'Too many reset attempts. Try again later.' },
-});
-
-/** POST /api/founder-messages — public contact relay via Savvy Scout */
 const founderMessageLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 8,
@@ -201,6 +297,51 @@ const founderMessageLimiter = rateLimit({
     code: 'RATE_LIMIT',
     message: 'Too many messages sent recently. Please wait before trying again.',
   },
+});
+
+const alertMutationLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => (isBetaMode() ? 60 : 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: { code: 'RATE_LIMIT', message: 'Too many alert changes. Slow down.' },
+});
+
+const alertMutationLimiter = composeSecurityLimiter('alertMutationLimiter', alertMutationLimiterMemory, {
+  windowMs: 60 * 1000,
+  max: () => (isBetaMode() ? 60 : 30),
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: 'Too many alert changes. Slow down.',
+});
+
+const bestMoveConsumeLimiterMemory = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => (isBetaMode() ? 120 : 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: { code: 'RATE_LIMIT', message: 'Too many Best Move requests. Slow down.' },
+});
+
+const bestMoveConsumeLimiter = composeSecurityLimiter('bestMoveConsumeLimiter', bestMoveConsumeLimiterMemory, {
+  windowMs: 60 * 1000,
+  max: () => (isBetaMode() ? 120 : 60),
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: 'Too many Best Move requests. Slow down.',
+});
+
+const globalApiDistributedLimiter = distributedRateLimitMiddleware({
+  name: 'globalApiLimiter',
+  category: RATE_LIMIT_CLASSIFICATION.globalApiLimiter,
+  windowMs: 15 * 60 * 1000,
+  max: () => caps().globalApi,
+  keyGenerator: (req) => String(req.ip || 'anon'),
+  message: isBetaMode()
+    ? 'Savvy Scout is updating — please try again shortly.'
+    : 'Too many requests. Try again later.',
 });
 
 module.exports = {
@@ -222,4 +363,9 @@ module.exports = {
   scoutMissionClaimLimiter,
   easterEggRedeemLimiter,
   founderMessageLimiter,
+  alertMutationLimiter,
+  bestMoveConsumeLimiter,
+  globalApiDistributedLimiter,
+  composeSecurityLimiter,
+  RATE_LIMIT_CLASSIFICATION,
 };

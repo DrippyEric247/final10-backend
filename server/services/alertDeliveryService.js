@@ -5,6 +5,7 @@ const { auditAlertDelivery } = require('./auditLogger');
 const { isProduction } = require('../config/envValidation');
 const { grantSavvyReward } = require('./savvyRewardService');
 const { resolveSavvyBalance } = require('../lib/dataAuthority');
+const { scheduleEmailRetry } = require('./alertEmailRetryService');
 
 function isAlertEmailDefaultEnabled() {
   const raw = process.env.ALERT_EMAIL_DEFAULT;
@@ -146,9 +147,36 @@ async function deliverAlertMatch(userId, auction, alert, matchSubdocId = null) {
                 : { auction: auction._id, emailSentAt: null },
             },
           },
-          { $set: { 'matches.$.emailSentAt': new Date() } }
+          {
+            $set: {
+              'matches.$.emailSentAt': new Date(),
+              'matches.$.emailDeliveryStatus': 'sent',
+              'matches.$.emailNextAttemptAt': null,
+              'matches.$.emailFailureReason': null,
+            },
+          }
         );
         emailSent = true;
+      } else {
+        const retryPatch = scheduleEmailRetry(
+          { emailRetryCount: matchEntry.emailRetryCount || 0 },
+          emailResult?.reason || 'send_failed'
+        );
+        await Alert.updateOne(
+          {
+            ...matchFilter,
+            matches: {
+              $elemMatch: matchSubdocId
+                ? { _id: matchSubdocId, emailSentAt: null }
+                : { auction: auction._id, emailSentAt: null },
+            },
+          },
+          {
+            $set: Object.fromEntries(
+              Object.entries(retryPatch).map(([k, v]) => [`matches.$.${k}`, v])
+            ),
+          }
+        );
       }
       auditAlertDelivery({
         userId: String(userId),
@@ -161,6 +189,25 @@ async function deliverAlertMatch(userId, auction, alert, matchSubdocId = null) {
         messageId: emailResult?.messageId || null,
       });
     } catch (err) {
+      const retryPatch = scheduleEmailRetry(
+        { emailRetryCount: matchEntry.emailRetryCount || 0 },
+        'exception'
+      );
+      await Alert.updateOne(
+        {
+          ...matchFilter,
+          matches: {
+            $elemMatch: matchSubdocId
+              ? { _id: matchSubdocId, emailSentAt: null }
+              : { auction: auction._id, emailSentAt: null },
+          },
+        },
+        {
+          $set: Object.fromEntries(
+            Object.entries(retryPatch).map(([k, v]) => [`matches.$.${k}`, v])
+          ),
+        }
+      );
       auditAlertDelivery({
         userId: String(userId),
         alertId: String(alert._id),

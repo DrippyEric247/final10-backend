@@ -12,6 +12,7 @@ function requestTelemetry(req, res, next) {
     const durMs = Number(process.hrtime.bigint() - start) / 1e6;
     if (durMs >= SLOW_MS) {
       info('SLOW_ROUTE', {
+        requestId: req.requestId || null,
         path: req.originalUrl,
         method: req.method,
         status: res.statusCode,

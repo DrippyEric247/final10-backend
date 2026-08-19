@@ -1,58 +1,51 @@
 const express = require('express');
 const marketScanner = require('../services/marketScanner');
 const auth = require('../middleware/auth');
+const { requireAdminAccess } = require('../middleware/requireRole');
+const { isProduction } = require('../config/envValidation');
+const { HttpError } = require('../middleware/apiErrors');
 
 const router = express.Router();
 
 // Start market scanner (admin only)
-router.post('/start', auth, async (req, res) => {
+router.post('/start', auth, requireAdminAccess(), async (req, res, next) => {
   try {
-    // In a real app, you'd check if user is admin
-    // For now, we'll allow any authenticated user to start/stop scanner
-    
     await marketScanner.startScanning();
-    
     res.json({ message: 'Market scanner started successfully' });
   } catch (error) {
-    console.error('Start scanner error:', error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // Stop market scanner (admin only)
-router.post('/stop', auth, async (req, res) => {
+router.post('/stop', auth, requireAdminAccess(), async (req, res, next) => {
   try {
     await marketScanner.stopScanning();
-    
     res.json({ message: 'Market scanner stopped successfully' });
   } catch (error) {
-    console.error('Stop scanner error:', error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // Get scanner status
-router.get('/status', auth, async (req, res) => {
+router.get('/status', auth, requireAdminAccess(), async (req, res, next) => {
   try {
-    res.json({ 
+    res.json({
       isScanning: marketScanner.isScanning,
-      lastScan: new Date().toISOString()
+      lastScan: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Get scanner status error:', error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
 // Manual scan trigger (admin only)
-router.post('/scan', auth, async (req, res) => {
+router.post('/scan', auth, requireAdminAccess(), async (req, res, next) => {
   try {
     await marketScanner.scanAllPlatforms();
-    
     res.json({ message: 'Manual scan completed successfully' });
   } catch (error) {
-    console.error('Manual scan error:', error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 
@@ -110,9 +103,12 @@ router.get('/video', auth, async (req, res) => {
   }
 });
 
-// Generate sample auction data for testing (temporarily without auth for testing)
-router.post('/generate-sample-data', async (req, res) => {
+// Generate sample auction data — dev/staging only, superadmin required
+router.post('/generate-sample-data', auth, requireAdminAccess(), async (req, res, next) => {
   try {
+    if (isProduction()) {
+      return next(new HttpError(403, 'FORBIDDEN', 'Sample data generation is disabled in production.'));
+    }
     const Auction = require('../models/Auction');
     
     // Sample auction data
@@ -235,14 +231,13 @@ router.post('/generate-sample-data', async (req, res) => {
     // Create sample auctions
     const createdAuctions = await Auction.insertMany(sampleAuctions);
     
-    res.json({ 
+    res.json({
       message: 'Sample auction data generated successfully',
       count: createdAuctions.length,
-      auctions: createdAuctions
+      auctions: createdAuctions,
     });
   } catch (error) {
-    console.error('Generate sample data error:', error);
-    res.status(500).json({ message: 'Server error' });
+    next(error);
   }
 });
 

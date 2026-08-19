@@ -14,6 +14,8 @@ const {
 const { getEntitlementByUserId } = require('../services/premiumEntitlementService');
 const { resolveAlertSpeedProfile } = require('../services/alertTimingService');
 const { normalizeAlertKeywords } = require('../lib/alertKeywords');
+const { sendApiError } = require('../middleware/apiResponse');
+const { alertMutationLimiter } = require('../middleware/rateLimits');
 
 const USER_ALERT_FIELDS =
   'subscription membershipTier premiumTier isPremium premium referralCodeUsed foundingTesterProgramCompleted betaTester foundingAccess betaAccessExpiresAt subscriptionExpires membershipExpiresAt perkMachine';
@@ -35,7 +37,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // Create alert — server limit + activation schedule
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, alertMutationLimiter, async (req, res) => {
   try {
     const {
       name,
@@ -50,7 +52,7 @@ router.post('/', auth, async (req, res) => {
     } = req.body;
 
     if (!name || !Array.isArray(keywords)) {
-      return res.status(400).json({ message: 'Invalid payload', code: 'INVALID_PAYLOAD' });
+      return sendApiError(res, req, 400, 'INVALID_PAYLOAD', 'Invalid payload');
     }
 
     if (
@@ -59,14 +61,17 @@ router.post('/', auth, async (req, res) => {
       req.body?.effectiveSpeedTier != null ||
       req.body?.alertsMax != null
     ) {
-      return res.status(400).json({
-        message: 'Client cannot set alert scheduling or limit fields.',
-        code: 'CLIENT_SCHEDULE_REJECTED',
-      });
+      return sendApiError(
+        res,
+        req,
+        400,
+        'CLIENT_SCHEDULE_REJECTED',
+        'Client cannot set alert scheduling or limit fields.'
+      );
     }
 
     const user = await User.findById(req.user.id).select(USER_ALERT_FIELDS);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return sendApiError(res, req, 404, 'NOT_FOUND', 'User not found');
 
     const ent = await getEntitlementByUserId(req.user.id);
     const profile = await resolveAlertSpeedProfile(req.user.id, user, ent);
@@ -125,11 +130,7 @@ router.post('/', auth, async (req, res) => {
     });
   } catch (err) {
     if (err instanceof AlertLimitError || err?.code === 'ALERT_LIMIT_REACHED') {
-      return res.status(403).json({
-        message: err.message,
-        code: 'ALERT_LIMIT_REACHED',
-        ...(err.details || {}),
-      });
+      return sendApiError(res, req, 403, 'ALERT_LIMIT_REACHED', err.message, err.details || {});
     }
     auditAlertCreated({
       userId: String(req.user?.id || ''),
@@ -137,13 +138,13 @@ router.post('/', auth, async (req, res) => {
       message: String(err?.message || '').slice(0, 200),
     });
     console.error('[alerts] create failed:', err?.message || err);
-    return res.status(err.status || 500).json({ message: err.message || 'Could not create alert' });
+    return sendApiError(res, req, err.status || 500, err.code || 'ALERT_CREATE_FAILED', err.message || 'Could not create alert');
   }
 });
 
-router.patch('/:id/toggle', auth, async (req, res) => {
+router.patch('/:id/toggle', auth, alertMutationLimiter, async (req, res) => {
   const alert = await Alert.findOne({ _id: req.params.id, user: req.user.id });
-  if (!alert) return res.status(404).json({ message: 'Not found' });
+  if (!alert) return sendApiError(res, req, 404, 'NOT_FOUND', 'Not found');
 
   const willActivate = !alert.isActive;
   if (willActivate) {
@@ -152,9 +153,7 @@ router.patch('/:id/toggle', auth, async (req, res) => {
     const tierCfg = require('../services/betaTesterService').getTierConfigForUser(user, ent);
     const activeCount = await countActiveAlerts(req.user.id);
     if (Number.isFinite(tierCfg.alertsMax) && activeCount >= tierCfg.alertsMax) {
-      return res.status(403).json({
-        message: `Alert limit reached for ${tierCfg.label} plan`,
-        code: 'ALERT_LIMIT_REACHED',
+      return sendApiError(res, req, 403, 'ALERT_LIMIT_REACHED', `Alert limit reached for ${tierCfg.label} plan`, {
         alertsMax: tierCfg.alertsMax,
       });
     }
@@ -167,9 +166,9 @@ router.patch('/:id/toggle', auth, async (req, res) => {
   res.json(serializeAlertForClient(alert));
 });
 
-router.patch('/:id', auth, async (req, res) => {
+router.patch('/:id', auth, alertMutationLimiter, async (req, res) => {
   const alert = await Alert.findOne({ _id: req.params.id, user: req.user.id });
-  if (!alert) return res.status(404).json({ message: 'Not found' });
+  if (!alert) return sendApiError(res, req, 404, 'NOT_FOUND', 'Not found');
 
   const body = req.body || {};
   if (
@@ -178,17 +177,20 @@ router.patch('/:id', auth, async (req, res) => {
     body.effectiveSpeedTier != null ||
     body.lastScannedAt != null
   ) {
-    return res.status(400).json({
-      message: 'Client cannot modify alert scheduling fields.',
-      code: 'CLIENT_SCHEDULE_REJECTED',
-    });
+    return sendApiError(
+      res,
+      req,
+      400,
+      'CLIENT_SCHEDULE_REJECTED',
+      'Client cannot modify alert scheduling fields.'
+    );
   }
 
   if (body.name != null) alert.name = String(body.name).trim().slice(0, 200);
   if (Array.isArray(body.keywords)) {
     alert.keywords = normalizeAlertKeywords(body.keywords);
     if (!alert.keywords.length) {
-      return res.status(400).json({ message: 'At least one keyword is required' });
+      return sendApiError(res, req, 400, 'INVALID_PAYLOAD', 'At least one keyword is required');
     }
   }
   if (body.maxPrice !== undefined) {
@@ -211,9 +213,9 @@ router.patch('/:id', auth, async (req, res) => {
   res.json(serializeAlertForClient(alert));
 });
 
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, alertMutationLimiter, async (req, res) => {
   const del = await Alert.findOneAndDelete({ _id: req.params.id, user: req.user.id });
-  if (!del) return res.status(404).json({ message: 'Not found' });
+  if (!del) return sendApiError(res, req, 404, 'NOT_FOUND', 'Not found');
   res.json({ ok: true });
 });
 

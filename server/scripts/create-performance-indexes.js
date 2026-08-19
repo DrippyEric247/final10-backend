@@ -6,6 +6,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // Import models
 const User = require('../models/User');
+const Alert = require('../models/Alert');
+const SavvyTransaction = require('../models/SavvyTransaction');
 const PromotedListing = require('../models/PromotedListing');
 const PromotionPackage = require('../models/PromotionPackage');
 const PromotionPayment = require('../models/PromotionPayment');
@@ -40,10 +42,23 @@ async function createPerformanceIndexes() {
     await createIndexIfNotExists(User.collection, { points: -1 });
     await createIndexIfNotExists(User.collection, { membershipTier: 1 });
     await createIndexIfNotExists(User.collection, { subscriptionExpires: 1 });
-    await createIndexIfNotExists(User.collection, { lastLogin: -1 });
-    await createIndexIfNotExists(User.collection, { 'ebayAuth.accessToken': 1 }, { sparse: true });
-    await createIndexIfNotExists(User.collection, { 'ebayAuth.refreshToken': 1 }, { sparse: true });
+    await createIndexIfNotExists(User.collection, { lastActive: -1 });
     console.log('✅ User indexes created');
+
+    // Alert model indexes (Wave 5/7 — scanner + delivery hot paths)
+    console.log('🔔 Creating Alert indexes...');
+    await createIndexIfNotExists(Alert.collection, { isActive: 1, nextScanAt: 1, eligibleAt: 1 });
+    await createIndexIfNotExists(Alert.collection, { user: 1, isActive: 1 });
+    await createIndexIfNotExists(Alert.collection, { scanClaimExpiresAt: 1 }, { sparse: true });
+    console.log('✅ Alert indexes created');
+
+    // SavvyTransaction ledger indexes (Wave 1/6 idempotency)
+    console.log('💰 Creating SavvyTransaction indexes...');
+    await createIndexIfNotExists(SavvyTransaction.collection, { idempotencyKey: 1 }, { unique: true });
+    await createIndexIfNotExists(SavvyTransaction.collection, { userId: 1, createdAt: -1 });
+    await createIndexIfNotExists(SavvyTransaction.collection, { userId: 1, source: 1, createdAt: -1 });
+    await createIndexIfNotExists(SavvyTransaction.collection, { createdAt: -1 });
+    console.log('✅ SavvyTransaction indexes created');
 
     // PromotedListing model indexes
     console.log('📢 Creating PromotedListing indexes...');

@@ -28,10 +28,22 @@ describe('CORS middleware', () => {
     expect(isOriginAllowed('http://localhost:4173')).toBe(true);
   });
 
-  it('allows Vercel preview deployments (*.vercel.app)', () => {
+  it('allows Vercel preview deployments in non-production', () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.ALLOW_VERCEL_PREVIEW_CORS;
     expect(isVercelAppOrigin('https://final10-client-git-beta-drippy.vercel.app')).toBe(true);
-    expect(isVercelAppOrigin('https://final10-abc123.vercel.app')).toBe(true);
     expect(isOriginAllowed('https://final10-client-git-beta-drippy.vercel.app')).toBe(true);
+  });
+
+  it('blocks Vercel previews in production unless ALLOW_VERCEL_PREVIEW_CORS=1', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.ALLOW_VERCEL_PREVIEW_CORS;
+    expect(isVercelAppOrigin('https://final10-abc123.vercel.app')).toBe(false);
+    expect(isOriginAllowed('https://final10-abc123.vercel.app')).toBe(false);
+
+    process.env.ALLOW_VERCEL_PREVIEW_CORS = '1';
+    expect(isVercelAppOrigin('https://final10-abc123.vercel.app')).toBe(true);
+    expect(isOriginAllowed('https://final10-abc123.vercel.app')).toBe(true);
   });
 
   it('blocks unknown origins', () => {

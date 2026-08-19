@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const crypto = require('crypto');
+const { getShieldWebhookSecret } = require('../lib/shieldWebhookSecret');
+const { sendApiError } = require('../middleware/apiResponse');
 
 /**
  * Shield Enforcement Webhook
@@ -21,24 +23,29 @@ router.post('/enforce', async (req, res) => {
     const timestamp = req.headers['x-shield-timestamp'];
     
     if (!signature || !timestamp) {
-      return res.status(401).json({ message: 'Missing signature or timestamp' });
+      return sendApiError(res, req, 401, 'UNAUTHORIZED', 'Missing signature or timestamp');
     }
-    
+
+    const webhookSecret = getShieldWebhookSecret();
+    if (!webhookSecret) {
+      return sendApiError(res, req, 503, 'SHIELD_WEBHOOK_DISABLED', 'Shield webhook verification is not configured.');
+    }
+
     // Check timestamp (prevent replay attacks)
     const now = Date.now();
     const requestTime = parseInt(timestamp);
     if (Math.abs(now - requestTime) > 300000) { // 5 minutes
-      return res.status(401).json({ message: 'Request too old' });
+      return sendApiError(res, req, 401, 'UNAUTHORIZED', 'Request too old');
     }
-    
+
     // Verify signature
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.SHIELD_WEBHOOK_SECRET || 'default_secret')
+      .createHmac('sha256', webhookSecret)
       .update(JSON.stringify(req.body))
       .digest('hex');
-    
+
     if (signature !== expectedSignature) {
-      return res.status(401).json({ message: 'Invalid signature' });
+      return sendApiError(res, req, 401, 'UNAUTHORIZED', 'Invalid signature');
     }
     
     const {

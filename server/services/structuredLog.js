@@ -40,6 +40,7 @@ function error(event, meta) {
 function logRouteError(req, err, status, code) {
   const base = {
     event: 'HTTP_ROUTE_ERROR',
+    requestId: req?.requestId || null,
     path: req.originalUrl,
     method: req.method,
     status,

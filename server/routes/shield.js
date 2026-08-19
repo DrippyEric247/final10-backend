@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const User = require('../models/User');
 const ShieldEvent = require('../models/ShieldEvent');
 const ShieldEnforcement = require('../models/ShieldEnforcement');
 const shieldDecisionEngine = require('../services/shieldDecisionEngine');

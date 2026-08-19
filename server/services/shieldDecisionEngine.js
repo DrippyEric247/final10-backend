@@ -470,7 +470,11 @@ class ShieldDecisionEngine {
    */
   generateSignature(payload) {
     const crypto = require('crypto');
-    const secret = process.env.SHIELD_WEBHOOK_SECRET || 'default_secret';
+    const { getShieldWebhookSecret } = require('../lib/shieldWebhookSecret');
+    const secret = getShieldWebhookSecret();
+    if (!secret) {
+      throw new Error('SHIELD_WEBHOOK_SECRET is not configured');
+    }
     return crypto.createHmac('sha256', secret).update(JSON.stringify(payload)).digest('hex');
   }
 

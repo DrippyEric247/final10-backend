@@ -7,6 +7,9 @@ const { logProcessCrash } = require('./services/structuredLog');
 process.on('uncaughtException', (err) => {
   logProcessCrash('PROCESS_UNCAUGHT_EXCEPTION', err);
   console.error('[startup] uncaughtException — process may be unstable:', err?.message);
+  if (process.env.NODE_ENV === 'production') {
+    setTimeout(() => process.exit(1), 300);
+  }
 });
 process.on('unhandledRejection', (reason) => {
   const e =
@@ -27,6 +30,7 @@ validateCoreEnv();
 
 const express = require('express');
 const { requestTelemetry } = require('./middleware/requestTelemetry');
+const { requestIdMiddleware } = require('./middleware/requestId');
 const mongoose = require('mongoose');
 const compression = require('compression');
 const cron = require('node-cron');
@@ -68,15 +72,23 @@ const PORT = Number(process.env.PORT) || 8080;
 const { logStartupSuccess } = require('./lib/startupBanner');
 
 /** Fast liveness — returns immediately (Railway / load balancer probes). */
-app.get('/api/health', (_req, res) => {
+function buildLivenessPayload() {
   const { isMongoReady } = require('./lib/mongoBoot');
-  res.status(200).json({
+  return {
     ok: true,
     live: true,
     mongoReady: isMongoReady(),
     uptimeSec: Math.round(process.uptime()),
     ts: new Date().toISOString(),
-  });
+  };
+}
+
+app.get('/api/health', (_req, res) => {
+  res.status(200).json(buildLivenessPayload());
+});
+
+app.get('/health', (_req, res) => {
+  res.status(200).json(buildLivenessPayload());
 });
 
 console.log(`[startup] boot phase=early_listen port=${PORT} host=0.0.0.0`);
@@ -119,7 +131,7 @@ app.use(
 );
 
 // --- Rate Limiting (skip OPTIONS + telemetry ingest) ---
-const { isAuthMeRequest } = require('./middleware/rateLimits');
+const { isAuthMeRequest, globalApiDistributedLimiter } = require('./middleware/rateLimits');
 const { rateLimitSkipDev } = require('./lib/rateLimitDevBypass');
 const { isBetaMode, getRouteRateCaps } = require('./config/betaMode');
 const { rolloverPendingSeasons, ensureCurrentSeason } = require('./services/scoutFlightChampionshipService');
@@ -137,11 +149,18 @@ const limiter = rateLimit({
     req.method === 'OPTIONS' ||
     req.path === '/health' ||
     req.path.startsWith('/health/') ||
+    req.path === '/api/health' ||
+    req.path.startsWith('/api/health/') ||
     req.path.startsWith('/analytics') ||
     isAuthMeRequest(req) ||
     rateLimitSkipDev(req),
 });
-app.use('/api/', limiter);
+app.use('/api/', (req, res, next) => {
+  globalApiDistributedLimiter(req, res, (err) => {
+    if (err) return next(err);
+    return limiter(req, res, next);
+  });
+});
 
 const { stripeWebhookHandler } = require('./routes/stripeWebhook');
 
@@ -156,6 +175,7 @@ app.post(
 // --- BODY PARSERS (must be before routes) ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestIdMiddleware);
 app.use(requestTelemetry);
 
 // --- Routes
@@ -344,16 +364,18 @@ app.use('/api/email', require('./routes/email'));
 app.use('/api/admin/email-test', require('./routes/adminEmailTestRoutes'));
 
 // Detailed readiness (email/mongo/jobs) — slower; use /api/health for fast probes.
-app.get('/api/health/ready', (_req, res) => {
+function buildReadinessPayload() {
   const { getEmailEnvPresence, getEmailProvider, isEmailConfigured, auditEmailFrom } = require('./services/emailService');
   const { isMongoReady } = require('./lib/mongoBoot');
   const mongoState = mongoose.connection.readyState;
   const mongoStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
-  res.json({
-    ok: isMongoReady(),
+  const mongoReady = isMongoReady();
+  return {
+    ok: mongoReady,
     live: true,
     uptimeSec: Math.round(process.uptime()),
     mongo: {
+      ready: mongoReady,
       readyState: mongoState,
       status: mongoStates[mongoState] || 'unknown',
       host: mongoose.connection.host || null,
@@ -376,21 +398,68 @@ app.get('/api/health/ready', (_req, res) => {
     })(),
     emailFromAudit: auditEmailFrom(),
     lastBootAlertE2e,
+  };
+}
+
+function sendReadiness(req, res) {
+  const payload = buildReadinessPayload();
+  res.status(payload.ok ? 200 : 503).json({
+    ...payload,
+    ...(req.requestId ? { requestId: req.requestId } : {}),
   });
-});
+}
+
+app.get('/api/health/ready', sendReadiness);
+app.get('/health/ready', sendReadiness);
+app.get('/ready', sendReadiness);
 
 async function onMongoConnected() {
+  const { withJobLease } = require('./lib/distributedJobLock');
+  const { verifyAndEnsureIndexes } = require('./lib/indexDeployment');
+  const { runAlertEmailRetryWorker } = require('./services/alertEmailRetryService');
+
+  try {
+    const dryRun =
+      String(process.env.INDEX_DEPLOY_DRY_RUN || '').toLowerCase() === 'true' ||
+      String(process.env.INDEX_DEPLOY_DRY_RUN || '') === '1';
+    const applyInProd = isProduction() && !dryRun;
+    const indexReport = await verifyAndEnsureIndexes({ dryRun: !applyInProd });
+    console.log(
+      `[index-deploy] ok=${indexReport.ok} dryRun=${!applyInProd} existing=${indexReport.existing.length} created=${indexReport.created.length} conflicts=${indexReport.conflicts.length}`
+    );
+    if (indexReport.manualRequired?.length) {
+      console.error('[index-deploy] MANUAL MIGRATION REQUIRED:', indexReport.manualRequired.join(', '));
+    }
+    if (isProduction() && !indexReport.ok) {
+      console.error('[index-deploy] refusing production boot — unsafe index state');
+      process.exit(1);
+    }
+  } catch (indexErr) {
+    console.error('[index-deploy] preflight failed:', indexErr?.message || indexErr);
+    if (isProduction()) process.exit(1);
+  }
+
   // Initialize auction aggregator
   const auctionAggregator = new AuctionAggregator();
 
   if (isAuctionCronRefreshEnabled()) {
     cron.schedule('*/30 * * * *', async () => {
-      console.log('[cron] auction refresh starting');
-      auditCronJob('auction_refresh', { phase: 'start' });
       try {
-        const totalRefreshed = await auctionAggregator.refreshAuctionData();
-        console.log(`[cron] auction refresh done: ${totalRefreshed} updated`);
-        auditCronJob('auction_refresh', { phase: 'done', totalRefreshed });
+        const leased = await withJobLease(
+          'job:auction_refresh',
+          async () => {
+            console.log('[cron] auction refresh starting');
+            auditCronJob('auction_refresh', { phase: 'start' });
+            const totalRefreshed = await auctionAggregator.refreshAuctionData();
+            console.log(`[cron] auction refresh done: ${totalRefreshed} updated`);
+            auditCronJob('auction_refresh', { phase: 'done', totalRefreshed });
+            return { totalRefreshed };
+          },
+          { leaseMs: 25 * 60 * 1000 }
+        );
+        if (leased.skipped) {
+          auditCronJob('auction_refresh', { phase: 'skipped', reason: leased.reason });
+        }
       } catch (error) {
         console.error('[cron] auction refresh failed:', error?.message || error);
         auditCronJob('auction_refresh', { phase: 'error', message: error?.message });
@@ -402,24 +471,28 @@ async function onMongoConnected() {
   }
 
   cron.schedule('5 0 * * *', () => {
-    auditCronJob('scout_flight_season_rollover', { phase: 'start' });
-    rolloverPendingSeasons()
-      .then(() => ensureCurrentSeason())
-      .then((season) => {
+    void withJobLease(
+      'job:scout_flight_season_rollover',
+      async () => {
+        auditCronJob('scout_flight_season_rollover', { phase: 'start' });
+        await rolloverPendingSeasons();
+        const season = await ensureCurrentSeason();
         console.log(`[cron] Scout Flight season ready: ${season?.seasonId} (${season?.status})`);
         auditCronJob('scout_flight_season_rollover', {
           phase: 'done',
           seasonId: season?.seasonId,
           status: season?.status,
         });
-      })
-      .catch((err) => {
-        console.error('[cron] Scout Flight season rollover failed:', err?.message || err);
-        auditCronJob('scout_flight_season_rollover', {
-          phase: 'error',
-          message: String(err?.message || err).slice(0, 200),
-        });
+        return season;
+      },
+      { leaseMs: 30 * 60 * 1000 }
+    ).catch((err) => {
+      console.error('[cron] Scout Flight season rollover failed:', err?.message || err);
+      auditCronJob('scout_flight_season_rollover', {
+        phase: 'error',
+        message: String(err?.message || err).slice(0, 200),
       });
+    });
   });
   ensureCurrentSeason()
     .then((season) => {
@@ -433,31 +506,44 @@ async function onMongoConnected() {
   if (isSavvyScoutBackgroundScanEnabled()) {
     const scoutCron = isProduction() ? '*/15 * * * *' : '*/5 * * * *';
     cron.schedule(scoutCron, () => {
-      auditCronJob('savvy_scout_alert_scan', { phase: 'start' });
-      runSavvyScoutAlertScan()
-        .then((result) => {
+      void withJobLease(
+        'job:savvy_scout_alert_scan',
+        async () => {
+          auditCronJob('savvy_scout_alert_scan', { phase: 'start' });
+          const result = await runSavvyScoutAlertScan();
           auditCronJob('savvy_scout_alert_scan', { phase: 'done', ...result });
-        })
-        .catch((err) => {
-          console.error('[SavvyScout] scheduled scan error:', err?.message || err);
-          auditCronJob('savvy_scout_alert_scan', {
-            phase: 'error',
-            message: String(err?.message || err).slice(0, 200),
-          });
+          return result;
+        },
+        { leaseMs: 14 * 60 * 1000 }
+      ).catch((err) => {
+        console.error('[SavvyScout] scheduled scan error:', err?.message || err);
+        auditCronJob('savvy_scout_alert_scan', {
+          phase: 'error',
+          message: String(err?.message || err).slice(0, 200),
         });
+      });
     });
     console.log(
       `⏰ Savvy Scout background scan enabled (${isProduction() ? 'every 15m' : 'every 5m'}). Set DISABLE_SAVVY_SCOUT_SCAN=true to pause.`
     );
     const bootDelayMs = isProduction() ? 5 * 60 * 1000 : 15_000;
     setTimeout(() => {
-      runSavvyScoutAlertScan().catch((err) => {
+      void withJobLease('job:savvy_scout_alert_scan', () => runSavvyScoutAlertScan(), {
+        leaseMs: 14 * 60 * 1000,
+      }).catch((err) => {
         console.warn('[SavvyScout] initial scan error:', err?.message || err);
       });
     }, bootDelayMs);
   } else {
     console.log('⏸ Savvy Scout background scan disabled (DISABLE_SAVVY_SCOUT_SCAN=true)');
   }
+
+  cron.schedule('*/2 * * * *', () => {
+    void runAlertEmailRetryWorker().catch((err) => {
+      console.warn('[AlertEmailRetry] worker error:', err?.message || err);
+    });
+  });
+  console.log('⏰ Alert email retry worker enabled (every 2m, distributed lease).');
 
   if (
     isProduction() &&
@@ -553,25 +639,46 @@ startMongoConnection({ port: PORT, onConnected: onMongoConnected });
 const { ensureCorsHeaders } = require('./middleware/cors');
 app.use('*', (req, res) => {
   ensureCorsHeaders(req, res);
-  res.status(404).json({ code: 'NOT_FOUND', message: 'Route not found' });
+  res.status(404).json({
+    code: 'NOT_FOUND',
+    message: 'Route not found',
+    ...(req.requestId ? { requestId: req.requestId } : {}),
+  });
 });
 
 const { errorHandler } = require('./middleware/errorHandler');
 app.use(errorHandler);
 
 // --- GRACEFUL SHUTDOWN ---
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  await mongoose.connection.close();
-  console.log('MongoDB connection closed');
+let shuttingDown = false;
+
+async function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received, shutting down gracefully`);
+  await new Promise((resolve) => {
+    if (!server || !server.close) {
+      resolve();
+      return;
+    }
+    server.close(() => resolve());
+    setTimeout(resolve, 10000);
+  });
+  try {
+    await mongoose.connection.close();
+    console.log('MongoDB connection closed');
+  } catch (err) {
+    console.error('[shutdown] Mongo close error:', err?.message);
+  }
   process.exit(0);
+}
+
+process.on('SIGTERM', () => {
+  void gracefulShutdown('SIGTERM');
 });
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
-  await mongoose.connection.close();
-  console.log('MongoDB connection closed');
-  process.exit(0);
+process.on('SIGINT', () => {
+  void gracefulShutdown('SIGINT');
 });
 
 

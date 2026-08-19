@@ -94,10 +94,17 @@ function isLocalDevOrigin(origin) {
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalizeOrigin(origin));
 }
 
-/** Beta-safe: any Vercel deployment (*.vercel.app), including preview branches. */
+/** Beta-safe: Vercel preview deployments — gated in production unless explicitly allowed. */
 function isVercelAppOrigin(origin) {
   const o = normalizeOrigin(origin);
-  return /^https:\/\/[a-z0-9][a-z0-9._-]*\.vercel\.app$/i.test(o);
+  if (!/^https:\/\/[a-z0-9][a-z0-9._-]*\.vercel\.app$/i.test(o)) return false;
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '').toLowerCase() === 'true' ||
+      String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '') === '1'
+    );
+  }
+  return true;
 }
 
 function isFinal10AppOrigin(origin) {
@@ -172,11 +179,16 @@ function logCorsStartup() {
   const clientUrl = normalizeOrigin(process.env.CLIENT_URL) || '(unset)';
   const allowedEnv = splitOriginCsv(process.env.ALLOWED_ORIGINS);
   const final10Listed = FINAL10_PRODUCTION_ORIGINS.every((o) => explicit.has(o));
+  const vercelPreviews =
+    process.env.NODE_ENV === 'production'
+      ? String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '').toLowerCase() === 'true' ||
+        String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '') === '1'
+      : true;
   console.log(
     `[cors] ready clientUrl=${clientUrl} credentials=${useCorsCredentials()} ` +
       `allowedOriginsEnv=${allowedEnv.length ? allowedEnv.join('|') : '(defaults)'} ` +
       `explicitOrigins=${explicit.size} final10ApexAndWww=${final10Listed} ` +
-      `vercelPreviews=*.vercel.app localhost=any-port`
+      `vercelPreviews=${vercelPreviews ? 'enabled' : 'disabled_in_production'} localhost=any-port`
   );
 }
 

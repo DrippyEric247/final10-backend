@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const { getBestMoveBudget, consumeBestMoveCredit } = require('../services/bestMoveUsageService');
+const { bestMoveConsumeLimiter } = require('../middleware/rateLimits');
 const { HttpError } = require('../middleware/apiErrors');
 
 const router = express.Router();
@@ -22,7 +23,7 @@ router.get('/usage', auth, async (req, res, next) => {
   }
 });
 
-router.post('/consume', auth, async (req, res, next) => {
+router.post('/consume', auth, bestMoveConsumeLimiter, async (req, res, next) => {
   try {
     const userId = req.user._id || req.user.id;
 

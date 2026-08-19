@@ -36,6 +36,7 @@ function errorHandler(err, req, res, next) {
   const body = {
     code,
     message: safeMessage,
+    ...(req.requestId ? { requestId: req.requestId } : {}),
     ...(isHttpError(err) ? err.extra : {}),
   };
 

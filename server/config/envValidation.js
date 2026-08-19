@@ -117,6 +117,36 @@ function validateCoreEnv() {
         );
       }
     }
+
+    const hasPublicOrigin =
+      Boolean(String(process.env.CLIENT_URL || '').trim()) ||
+      Boolean(String(process.env.FRONTEND_URL || '').trim()) ||
+      Boolean(String(process.env.ALLOWED_ORIGINS || '').trim());
+    if (!hasPublicOrigin) {
+      warnings.push(
+        '[security] CLIENT_URL, FRONTEND_URL, and ALLOWED_ORIGINS are all unset — relying on built-in CORS defaults (final10.app + vercel previews).'
+      );
+    }
+
+    if (envFlag('ALERT_EMAIL_ENABLED')) {
+      const hasResend = Boolean(String(process.env.RESEND_API_KEY || '').trim());
+      const hasSmtp =
+        Boolean(process.env.SMTP_HOST) &&
+        Boolean(process.env.SMTP_USER) &&
+        Boolean(process.env.SMTP_PASS);
+      if (!hasResend && !hasSmtp) {
+        errors.push(
+          'ALERT_EMAIL_ENABLED is true but neither RESEND_API_KEY nor SMTP credentials are configured.'
+        );
+      }
+    }
+
+    try {
+      const { validateShieldWebhookSecretAtBoot } = require('../lib/shieldWebhookSecret');
+      validateShieldWebhookSecretAtBoot();
+    } catch (shieldErr) {
+      errors.push(String(shieldErr.message || shieldErr));
+    }
   } else {
     // Dev mode — warn loudly but never block startup.
     if (!process.env.JWT_SECRET) {
