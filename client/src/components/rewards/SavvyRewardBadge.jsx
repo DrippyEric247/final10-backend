@@ -67,6 +67,60 @@ function deriveBaseSavvy({ baseSavvy, price, savings }) {
   return Math.max(40, derived);
 }
 
+function hasUsablePricingInput({ price, savings, baseSavvy } = {}) {
+  if (price != null && price !== '') {
+    const p = Number(price);
+    if (Number.isFinite(p)) return true;
+  }
+  const s = Number(savings);
+  if (Number.isFinite(s) && s > 0) return true;
+  const b = Number(baseSavvy);
+  return Number.isFinite(b) && b > 0;
+}
+
+function collectMissingPricingFields({ price, savings, baseSavvy } = {}) {
+  const missing = [];
+  if (price == null || price === '' || !Number.isFinite(Number(price))) missing.push('price');
+  const s = Number(savings);
+  if (!Number.isFinite(s) || s <= 0) missing.push('savings');
+  const b = Number(baseSavvy);
+  if (!Number.isFinite(b) || b <= 0) missing.push('baseSavvy');
+  return missing;
+}
+
+function logAuctionPricingGap(listingId, missingFields, extra = {}) {
+  if (process.env.NODE_ENV !== 'development') return;
+  console.warn('[SavvyRewardBadge] Incomplete auction pricing', {
+    listingId: listingId || null,
+    missingFields,
+    ...extra,
+  });
+}
+
+function PricingUnavailableBadge({ compact, className = '' }) {
+  const label = 'Price data unavailable';
+  if (compact) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border border-slate-500/45 bg-slate-900/40 px-2.5 py-1 text-[11px] font-semibold text-slate-300 ${className}`}
+        title="Reward estimate needs a current price or market value."
+        aria-label={label}
+      >
+        {label}
+      </span>
+    );
+  }
+  return (
+    <div
+      className={`rounded-xl border border-slate-500/45 bg-slate-900/40 px-3 py-2.5 text-sm font-semibold text-slate-300 ${className}`}
+      role="status"
+      aria-label={label}
+    >
+      {label}
+    </div>
+  );
+}
+
 /**
  * Trust-tier base derivation only — multiplier/final amounts come from server preview.
  * @deprecated for payout totals — use server estimate hooks instead.
@@ -192,6 +246,11 @@ export default function SavvyRewardBadge({
   const betaPreviewUnlock = rewardsLockedLocal && !shouldShowRewardsLocked(tier);
   const effectiveTrustScore = betaPreviewUnlock ? BETA_REWARD_DISPLAY_TRUST_SCORE : trustScore;
 
+  const pricingInputAvailable = useMemo(
+    () => hasUsablePricingInput({ price, savings, baseSavvy }),
+    [price, savings, baseSavvy]
+  );
+
   const dealSnapshot = useMemo(() => {
     const id = String(listingId || "").trim();
     if (!id) return null;
@@ -215,11 +274,37 @@ export default function SavvyRewardBadge({
   const previewBase = dealEstimate?.baseSavvy ?? trustOnlyBase ?? Math.round(Number(baseSavvy) || 0);
   const previewSource = dealSnapshot ? "deal_purchase" : rewardSource;
 
-  const { preview: sourcePreview, loading: previewLoading } = useSavvyRewardPreview(
-    !dealSnapshot && previewBase > 0 && !rewardsLockedLocal
-      ? { baseAmount: previewBase, source: previewSource }
-      : null
-  );
+  const previewOptions = useMemo(() => {
+    if (dealSnapshot || previewBase <= 0 || rewardsLockedLocal) return null;
+    return { baseAmount: previewBase, source: previewSource, listingId: dealSnapshot?.listingId };
+  }, [dealSnapshot, previewBase, rewardsLockedLocal, previewSource]);
+
+  const { preview: sourcePreview, loading: previewLoading } = useSavvyRewardPreview(previewOptions);
+
+  const hasServerDealEstimate =
+    dealEstimate &&
+    dealEstimate.eligible !== false &&
+    dealEstimate.state !== 'not_eligible' &&
+    (Number.isFinite(Number(dealEstimate.totalSavvy)) ||
+      Number.isFinite(Number(dealEstimate.baseSavvy)));
+
+  const estimateFetchDone = !dealSnapshot || !dealLoading;
+  const previewFetchDone = !previewOptions || !previewLoading;
+  const rewardCalcUnavailable =
+    !rewardsLockedLocal &&
+    estimateFetchDone &&
+    previewFetchDone &&
+    !hasServerDealEstimate &&
+    !sourcePreview &&
+    !pricingInputAvailable;
+
+  useEffect(() => {
+    if (!rewardCalcUnavailable) return;
+    logAuctionPricingGap(String(listingId || '').trim() || null, collectMissingPricingFields({ price, savings, baseSavvy }), {
+      hasDealSnapshot: Boolean(dealSnapshot),
+      dealEstimateState: dealEstimate?.state ?? null,
+    });
+  }, [rewardCalcUnavailable, listingId, price, savings, baseSavvy, dealSnapshot, dealEstimate?.state]);
 
   const serverReward = useMemo(() => {
     if (dealEstimate && dealEstimate.eligible !== false && dealEstimate.state !== "not_eligible") {
@@ -295,6 +380,10 @@ export default function SavvyRewardBadge({
   const ariaLabel = hasBoost
     ? `${baseLabel}. ${multiplierLabel} multiplier boosts to plus ${reward.boosted.toLocaleString()} Savvy.`
     : baseLabel;
+
+  if (rewardCalcUnavailable) {
+    return <PricingUnavailableBadge compact={compact} className={className} />;
+  }
 
   // Compact chip-style (for grid overlays, carousels, etc.).
   if (compact) {

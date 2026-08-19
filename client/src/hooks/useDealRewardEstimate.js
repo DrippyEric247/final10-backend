@@ -78,7 +78,16 @@ export function useDealRewardEstimate(listingSnapshot) {
       const promise = estimateDealRewards([payload])
         .then((result) => {
           const next = result?.estimates?.[listingId] || null;
-          if (next) cache.set(key, next);
+          if (next) {
+            cache.set(key, next);
+          } else if (process.env.NODE_ENV === 'development') {
+            console.warn('[useDealRewardEstimate] Missing deal reward estimate', {
+              listingId,
+              trustScore,
+              price,
+              savings,
+            });
+          }
           return next;
         })
         .finally(() => {
