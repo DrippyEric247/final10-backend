@@ -20,6 +20,7 @@ import { evaluateBestMove } from "./bestMoveEngine";
 import { evaluateTrustScore } from "./trustScoreEngine";
 import type { BestMoveResult } from "../types/bestMove";
 import type { TrustScoreResult } from "../types/trustScore";
+import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from "./sellerTrustEvidence";
 import {
   getHeroSearchQueriesForInterest,
   isLowWowOnboardingTitle,
@@ -752,13 +753,21 @@ function buildHeroMatchMessage(
   const savingsLine =
     pick.savingsAmount > 0
       ? `Est. savings ${pick.savingsPercent >= 1 ? `${Math.round(pick.savingsPercent)}%` : formatUsd(pick.savingsAmount)}.`
-      : "Strong value vs market.";
+      : 'Strong value vs market.';
+  const evidence = buildSellerTrustEvidence(
+    (pick.listing || {}) as Record<string, unknown>,
+    pick.trust
+  );
+  const sellerLine =
+    evidence.positiveFeedbackPercent != null
+      ? `Seller: ${sellerTrustEvidenceSummary(evidence)}. ${evidence.final10Note}`
+      : evidence.final10Note;
   return [
-    `Compared ${finalistCount} category ${finalistCount === 1 ? "winner" : "winners"} from your picks.`,
-    `Trust score ${pick.trust.trustScore}.`,
+    `Compared ${finalistCount} category ${finalistCount === 1 ? 'winner' : 'winners'} from your picks.`,
+    sellerLine,
     savingsLine,
-    "Savvy Points unlock when you act on this move.",
-  ].join(" ");
+    'Savvy Points unlock when you act on this move.',
+  ].join(' ');
 }
 
 function formatUsd(amount: number): string {

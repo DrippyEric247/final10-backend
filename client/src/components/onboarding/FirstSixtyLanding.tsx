@@ -72,7 +72,7 @@ const STEPS_BASE: ReadonlyArray<Step> = [
     id: "trust",
     eyebrow: "Why trust matters",
     title: "Built-in trust on every pick.",
-    body: "Transparent trust scores. Reviewed sellers. Weak deals never make it to Best Move.",
+    body: "Marketplace seller evidence first. Explainable Final10 checks. Weak deals never make it to Best Move.",
     visual: <span aria-hidden>🛡️</span>,
   },
 ];

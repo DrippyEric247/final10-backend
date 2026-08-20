@@ -51,6 +51,7 @@ import {
   rankQuickSnipeListings,
   resolveQuickSnipesBestMove,
 } from '../lib/quickSnipesBestMove';
+import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from '../lib/sellerTrustEvidence';
 import { isBestMoveDisplayable } from '../lib/bestMoveListingValidation';
 import { auditQuickSnipes, auditBestMove } from '../lib/auditLog';
 import {
@@ -711,7 +712,13 @@ const LocalDeals = () => {
   const heroSavings = Math.max(0, Math.round(heroMarket - heroPrice));
   const heroWatchers = Math.max(1, Number(heroItem?.bidCount || 0));
   const heroTime = Math.max(0, Number(heroItem?.secondsRemaining || 0) - liveTick);
-  const heroTrust = Math.max(0, Math.round(Number(heroItem?.trustScore || 0)));
+  const heroSellerLabel = (() => {
+    if (!heroItem) return 'Seller —';
+    const ev = buildSellerTrustEvidence(heroItem);
+    if (ev.positiveFeedbackPercent != null) return sellerTrustEvidenceSummary(ev);
+    if (ev.evidenceState === 'LIMITED_HISTORY') return 'Limited seller history';
+    return ev.evidenceState === 'GOOD' ? 'Strong seller' : 'Check seller';
+  })();
 
   const runHunt = (raw, source = 'hunt', opts = {}) => {
     const q = String(raw || '').trim();
@@ -795,7 +802,7 @@ const LocalDeals = () => {
               <div className="absolute inset-0 z-20 p-5 sm:p-7 flex flex-col justify-between">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="px-3 py-1 rounded-full text-xs font-black tracking-[0.14em] bg-rose-600/85 border border-rose-300/30">🔥 LIVE QUICK SNIPE</span>
-                  <span className="px-3 py-1 rounded-full text-xs bg-slate-900/75 border border-white/20">Trust {heroTrust >= 80 ? 'HIGH' : heroTrust >= 60 ? 'MED' : 'LOW'}</span>
+                  <span className="px-3 py-1 rounded-full text-xs bg-slate-900/75 border border-white/20">{heroSellerLabel}</span>
                   <span className="px-3 py-1 rounded-full text-xs bg-slate-900/75 border border-white/20">Only {heroWatchers} watchers</span>
                 </div>
                 <div>

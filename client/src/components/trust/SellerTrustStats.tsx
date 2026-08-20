@@ -4,24 +4,18 @@ import '../../styles/SellerTrustStats.css';
 
 export type SellerTrustStatsProps = {
   display: SellerTrustDisplay;
-  score: number;
+  /** @deprecated Internal score — not shown in evidence-first UI. */
+  score?: number;
   compact?: boolean;
 };
 
-export default function SellerTrustStats({ display, score, compact = false }: SellerTrustStatsProps) {
+/** @deprecated Prefer SellerTrustEvidence — stats grid without proprietary score. */
+export default function SellerTrustStats({ display, compact = false }: SellerTrustStatsProps) {
   return (
     <dl
       className={`seller-trust-stats${compact ? ' seller-trust-stats--compact' : ''}`}
-      aria-label="Seller trust details"
+      aria-label="Seller marketplace details"
     >
-      <div className="seller-trust-stats__cell">
-        <dt>Score</dt>
-        <dd>{score}/100</dd>
-      </div>
-      <div className="seller-trust-stats__cell">
-        <dt>Band</dt>
-        <dd>{display.bandLabel}</dd>
-      </div>
       <div className="seller-trust-stats__cell">
         <dt>Feedback</dt>
         <dd>{display.feedbackPercent}</dd>

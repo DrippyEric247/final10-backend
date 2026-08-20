@@ -49,6 +49,7 @@ export function applyServerRankToListing(item, rankRow) {
     recommendationType: signals.recommendationType ?? item.recommendationType,
     confidenceScore: signals.dealScore ?? item.confidenceScore,
     safeToRecommend: signals.safeToRecommend ?? item.safeToRecommend,
+    sellerEvidence: rankRow.sellerEvidence ?? item.sellerEvidence ?? null,
     rankScore: rankRow.rankScore,
     rankPosition: rankRow.rankPosition,
     rankLabels: Array.isArray(rankRow.labels) ? rankRow.labels : [],

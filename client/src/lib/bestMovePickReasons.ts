@@ -1,12 +1,17 @@
-import type { BestMoveResult } from '../types/bestMove';
 import type { TrustScoreResult } from '../types/trustScore';
+import { buildSellerTrustEvidence } from './sellerTrustEvidence';
 
 export type PickReasonInput = {
   item: Record<string, unknown>;
-  decision: Pick<BestMoveResult, 'confidence' | 'confidenceScore' | 'estimatedSavings' | 'bestMove'>;
+  decision: {
+    confidence: string;
+    confidenceScore?: number;
+    estimatedSavings?: number;
+    bestMove: string;
+  };
   trustResult: Pick<
     TrustScoreResult,
-    'trustScore' | 'sellerTrustScore' | 'safeToRecommend' | 'sellerTrustBand'
+    'trustScore' | 'sellerTrustScore' | 'safeToRecommend' | 'sellerTrustBand' | 'sellerTrustReasons'
   > & { savvyVerifiedSeller?: boolean };
   effectiveSavings?: number;
 };
@@ -22,6 +27,44 @@ function formatMoney(n: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
 }
 
+function appendSellerEvidenceReasons(
+  reasons: ScoredReason[],
+  item: Record<string, unknown>,
+  trustResult: PickReasonInput['trustResult']
+) {
+  const evidence = buildSellerTrustEvidence(item, trustResult as TrustScoreResult);
+  const pct = evidence.positiveFeedbackPercent;
+  const count = evidence.feedbackCount;
+
+  if (pct != null && count != null && count >= 500 && pct >= 98) {
+    reasons.push({
+      text: `Seller has ${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)}% positive feedback across ${count.toLocaleString()} ratings, and Final10 found no major seller concerns.`,
+      score: 82,
+    });
+    return;
+  }
+
+  if (pct != null && count != null && count >= 20 && pct >= 95) {
+    reasons.push({
+      text: `Seller shows ${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)}% positive feedback across ${count.toLocaleString()} ratings.`,
+      score: 74,
+    });
+    return;
+  }
+
+  if (pct != null && count != null && count < 20 && pct >= 95) {
+    reasons.push({
+      text: `Seller has ${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)}% positive feedback, but only ${count} rating${count === 1 ? '' : 's'}. The seller looks positive so far, although the history is limited.`,
+      score: 68,
+    });
+    return;
+  }
+
+  if (evidence.sellerConcerns[0]) {
+    reasons.push({ text: evidence.sellerConcerns[0], score: 58 });
+  }
+}
+
 /**
  * Build the top factual reasons Savvy selected this listing as a Best Move.
  * Prioritizes urgency, competition, value, and trust — never generic filler.
@@ -34,7 +77,6 @@ export function buildBestMovePickReasons(input: PickReasonInput, max = 5): strin
   const price =
     toNum(item.buyNowPrice) ?? toNum(item.currentBidPrice) ?? toNum(item.price) ?? null;
   const market = toNum(item.marketValue) ?? null;
-  const sellerTrust = toNum(trustResult.sellerTrustScore) ?? toNum(trustResult.trustScore) ?? 0;
   const savvyVerified = Boolean(item.savvyVerifiedSeller) || Boolean(trustResult.savvyVerifiedSeller);
   const isAuction = Boolean(item.isAuction);
   const reasons: ScoredReason[] = [];
@@ -78,10 +120,8 @@ export function buildBestMovePickReasons(input: PickReasonInput, max = 5): strin
 
   if (savvyVerified) {
     reasons.push({ text: 'Savvy verified seller', score: 80 });
-  } else if (sellerTrust >= 78 || trustResult.sellerTrustBand === 'elite') {
-    reasons.push({ text: `High trust seller (${Math.round(sellerTrust)}/100)`, score: 76 });
-  } else if (sellerTrust >= 65 || trustResult.sellerTrustBand === 'high') {
-    reasons.push({ text: 'Established seller with strong signals', score: 62 });
+  } else {
+    appendSellerEvidenceReasons(reasons, item, trustResult);
   }
 
   if (

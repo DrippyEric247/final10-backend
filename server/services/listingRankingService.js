@@ -4,6 +4,7 @@
  */
 const { evaluateListingTrust } = require('../lib/listingRanking/trustScoreEngine');
 const { evaluateBestMove } = require('../lib/listingRanking/bestMoveEngine');
+const { buildSellerTrustEvidence } = require('../lib/listingRanking/sellerTrustEvidence');
 const { toNum } = require('../lib/listingRanking/utils');
 
 const RECOMMENDATION_WEIGHT = {
@@ -98,6 +99,7 @@ function scoreListing(listing, options = {}) {
   return {
     listingId: String(item.listingId || item.id || item.itemId || ''),
     rankScore: Math.round(rankScore * 100) / 100,
+    sellerEvidence: buildSellerTrustEvidence(item, trust),
     signals: {
       trustScore: trust.trustScore,
       trustLevel: trust.trustLevel,

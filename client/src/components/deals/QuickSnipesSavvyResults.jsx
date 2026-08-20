@@ -10,6 +10,8 @@ import { getConfidenceLabel, rankQuickSnipeListings } from '../../lib/quickSnipe
 import ListingCardImage from '../listings/ListingCardImage';
 import { NO_PERFECT_MATCH_MESSAGE } from '../../lib/bestMoveFallbackConfig';
 import { isBestMoveDisplayable, resolveDirectItemUrl } from '../../lib/bestMoveListingValidation';
+import SellerTrustEvidence from '../trust/SellerTrustEvidence';
+import { buildSellerTrustEvidence } from '../../lib/sellerTrustEvidence';
 
 const TRENDING_SNEAKERS = [
   { label: 'Jordan 1', query: 'air jordan 1' },
@@ -155,11 +157,16 @@ function buildTrustBadges(item) {
 
 function buildSnipeTags(scored) {
   const tags = [];
-  const trust = Number(scored?.item?.trustScore) || 0;
   const bids = Number(scored?.item?.bidCount || 0);
+  const evidence = buildSellerTrustEvidence(scored?.item || {});
   if (bids <= 2) tags.push({ key: 'lowcomp', label: 'LOW COMPETITION', tone: 'hot' });
-  if (trust >= 80) tags.push({ key: 'trust', label: 'HIGH TRUST', tone: 'cyan' });
-  else if (trust >= 60) tags.push({ key: 'watch', label: 'WORTH WATCHING', tone: 'violet' });
+  if (evidence.evidenceState === 'GOOD' && (evidence.feedbackCount || 0) >= 100) {
+    tags.push({ key: 'trust', label: 'STRONG SELLER', tone: 'cyan' });
+  } else if (evidence.evidenceState === 'LIMITED_HISTORY') {
+    tags.push({ key: 'watch', label: 'LIMITED HISTORY', tone: 'violet' });
+  } else if (evidence.evidenceState === 'CHECK_DETAILS' || evidence.evidenceState === 'CONCERN_DETECTED') {
+    tags.push({ key: 'watch', label: 'CHECK DETAILS', tone: 'violet' });
+  }
   if (scored?.extraordinary) tags.push({ key: 'top', label: 'TOP PICK', tone: 'gold' });
   return tags.slice(0, 3);
 }
@@ -275,9 +282,8 @@ function OpportunityCard({
             Est. savings: {toMoney(savings)}
             {Number.isFinite(savingsPct) && savingsPct > 0 ? ` (${Math.round(savingsPct)}%)` : ''}
           </div>
-          <div>
-            <span className="text-slate-400">Trust score:</span>{' '}
-            <span className="font-bold text-cyan-200">{Math.round(Number(item.trustScore || 0))}%</span>
+          <div className="mt-2">
+            <SellerTrustEvidence listing={item} compact showDetailsToggle={false} />
           </div>
         </div>
 
@@ -336,7 +342,6 @@ function BestMoveFallbackCard({
   const market = Number(item.marketValue ?? 0);
   const savings = Number(fallback.savings) || Math.max(0, market - price);
   const savingsPct = Number(fallback.savingsPct) || (market > 0 ? (savings / market) * 100 : 0);
-  const trust = Math.round(Number(fallback.trustScore ?? item.trustScore) || 0);
   const confidence = fallback.confidence || getConfidenceLabel(fallback.confidenceScore ?? item.confidenceScore);
   const url = resolveDirectItemUrl(item);
   const seconds = Math.max(0, Number(item.secondsRemaining || 0) - liveTick);
@@ -378,7 +383,9 @@ function BestMoveFallbackCard({
               Est. savings: {toMoney(savings)}
               {savingsPct > 0 ? ` (${Math.round(savingsPct)}%)` : ''}
             </div>
-            <div><span className="text-slate-400">Trust score:</span> <span className="font-bold text-cyan-200">{trust}%</span></div>
+            <div className="mt-2">
+              <SellerTrustEvidence listing={item} compact showDetailsToggle={false} />
+            </div>
             <div><span className="text-slate-400">Ends in:</span> <span className="font-bold text-amber-200">{fmtTime(seconds)}</span></div>
             <div><span className="text-slate-400">Activity:</span> <span className="font-bold text-amber-200">{bids} watching</span></div>
           </div>

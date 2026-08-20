@@ -94,16 +94,6 @@ export default function EliteAuctionCard({
     .join(" ");
 
   const savingsTop = showSavvyUnlocked ? 52 : 12;
-  const trustRounded = Math.min(
-    100,
-    Math.max(
-      0,
-      Math.round(
-        Number(trustResult?.sellerTrustScore ?? trustResult?.trustScore ?? trustScore) || 0
-      )
-    )
-  );
-  const trustSegments = Math.min(10, Math.max(0, Math.round(trustRounded / 10)));
   const savingsPct = savingsPctFrom({ marketValueNum, displayPriceNum });
   const aiFeelingBadge = pickEliteAiFeelingBadge({
     tier,
@@ -150,34 +140,9 @@ export default function EliteAuctionCard({
           <span className="elite-card__save-line">{savingsSubline}</span>
         </div>
 
-        <div className="elite-card__trust-block">
-          <div className="elite-card__trust-head">
-            <span className="elite-card__trust-title">
-              Seller trust: <strong>{trustRounded}/100</strong>
-            </span>
-            <span className="elite-card__trust-score-pill" aria-hidden>
-              {trustRounded}
-            </span>
-          </div>
-          <div
-            className="elite-card__trust-segments"
-            role="img"
-            aria-label={`Seller trust score ${trustRounded} out of 100`}
-          >
-            {Array.from({ length: 10 }, (_, i) => (
-              <span
-                key={i}
-                className={
-                  i < trustSegments
-                    ? "elite-card__trust-seg elite-card__trust-seg--on"
-                    : "elite-card__trust-seg"
-                }
-              />
-            ))}
-          </div>
-        </div>
-
-        {trustResult ? <SavvyTrustPanel trust={trustResult} /> : null}
+        {trustResult ? (
+          <SavvyTrustPanel trust={trustResult} listing={item} className="elite-card__trust-panel" compact />
+        ) : null}
 
         <div className="elite-card__badge elite-card__badge--ai" title="AI feeling for this listing">
           {aiFeelingBadge}

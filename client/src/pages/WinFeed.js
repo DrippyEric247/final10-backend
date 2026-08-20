@@ -119,6 +119,7 @@ const EMPTY_FORM = {
   marketValue: "",
   category: "gaming",
   trustScore: 80,
+  sellerFeedbackPercent: "",
   verification: WIN_VERIFICATION.SCREENSHOT,
   proofUrl: "",
   secondsToWin: "",
@@ -148,10 +149,10 @@ function PostYourWinModal({ open, onClose, onSubmit, defaultUsername, todayCount
     () =>
       computeReward({
         savings: form.savings,
-        trustScore: form.trustScore,
+        trustScore: form.sellerFeedbackPercent !== "" ? Number(form.sellerFeedbackPercent) : form.trustScore,
         verification: form.verification,
       }),
-    [form.savings, form.trustScore, form.verification]
+    [form.savings, form.sellerFeedbackPercent, form.trustScore, form.verification]
   );
 
   const previewTitle = useMemo(
@@ -319,15 +320,18 @@ function PostYourWinModal({ open, onClose, onSubmit, defaultUsername, todayCount
             </label>
 
             <label className="wf-field">
-              <span>Trust score at purchase</span>
+              <span>Seller positive feedback % <em>optional</em></span>
               <input
-                type="range"
+                type="number"
                 min="0"
                 max="100"
-                value={form.trustScore}
-                onChange={(e) => set("trustScore", Number(e.target.value))}
+                value={form.sellerFeedbackPercent}
+                onChange={(e) => set("sellerFeedbackPercent", e.target.value)}
+                placeholder="100"
               />
-              <small className="wf-range-readout">{form.trustScore}/100</small>
+              <small className="wf-range-readout">
+                Used for reward estimate only — not shown as a proprietary score.
+              </small>
             </label>
 
             <label className="wf-field">
@@ -499,9 +503,6 @@ function WinCard({ win }) {
         <div className="wf-card-meta">
           <span className={`wf-verify ${verifyCls}`} title={verifyLabel}>
             <VerifyIcon className="wf-verify-icon" size={14} aria-hidden /> {verifyLabel}
-          </span>
-          <span className="wf-card-trust" title="Trust score at time of purchase">
-            Trust {Math.round(Number(win.trustScore) || 0)}
           </span>
           <span className="wf-card-cat">
             {WIN_CATEGORY_LABELS[win.category] || win.category}

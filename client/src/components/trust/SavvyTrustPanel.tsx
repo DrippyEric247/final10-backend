@@ -1,56 +1,34 @@
 import React from 'react';
 import type { TrustScoreResult } from '../../types/trustScore';
 import { SCOUT_LABELS } from '../../config/savvyScoutBranding';
-import SellerTrustStats from './SellerTrustStats';
+import SellerTrustEvidence from './SellerTrustEvidence';
 import '../../styles/SavvyTrustPanel.css';
-
-const SELLER_BADGE: Record<
-  TrustScoreResult['sellerTrustBand'],
-  { emoji: string; label: string }
-> = {
-  elite: { emoji: '🟢', label: 'Elite Verified Seller' },
-  high: { emoji: '🟢', label: 'Trusted Seller' },
-  medium: { emoji: '🟡', label: 'Established Seller' },
-  low: { emoji: '🔴', label: 'Limited Seller History' },
-  unknown: { emoji: '🟡', label: 'Seller profile partial' },
-};
 
 export type SavvyTrustPanelProps = {
   trust: TrustScoreResult;
+  listing?: Record<string, unknown> | null;
   className?: string;
+  compact?: boolean;
 };
 
 /**
- * Savvy Trust — seller reputation and deal signals are **never** merged into one label.
+ * Savvy Trust — seller reputation (evidence-first) and deal signals stay separate.
  */
-export default function SavvyTrustPanel({ trust, className = '' }: SavvyTrustPanelProps) {
-  const sellerBadge = SELLER_BADGE[trust.sellerTrustBand];
-  const sellerExplain =
-    trust.sellerTrustReasons[0] ||
-    trust.trustReasons[0] ||
-    'Seller trust is based on marketplace reputation — not listing price.';
-
+export default function SavvyTrustPanel({
+  trust,
+  listing = null,
+  className = '',
+  compact = false,
+}: SavvyTrustPanelProps) {
   const rootClass = `savvy-trust-panel savvy-trust-panel--${trust.trustLevel} ${className}`.trim();
 
   return (
     <div className={rootClass} role="region" aria-label="Savvy seller and deal assessment">
-      <div className="savvy-trust-panel__row">
-        <span className="savvy-trust-panel__badge">
-          {sellerBadge.emoji} {sellerBadge.label}{' '}
-          <span className="savvy-trust-panel__score">· {trust.sellerTrustScore}/100</span>
-        </span>
-        <span className="savvy-trust-panel__ai">
-          {SCOUT_LABELS.confidence} <strong>{trust.aiConfidence}%</strong>
-        </span>
-      </div>
-
       {trust.savvyVerifiedSeller ? (
         <div className="savvy-trust-panel__verified">Savvy Verified Seller</div>
       ) : null}
 
-      {trust.sellerDisplay ? (
-        <SellerTrustStats display={trust.sellerDisplay} score={trust.sellerTrustScore} />
-      ) : null}
+      <SellerTrustEvidence trust={trust} listing={listing || undefined} compact={compact} />
 
       {trust.dealHighlights.length > 0 ? (
         <div className="savvy-trust-panel__chips" aria-label="Deal signals">
@@ -72,11 +50,11 @@ export default function SavvyTrustPanel({ trust, className = '' }: SavvyTrustPan
         </p>
       ) : null}
 
-      {trust.savvyWarningHeadline ? (
-        <p className="savvy-trust-panel__warn">{trust.savvyWarningHeadline}</p>
-      ) : null}
-
-      <p className="savvy-trust-panel__explain">{sellerExplain}</p>
+      <div className="savvy-trust-panel__row savvy-trust-panel__row--meta">
+        <span className="savvy-trust-panel__ai">
+          {SCOUT_LABELS.confidence} <strong>{trust.aiConfidence}%</strong>
+        </span>
+      </div>
 
       {!trust.safeToRecommend ? (
         <p className="savvy-trust-panel__cooldown">

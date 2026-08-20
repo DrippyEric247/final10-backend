@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Lock, Sparkles, X } from "lucide-react";
 import SavvyAlertButton from "../alerts/SavvyAlertButton";
+import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from "../../lib/sellerTrustEvidence";
 import { getBestListingImageUrl } from "../../lib/listingImageUrl";
 import "../../styles/ListingCardImage.css";
 import "../../styles/AuctionsSavvyCompareModal.css";
@@ -27,7 +28,10 @@ function toMoney(n) {
 }
 
 function MiniListingCard({ row, badgeLabel, privacyMode = false }) {
-  const { item, trustScore, dealScore, savings, displayPrice, secondsLeft, isAuctionType } = row;
+  const { item, dealScore, savings, displayPrice, secondsLeft, isAuctionType } = row;
+  const sellerSummary = privacyMode
+    ? "—"
+    : sellerTrustEvidenceSummary(buildSellerTrustEvidence(item || {}));
   const img = privacyMode ? "/fallback.png" : getBestListingImageUrl(item) || "/fallback.png";
   const title = privacyMode ? "Savvy Best Move (upgrade to reveal)" : item?.title || "Listing";
   const mins = Math.floor(Math.max(0, secondsLeft) / 60);
@@ -85,8 +89,8 @@ function MiniListingCard({ row, badgeLabel, privacyMode = false }) {
           <span style={{ color: "#86efac", fontWeight: 700 }}>Save {privacyMode ? "—" : toMoney(savings)}</span>
         </div>
         <div style={{ fontSize: 13, color: "#a5b4fc" }}>
-          Trust{" "}
-          <strong style={{ color: "#e0e7ff" }}>{privacyMode ? "—" : `${Math.round(trustScore)}/100`}</strong>
+          Seller{" "}
+          <strong style={{ color: "#e0e7ff" }}>{sellerSummary}</strong>
           <span style={{ margin: "0 8px", color: "#475569" }}>·</span>
           Deal score{" "}
           <strong style={{ color: "#e0e7ff" }}>{privacyMode ? "—" : `${dealScore}/100`}</strong>

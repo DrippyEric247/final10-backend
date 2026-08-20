@@ -13,6 +13,7 @@ import {
   buildPassiveHints,
 } from "../lib/assistantSignals";
 import ebayService from "../services/ebayService";
+import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from "../lib/sellerTrustEvidence";
 import {
   getAlertsEnabled,
   setAlertsEnabled,
@@ -563,6 +564,16 @@ function normalizeDealItem(raw) {
     trustScore: Number(raw.trustScore),
     trustLevel: String(raw.trustLevel || "").toLowerCase(),
     condition: String(raw.condition || "").toLowerCase(),
+    sellerFeedbackPercent:
+      raw.sellerFeedbackPercent ??
+      (typeof raw.seller === "object" ? raw.seller?.feedbackPercentage : null),
+    sellerFeedbackCount:
+      raw.sellerFeedbackCount ??
+      (typeof raw.seller === "object" ? raw.seller?.feedbackScore : null),
+    seller:
+      typeof raw.seller === "string"
+        ? raw.seller
+        : raw.seller?.username || raw.sellerUsername || null,
   };
   deal.verdict = evaluateDeal(deal).verdict;
   return deal;
@@ -1111,11 +1122,15 @@ export default function Final10SideAssistant() {
               (Number(b.savingsPct) || 0) - (Number(a.savingsPct) || 0)
           );
           const top = ranked[0];
+          const sellerLine = (() => {
+            const summary = sellerTrustEvidenceSummary(buildSellerTrustEvidence(top));
+            return summary !== "Feedback data unavailable" ? ` · Seller: ${summary}` : "";
+          })();
           return {
             intent,
             kind: "deals",
             verdict: mkVerdict("Best Move", "great"),
-            reason: `Top pick: ${top.title} at ${top.priceText}${Number.isFinite(top.savingsPct) ? ` (${top.savingsPct}% savings)` : ""}${Number.isFinite(top.trustScore) ? ` · Trust ${Math.round(top.trustScore)}` : ""}.`,
+            reason: `Top pick: ${top.title} at ${top.priceText}${Number.isFinite(top.savingsPct) ? ` (${top.savingsPct}% savings)` : ""}${sellerLine}.`,
             deals: ranked.slice(0, 3),
             action: { label: "See all on Trending", path: "/feed", kind: "nav" },
           };

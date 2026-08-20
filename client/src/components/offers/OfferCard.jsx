@@ -1,7 +1,9 @@
 import React, { useMemo } from "react";
-import { Clock3, ShieldAlert, TrendingUp } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import SavvyRewardBadge from "../rewards/SavvyRewardBadge";
 import ListingCardImage from "../listings/ListingCardImage";
+import SellerTrustEvidence from "../trust/SellerTrustEvidence";
+import { buildSellerTrustEvidence } from "../../lib/sellerTrustEvidence";
 import { bestMoveTag, offerReason } from "../../lib/offerEngine";
 
 function sourceTag(sourceType) {
@@ -44,7 +46,13 @@ export default function OfferCard({
 }) {
   const move = useMemo(() => bestMoveTag(offer), [offer]);
   const urgent = Number(offer.expiresAt) - Date.now() < 4 * 60 * 60 * 1000;
-  const lowTrust = Number(offer.trustScore) < 60;
+  const lowTrust = useMemo(() => {
+    const evidence = buildSellerTrustEvidence(offer);
+    return (
+      evidence.evidenceState === 'CONCERN_DETECTED' ||
+      evidence.evidenceState === 'SELLER_DATA_UNAVAILABLE'
+    );
+  }, [offer]);
 
   return (
     <article
@@ -99,16 +107,14 @@ export default function OfferCard({
             <Clock3 className="h-3.5 w-3.5" />
             {formatRemaining(offer.expiresAt)}
           </div>
-          <div className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-            lowTrust ? "border-rose-400/45 bg-rose-500/20 text-rose-200" : "border-emerald-400/45 bg-emerald-500/20 text-emerald-200"
-          }`}>
-            {lowTrust ? <ShieldAlert className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
-            Trust {offer.trustScore}
-          </div>
+        </div>
+
+        <div className="mt-3">
+          <SellerTrustEvidence listing={offer} compact showDetailsToggle={false} />
         </div>
 
         {lowTrust ? (
-          <div className="mt-2 text-xs font-semibold text-rose-300">⚠ Risk label: low trust</div>
+          <div className="mt-2 text-xs font-semibold text-rose-300">Review seller details before purchasing.</div>
         ) : null}
 
         <SavvyRewardBadge

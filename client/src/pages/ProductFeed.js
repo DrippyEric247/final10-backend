@@ -8,6 +8,8 @@ import { SCOUT_LABELS, SAVVY_SCOUT } from "../config/savvyScoutBranding";
 import ListingIntentAnchor from "../components/ListingIntentAnchor";
 import SavvyRewardCoinBadge from "../components/rewards/SavvyRewardCoinBadge";
 import { evaluateTrustScore, trustScoreInputFromListing } from "../lib/trustScoreEngine";
+import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from "../lib/sellerTrustEvidence";
+import SellerTrustEvidence from "../components/trust/SellerTrustEvidence";
 import {
   mergeServerRanksIntoListings,
   useServerListingRanks,
@@ -604,7 +606,9 @@ export default function ProductFeed() {
           <div className="meta">
             <p className="sub">{firstDeal.title}</p>
             <div className="row">
-              <span className="sub">Trust: {Math.round(Number(firstDeal.trustScore || 0))}</span>
+              <span className="sub">
+                Seller: {sellerTrustEvidenceSummary(buildSellerTrustEvidence(firstDeal))}
+              </span>
               <span className="sub">Value: ${(firstDeal.feedSavings || 0).toFixed(0)} potential</span>
               <span className="sub">Timing: {firstDeal.endsIn || firstDeal.endsAtHuman || "Live now"}</span>
             </div>
@@ -746,7 +750,9 @@ export default function ProductFeed() {
                     <h4>{rec.title}</h4>
                     <div className="smart-cart-save">SAVE ${rec.estimatedSavings.toLocaleString()}</div>
                     <p>Market: ${Math.round(rec.marketPrice).toLocaleString()} · Now: ${Math.round(rec.currentPrice).toLocaleString()}</p>
-                    <p>Trust: {rec.trustScore >= 80 ? "HIGH" : rec.trustScore >= 60 ? "MED" : "LOW"} · Only {rec.watchers} watcher{rec.watchers === 1 ? "" : "s"}</p>
+                    <p>
+                      Seller: {sellerTrustEvidenceSummary(buildSellerTrustEvidence(rec.item || rec))} · Only {rec.watchers} watcher{rec.watchers === 1 ? "" : "s"}
+                    </p>
                     <p>{rec.reason}</p>
                     <div className="smart-cart-actions">
                       <button type="button" onClick={() => addToSmartCart(rec.item || rec)}>ADD TO BUILD</button>
@@ -851,8 +857,6 @@ export default function ProductFeed() {
                         ? `$${curRaw}`
                         : "—";
                   const savingsNum = Number(it.feedSavings);
-                  const trustNum = Number(it.trustScore);
-                  const trustDisplay = Number.isFinite(trustNum) ? trustNum : "—";
                   return (
                     <ListingIntentAnchor
                       key={`${sec.id}-${idKey || it.title}`}
@@ -913,7 +917,7 @@ export default function ProductFeed() {
                                 : "Save —"}
                             </span>
                           </div>
-                          <div className="trust-score">Trust: {trustDisplay}/100</div>
+                          <SellerTrustEvidence listing={it} compact showDetailsToggle={false} />
                         </div>
 
                         <div className="deal-actions" style={{ padding: "0 14px 0" }}>

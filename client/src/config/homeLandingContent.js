@@ -39,7 +39,7 @@ export const WHY_FINAL10 = Object.freeze([
   'AI-powered deal discovery',
   'Final-minute auction opportunities',
   'Smart alerts',
-  'Seller Trust Scores',
+  'Evidence-first seller trust',
   'Battle Pass rewards',
   'Login streaks',
   'Scout Flight',

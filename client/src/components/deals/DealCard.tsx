@@ -328,14 +328,6 @@ export function DealCardShell({
     const raw = Number(item.pointsMultiplier);
     return Number.isFinite(raw) && raw > 1 ? raw : undefined;
   }, [item.pointsMultiplier]);
-  const cautionLabel =
-    trustResult.sellerTrustBand === 'low'
-      ? trustResult.riskFlags.includes('new_seller')
-        ? 'Low seller history'
-        : 'Use caution on seller'
-      : trustResult.trustLevel === 'unverified'
-        ? 'Thin seller profile'
-        : null;
   const recommendationLine = useMemo(() => {
     if (decision.bestMove === 'bid') return 'Bid now';
     if (decision.bestMove === 'buy_now') return 'Buy now';
@@ -549,17 +541,7 @@ export function DealCardShell({
           </div>
         </div>
 
-        <div className="trust-score">
-          Seller trust: {trustResult.sellerTrustScore}/100
-          {cautionLabel ? <span className="ml-2 text-xs font-semibold text-rose-300">({cautionLabel})</span> : null}
-        </div>
-        {trustResult.dealWarningHeadline ? (
-          <div className="text-xs font-semibold text-amber-200/90 mt-1">
-            Deal: {trustResult.dealWarningHeadline}
-          </div>
-        ) : null}
-
-        <SavvyTrustPanel trust={trustResult} className="mt-3" />
+        <SavvyTrustPanel trust={trustResult} listing={item as Record<string, unknown>} className="mt-3" compact />
 
         <div className="deal-actions">
           {item.itemWebUrl ? (
@@ -713,7 +695,7 @@ export function DealCardShell({
                       <div>
                         <div className="text-xs font-bold text-white">{rec.name}</div>
                         <div className="text-[11px] text-gray-300">
-                          {formatPrice(rec.estPrice, item.currency || 'USD')} • Trust {rec.trustScore} • {rec.timing}
+                          {formatPrice(rec.estPrice, item.currency || 'USD')} • {rec.timing}
                         </div>
                       </div>
                     </div>

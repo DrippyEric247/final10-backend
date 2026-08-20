@@ -348,7 +348,7 @@ export default function BusinessOffersDashboard() {
                       : ""}
                   </div>
                   <div className="text-xs text-slate-300">
-                    Trust {Math.round(pick.trustScore || 0)}% · {poolSize} compared
+                    {poolSize} compared
                   </div>
                   <button
                     type="button"

@@ -29,6 +29,7 @@ import AuctionLiveCountdown, {
   isAuctionCountdownUrgent,
 } from "../components/deals/AuctionLiveCountdown";
 import WhySavvyPickedSection from "../components/deals/WhySavvyPickedSection";
+import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from "../lib/sellerTrustEvidence";
 import type { DealListing } from "../components/deals/DealCard";
 import "../styles/best-move-insights.css";
 import "../styles/OnboardingBestMove.css";
@@ -553,9 +554,11 @@ function ResultPanel({
   onSkip: () => void;
 }) {
   const { listing, decision, trust, savingsAmount, savingsPercent } = active;
+  const sellerEvidence = buildSellerTrustEvidence(listing as Record<string, unknown>, trust);
   const price =
     listing.buyNowPrice ?? listing.currentBidPrice ?? listing.currentBid ?? listing.price;
   const band = trustBand(trust.trustScore);
+  const sellerSummary = sellerTrustEvidenceSummary(sellerEvidence);
   const secondsLeft = getSecondsRemaining(active);
   const isAuction = Boolean((listing as Record<string, unknown>).isAuction ?? secondsLeft);
   const auctionUrgent = isAuction && isAuctionCountdownUrgent(secondsLeft ?? undefined);
@@ -704,14 +707,15 @@ function ResultPanel({
 
           <div className="onboard-move-card-grid">
             <div className={`onboard-move-stat trust trust-${band}`}>
-              <div className="onboard-move-stat-label">Trust score</div>
+              <div className="onboard-move-stat-label">Seller</div>
               <div className="onboard-move-stat-value">
-                {trust.trustScore}
+                {sellerSummary}
                 <span className="onboard-move-stat-suffix">
                   {" "}
-                  · {band.toUpperCase()}
+                  · {sellerEvidence.evidenceState.replace(/_/g, " ")}
                 </span>
               </div>
+              <p className="onboard-move-stat-note">{sellerEvidence.final10Note}</p>
             </div>
             <div className="onboard-move-stat rank">
               <div className="onboard-move-stat-label">Scored above</div>
