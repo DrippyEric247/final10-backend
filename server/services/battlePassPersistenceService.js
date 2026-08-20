@@ -214,11 +214,17 @@ async function ensureProgressDocuments(userId) {
   }
   let inv = await CosmeticInventory.findOne({ userId });
   if (!inv) {
-    inv = await CosmeticInventory.create({
-      userId,
-      unlockedItemIds: [...DEFAULT_STARTER_UNLOCKS],
-      newItemIds: [],
-    });
+    inv = await CosmeticInventory.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: {
+          userId,
+          unlockedItemIds: [...DEFAULT_STARTER_UNLOCKS],
+          newItemIds: [],
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
   }
   return { bp, inv };
 }

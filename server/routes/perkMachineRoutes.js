@@ -79,11 +79,22 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
   } catch (err) {
     console.error('[perk-machine/spin]', err);
     if (err.status) {
+      const clientMessage =
+        err.code === 'INSUFFICIENT_SAVVY'
+          ? err.message
+          : err.code === 'SPIN_IN_PROGRESS' || err.code === 'SPIN_COOLDOWN'
+            ? err.message
+            : err.code === 'FREE_SPIN_UNAVAILABLE'
+              ? err.message
+              : err.status >= 500
+                ? 'Spin failed — no Savvy was spent. Try again.'
+                : err.message;
       return res.status(err.status).json({
-        message: err.message,
+        message: clientMessage,
         code: err.code,
         required: err.required,
         balance: err.balance,
+        ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
       });
     }
     return res.status(500).json({

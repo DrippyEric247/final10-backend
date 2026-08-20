@@ -7,7 +7,7 @@ const supplyDropSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     source: {
       type: String,
-      enum: ['admin', 'scoutSupport', 'scheduler', 'push', 'test'],
+      enum: ['admin', 'scoutSupport', 'scheduler', 'push', 'test', 'perk_machine'],
       default: 'admin',
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
