@@ -359,7 +359,10 @@ function deriveRiskAssessment(params: {
 
   if (pct != null && pct < 90) {
     riskLevel = 'high_risk';
-  } else if (pct != null && pct < 95 || sellerConcerns.some((c) => /weaker|negative/i.test(c))) {
+  } else if (
+    (pct != null && pct < 95) ||
+    sellerConcerns.some((c) => /weaker|negative/i.test(c))
+  ) {
     riskLevel = 'moderate_risk';
   } else if (count != null && count < 20 && pct != null && pct >= 95) {
     riskLevel = 'limited_evidence';
@@ -553,14 +556,11 @@ export function buildSellerTrustEvidence(
 
 /** Compact one-line summary for tight card layouts. */
 export function sellerTrustEvidenceSummary(evidence: SellerTrustEvidence): string {
-  if (evidence.marketplaceRating.display && evidence.feedbackCount != null) {
-    return `${evidence.marketplaceRating.display} • ${formatFeedbackCount(evidence.feedbackCount)} ratings`;
-  }
-  if (evidence.marketplaceRating.display) return evidence.marketplaceRating.display;
-  if (evidence.feedbackCount != null) {
-    return `${formatFeedbackCount(evidence.feedbackCount)} ratings`;
-  }
-  return 'Seller reputation unavailable';
+  const line = formatPositiveLine(
+    evidence.positiveFeedbackPercent,
+    evidence.feedbackCount
+  );
+  return line || 'Seller reputation unavailable';
 }
 
 export const EVIDENCE_STATE_LABEL: Record<SellerEvidenceState, string> = {

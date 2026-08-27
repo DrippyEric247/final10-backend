@@ -75,7 +75,7 @@ export default function SellerTrustEvidence({
   return (
     <section
       className={`seller-trust-evidence ${stateClass} ${riskClass}${compact ? ' seller-trust-evidence--compact' : ''} ${className}`.trim()}
-      aria-label="Seller reputation"
+      aria-label={`Seller reputation — ${EVIDENCE_STATE_LABEL[resolved.evidenceState]}`}
     >
       {!compact ? (
         <h3 className="seller-trust-evidence__section-title">Seller reputation</h3>
