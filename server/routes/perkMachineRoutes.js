@@ -17,6 +17,7 @@ const {
   adminResetFreeSpin,
   adminGrantSavvy,
   adminGrantEgg,
+  adminGrantRewardTest,
   adminClearHistory,
   adminSetNukeSpinProgress,
   adminTriggerNukeEvent,
@@ -119,6 +120,10 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
         balance: err.balance,
         failedStage: err.failedStage || null,
         lastOkStage: err.lastOkStage || trace.getLastOkStage(),
+        rewardId: err.rewardId || null,
+        rewardType: err.rewardType || null,
+        grantHandler: err.grantHandler || null,
+        failedField: err.field || null,
         ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
       });
     }
@@ -128,6 +133,10 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
       message: 'Spin failed — no Savvy was spent. Try again.',
       failedStage: err.failedStage || null,
       lastOkStage: err.lastOkStage || trace.getLastOkStage(),
+      rewardId: err.rewardId || null,
+      rewardType: err.rewardType || null,
+      grantHandler: err.grantHandler || null,
+      failedField: err.field || null,
       ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
     });
   }
@@ -312,6 +321,22 @@ router.post('/admin/grant-egg', auth, requireAdminAccess(), async (req, res, nex
     res.json({ message: `Granted ${count} ${tier} egg(s).`, ...result });
   } catch (err) {
     console.error('[perk-machine/admin/grant-egg]', err);
+    next(err);
+  }
+});
+
+router.post('/admin/grant-reward-test', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    const rewardId = String(req.body?.rewardId || '').trim();
+    const result = await adminGrantRewardTest(user, rewardId, req.adminUser || user);
+    res.json({
+      message: `Reward grant test complete for ${rewardId}.`,
+      ...result,
+    });
+  } catch (err) {
+    console.error('[perk-machine/admin/grant-reward-test]', err);
     next(err);
   }
 });

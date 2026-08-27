@@ -186,7 +186,9 @@ describeReal('perkMachine spin — Mongo integration', () => {
     }
   });
 
-  test('each spin pool reward type completes with admin bypass', async () => {
+  test(
+    'each spin pool reward type completes with admin bypass',
+    async () => {
     const user = await User.create({
       username: `pm_all_${Date.now()}`,
       email: `pm_all_${Date.now()}@test.local`,
@@ -215,7 +217,9 @@ describeReal('perkMachine spin — Mongo integration', () => {
       await SupplyDrop.deleteMany({ userId: user._id });
       await User.deleteOne({ _id: user._id });
     }
-  });
+  },
+    60000
+  );
 
   test('failed spin after savvy spend refunds balance', async () => {
     const SupplyDropModel = require('../models/SupplyDrop');

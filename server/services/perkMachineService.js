@@ -43,17 +43,10 @@ const {
   buildMultiplierBreakdown,
   MULTIPLIER_TYPE,
 } = require('./perkMachineMultiplier');
-const { createSupplyDrop } = require('./supplyDropService');
 const {
   buildTournamentTicketProgress,
   recordSpinForTournamentTicket,
-  ensureEventInventory,
 } = require('./scoutFlightTicketService');
-const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
-const {
-  PERK_CALLING_CARD_DUPLICATE_SAVVY,
-  pickPerkCallingCard,
-} = require('../config/perkCallingCards');
 const {
   maybeResetSpinHeat,
   getSpinHeatState,
@@ -71,6 +64,13 @@ const {
   ensureNukeDoc,
 } = require('./perkMachineNukeService');
 const { createSpinTracer } = require('./perkMachineSpinTrace');
+const {
+  sanitizeRewardForGrantLog,
+  validateRewardBeforeGrant,
+  executePerkMachineRewardGrant,
+  enrichGrantError,
+  resolveGrantHandler,
+} = require('./perkMachineRewardGrant');
 
 function sanitizePerkMachineDate(value) {
   if (value == null || value === '') return null;
@@ -463,249 +463,13 @@ async function applyReward(user, rewardDef, spinId) {
     return granted;
   }
 
-  if (rewardDef.type === 'savvy') {
-    const baseAmount = Number(rewardDef.baseAmount ?? rewardDef.amount) || 0;
-    const spinMult = Number(rewardDef.spinMultiplier) || 1;
-    const scaledBase = Number(rewardDef.amount) || baseAmount;
-    const result = await grantSavvyReward(user, {
-      rewardType: 'perk_machine',
-      amount: scaledBase,
-      baseAmount: scaledBase,
-      idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${scaledBase}:${spinMult}`,
-      note: `Perk Machine — ${rewardDef.label}${spinMult > 1 ? ` (${spinMult}× spin)` : ''}`,
-      meta: { spinId, source: 'perk_machine', spinMultiplier: spinMult },
-    });
-    granted.savvyGranted = result.amount;
-    granted.savvyBoosted = false;
-    granted.spinMultiplierApplied = spinMult > 1 ? spinMult : null;
-    granted.newBalance = result.newBalance;
-    granted.rewardClass = result.rewardClass;
-    granted.multiplierEligible = result.multiplierEligible;
-    if (rewardDef.baseAmount != null) {
-      granted.baseAmount = rewardDef.baseAmount;
-      granted.baseLabel = rewardDef.baseLabel || `+${rewardDef.baseAmount} Savvy`;
-    }
-  } else if (rewardDef.type === 'egg') {
-    const tier = rewardDef.eggTier;
-    if (tier === 'extraFreeSpin') {
-      pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin) + qty;
-    } else if (tier && pm.eggInventory[tier] != null) {
-      pm.eggInventory[tier] = Number(pm.eggInventory[tier]) + qty;
-    }
-    granted.eggsGranted = qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-    try {
-      const { isHatchableEggTier } = require('../config/eggCamoCollection');
-      if (isHatchableEggTier(tier)) {
-        const eggSource = String(spinId || '').startsWith('hatch:')
-          ? 'perk_machine_hatch'
-          : 'perk_machine';
-        const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
-        await recordLegitimateEggAcquisition(user, {
-          tier,
-          quantity: qty,
-          source: eggSource,
-          skipSave: true,
-        });
-      }
-    } catch (err) {
-      console.error('[egg-camo] perk machine grant tracking failed', err?.message || err);
-    }
-  } else if (rewardDef.type === 'token' && rewardDef.tokenKey) {
-    pm.tokens[rewardDef.tokenKey] = Number(pm.tokens[rewardDef.tokenKey] || 0) + qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-  } else if (rewardDef.type === 'streak_shield') {
-    if (!user.dailyStreak) user.dailyStreak = {};
-    user.dailyStreak.scoutShields = Number(user.dailyStreak.scoutShields || 0) + qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-  } else if (rewardDef.type === 'calling_card') {
-    pm.callingCardDrops = Number(pm.callingCardDrops) + qty;
-    if (!Array.isArray(user.badges)) user.badges = [];
-    if (!user.badges.includes('perk_calling_card')) {
-      user.badges.push('perk_calling_card');
-    }
-
-    // Award a specific calling card (server-authoritative) so the reveal can
-    // name it. Owning it already converts the drop into Savvy — never nothing.
-    const card = pickPerkCallingCard();
-    granted.label = 'Calling Card Drop';
-    granted.callingCardId = card.id;
-    granted.callingCardName = card.name;
-    granted.callingCardTagline = card.tagline;
-    granted.callingCardRarity = card.rarity;
-
-    let newlyUnlocked = false;
-    try {
-      newlyUnlocked = await grantSystemCosmeticUnlock(user._id, card.id, 'perk_machine_spin');
-    } catch (e) {
-      newlyUnlocked = false;
-    }
-
-    if (newlyUnlocked) {
-      granted.callingCardDuplicate = false;
-    } else {
-      granted.callingCardDuplicate = true;
-      const dupResult = await grantSavvyReward(user, {
-        rewardType: 'perk_machine',
-        amount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
-        baseAmount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
-        multiplier: 1,
-        idempotencyKey: `perk_card_dupe:${spinId}:${card.id}`,
-        note: `Perk Machine — duplicate ${card.name} converted to Savvy`,
-        meta: { spinId, source: 'perk_machine_calling_card_duplicate', cardId: card.id },
-      });
-      granted.duplicateSavvy = dupResult.amount;
-      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + Number(dupResult.amount || 0);
-      granted.newBalance = dupResult.newBalance;
-    }
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-  } else if (rewardDef.type === 'scout_upgrade') {
-    pm.scoutUpgrades = Number(pm.scoutUpgrades || 0) + 1;
-    if (!Array.isArray(user.badges)) user.badges = [];
-    if (!user.badges.includes('savvy_scout_upgrade')) {
-      user.badges.push('savvy_scout_upgrade');
-    }
-  } else if (rewardDef.type === 'scout_flight_ticket') {
-    const inv = ensureEventInventory(user);
-    inv.scoutFlightTicket = Number(inv.scoutFlightTicket) + qty;
-    granted.ticketsGranted = qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-    user.markModified('eventInventory');
-  } else if (rewardDef.type === 'guaranteed_multiplier') {
-    // Applies to the user's NEXT perk machine spin only (consumed on spin).
-    const value = Math.max(2, Number(rewardDef.multiplierValue) || 2);
-    pm.nextSpinGuaranteedMultiplier = value;
-    granted.guaranteedMultiplier = value;
-  } else if (rewardDef.type === 'permanent_multiplier') {
-    const bonus = Number(rewardDef.permanentBonus) || 0;
-    user.powerMultiplierBonus =
-      Math.round(((Number(user.powerMultiplierBonus) || 0) + bonus) * 100) / 100;
-    granted.permanentBonus = bonus;
-    granted.powerMultiplierBonus = user.powerMultiplierBonus;
-  } else if (rewardDef.type === 'timed_savvy_multiplier') {
-    const { activateMythicSavvyMultiplier } = require('./savvyMultiplierService');
-    const durationMs = Number(rewardDef.durationMs) || 5 * 60 * 60 * 1000;
-    const multiplier = Math.max(1, Number(rewardDef.multiplierValue) || 3);
-    const boost = activateMythicSavvyMultiplier(user, { durationMs, multiplier });
-    granted.savvyEarningsMultiplier = multiplier;
-    granted.savvyEarningsExpiresAt = boost.expiresAt;
-    user.markModified('savvyEarningBoosts');
-  } else if (rewardDef.type === 'timed_event_token') {
-    const token = {
-      id: crypto.randomUUID(),
-      kind: rewardDef.eventKind,
-      label: rewardDef.label,
-      icon: rewardDef.icon || (rewardDef.eventKind === 'savvySale' ? '🏷️' : '⚡'),
-      durationMs: Number(rewardDef.durationMs) || 0,
-      acquiredAt: new Date(),
-    };
-    pm.timedEventTokens.push(token);
-    granted.timedTokenId = token.id;
-    granted.eventKind = token.kind;
-    granted.durationMs = token.durationMs;
-  } else if (rewardDef.type === 'faster_alert_perk') {
-    const { grantFasterAlertPerk } = require('./alertTimingService');
-    const { FASTER_ALERT_PERK } = require('../config/alertSpeedConfig');
-    const durationMs = Number(rewardDef.durationMs) || FASTER_ALERT_PERK.defaultDurationMs;
-    const perkSource = String(spinId || '').startsWith('hatch:') ? 'egg_hatch' : 'perk_machine';
-    const perkResult = await grantFasterAlertPerk(user._id, durationMs, perkSource, {
-      idempotencyKey: `faster_alert:${user._id}:${spinId}:${rewardDef.id}`,
-    });
-    granted.fasterAlertPerk = true;
-    granted.fasterAlertExpiresAt = perkResult.expiresAt;
-    granted.fasterAlertIdempotent = Boolean(perkResult.idempotent);
-  } else if (rewardDef.type === 'supply_drop_token') {
-    pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + qty;
-    granted.supplyDropTokensGranted = qty;
-  } else if (rewardDef.type === 'supply_drop_double') {
-    pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + 1;
-    pm.nextSupplyDropDouble = true;
-    granted.supplyDropTokensGranted = 1;
-    granted.nextSupplyDropDouble = true;
-  } else if (rewardDef.type === 'spin_token_2slot') {
-    pm.tokens.paid2Spin = Number(pm.tokens.paid2Spin || 0) + qty;
-    granted.spinTokensGranted = qty;
-  } else if (rewardDef.type === 'bp_tier_skip') {
-    pm.tokens.battlePassTierSkip = Number(pm.tokens.battlePassTierSkip || 0) + qty;
-    granted.tierSkipsGranted = qty;
-  } else if (rewardDef.type === 'bp_tier_skip_bulk') {
-    const tiers = Math.max(1, Number(rewardDef.tiers) || Number(rewardDef.quantity) || 1);
-    const { applyBattlePassTierSkip } = require('./battlePassSkipService');
-    const skipResult = await applyBattlePassTierSkip(user, tiers, {
-      idempotencyKey: `bp_skip_bulk:${user._id}:${spinId}`,
-      source: rewardDef.id || 'mythic_bp_skip_20',
-    });
-    granted.tierSkipsGranted = skipResult.tiersApplied || 0;
-    granted.battlePassSkip = skipResult;
-    if (skipResult.converted) {
-      granted.savvyGranted = skipResult.savvyGranted || 0;
-      granted.label = 'Battle Pass Complete — +2,000 Savvy';
-      granted.convertedFromBpSkip = true;
-    }
-  } else if (rewardDef.type === 'login_streak_advance') {
-    const advanceDays = Math.max(1, Number(rewardDef.days) || 1);
-    const { advanceLoginStreakProgress } = require('./dailyStreakService');
-    const advance = await advanceLoginStreakProgress(user, advanceDays, {
-      idempotencyKey: `login_skip:${user._id}:${spinId}`,
-      source: rewardDef.id || 'login_streak_skip',
-    });
-    granted.loginStreakAdvance = advance;
-    granted.daysAdvanced = advanceDays;
-    if (advance.savvyGranted) {
-      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + advance.savvyGranted;
-    }
-  } else if (rewardDef.type === 'free_perk_spin_hour') {
-    const durationMs = Number(rewardDef.durationMs) || 60 * 60 * 1000;
-    const now = Date.now();
-    const currentUntil = pm.freePerkSpinUntil
-      ? new Date(pm.freePerkSpinUntil).getTime()
-      : 0;
-    const base = currentUntil > now ? currentUntil : now;
-    pm.freePerkSpinUntil = new Date(base + durationMs);
-    granted.freePerkSpinUntil = pm.freePerkSpinUntil;
-    granted.freePerkSpinHour = true;
-  } else if (rewardDef.type === 'egg_haul') {
-    const { grantEggHaul } = require('./eggHaulService');
-    const haul = await grantEggHaul(user, `egg_haul:${user._id}:${spinId}`);
-    granted.eggHaul = haul;
-    granted.totalEggsGranted = haul.totalEggs || 0;
-  } else if (rewardDef.type === 'easter_challenge_activator') {
-    const { activateEasterChallenge } = require('./easterChallengeService');
-    const challengeId = rewardDef.challengeId || 'wave3_placeholder';
-    const activation = await activateEasterChallenge(user, challengeId, {
-      idempotencyKey: `easter_activate:${user._id}:${spinId}`,
-      adminBypass: Boolean(rewardDef.adminBypass),
-    });
-    granted.easterChallenge = activation;
-    if (activation.fallbackRequired && activation.slotOccupied) {
-      const { grantSavvyReward } = require('./savvyRewardService');
-      const { REWARD_CLASS } = require('../config/savvyRewardPolicy');
-      const fallback = await grantSavvyReward(user, {
-        rewardType: 'easter_challenge',
-        amount: 5000,
-        baseAmount: 5000,
-        idempotencyKey: `easter_fallback:${user._id}:${spinId}`,
-        note: 'Easter challenge slot occupied — Savvy fallback',
-        meta: {
-          rewardClass: REWARD_CLASS.FIXED,
-          multiplierEligible: false,
-          fallbackReason: 'slot_occupied',
-          activeChallengeId: activation.activeChallengeId,
-        },
-      });
-      granted.easterChallengeFallback = true;
-      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + (fallback.amount || 0);
-      granted.label = 'Challenge Slot Occupied — +5,000 Savvy';
-    }
-  } else if (rewardDef.type === 'supply_drop') {
-    const drop = await createSupplyDrop({
-      scope: 'user',
-      userId: user._id,
-      source: 'perk_machine',
-    });
-    granted.supplyDropId = drop.dropId;
-    granted.supplyDrop = drop;
-    granted.supplyDropLabel = drop.rewardLabel || rewardDef.label;
+  const handler = resolveGrantHandler(rewardDef.type);
+  try {
+    validateRewardBeforeGrant(rewardDef);
+    const grantResult = await executePerkMachineRewardGrant(user, rewardDef, spinId, pm);
+    granted = { ...granted, ...grantResult };
+  } catch (err) {
+    throw enrichGrantError(err, rewardDef, handler);
   }
 
   user.markModified('perkMachine');
@@ -1042,7 +806,11 @@ async function spinPerkMachine(user, options = {}) {
           await trace.runStage(
             `REWARD_GRANT_${grantIndex}`,
             () => applyReward(user, pick, `${spinId}:${grantIndex}`),
-            { rewardId: pick.id, type: pick.type, slot: grantIndex }
+            {
+              ...sanitizeRewardForGrantLog(pick),
+              slot: grantIndex,
+              handler: resolveGrantHandler(pick.type),
+            }
           )
         );
         grantIndex += 1;
@@ -1055,10 +823,16 @@ async function spinPerkMachine(user, options = {}) {
         scaled = nukeApplied.reward;
         totalNukeBonusSavvy += nukeApplied.nukeBonusSavvy || 0;
       }
+      const grantLogPayload = {
+        ...sanitizeRewardForGrantLog(scaled),
+        slot: grantIndex,
+        handler: resolveGrantHandler(scaled.type),
+      };
+      validateRewardBeforeGrant(scaled);
       const granted = await trace.runStage(
         `REWARD_GRANT_${grantIndex}`,
         () => applyReward(user, scaled, `${spinId}:${grantIndex}`),
-        { rewardId: scaled.id, type: scaled.type, slot: grantIndex }
+        grantLogPayload
       );
       if (scaled.nukeBonusSavvy) granted.nukeBonusSavvy = scaled.nukeBonusSavvy;
       if (scaled.nukeMultiplier) granted.nukeMultiplier = scaled.nukeMultiplier;

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { SUPPLY_DROP_SOURCES } = require('../config/perkMachineSources');
 
 const supplyDropSchema = new mongoose.Schema(
   {
@@ -7,7 +8,7 @@ const supplyDropSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     source: {
       type: String,
-      enum: ['admin', 'scoutSupport', 'scheduler', 'push', 'test', 'perk_machine'],
+      enum: SUPPLY_DROP_SOURCES,
       default: 'admin',
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
