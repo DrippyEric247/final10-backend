@@ -268,16 +268,15 @@ export function evaluateListingTrust(
   return evaluateTrustScore({ ...base, ...patch });
 }
 
-export function getTrustSummary(_listing: TrustScoreInput, trustResult: TrustScoreResult): string {
-  if (trustResult.sellerTrustBand === 'elite' || trustResult.sellerTrustBand === 'high') {
-    return trustResult.sellerTrustReasons[0] || trustResult.trustReasons[0] || 'Trusted seller profile.';
-  }
-  if (trustResult.dealWarningHeadline) return trustResult.dealWarningHeadline;
-  if (trustResult.savvyWarningHeadline) return trustResult.savvyWarningHeadline;
-  if (trustResult.trustLevel === 'medium') {
-    return trustResult.trustWarnings[0] || 'Mixed signals — review listing details.';
-  }
-  return trustResult.trustWarnings[0] || 'Proceed with extra verification.';
+export function getTrustSummary(
+  listing: TrustScoreInput | Record<string, unknown>,
+  trustResult: TrustScoreResult
+): string {
+  // Lazy require avoids circular dependency with sellerTrustEvidence → trustScoreEngine.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { buildSellerTrustEvidence } = require('./sellerTrustEvidence') as typeof import('./sellerTrustEvidence');
+  const evidence = buildSellerTrustEvidence(listing as Record<string, unknown>, trustResult);
+  return evidence.final10Note;
 }
 
 function bestMoveLabel(bestMove: BestMoveResult['bestMove']): string {

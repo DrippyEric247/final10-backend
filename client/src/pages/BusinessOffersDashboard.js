@@ -281,8 +281,13 @@ export default function BusinessOffersDashboard() {
                   </span>
                 </div>
                 <div>
-                  Trust:{" "}
-                  <span className="text-cyan-200 font-bold">{bundle.avgTrustScore}%</span> · Savvy pts ~{" "}
+                  Seller feedback:{" "}
+                  <span className="text-cyan-200 font-bold">
+                    {bundle.avgPositiveFeedbackPercent != null
+                      ? `${bundle.avgPositiveFeedbackPercent}% avg positive`
+                      : "Varies by seller"}
+                  </span>{" "}
+                  · Savvy pts ~{" "}
                   <span className="text-amber-200 font-bold">{projectedPoints}</span>
                 </div>
               </div>

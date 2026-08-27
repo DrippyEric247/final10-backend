@@ -139,3 +139,132 @@
   font-size: 0.68rem;
   color: rgba(148, 163, 184, 0.8);
 }
+
+.seller-trust-evidence__section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.seller-trust-evidence__rating-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.seller-trust-evidence__rating-primary {
+  font-weight: 700;
+  color: #f1f5f9;
+  font-size: 0.88rem;
+}
+
+.seller-trust-evidence__rating-count {
+  font-size: 0.75rem;
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.seller-trust-evidence__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.35rem 0;
+}
+
+.seller-trust-evidence__badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #c7d2fe;
+  cursor: help;
+}
+
+.seller-trust-evidence--risk-limited-evidence .seller-trust-evidence__badge,
+.seller-trust-evidence--limited_history .seller-trust-evidence__badge {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+}
+
+.seller-trust-evidence__risk {
+  margin: 0.25rem 0 0.35rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.seller-trust-evidence--risk-low-risk .seller-trust-evidence__risk {
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.seller-trust-evidence--risk-limited-evidence .seller-trust-evidence__risk,
+.seller-trust-evidence--risk-moderate-risk .seller-trust-evidence__risk {
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.seller-trust-evidence--risk-high-risk .seller-trust-evidence__risk {
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.seller-trust-evidence__risk-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.seller-trust-evidence__risk-reasons {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.72rem;
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.seller-trust-evidence__why-toggle {
+  margin-top: 0.3rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(125, 211, 252, 0.95);
+  font-size: 0.68rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.seller-trust-evidence__why-body {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  color: rgba(203, 213, 225, 0.92);
+  line-height: 1.4;
+}
+
+.seller-trust-evidence__remarks-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.seller-trust-evidence__remarks-list li {
+  margin-bottom: 0.35rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -54,13 +54,24 @@ function normalizeDealEmailData(input = {}) {
 
   const progressPercent = Math.max(0, Math.min(100, pickNumber(input.progressPercent, 0) || 0));
   const trustScore = pickNumber(input.trustScore);
+  const sellerFeedbackPercent = pickNumber(input.sellerFeedbackPercent);
+  const sellerFeedbackCount = pickNumber(input.sellerFeedbackCount);
   const rankedAbove = pickNumber(input.rankedAbovePercent);
   const savingsPercent = pickNumber(input.savingsPercent);
+
+  const sellerFeedbackLine =
+    sellerFeedbackPercent != null
+      ? `${sellerFeedbackPercent % 1 === 0 ? Math.round(sellerFeedbackPercent) : sellerFeedbackPercent.toFixed(1)}% Positive${
+          sellerFeedbackCount != null ? ` (${sellerFeedbackCount.toLocaleString('en-US')} ratings)` : ''
+        }`
+      : '—';
 
   const whyPicked = Array.isArray(input.whyPickedReasons)
     ? input.whyPickedReasons.filter(Boolean).slice(0, 6)
     : buildDefaultWhyPicked({
         trustScore,
+        sellerFeedbackPercent,
+        sellerFeedbackCount,
         rankedAbove,
         savingsPercent,
         shippingStatus: input.shippingStatus,
@@ -89,6 +100,7 @@ function normalizeDealEmailData(input = {}) {
     originalPrice: formatMoney(input.originalPrice, ''),
     savingsAmount: formatMoney(input.savingsAmount, ''),
     savingsPercent: savingsPercent != null ? formatPercent(savingsPercent) : '—',
+    sellerFeedbackLine,
     trustScore: trustScore != null ? `${Math.round(trustScore)}/100` : '—',
     rankedAbovePercent:
       rankedAbove != null ? `${Math.round(rankedAbove)}%` : '—',
@@ -119,12 +131,36 @@ function normalizeDealEmailData(input = {}) {
   };
 }
 
-function buildDefaultWhyPicked({ trustScore, rankedAbove, savingsPercent, shippingStatus, savingsAmount }) {
+function buildDefaultWhyPicked({
+  trustScore,
+  sellerFeedbackPercent,
+  sellerFeedbackCount,
+  rankedAbove,
+  savingsPercent,
+  shippingStatus,
+  savingsAmount,
+}) {
   const rows = [];
-  if (trustScore != null && trustScore >= 70) {
-    rows.push(`Verified seller with a ${Math.round(trustScore)}/100 trust score`);
+  if (sellerFeedbackPercent != null && sellerFeedbackCount != null) {
+    const pct =
+      sellerFeedbackPercent % 1 === 0
+        ? Math.round(sellerFeedbackPercent)
+        : sellerFeedbackPercent.toFixed(1);
+    if (sellerFeedbackCount >= 100 && sellerFeedbackPercent >= 98) {
+      rows.push(
+        `Seller has ${pct}% positive feedback across ${sellerFeedbackCount.toLocaleString('en-US')} ratings`
+      );
+    } else if (sellerFeedbackCount < 20 && sellerFeedbackPercent >= 95) {
+      rows.push(
+        `Seller has ${pct}% positive feedback, but only ${sellerFeedbackCount} rating${sellerFeedbackCount === 1 ? '' : 's'} — limited history`
+      );
+    } else {
+      rows.push(`Seller feedback: ${pct}% positive (${sellerFeedbackCount.toLocaleString('en-US')} ratings)`);
+    }
+  } else if (trustScore != null && trustScore >= 70) {
+    rows.push('Seller signals look solid — review marketplace feedback on the listing');
   } else if (trustScore != null) {
-    rows.push(`Trust score ${Math.round(trustScore)}/100 — review seller details before buying`);
+    rows.push('Review seller marketplace feedback before buying');
   }
   if (rankedAbove != null && rankedAbove >= 50) {
     rows.push(`Ranked above ${Math.round(rankedAbove)}% of similar listings`);
@@ -302,8 +338,8 @@ function buildSavvyScoutDealFoundHtml(raw = {}) {
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td width="33%" align="center" style="padding:8px 4px;background:${COLORS.card};border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};">
-                          <div style="font-size:16px;font-weight:bold;color:${COLORS.text};">${escapeHtml(d.trustScore)}</div>
-                          Trust Score
+                          <div style="font-size:13px;font-weight:bold;color:${COLORS.text};line-height:1.3;">${escapeHtml(d.sellerFeedbackLine)}</div>
+                          Seller Feedback
                         </td>
                         <td width="33%" align="center" style="padding:8px 4px;background:${COLORS.card};border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${COLORS.muted};">
                           <div style="font-size:16px;font-weight:bold;color:${COLORS.text};">${escapeHtml(d.rankedAbovePercent)}</div>
@@ -511,7 +547,7 @@ function buildSavvyScoutDealFoundText(raw = {}) {
     d.productTitle,
     `Price: ${d.currentPrice}${d.originalPrice !== '—' ? ` (was ${d.originalPrice})` : ''}`,
     `Savings: ${d.savingsAmount} (${d.savingsPercent} OFF)`,
-    `Trust Score: ${d.trustScore}`,
+    `Seller feedback: ${d.sellerFeedbackLine}`,
     `Ranked Above: ${d.rankedAbovePercent} of similar listings`,
     `Shipping: ${d.shippingStatus}`,
     '',

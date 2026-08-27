@@ -1,100 +1,95 @@
-import { buildSellerTrustEvidence } from './sellerTrustEvidence';
+import {
+  buildSellerTrustEvidence,
+  formatMarketplaceRatingDisplay,
+  sellerTrustEvidenceSummary,
+} from './sellerTrustEvidence';
 import { evaluateTrustScore } from './trustScoreEngine';
 
-describe('sellerTrustEvidence', () => {
-  test('A — 100% positive, 5000 feedback → strong evidence, no mystery score in payload', () => {
+describe('sellerTrustEvidence — marketplace-grounded trust', () => {
+  test('A — 100% positive, 3 ratings → NEW SELLER + LIMITED EVIDENCE', () => {
     const listing = {
-      seller: 'power_seller',
-      sellerFeedbackPercent: 100,
-      sellerFeedbackCount: 5000,
-      sellerAccountAgeDays: 2000,
-    };
-    const trust = evaluateTrustScore(listing);
-    const evidence = buildSellerTrustEvidence(listing, trust);
-
-    expect(evidence.positiveFeedbackPercent).toBe(100);
-    expect(evidence.feedbackCount).toBe(5000);
-    expect(evidence.evidenceState).toBe('GOOD');
-    expect(evidence.final10Note).toMatch(/No major seller concerns/i);
-    expect(evidence.internalTrustScore).toBeGreaterThan(36);
-  });
-
-  test('B — 100% positive, 3 feedback → limited history explained', () => {
-    const listing = {
-      seller: 'new_seller',
+      seller: 'new_shop',
       sellerFeedbackPercent: 100,
       sellerFeedbackCount: 3,
-      sellerAccountAgeDays: 30,
-    };
-    const trust = evaluateTrustScore(listing);
-    const evidence = buildSellerTrustEvidence(listing, trust);
-
-    expect(evidence.positiveFeedbackPercent).toBe(100);
-    expect(evidence.feedbackCount).toBe(3);
-    expect(evidence.evidenceState).toBe('LIMITED_HISTORY');
-    expect(evidence.final10Note).toMatch(/limited/i);
-  });
-
-  test('C — 97% positive, large volume → actual percent + concern note', () => {
-    const listing = {
-      seller: 'big_seller',
-      sellerFeedbackPercent: 97,
-      sellerFeedbackCount: 10000,
     };
     const evidence = buildSellerTrustEvidence(listing, evaluateTrustScore(listing));
 
-    expect(evidence.positiveFeedbackPercent).toBe(97);
-    expect(evidence.evidenceState).toBe('CHECK_DETAILS');
-    expect(evidence.sellerConcerns.some((c) => /negative feedback/i.test(c))).toBe(true);
+    expect(evidence.marketplaceRating.display).toBe('100% Positive Feedback');
+    expect(evidence.feedbackCount).toBe(3);
+    expect(evidence.final10Remarks.some((r) => r.code === 'NEW_SELLER')).toBe(true);
+    expect(evidence.riskLevel).toBe('limited_evidence');
+    expect(evidence.positiveFeedbackPercent).toBe(100);
+    expect(formatMarketplaceRatingDisplay(100)).toBe('100% Positive Feedback');
   });
 
-  test('D — missing feedback → unavailable, no fabricated score shown to UI layer', () => {
+  test('B — 100% positive, 250 ratings → strong evidence, not auto-risky', () => {
+    const listing = {
+      seller: 'solid_seller',
+      sellerFeedbackPercent: 100,
+      sellerFeedbackCount: 250,
+    };
+    const evidence = buildSellerTrustEvidence(listing, evaluateTrustScore(listing));
+
+    expect(evidence.marketplaceRating.display).toBe('100% Positive Feedback');
+    expect(evidence.riskLevel).not.toBe('high_risk');
+    expect(evidence.final10Remarks.some((r) => r.code === 'NEW_SELLER')).toBe(false);
+  });
+
+  test('C — 99.9% positive, 15000 ratings, Top Rated → ESTABLISHED + TOP RATED', () => {
+    const listing = {
+      seller: 'power_seller',
+      sellerFeedbackPercent: 99.9,
+      sellerFeedbackCount: 15000,
+      sellerTopRated: true,
+    };
+    const evidence = buildSellerTrustEvidence(listing, evaluateTrustScore(listing));
+
+    expect(evidence.marketplaceRating.display).toBe('99.9% Positive Feedback');
+    expect(evidence.final10Remarks.some((r) => r.code === 'ESTABLISHED_SELLER')).toBe(true);
+    expect(evidence.final10Remarks.some((r) => r.code === 'TOP_RATED_SELLER')).toBe(true);
+    expect(evidence.riskLevel).toBe('low_risk');
+  });
+
+  test('D — 94% positive, 2000 ratings → caution without invented reasons', () => {
+    const listing = {
+      seller: 'mid_seller',
+      sellerFeedbackPercent: 94,
+      sellerFeedbackCount: 2000,
+    };
+    const evidence = buildSellerTrustEvidence(listing, evaluateTrustScore(listing));
+
+    expect(evidence.marketplaceRating.display).toBe('94% Positive Feedback');
+    expect(evidence.riskLevel).toBe('moderate_risk');
+    expect(evidence.final10Remarks.some((r) => r.code === 'RECENT_NEGATIVE_FEEDBACK')).toBe(true);
+    expect(evidence.sellerConcerns.some((c) => /shipping delays|item condition/i.test(c))).toBe(false);
+  });
+
+  test('E — no marketplace reputation → unavailable, no fake 0%', () => {
     const evidence = buildSellerTrustEvidence({ seller: 'unknown' });
 
     expect(evidence.positiveFeedbackPercent).toBeNull();
+    expect(evidence.marketplaceRating.display).toBeNull();
     expect(evidence.evidenceState).toBe('SELLER_DATA_UNAVAILABLE');
-    expect(evidence.final10Note).toMatch(/don't have enough seller information/i);
+    expect(sellerTrustEvidenceSummary(evidence)).toBe('Seller reputation unavailable');
+    expect(sellerTrustEvidenceSummary(evidence)).not.toMatch(/0%/);
   });
 
-  test('E — excellent seller + suspicious listing → separate listing concern', () => {
+  test('F — 100% positive, 5 ratings, no returns → NEW SELLER + NO RETURNS', () => {
     const listing = {
-      seller: 'top_seller',
+      seller: 'fresh_seller',
       sellerFeedbackPercent: 100,
-      sellerFeedbackCount: 2100,
-      marketValue: 500,
-      price: 50,
-      title: 'Test item',
+      sellerFeedbackCount: 5,
+      sellerReturnsAccepted: false,
     };
-    const trust = evaluateTrustScore(listing);
-    const evidence = buildSellerTrustEvidence(listing, trust);
+    const evidence = buildSellerTrustEvidence(listing, evaluateTrustScore(listing));
 
-    expect(evidence.positiveFeedbackPercent).toBe(100);
-    expect(evidence.listingConcerns.length).toBeGreaterThan(0);
-    expect(evidence.evidenceState).toBe('GOOD');
+    expect(evidence.marketplaceRating.display).toBe('100% Positive Feedback');
+    expect(evidence.final10Remarks.some((r) => r.code === 'NEW_SELLER')).toBe(true);
+    expect(evidence.final10Remarks.some((r) => r.code === 'NO_RETURNS')).toBe(true);
+    expect(evidence.returnsAccepted).toBe(false);
   });
 
-  test('F — weak seller evidence + normal listing → seller concern, no invented listing concern', () => {
-    const listing = {
-      seller: 'risky_seller',
-      sellerFeedbackPercent: 88,
-      sellerFeedbackCount: 12,
-      marketValue: 200,
-      price: 200,
-      buyNowPrice: 200,
-      title: 'Normal listing with full details',
-      imageUrl: 'https://example.com/item.jpg',
-      condition: 'Used',
-    };
-    const trust = evaluateTrustScore(listing);
-    const evidence = buildSellerTrustEvidence(listing, trust);
-
-    expect(evidence.positiveFeedbackPercent).toBe(88);
-    expect(evidence.sellerConcerns.length).toBeGreaterThan(0);
-    expect(evidence.listingConcerns.length).toBe(0);
-    expect(evidence.evidenceState).toBe('CONCERN_DETECTED');
-  });
-
-  test('G — contradictory case: internal score ~36 while eBay shows 100%', () => {
+  test('G — internal score ~36 while eBay shows 100% — UI uses marketplace only', () => {
     const listing = {
       seller: 'named_seller',
       sellerFeedbackPercent: 100,
@@ -106,9 +101,12 @@ describe('sellerTrustEvidence', () => {
 
     expect(trust.sellerTrustScore).toBeGreaterThanOrEqual(36);
     expect(trust.sellerTrustScore).toBeLessThanOrEqual(40);
-    expect(evidence.positiveFeedbackPercent).toBe(100);
-    expect(evidence.feedbackCount).toBe(5);
-    expect(evidence.evidenceState).toBe('LIMITED_HISTORY');
-    expect(evidence.final10Note).toMatch(/limited/i);
+    expect(evidence.marketplaceRating.display).toBe('100% Positive Feedback');
+    expect(sellerTrustEvidenceSummary(evidence)).toContain('100% Positive Feedback');
+    expect(sellerTrustEvidenceSummary(evidence)).not.toMatch(/Trust Score|36%/);
+  });
+
+  test('98.7% displays exactly as marketplace value', () => {
+    expect(formatMarketplaceRatingDisplay(98.7)).toBe('98.7% Positive Feedback');
   });
 });

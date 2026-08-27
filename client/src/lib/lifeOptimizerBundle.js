@@ -417,6 +417,8 @@ function computeBundleSummary(rows) {
   let marketTotal = 0;
   let savings = 0;
   let trustSum = 0;
+  let feedbackPctSum = 0;
+  let feedbackPctCount = 0;
 
   for (const row of picks) {
     const p = Number(row.pick.price) || 0;
@@ -426,9 +428,21 @@ function computeBundleSummary(rows) {
     marketTotal += market > 0 ? market : p;
     savings += Math.max(0, market - p);
     trustSum += Number(row.pick.trustScore) || 0;
+    const rawPct =
+      row.pick.sellerFeedbackPercent ??
+      row.pick.seller?.feedbackPercentage ??
+      row.pick._raw?.sellerFeedbackPercent;
+    const pct = rawPct != null ? Number(String(rawPct).replace(/%/g, "")) : NaN;
+    if (Number.isFinite(pct)) {
+      feedbackPctSum += pct;
+      feedbackPctCount += 1;
+    }
   }
 
   const avgTrust = picks.length ? Math.round(trustSum / picks.length) : 0;
+  const avgPositiveFeedbackPercent = feedbackPctCount
+    ? Math.round((feedbackPctSum / feedbackPctCount) * 10) / 10
+    : null;
   const savvyPointsEstimate = 120 + picks.length * 48 + Math.round(savings * 0.15);
 
   return {
@@ -437,6 +451,7 @@ function computeBundleSummary(rows) {
     estimatedMarket: marketTotal,
     estimatedSavings: savings,
     avgTrustScore: avgTrust,
+    avgPositiveFeedbackPercent,
     savvyPointsEstimate,
   };
 }
