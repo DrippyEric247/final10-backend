@@ -23,7 +23,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const SupplyDrop = require('../models/SupplyDrop');
 const { spinPerkMachine, getPerkMachineStatus } = require('../services/perkMachineService');
-const { SPIN_MODES } = require('../config/perkMachineRewards');
+const { SPIN_MODES, REWARD_POOL, validateSpinRewardConfig } = require('../config/perkMachineRewards');
 const { applySpinHeatToBaseCost } = require('../config/spinHeatConfig');
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -32,6 +32,26 @@ const describeReal = MONGODB_URI ? describe : describe.skip;
 describe('perkMachine spin — unit', () => {
   test('3-slot base price at 1x heat is 60 Savvy', () => {
     expect(applySpinHeatToBaseCost(60, 1)).toBe(60);
+  });
+
+  test('validateSpinRewardConfig accepts every spin pool reward', () => {
+    for (const reward of REWARD_POOL) {
+      const result = validateSpinRewardConfig(reward);
+      expect(result.valid).toBe(true);
+    }
+  });
+
+  test('validateSpinRewardConfig rejects supply_drop when enum missing perk_machine', () => {
+    jest.resetModules();
+    jest.doMock('../models/SupplyDrop', () => ({
+      schema: { path: () => ({ enumValues: ['admin', 'test'] }) },
+    }));
+    const { validateSpinRewardConfig: validate } = require('../config/perkMachineRewards');
+    const result = validate({ id: 'supply_drop', type: 'supply_drop' });
+    expect(result.valid).toBe(false);
+    expect(result.code).toBe('REWARD_CONFIG_UNAVAILABLE');
+    jest.dontMock('../models/SupplyDrop');
+    jest.resetModules();
   });
 
   test('invalid mode returns INVALID_MODE', async () => {
@@ -139,6 +159,96 @@ describeReal('perkMachine spin — Mongo integration', () => {
       const reloaded = await User.findById(user._id);
       expect(reloaded.perkMachine.spinHeatTierIndex).toBe(1);
     } finally {
+      await User.deleteOne({ _id: user._id });
+    }
+  });
+
+  test('free daily spin completes at 0 Savvy without advancing heat', async () => {
+    const user = await User.create({
+      username: `pm_free_${Date.now()}`,
+      email: `pm_free_${Date.now()}@test.local`,
+      password: 'testpass123',
+      savvyPoints: 100,
+      perkMachine: { spinHeatTierIndex: 2 },
+    });
+
+    try {
+      const before = Number(user.savvyPoints);
+      const result = await spinPerkMachine(user, { mode: SPIN_MODES.FREE });
+      expect(result.savvyCost).toBe(0);
+      expect(result.slots).toBe(1);
+
+      const after = await User.findById(user._id);
+      expect(Number(after.savvyPoints)).toBe(before + (result.savvyWon || 0));
+      expect(after.perkMachine.spinHeatTierIndex).toBe(2);
+    } finally {
+      await User.deleteOne({ _id: user._id });
+    }
+  });
+
+  test('each spin pool reward type completes with admin bypass', async () => {
+    const user = await User.create({
+      username: `pm_all_${Date.now()}`,
+      email: `pm_all_${Date.now()}@test.local`,
+      password: 'testpass123',
+      savvyPoints: 500000,
+      perkMachine: { spinHeatTierIndex: 0, lastFreeSpinDay: '1999-01-01' },
+    });
+
+    try {
+      for (const reward of REWARD_POOL) {
+        const reloaded = await User.findById(user._id);
+        reloaded.perkMachine.lastSpinAt = null;
+        reloaded.markModified('perkMachine');
+        await reloaded.save();
+
+        const before = Number(reloaded.savvyPoints);
+        const result = await spinPerkMachine(reloaded, {
+          mode: SPIN_MODES.PAID_1,
+          forceRewardId: reward.id,
+          adminBypassCost: true,
+        });
+        expect(result.rewards.length).toBeGreaterThan(0);
+        expect(result.savvyBalance).toBe(before + (result.savvyWon || 0));
+      }
+    } finally {
+      await SupplyDrop.deleteMany({ userId: user._id });
+      await User.deleteOne({ _id: user._id });
+    }
+  });
+
+  test('failed spin after savvy spend refunds balance', async () => {
+    const SupplyDropModel = require('../models/SupplyDrop');
+    const originalPath = SupplyDropModel.schema.path('source');
+    const originalEnum = [...(originalPath.enumValues || [])];
+
+    SupplyDropModel.schema.path('source', {
+      ...originalPath.options,
+      enum: originalEnum.filter((v) => v !== 'perk_machine'),
+    });
+
+    const user = await User.create({
+      username: `pm_refund_${Date.now()}`,
+      email: `pm_refund_${Date.now()}@test.local`,
+      password: 'testpass123',
+      savvyPoints: 500,
+      perkMachine: { spinHeatTierIndex: 0, lastFreeSpinDay: '1999-01-01', lastSpinAt: null },
+    });
+
+    try {
+      const before = Number(user.savvyPoints);
+      await expect(
+        spinPerkMachine(user, { mode: SPIN_MODES.PAID_1, forceRewardId: 'supply_drop' })
+      ).rejects.toMatchObject({ code: 'REWARD_CONFIG_UNAVAILABLE', status: 500 });
+
+      const after = await User.findById(user._id);
+      expect(Number(after.savvyPoints)).toBe(before);
+      expect(after.perkMachine.spinHeatTierIndex).toBe(0);
+    } finally {
+      SupplyDropModel.schema.path('source', {
+        ...originalPath.options,
+        enum: originalEnum,
+      });
       await User.deleteOne({ _id: user._id });
     }
   });

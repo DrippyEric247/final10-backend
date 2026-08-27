@@ -17,6 +17,7 @@ const FIXED_SOURCES = new Set([
   'perk_machine',
   'perk_machine_calling_card_duplicate',
   'perk_machine_hatch',
+  'perk_machine_refund',
   'admin_perk_machine_grant',
   // Feature voting / community
   'feature_vote_reward',

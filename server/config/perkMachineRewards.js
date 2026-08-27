@@ -311,6 +311,152 @@ function getRewardIndex() {
   return REWARD_INDEX.map((entry) => ({ ...entry }));
 }
 
+const VALID_EGG_TIERS = new Set([
+  'common',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+  'extraFreeSpin',
+]);
+
+const VALID_TOKEN_KEYS = new Set([
+  'battlePassXp15',
+  'savvyLevelXp15',
+  'savvyMultiplier15',
+  'paid3Spin',
+  'paid2Spin',
+  'maxSupplyDrop',
+  'battlePassTierSkip',
+]);
+
+const KNOWN_SPIN_REWARD_TYPES = new Set([
+  'savvy',
+  'egg',
+  'token',
+  'streak_shield',
+  'calling_card',
+  'multiplier_2x',
+  'scout_flight_ticket',
+  'supply_drop',
+  'scout_upgrade',
+  'guaranteed_multiplier',
+  'permanent_multiplier',
+  'timed_savvy_multiplier',
+  'timed_event_token',
+  'faster_alert_perk',
+  'supply_drop_token',
+  'supply_drop_double',
+  'spin_token_2slot',
+  'bp_tier_skip',
+  'bp_tier_skip_bulk',
+  'login_streak_advance',
+  'free_perk_spin_hour',
+  'egg_haul',
+  'easter_challenge_activator',
+]);
+
+function getSupplyDropSourceEnumValues() {
+  try {
+    const SupplyDrop = require('../models/SupplyDrop');
+    const path = SupplyDrop.schema.path('source');
+    return path?.enumValues || path?.options?.enum || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Validate a reward definition before granting or charging Savvy.
+ * Rejects misconfigured rewards instead of crashing mid-transaction.
+ */
+function validateSpinRewardConfig(rewardDef) {
+  if (!rewardDef || typeof rewardDef !== 'object') {
+    return {
+      valid: false,
+      code: 'INVALID_REWARD_CONFIG',
+      message: 'Reward definition missing',
+      rewardId: null,
+    };
+  }
+
+  const rewardId = rewardDef.id || null;
+  if (!rewardId || !rewardDef.type) {
+    return {
+      valid: false,
+      code: 'INVALID_REWARD_CONFIG',
+      message: 'Reward missing id or type',
+      rewardId,
+    };
+  }
+
+  if (!KNOWN_SPIN_REWARD_TYPES.has(rewardDef.type)) {
+    return {
+      valid: false,
+      code: 'INVALID_REWARD_CONFIG',
+      message: `Unknown reward type: ${rewardDef.type}`,
+      rewardId,
+    };
+  }
+
+  if (rewardDef.type === 'savvy') {
+    const amount = Number(rewardDef.amount ?? rewardDef.baseAmount);
+    if (!(amount > 0)) {
+      return {
+        valid: false,
+        code: 'INVALID_REWARD_CONFIG',
+        message: `Savvy reward ${rewardId} has invalid amount`,
+        rewardId,
+      };
+    }
+  }
+
+  if (rewardDef.type === 'egg' && !VALID_EGG_TIERS.has(rewardDef.eggTier)) {
+    return {
+      valid: false,
+      code: 'INVALID_REWARD_CONFIG',
+      message: `Egg reward ${rewardId} has invalid tier`,
+      rewardId,
+    };
+  }
+
+  if (rewardDef.type === 'token' && !VALID_TOKEN_KEYS.has(rewardDef.tokenKey)) {
+    return {
+      valid: false,
+      code: 'INVALID_REWARD_CONFIG',
+      message: `Token reward ${rewardId} has invalid tokenKey`,
+      rewardId,
+    };
+  }
+
+  if (rewardDef.type === 'supply_drop') {
+    const sources = getSupplyDropSourceEnumValues();
+    if (!sources.includes('perk_machine')) {
+      return {
+        valid: false,
+        code: 'REWARD_CONFIG_UNAVAILABLE',
+        message:
+          'Supply Drop reward is unavailable — deploy SupplyDrop source enum perk_machine',
+        rewardId,
+      };
+    }
+  }
+
+  if (rewardDef.type === 'calling_card') {
+    const { PERK_CALLING_CARDS } = require('./perkCallingCards');
+    if (!Array.isArray(PERK_CALLING_CARDS) || PERK_CALLING_CARDS.length === 0) {
+      return {
+        valid: false,
+        code: 'REWARD_CONFIG_UNAVAILABLE',
+        message: 'Calling card reward pool is empty',
+        rewardId,
+      };
+    }
+  }
+
+  return { valid: true, rewardId };
+}
+
 const HATCH_COOLDOWN_MS = 800;
 
 module.exports = {
@@ -332,4 +478,6 @@ module.exports = {
   pickResultMessage,
   emptyEggInventory,
   getRewardIndex,
+  validateSpinRewardConfig,
+  getSupplyDropSourceEnumValues,
 };
