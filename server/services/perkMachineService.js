@@ -60,7 +60,7 @@ const {
   formatSpinHeatForClient,
   advanceSpinHeat,
 } = require('./spinHeatService');
-const { applySpinHeatToBaseCost } = require('../config/spinHeatConfig');
+const { applySpinHeatToBaseCost, SPIN_HEAT_MULTIPLIERS } = require('../config/spinHeatConfig');
 const {
   maybeExpireNukeEvent,
   captureNukeEligibility,
@@ -77,6 +77,54 @@ function sanitizePerkMachineDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function sanitizeStringIdArray(value, cap = 100) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const entry of value) {
+    if (entry == null) continue;
+    const id = String(entry).trim();
+    if (!id) continue;
+    out.push(id);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+function sanitizeTimedEventMap(events) {
+  if (!events || typeof events !== 'object' || Array.isArray(events)) return {};
+  const out = {};
+  for (const [key, raw] of Object.entries(events)) {
+    if (!raw || typeof raw !== 'object') continue;
+    out[key] = {
+      ...raw,
+      activatedAt: sanitizePerkMachineDate(raw.activatedAt),
+      expiresAt: sanitizePerkMachineDate(raw.expiresAt),
+    };
+  }
+  return out;
+}
+
+function sanitizeActiveBoostsMap(boosts) {
+  if (!boosts || typeof boosts !== 'object' || Array.isArray(boosts)) return {};
+  const out = {};
+  for (const [key, raw] of Object.entries(boosts)) {
+    if (!raw || typeof raw !== 'object') continue;
+    out[key] = {
+      ...raw,
+      activatedAt: sanitizePerkMachineDate(raw.activatedAt),
+      expiresAt: sanitizePerkMachineDate(raw.expiresAt),
+    };
+  }
+  return out;
+}
+
+function clampSpinHeatTierIndex(value) {
+  const maxIndex = SPIN_HEAT_MULTIPLIERS.length - 1;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(maxIndex, Math.max(0, Math.round(parsed)));
+}
+
 function sanitizePerkMachineDocDates(pm) {
   if (!pm || typeof pm !== 'object') return;
   pm.lastSpinAt = sanitizePerkMachineDate(pm.lastSpinAt);
@@ -85,10 +133,18 @@ function sanitizePerkMachineDocDates(pm) {
   pm.freePerkSpinUntil = sanitizePerkMachineDate(pm.freePerkSpinUntil);
   pm.lastHatchAt = sanitizePerkMachineDate(pm.lastHatchAt);
   pm.lastExchangeAt = sanitizePerkMachineDate(pm.lastExchangeAt);
+  pm.spinHeatTierIndex = clampSpinHeatTierIndex(pm.spinHeatTierIndex);
+
+  pm.personalEvents = sanitizeTimedEventMap(pm.personalEvents);
+  pm.activeBoosts = sanitizeActiveBoostsMap(pm.activeBoosts);
 
   if (pm.nuke && typeof pm.nuke === 'object') {
     pm.nuke.lastActivationAt = sanitizePerkMachineDate(pm.nuke.lastActivationAt);
     pm.nuke.lastCompletionAt = sanitizePerkMachineDate(pm.nuke.lastCompletionAt);
+    pm.nuke.lifetimeQualifyingSpins = Math.max(0, Math.round(Number(pm.nuke.lifetimeQualifyingSpins) || 0));
+    pm.nuke.nukeEventsTriggered = Math.max(0, Math.round(Number(pm.nuke.nukeEventsTriggered) || 0));
+    pm.nuke.processedSpinIds = sanitizeStringIdArray(pm.nuke.processedSpinIds);
+    pm.nuke.milestonesSeen = sanitizeStringIdArray(pm.nuke.milestonesSeen, 50);
     if (pm.nuke.activeEvent && typeof pm.nuke.activeEvent === 'object') {
       pm.nuke.activeEvent.activatedAt = sanitizePerkMachineDate(pm.nuke.activeEvent.activatedAt);
       pm.nuke.activeEvent.expiresAt = sanitizePerkMachineDate(pm.nuke.activeEvent.expiresAt);
@@ -105,8 +161,18 @@ function sanitizePerkMachineDocDates(pm) {
     });
   }
 
-  if (Array.isArray(pm.spinHistory)) {
-    pm.spinHistory = pm.spinHistory.map((entry) => {
+  if (Array.isArray(pm.eggHaulGrants)) {
+    pm.eggHaulGrants = pm.eggHaulGrants.map((entry) => {
+      if (!entry || typeof entry !== 'object') return entry;
+      return {
+        ...entry,
+        grantedAt: sanitizePerkMachineDate(entry.grantedAt) || entry.grantedAt || new Date(),
+      };
+    });
+  }
+
+  if (Array.isArray(pm.eggExchangeHistory)) {
+    pm.eggExchangeHistory = pm.eggExchangeHistory.map((entry) => {
       if (!entry || typeof entry !== 'object') return entry;
       return {
         ...entry,
@@ -114,6 +180,22 @@ function sanitizePerkMachineDocDates(pm) {
       };
     });
   }
+
+  if (!Array.isArray(pm.spinHistory)) {
+    pm.spinHistory = [];
+  }
+}
+
+/** Final normalization immediately before user.save() on spin completion. */
+function sanitizePerkMachineForPersist(user) {
+  const pm = ensurePerkMachineDoc(user);
+  if (!Array.isArray(pm.spinHistory)) pm.spinHistory = [];
+  sanitizePerkMachineDocDates(pm);
+  if (typeof pm.ticketSpinProgress !== 'number' || Number.isNaN(pm.ticketSpinProgress)) {
+    pm.ticketSpinProgress = 0;
+  }
+  user.markModified('perkMachine');
+  return pm;
 }
 
 function ensurePerkMachineDoc(user) {
@@ -142,6 +224,7 @@ function ensurePerkMachineDoc(user) {
   if (typeof pm.spinHeatTierIndex !== 'number' || Number.isNaN(pm.spinHeatTierIndex)) {
     pm.spinHeatTierIndex = 0;
   }
+  pm.spinHeatTierIndex = clampSpinHeatTierIndex(pm.spinHeatTierIndex);
   sanitizePerkMachineDocDates(pm);
   ensureNukeDoc(pm);
   return pm;
@@ -1097,7 +1180,7 @@ async function spinPerkMachine(user, options = {}) {
     });
 
     pm.lastSpinAt = new Date();
-    user.markModified('perkMachine');
+    sanitizePerkMachineForPersist(user);
     spinContext.stage = 'persist';
     await user.save();
 
