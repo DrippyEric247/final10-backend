@@ -70,6 +70,7 @@ const {
   formatNukeForClient,
   ensureNukeDoc,
 } = require('./perkMachineNukeService');
+const { createSpinTracer } = require('./perkMachineSpinTrace');
 
 function sanitizePerkMachineDate(value) {
   if (value == null || value === '') return null;
@@ -793,25 +794,39 @@ async function refundFailedSpinSavvy(user, { spinId, amount, spendSource }) {
 }
 
 async function spinPerkMachine(user, options = {}) {
+  const trace = createSpinTracer(options.spinTraceId);
+  const spinTraceId = trace.spinTraceId;
   const userId = user._id;
   const mode = String(options.mode || '').trim();
+  const isFreeSpin = mode === SPIN_MODES.FREE;
+
+  trace.log('START', { userId: String(userId), mode, isFreeSpin });
+
   const config = getSpinConfig(mode);
   if (!config) {
     const err = new Error('Invalid spin mode');
     err.status = 400;
     err.code = 'INVALID_MODE';
+    err.spinTraceId = spinTraceId;
+    trace.logError('REQUEST_PARSED', err, { mode });
     throw err;
   }
 
   let lockedUser;
   let spinContext = null;
   try {
-    lockedUser = await acquirePerkSpinLock(userId);
-    assertSpinCooldown(lockedUser, options.adminBypassCost);
+    lockedUser = await trace.runStage('LOCK_ACQUIRE', () => acquirePerkSpinLock(userId));
+    trace.runStageSync('SPIN_COOLDOWN_CHECK', () => {
+      assertSpinCooldown(lockedUser, options.adminBypassCost);
+      return {};
+    });
     user = lockedUser;
     ensurePerkMachineDoc(user);
+    trace.logOk('LEGACY_STATE_SANITIZED', {
+      spinHeatTierIndex: user.perkMachine?.spinHeatTierIndex ?? 0,
+    });
 
-    logPerkSpin('USER_LOADED', {
+    trace.logOk('USER_LOADED', {
       userId: String(userId),
       hasPerkMachine: Boolean(user.perkMachine),
       spinHeatTierIndex: user.perkMachine?.spinHeatTierIndex ?? 0,
@@ -822,8 +837,7 @@ async function spinPerkMachine(user, options = {}) {
     }
 
     const heatBeforeSpin = getSpinHeatState(user);
-    logPerkSpin('HEAT_CALCULATED', {
-      userId: String(userId),
+    trace.logOk('HEAT_STATE_READ', {
       heatMultiplier: heatBeforeSpin.multiplier,
       heatTierIndex: heatBeforeSpin.tierIndex,
     });
@@ -839,6 +853,8 @@ async function spinPerkMachine(user, options = {}) {
     let freeSpinRollback = null;
     const balanceBefore = Math.round(Number(user.savvyPoints) || 0);
     const freeSpinAvailable = canUseFreeSpin(user);
+
+    trace.logOk('BALANCE_READ', { balance: balanceBefore, isFreeSpin });
 
     const savvySale = await getActiveSavvySale();
 
@@ -858,6 +874,7 @@ async function spinPerkMachine(user, options = {}) {
           usedExtraFreeSpin &&
           eggExtraBefore > (Number(user.perkMachine?.eggInventory?.extraFreeSpin) || 0),
       };
+      trace.logOk('BALANCE_VALIDATED', { balance: balanceBefore, required: 0, isFreeSpin: true });
     } else {
       const salePricing = resolveSavvySaleSpinPricing(savvyCost, savvySale);
       originalSavvyCost = salePricing.originalCost;
@@ -916,22 +933,30 @@ async function spinPerkMachine(user, options = {}) {
           err.code = 'INSUFFICIENT_SAVVY';
           err.required = savvyCost;
           err.balance = balance;
+          err.spinTraceId = spinTraceId;
+          trace.logError('BALANCE_VALIDATED', err, { balance, required: savvyCost });
           throw err;
         }
       } else {
         savvyCost = 0;
         originalSavvyCost = 0;
       }
+      trace.logOk('BALANCE_VALIDATED', { balance, required: savvyCost, isFreeSpin: false });
     }
 
-    logPerkSpin('PRICE_CALCULATED', {
-      userId: String(userId),
-      mode,
+    trace.logOk('REQUEST_PARSED', {
+      spinType: mode,
       slotCount: config.slots,
-      basePrice: config.savvy,
+      isFreeSpin,
+      baseCost: config.savvy,
       heatMultiplier: heatBeforeSpin.multiplier,
-      effectivePrice: savvyCost,
-      freeSpinRequested: mode === SPIN_MODES.FREE,
+      effectiveCost: savvyCost,
+      effectiveCostIsNaN: Number.isNaN(Number(savvyCost)),
+    });
+    trace.logOk('HEAT_PRICE_CALCULATED', {
+      baseCost: config.savvy,
+      heatMultiplier: heatBeforeSpin.multiplier,
+      effectiveCost: savvyCost,
     });
 
     const pm = ensurePerkMachineDoc(user);
@@ -941,6 +966,7 @@ async function spinPerkMachine(user, options = {}) {
 
     spinContext = {
       stage: 'init',
+      spinTraceId,
       userId: String(userId),
       spinId,
       mode,
@@ -949,7 +975,7 @@ async function spinPerkMachine(user, options = {}) {
       heatMultiplier: heatBeforeSpin.multiplier,
       effectivePrice: savvyCost,
       balanceBefore,
-      freeSpinRequested: mode === SPIN_MODES.FREE,
+      freeSpinRequested: isFreeSpin,
       freeSpinAvailable,
       savvyCost,
       savvySpent: false,
@@ -960,22 +986,8 @@ async function spinPerkMachine(user, options = {}) {
       ...(freeSpinRollback || {}),
     };
 
-    logPerkSpin('START', {
-      userId: spinContext.userId,
-      spinId,
-      slotCount: slots,
-      basePrice: config.savvy,
-      heatMultiplier: heatBeforeSpin.multiplier,
-      effectivePrice: savvyCost,
-      balanceBefore,
-      freeSpinRequested: mode === SPIN_MODES.FREE,
-      freeSpinAvailable,
-    });
-
     const pool = buildWeightedPool(tier, options.forceRewardId || null);
-    logPerkSpin('REWARD_POOL_LOADED', {
-      userId: spinContext.userId,
-      spinId,
+    trace.logOk('REWARD_POOL_VALIDATED', {
       poolSize: pool.length,
       forcedRewardId: options.forceRewardId || null,
     });
@@ -987,23 +999,25 @@ async function spinPerkMachine(user, options = {}) {
       const picked = pickWeightedReward(slotPool);
       const validation = validateSpinRewardConfig(picked);
       if (!validation.valid) {
-        console.error('[PERK_SPIN_ERROR]', {
-          stage: 'reward_validation',
-          userId: spinContext.userId,
-          spinId,
-          slotIndex: i,
-          rewardId: validation.rewardId,
-          code: validation.code,
-          message: validation.message,
-        });
         const err = new Error(validation.message || `Invalid reward configuration for slot ${i + 1}`);
         err.status = 500;
         err.code = validation.code || 'INVALID_REWARD_CONFIG';
         err.rewardKey = validation.rewardId || picked?.id || null;
+        err.spinTraceId = spinTraceId;
+        trace.logError('REWARD_POOL_VALIDATED', err, {
+          slotIndex: i,
+          rewardId: validation.rewardId,
+          code: validation.code,
+        });
         throw err;
       }
       rawPicks.push(picked);
     }
+    trace.logOk('REWARDS_SELECTED', {
+      slotCount: slots,
+      rewardIds: rawPicks.map((r) => r.id),
+      rewardTypes: rawPicks.map((r) => r.type),
+    });
 
     const multiplierCount = countMultiplierTiles(rawPicks);
     const tileResult = computeSpinMultiplier(multiplierCount);
@@ -1021,9 +1035,16 @@ async function spinPerkMachine(user, options = {}) {
     let totalNukeBonusSavvy = 0;
 
     spinContext.stage = 'reward_generation';
+    trace.logStart('DB_TRANSACTION', { note: 'logical spin transaction — rewards then persist' });
     for (const pick of rawPicks) {
       if (pick.type === MULTIPLIER_TYPE) {
-        rewards.push(await applyReward(user, pick, `${spinId}:${grantIndex}`));
+        rewards.push(
+          await trace.runStage(
+            `REWARD_GRANT_${grantIndex}`,
+            () => applyReward(user, pick, `${spinId}:${grantIndex}`),
+            { rewardId: pick.id, type: pick.type, slot: grantIndex }
+          )
+        );
         grantIndex += 1;
         continue;
       }
@@ -1034,57 +1055,71 @@ async function spinPerkMachine(user, options = {}) {
         scaled = nukeApplied.reward;
         totalNukeBonusSavvy += nukeApplied.nukeBonusSavvy || 0;
       }
-      const granted = await applyReward(user, scaled, `${spinId}:${grantIndex}`);
+      const granted = await trace.runStage(
+        `REWARD_GRANT_${grantIndex}`,
+        () => applyReward(user, scaled, `${spinId}:${grantIndex}`),
+        { rewardId: scaled.id, type: scaled.type, slot: grantIndex }
+      );
       if (scaled.nukeBonusSavvy) granted.nukeBonusSavvy = scaled.nukeBonusSavvy;
       if (scaled.nukeMultiplier) granted.nukeMultiplier = scaled.nukeMultiplier;
       rewards.push(granted);
       grantIndex += 1;
     }
-
-    logPerkSpin('REWARDS_GENERATED', {
-      userId: spinContext.userId,
-      spinId,
-      slotCount: slots,
+    trace.logOk('REWARD_GRANT', {
+      count: rewards.length,
       rewardTypes: rewards.map((r) => r.type),
-      rewardIds: rawPicks.map((r) => r.id),
     });
 
     spinContext.stage = 'savvy_spend';
     if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
       const spendSource = savvySaleApplied ? 'perk_spin_sale_discount' : 'perk_machine_spin';
       spinContext.spendSource = spendSource;
-      const spend = await spendSavvyReward(user, {
-        amount: savvyCost,
-        source: spendSource,
-        idempotencyKey: `perk_spin_spend:${spinId}`,
-        note: savvySaleApplied
-          ? `Perk Machine spin (${mode}) — Savvy Sale ${savvySaleSavings} off`
-          : `Perk Machine spin (${mode})`,
-        meta: {
-          mode,
-          spinId,
-          savvySaleApplied,
-          savvySaleEventId: savvySale?.eventId || null,
-          originalSavvyCost,
-          savvySaleSavings,
-          actualCostCharged: savvyCost,
-          spinHeatMultiplier: heatBeforeSpin.multiplier,
-        },
-      });
+      const spend = await trace.runStage(
+        'WALLET_DEBIT',
+        () =>
+          spendSavvyReward(user, {
+            amount: savvyCost,
+            source: spendSource,
+            idempotencyKey: `perk_spin_spend:${spinId}`,
+            note: savvySaleApplied
+              ? `Perk Machine spin (${mode}) — Savvy Sale ${savvySaleSavings} off`
+              : `Perk Machine spin (${mode})`,
+            meta: {
+              mode,
+              spinId,
+              spinTraceId,
+              savvySaleApplied,
+              savvySaleEventId: savvySale?.eventId || null,
+              originalSavvyCost,
+              savvySaleSavings,
+              actualCostCharged: savvyCost,
+              spinHeatMultiplier: heatBeforeSpin.multiplier,
+            },
+          }),
+        { amount: savvyCost, source: spendSource, isFreeSpin: false }
+      );
       if (!spend.spent && !spend.duplicate) {
         const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
         err.status = 402;
         err.code = 'INSUFFICIENT_SAVVY';
         err.required = savvyCost;
         err.balance = Math.round(Number(user.savvyPoints) || 0);
+        err.spinTraceId = spinTraceId;
+        trace.logError('WALLET_DEBIT', err, { amount: savvyCost });
         throw err;
       }
       spinContext.savvySpent = Boolean(spend.spent);
+      trace.logOk('WALLET_LEDGER', {
+        transactionId: spend.transactionId || null,
+        balanceAfter: spend.newBalance,
+        spent: spend.spent,
+      });
+    } else {
+      trace.logOk('WALLET_DEBIT', { skipped: true, reason: isFreeSpin ? 'free_spin' : 'zero_cost' });
+      trace.logOk('WALLET_LEDGER', { skipped: true });
     }
 
-    logPerkSpin('BALANCE_UPDATED', {
-      userId: spinContext.userId,
-      spinId,
+    trace.logOk('BALANCE_UPDATED', {
       savvySpent: spinContext.savvySpent,
       savvyCost: mode === SPIN_MODES.FREE ? 0 : savvyCost,
       balanceAfterSpend: Math.round(Number(user.savvyPoints) || 0),
@@ -1120,10 +1155,18 @@ async function spinPerkMachine(user, options = {}) {
       createdAt: new Date(),
     };
 
-    pm.spinHistory.push(historyEntry);
-    if (pm.spinHistory.length > MAX_HISTORY) {
-      pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
-    }
+    trace.runStageSync(
+      'SPIN_HISTORY',
+      () => {
+        pm.spinHistory.push(historyEntry);
+        if (pm.spinHistory.length > MAX_HISTORY) {
+          pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
+        }
+        user.markModified('perkMachine');
+        return { historyLength: pm.spinHistory.length };
+      },
+      { mode, slots: historyEntry.slots, savvyCost: historyEntry.savvyCost }
+    );
 
     if (savvySaleSavings > 0 && !usedPaid3Token && !usedPaid2Token) {
       try {
@@ -1134,7 +1177,11 @@ async function spinPerkMachine(user, options = {}) {
       }
     }
 
-    const ticketResult = recordSpinForTournamentTicket(user, pm);
+    const ticketResult = trace.runStageSync(
+      'TOURNAMENT_PROGRESS',
+      () => recordSpinForTournamentTicket(user, pm),
+      { isFreeSpin }
+    );
 
     let spinHeatAdvance = null;
     if (
@@ -1144,7 +1191,17 @@ async function spinPerkMachine(user, options = {}) {
       !usedPaid3Token &&
       !usedPaid2Token
     ) {
-      spinHeatAdvance = advanceSpinHeat(user);
+      spinHeatAdvance = trace.runStageSync(
+        'HEAT_UPDATE',
+        () => advanceSpinHeat(user),
+        {
+          heatTierBefore: heatBeforeSpin.tierIndex,
+          heatMultiplierBefore: heatBeforeSpin.multiplier,
+        }
+      );
+      user.markModified('perkMachine');
+    } else {
+      trace.logOk('HEAT_UPDATE', { skipped: true, isFreeSpin });
     }
 
     const combinedMultiplier =
@@ -1170,33 +1227,43 @@ async function spinPerkMachine(user, options = {}) {
       });
     }
 
-    const nukeProgress = recordQualifyingNukeSpin(user, {
-      spinId,
-      mode,
-      savvyCostCharged: finalCost,
-      usedPaid3Token,
-      usedPaid2Token,
-      adminBypass: Boolean(options.adminBypassCost),
-    });
+    const nukeProgress = trace.runStageSync(
+      'NUKE_PROGRESS',
+      () =>
+        recordQualifyingNukeSpin(user, {
+          spinId,
+          mode,
+          savvyCostCharged: finalCost,
+          usedPaid3Token,
+          usedPaid2Token,
+          adminBypass: Boolean(options.adminBypassCost),
+        }),
+      { isFreeSpin, savvyCostCharged: finalCost }
+    );
 
     pm.lastSpinAt = new Date();
-    sanitizePerkMachineForPersist(user);
     spinContext.stage = 'persist';
-    await user.save();
+    await trace.runStage(
+      'USER_SAVE',
+      async () => {
+        sanitizePerkMachineForPersist(user);
+        await trace.validateUserDoc(user, 'USER');
+        await user.save();
+        return {
+          heatTierIndex: user.perkMachine?.spinHeatTierIndex,
+          balanceAfter: Math.round(Number(user.savvyPoints) || 0),
+        };
+      },
+      { isFreeSpin }
+    );
+    trace.logOk('DB_TRANSACTION_COMMIT', { spinId, mode });
 
-    logPerkSpin('PERSISTED', {
-      userId: spinContext.userId,
-      spinId,
-      heatTierIndex: user.perkMachine?.spinHeatTierIndex,
-    });
-
-    logPerkSpin('SUCCESS', {
-      userId: spinContext.userId,
-      spinId,
+    trace.logOk('SUCCESS', {
       slotCount: slots,
       effectivePrice: finalCost,
       balanceAfter: Math.round(Number(user.savvyPoints) || 0),
       heatTierIndex: user.perkMachine?.spinHeatTierIndex,
+      isFreeSpin,
     });
 
     if (nukeProgress?.thresholdReached) {
@@ -1241,6 +1308,7 @@ async function spinPerkMachine(user, options = {}) {
     }
 
     return {
+      spinTraceId,
       spinId,
       mode,
       slots,
@@ -1301,8 +1369,15 @@ async function spinPerkMachine(user, options = {}) {
       status,
     };
   } catch (err) {
+    trace.logError(err.failedStage || spinContext?.stage || 'unknown', err, {
+      userId: spinContext?.userId || String(userId),
+      spinId: spinContext?.spinId || null,
+      mode: spinContext?.mode || mode,
+      lastOkStage: trace.getLastOkStage(),
+    });
     if (spinContext) {
       logPerkSpinFailed(spinContext.stage || 'unknown', err, {
+        spinTraceId,
         userId: spinContext.userId,
         spinId: spinContext.spinId,
         mode: spinContext.mode,
@@ -1311,6 +1386,7 @@ async function spinPerkMachine(user, options = {}) {
         heatMultiplier: spinContext.heatMultiplier,
         heatTierIndex: user?.perkMachine?.spinHeatTierIndex,
         savvySpent: spinContext.savvySpent,
+        lastOkStage: trace.getLastOkStage(),
       });
       if (spinContext.savvySpent && spinContext.savvyCost > 0) {
         try {
@@ -1336,6 +1412,9 @@ async function spinPerkMachine(user, options = {}) {
       mapped.code = err.code;
       mapped.required = err.required;
       mapped.balance = err.balance;
+      mapped.spinTraceId = spinTraceId;
+      mapped.failedStage = err.failedStage || 'LOCK_ACQUIRE';
+      mapped.lastOkStage = trace.getLastOkStage();
       throw mapped;
     }
     if (err?.name === 'InsufficientSavvyError') {
@@ -1344,14 +1423,21 @@ async function spinPerkMachine(user, options = {}) {
       mapped.code = 'INSUFFICIENT_SAVVY';
       mapped.required = err.required;
       mapped.balance = err.balance;
+      mapped.spinTraceId = spinTraceId;
+      mapped.failedStage = err.failedStage || 'WALLET_DEBIT';
+      mapped.lastOkStage = trace.getLastOkStage();
       throw mapped;
     }
     if (err?.name === 'ValidationError' || err?.name === 'CastError') {
       const mapped = new Error(err.message || 'Spin reward validation failed');
       mapped.status = 500;
       mapped.code = 'SPIN_FAILED';
+      mapped.spinTraceId = spinTraceId;
+      mapped.failedStage = err.failedStage || spinContext?.stage || 'USER_SAVE';
+      mapped.lastOkStage = trace.getLastOkStage();
       throw mapped;
     }
+    if (err && !err.spinTraceId) err.spinTraceId = spinTraceId;
     throw err;
   } finally {
     await releasePerkSpinLock(userId);

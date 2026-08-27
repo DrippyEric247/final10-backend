@@ -25,6 +25,7 @@ const {
   adminGetNukeStateForUserId,
 } = require('../services/perkMachineAdminService');
 const { SPIN_MODES, getRewardIndex } = require('../config/perkMachineRewards');
+const { createSpinTraceId, createSpinTracer } = require('../services/perkMachineSpinTrace');
 
 const router = express.Router();
 
@@ -66,18 +67,39 @@ router.get('/reward-index', auth, async (req, res, next) => {
 });
 
 router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
+  const spinTraceId = createSpinTraceId();
+  const trace = createSpinTracer(spinTraceId);
+  trace.log('ROUTE_START', { path: '/api/perk-machine/spin' });
+
   try {
     const user = await User.findById(req.user.id);
-    if (!user) return next(new HttpError(404, 'NOT_FOUND', 'User not found'));
+    if (!user) {
+      const err = new Error('User not found');
+      trace.logError('AUTH_OK', err);
+      return res.status(404).json({
+        spinTraceId,
+        code: 'NOT_FOUND',
+        message: 'User not found',
+      });
+    }
+    trace.logOk('AUTH_OK', { userId: String(user._id) });
 
     const mode = String(req.body?.mode || '').trim();
-    const result = await spinPerkMachine(user, { mode });
+    trace.logOk('REQUEST_RECEIVED', { mode, spinType: mode });
+
+    const result = await spinPerkMachine(user, { mode, spinTraceId });
     res.json({
+      spinTraceId,
       message: result.resultMessage,
       ...result,
     });
   } catch (err) {
     console.error('[perk-machine/spin]', err);
+    const resolvedTraceId = err.spinTraceId || spinTraceId;
+    trace.logError(err.failedStage || 'ROUTE_ERROR', err, {
+      mode: String(req.body?.mode || '').trim(),
+      lastOkStage: err.lastOkStage || trace.getLastOkStage(),
+    });
     if (err.status) {
       const clientMessage =
         err.code === 'INSUFFICIENT_SAVVY'
@@ -90,16 +112,22 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
                 ? 'Spin failed — no Savvy was spent. Try again.'
                 : err.message;
       return res.status(err.status).json({
+        spinTraceId: resolvedTraceId,
         message: clientMessage,
         code: err.code,
         required: err.required,
         balance: err.balance,
+        failedStage: err.failedStage || null,
+        lastOkStage: err.lastOkStage || trace.getLastOkStage(),
         ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
       });
     }
     return res.status(500).json({
+      spinTraceId: resolvedTraceId,
       code: 'SPIN_FAILED',
       message: 'Spin failed — no Savvy was spent. Try again.',
+      failedStage: err.failedStage || null,
+      lastOkStage: err.lastOkStage || trace.getLastOkStage(),
       ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
     });
   }
