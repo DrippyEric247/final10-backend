@@ -252,6 +252,44 @@ describeReal('perkMachine spin — Mongo integration', () => {
       await User.deleteOne({ _id: user._id });
     }
   });
+
+  test('invalid legacy perkMachine date fields sanitize before persist', async () => {
+    const user = await User.create({
+      username: `pm_bad_dates_${Date.now()}`,
+      email: `pm_bad_dates_${Date.now()}@test.local`,
+      password: 'testpass123',
+      savvyPoints: 5000,
+      perkMachine: { lastFreeSpinDay: '1999-01-01' },
+    });
+
+    await User.collection.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          'perkMachine.spinHeatTierIndex': null,
+          'perkMachine.spinHeatCooldownUntil': 'not-a-valid-date',
+          'perkMachine.lastSpinAt': 'also-invalid',
+          'perkMachine.freePerkSpinUntil': 'bad',
+        },
+      }
+    );
+
+    try {
+      const reloaded = await User.findById(user._id);
+      const result = await spinPerkMachine(reloaded, {
+        mode: SPIN_MODES.PAID_1,
+        adminBypassCost: true,
+      });
+      expect(result.spinId).toBeTruthy();
+
+      const saved = await User.findById(user._id);
+      expect(saved.perkMachine.spinHeatTierIndex).toBe(0);
+      expect(saved.perkMachine.spinHeatCooldownUntil).toBeNull();
+      expect(saved.perkMachine.lastSpinAt).toBeInstanceOf(Date);
+    } finally {
+      await User.deleteOne({ _id: user._id });
+    }
+  });
 });
 
 if (!MONGODB_URI) {

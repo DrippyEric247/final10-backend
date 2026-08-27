@@ -71,6 +71,51 @@ const {
   ensureNukeDoc,
 } = require('./perkMachineNukeService');
 
+function sanitizePerkMachineDate(value) {
+  if (value == null || value === '') return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function sanitizePerkMachineDocDates(pm) {
+  if (!pm || typeof pm !== 'object') return;
+  pm.lastSpinAt = sanitizePerkMachineDate(pm.lastSpinAt);
+  pm.spinLockUntil = sanitizePerkMachineDate(pm.spinLockUntil);
+  pm.spinHeatCooldownUntil = sanitizePerkMachineDate(pm.spinHeatCooldownUntil);
+  pm.freePerkSpinUntil = sanitizePerkMachineDate(pm.freePerkSpinUntil);
+  pm.lastHatchAt = sanitizePerkMachineDate(pm.lastHatchAt);
+  pm.lastExchangeAt = sanitizePerkMachineDate(pm.lastExchangeAt);
+
+  if (pm.nuke && typeof pm.nuke === 'object') {
+    pm.nuke.lastActivationAt = sanitizePerkMachineDate(pm.nuke.lastActivationAt);
+    pm.nuke.lastCompletionAt = sanitizePerkMachineDate(pm.nuke.lastCompletionAt);
+    if (pm.nuke.activeEvent && typeof pm.nuke.activeEvent === 'object') {
+      pm.nuke.activeEvent.activatedAt = sanitizePerkMachineDate(pm.nuke.activeEvent.activatedAt);
+      pm.nuke.activeEvent.expiresAt = sanitizePerkMachineDate(pm.nuke.activeEvent.expiresAt);
+    }
+  }
+
+  if (Array.isArray(pm.timedEventTokens)) {
+    pm.timedEventTokens = pm.timedEventTokens.map((token) => {
+      if (!token || typeof token !== 'object') return token;
+      return {
+        ...token,
+        acquiredAt: sanitizePerkMachineDate(token.acquiredAt) || new Date(),
+      };
+    });
+  }
+
+  if (Array.isArray(pm.spinHistory)) {
+    pm.spinHistory = pm.spinHistory.map((entry) => {
+      if (!entry || typeof entry !== 'object') return entry;
+      return {
+        ...entry,
+        createdAt: sanitizePerkMachineDate(entry.createdAt) || entry.createdAt || new Date(),
+      };
+    });
+  }
+}
+
 function ensurePerkMachineDoc(user) {
   if (!user.perkMachine || typeof user.perkMachine !== 'object') {
     user.perkMachine = {};
@@ -94,9 +139,10 @@ function ensurePerkMachineDoc(user) {
   if (!Array.isArray(pm.timedEventTokens)) pm.timedEventTokens = [];
   if (!pm.personalEvents || typeof pm.personalEvents !== 'object') pm.personalEvents = {};
   if (pm.eggInventory && typeof pm.eggInventory.mythic !== 'number') pm.eggInventory.mythic = 0;
-  if (typeof pm.spinHeatTierIndex !== 'number') pm.spinHeatTierIndex = 0;
-  if (pm.spinHeatCooldownUntil === undefined) pm.spinHeatCooldownUntil = null;
-  if (pm.freePerkSpinUntil === undefined) pm.freePerkSpinUntil = null;
+  if (typeof pm.spinHeatTierIndex !== 'number' || Number.isNaN(pm.spinHeatTierIndex)) {
+    pm.spinHeatTierIndex = 0;
+  }
+  sanitizePerkMachineDocDates(pm);
   ensureNukeDoc(pm);
   return pm;
 }
@@ -600,11 +646,22 @@ function logPerkSpin(event, payload) {
   console.log(`[PERK_SPIN_${event}]`, JSON.stringify(payload));
 }
 
+function formatMongooseErrorDetails(err) {
+  if (!err?.errors || typeof err.errors !== 'object') return null;
+  return Object.entries(err.errors).map(([path, detail]) => ({
+    path,
+    kind: detail?.kind,
+    message: detail?.message,
+    value: detail?.value,
+  }));
+}
+
 function logPerkSpinFailed(stage, err, context = {}) {
   console.error('[PERK_SPIN_ERROR]', {
     stage,
     errorName: err?.name,
     errorMessage: err?.message,
+    validationDetails: formatMongooseErrorDetails(err),
     stack: err?.stack,
     ...context,
   });
@@ -621,6 +678,20 @@ async function rollbackFailedSpinEntitlements(user, rollback = {}) {
   }
   if (rollback.guaranteedMultiplier > 0) {
     pm.nextSpinGuaranteedMultiplier = rollback.guaranteedMultiplier;
+  }
+  user.markModified('perkMachine');
+  await user.save().catch(() => {});
+}
+
+async function rollbackFailedFreeSpinClaim(user, rollback = {}) {
+  if (!user || !rollback.freeSpinClaimed) return;
+  const pm = ensurePerkMachineDoc(user);
+  if (rollback.usedExtraFreeSpin) {
+    pm.extraFreeSpins = Number(pm.extraFreeSpins || 0) + 1;
+  } else if (rollback.usedEggExtraFreeSpin) {
+    pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin || 0) + 1;
+  } else {
+    pm.lastFreeSpinDay = rollback.previousLastFreeSpinDay ?? null;
   }
   user.markModified('perkMachine');
   await user.save().catch(() => {});
@@ -682,16 +753,28 @@ async function spinPerkMachine(user, options = {}) {
     let usedPaid2Token = false;
     let usedExtraFreeSpin = false;
     let freePerkHourApplied = false;
+    let freeSpinRollback = null;
     const balanceBefore = Math.round(Number(user.savvyPoints) || 0);
     const freeSpinAvailable = canUseFreeSpin(user);
 
     const savvySale = await getActiveSavvySale();
 
     if (mode === SPIN_MODES.FREE) {
+      const pmBeforeFree = ensurePerkMachineDoc(user);
+      const previousLastFreeSpinDay = pmBeforeFree.lastFreeSpinDay ?? null;
+      const eggExtraBefore = Number(pmBeforeFree.eggInventory?.extraFreeSpin) || 0;
       const claim = await claimFreeSpinSlot(userId);
       user = claim.user;
       usedExtraFreeSpin = claim.usedExtraFreeSpin;
       ensurePerkMachineDoc(user);
+      freeSpinRollback = {
+        previousLastFreeSpinDay,
+        freeSpinClaimed: true,
+        usedExtraFreeSpin,
+        usedEggExtraFreeSpin:
+          usedExtraFreeSpin &&
+          eggExtraBefore > (Number(user.perkMachine?.eggInventory?.extraFreeSpin) || 0),
+      };
     } else {
       const salePricing = resolveSavvySaleSpinPricing(savvyCost, savvySale);
       originalSavvyCost = salePricing.originalCost;
@@ -791,6 +874,7 @@ async function spinPerkMachine(user, options = {}) {
       usedPaid3Token,
       usedPaid2Token,
       guaranteedMultiplier: Number(pm.nextSpinGuaranteedMultiplier) || 0,
+      ...(freeSpinRollback || {}),
     };
 
     logPerkSpin('START', {
@@ -1157,6 +1241,11 @@ async function spinPerkMachine(user, options = {}) {
       } catch (rollbackErr) {
         console.error('[perk-machine/spin] entitlement rollback failed:', rollbackErr?.message || rollbackErr);
       }
+      try {
+        await rollbackFailedFreeSpinClaim(user, spinContext);
+      } catch (freeRollbackErr) {
+        console.error('[perk-machine/spin] free spin rollback failed:', freeRollbackErr?.message || freeRollbackErr);
+      }
     }
     if (err instanceof SpinLockError) {
       const mapped = new Error(err.message);
@@ -1174,7 +1263,7 @@ async function spinPerkMachine(user, options = {}) {
       mapped.balance = err.balance;
       throw mapped;
     }
-    if (err?.name === 'ValidationError') {
+    if (err?.name === 'ValidationError' || err?.name === 'CastError') {
       const mapped = new Error(err.message || 'Spin reward validation failed');
       mapped.status = 500;
       mapped.code = 'SPIN_FAILED';
