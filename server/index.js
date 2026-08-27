@@ -266,6 +266,7 @@ app.use('/api/users',       userRoutes);
 app.use('/api/referrals', require('./routes/referralTrackingRoutes'));
 app.use('/api/admin/referrals', require('./routes/adminReferralRoutes'));
 app.use('/api/deals', require('./routes/dealRewards'));
+app.use('/api/deals', require('./routes/canonicalDealRoutes'));
 app.use('/api/savvy', require('./routes/savvyMultiplierRoutes'));
 app.use('/api/levels',      levelRoutes);
 app.use('/api/payments',    paymentRoutes);

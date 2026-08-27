@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ListingCardImage from './listings/ListingCardImage';
+import DealShareButton from './deals/DealShareButton';
 
 const PromotedItemCard = ({ item, index, isPromoted = false }) => {
   const getPromotionBadge = (type) => {
@@ -160,6 +161,7 @@ const PromotedItemCard = ({ item, index, isPromoted = false }) => {
             'View Auction'
           )}
         </Link>
+        <DealShareButton deal={item} compact />
       </div>
 
       {/* Promotion Attribution */}

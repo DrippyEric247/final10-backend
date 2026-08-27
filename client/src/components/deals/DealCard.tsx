@@ -36,6 +36,7 @@ import BuyNowDealCard from './BuyNowDealCard';
 import WatchDealCard from './WatchDealCard';
 import PassDealCard from './PassDealCard';
 import SavvyAlertButton from '../alerts/SavvyAlertButton';
+import DealShareButton from './DealShareButton';
 import ListingCardImage from '../listings/ListingCardImage';
 import TrueMarketValueBlock from '../market/TrueMarketValueBlock';
 import DealBadges from '../market/DealBadges';
@@ -589,6 +590,7 @@ export function DealCardShell({
               }}
             />
           ) : null}
+          <DealShareButton deal={item as Record<string, unknown>} compact />
         </div>
 
         {isGoneDeal ? (

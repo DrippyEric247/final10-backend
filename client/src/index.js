@@ -1,6 +1,7 @@
 import './styles/theme.css';
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -13,13 +14,15 @@ root.render(
   <React.StrictMode>
     <AppErrorBoundary>
       <BrowserRouter>
-        <AuthProvider>
-          <CosmeticsProvider>
-            <SavvyPointsProvider>
-              <App />
-            </SavvyPointsProvider>
-          </CosmeticsProvider>
-        </AuthProvider>
+        <HelmetProvider>
+          <AuthProvider>
+            <CosmeticsProvider>
+              <SavvyPointsProvider>
+                <App />
+              </SavvyPointsProvider>
+            </CosmeticsProvider>
+          </AuthProvider>
+        </HelmetProvider>
       </BrowserRouter>
     </AppErrorBoundary>
   </React.StrictMode>

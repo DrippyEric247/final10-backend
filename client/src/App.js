@@ -1,4 +1,5 @@
 import ProductFeed from './pages/ProductFeed';
+import DealDetail from './pages/DealDetail';
 import Trending from './pages/Trending';
 import VideoScanner from './components/VideoScanner';
 import Navigation from './components/Navigation';
@@ -374,6 +375,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/social" element={<SocialAuthCallback />} />
+          <Route path="/deal/:dealId" element={<DealDetail />} />
           <Route path="/auctions" element={<Auctions />} />
           <Route path="/auction/:id" element={<AuctionDetail />} />
           <Route path="/feed" element={<ProductFeed />} />

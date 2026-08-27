@@ -1,0 +1,31 @@
+.deal-share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(196, 181, 253, 0.35);
+  background: rgba(30, 27, 75, 0.55);
+  color: #e9d5ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.deal-share-btn:hover:not(:disabled) {
+  background: rgba(91, 33, 182, 0.45);
+  border-color: rgba(216, 180, 254, 0.65);
+  transform: translateY(-1px);
+}
+
+.deal-share-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.deal-share-btn--compact {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.72rem;
+}

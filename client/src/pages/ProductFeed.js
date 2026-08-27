@@ -31,6 +31,7 @@ import { Link } from "react-router-dom";
 import ebayService from "../services/ebayService";
 import promotionService from "../services/promotionService";
 import SavvyAlertButton from "../components/alerts/SavvyAlertButton";
+import DealShareButton from "../components/deals/DealShareButton";
 import { useAuth } from "../context/AuthContext";
 import { emitTourAction } from "../lib/tourGuide";
 import { hasCompletedFirstSixty } from "../lib/firstRunState";
@@ -972,14 +973,7 @@ export default function ProductFeed() {
                           >
                             Add to Build
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() => navigator.share?.({ title: it.title, url: it.url || window.location.href })
-                              .catch(() => {})}
-                          >
-                            Share
-                          </button>
+                          <DealShareButton deal={it} compact className="btn btn-ghost" />
                           <button
                             type="button"
                             className="btn btn-ghost"

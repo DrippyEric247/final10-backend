@@ -11,6 +11,7 @@ import ListingCardImage from '../listings/ListingCardImage';
 import { NO_PERFECT_MATCH_MESSAGE } from '../../lib/bestMoveFallbackConfig';
 import { isBestMoveDisplayable, resolveDirectItemUrl } from '../../lib/bestMoveListingValidation';
 import SellerTrustEvidence from '../trust/SellerTrustEvidence';
+import DealShareButton from './DealShareButton';
 import { buildSellerTrustEvidence } from '../../lib/sellerTrustEvidence';
 
 const TRENDING_SNEAKERS = [
@@ -315,6 +316,7 @@ function OpportunityCard({
           <button type="button" className="qscc-savvy-btn qscc-savvy-btn--accent" onClick={() => saveAlert(item, searchQuery)}>
             Save alert
           </button>
+          <DealShareButton deal={item} compact shareSource="share" />
           <button
             type="button"
             className="qscc-savvy-btn qscc-savvy-btn--ghost"

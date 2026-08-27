@@ -1,6 +1,7 @@
 import React from "react";
 import ListingCardImage from "./ListingCardImage";
 import SavvyAlertButton from "../alerts/SavvyAlertButton";
+import DealShareButton from "../deals/DealShareButton";
 import SavvyTrustPanel from "../trust/SavvyTrustPanel";
 import "../../styles/EliteAuctionCard.css";
 
@@ -189,6 +190,7 @@ export default function EliteAuctionCard({
                 <span>Bid Now</span>
               </button>
             ) : null}
+            <DealShareButton deal={item} compact className="elite-card__btn-share" />
           </div>
           {ebayHref ? (
             <a

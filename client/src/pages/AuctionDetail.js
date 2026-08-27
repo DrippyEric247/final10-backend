@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, TrendingUp, Zap, Award, Share2, Loader2 } from 'lucide-react';
+import { Clock, Users, TrendingUp, Zap, Award, Loader2 } from 'lucide-react';
 import ebayService from '../services/ebayService';
 import SavvyAlertButton from '../components/alerts/SavvyAlertButton';
+import DealShareButton from '../components/deals/DealShareButton';
 import {
   SAVVY_CREDIT_EVENT,
   applyCreditToOrder,
@@ -243,10 +244,17 @@ const AuctionDetail = () => {
                   }}
                 />
               </div>
-              <button className="btn-secondary flex-1 flex items-center justify-center gap-2">
-                <Share2 className="w-4 h-4" />
-                Share
-              </button>
+              <DealShareButton
+                deal={{
+                  itemId: auction.itemId || auction.id || id,
+                  title: auction.title,
+                  price: auction.currentBid || auction.price,
+                  imageUrl: auction.image,
+                  itemWebUrl: auction.itemUrl || auction.url,
+                  source: 'ebay',
+                }}
+                className="btn-secondary flex-1"
+              />
             </div>
           </motion.div>
         </div>
