@@ -505,12 +505,19 @@ function formatMongooseErrorDetails(err) {
 }
 
 function logPerkSpinFailed(stage, err, context = {}) {
+  const { getServerCommitSha } = require('../lib/deploySha');
   console.error('[PERK_SPIN_ERROR]', {
     stage,
+    serverCommitSha: getServerCommitSha(),
     errorName: err?.name,
     errorMessage: err?.message,
     validationDetails: formatMongooseErrorDetails(err),
     stack: err?.stack,
+    failedStage: err?.failedStage || stage,
+    lastOkStage: err?.lastOkStage || null,
+    rewardId: err?.rewardId || null,
+    rewardType: err?.rewardType || null,
+    grantHandler: err?.grantHandler || null,
     ...context,
   });
 }
