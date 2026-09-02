@@ -24,6 +24,17 @@ const {
   adminGetNukeState,
   adminGetNukeStateForUserId,
 } = require('../services/perkMachineAdminService');
+const {
+  runPaidSpinRegression,
+  runDisposablePaidSpinProbe,
+  runRewardFamilyMatrix,
+  runDisposableRewardFamilyMatrix,
+  compareFreeVsPaidPools,
+  compareFreeVsPaidExecutionPaths,
+  auditSessionPropagation,
+  TEST_SAVVY_1,
+} = require('../services/perkMachineRegressionService');
+const { listRegressionRewardFamilies } = require('../config/perkMachineTestRewards');
 const { SPIN_MODES, getRewardIndex } = require('../config/perkMachineRewards');
 
 const router = express.Router();
@@ -284,6 +295,64 @@ router.post('/admin/grant-egg', auth, requireAdminAccess(), async (req, res, nex
     res.json({ message: `Granted ${count} ${tier} egg(s).`, ...result });
   } catch (err) {
     console.error('[perk-machine/admin/grant-egg]', err);
+    next(err);
+  }
+});
+
+/** Full paid transaction regression — disposable test account by default (no admin balance impact). */
+router.post('/admin/paid-spin-regression', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const forceRewardId = String(req.body?.forceReward || req.body?.forceRewardId || TEST_SAVVY_1.id).trim();
+    const mode = String(req.body?.mode || SPIN_MODES.PAID_1).trim();
+    const useDisposable = req.body?.useDisposableAccount !== false;
+    const gitCommitSha =
+      process.env.RAILWAY_GIT_COMMIT_SHA ||
+      process.env.RAILWAY_GIT_SHA ||
+      process.env.GIT_COMMIT ||
+      null;
+
+    const result = useDisposable
+      ? await runDisposablePaidSpinProbe({ mode, forceRewardId })
+      : await runPaidSpinRegression(await User.findById(req.user.id), { mode, forceRewardId });
+
+    res.json({
+      message: `Paid spin regression ${result.outcome} (${forceRewardId}).`,
+      gitCommitSha,
+      executionPathComparison: compareFreeVsPaidExecutionPaths(),
+      ...result,
+    });
+  } catch (err) {
+    console.error('[perk-machine/admin/paid-spin-regression]', err);
+    next(err);
+  }
+});
+
+/** Phase 4 matrix — disposable test account by default. */
+router.post('/admin/paid-spin-regression/matrix', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const mode = String(req.body?.mode || SPIN_MODES.PAID_1).trim();
+    const useDisposable = req.body?.useDisposableAccount !== false;
+    const gitCommitSha =
+      process.env.RAILWAY_GIT_COMMIT_SHA ||
+      process.env.RAILWAY_GIT_SHA ||
+      process.env.GIT_COMMIT ||
+      null;
+
+    const matrix = useDisposable
+      ? await runDisposableRewardFamilyMatrix({ mode })
+      : await runRewardFamilyMatrix(await User.findById(req.user.id), { mode });
+
+    res.json({
+      message: 'Paid spin regression matrix complete.',
+      gitCommitSha,
+      poolComparison: compareFreeVsPaidPools(),
+      sessionAudit: auditSessionPropagation(),
+      executionPathComparison: compareFreeVsPaidExecutionPaths(),
+      families: listRegressionRewardFamilies(),
+      ...matrix,
+    });
+  } catch (err) {
+    console.error('[perk-machine/admin/paid-spin-regression/matrix]', err);
     next(err);
   }
 });

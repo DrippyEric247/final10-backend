@@ -271,6 +271,9 @@ function adjustedWeight(reward, tier) {
 
 function buildWeightedPool(tier, forceRewardId = null) {
   if (forceRewardId) {
+    const { resolveAdminTestReward } = require('./perkMachineTestRewards');
+    const adminForced = resolveAdminTestReward(forceRewardId);
+    if (adminForced) return [{ ...adminForced, weight: 1 }];
     const forced = REWARD_POOL.find((r) => r.id === forceRewardId);
     if (forced) return [{ ...forced, weight: 1 }];
   }
