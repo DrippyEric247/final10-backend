@@ -72,19 +72,11 @@ const PORT = Number(process.env.PORT) || 8080;
 const { logStartupSuccess } = require('./lib/startupBanner');
 
 /** Fast liveness — returns immediately (Railway / load balancer probes). */
-function resolveDeployGitSha() {
-  return (
-    process.env.RAILWAY_GIT_COMMIT_SHA ||
-    process.env.RAILWAY_GIT_SHA ||
-    process.env.GIT_COMMIT ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    null
-  );
-}
+const { getServerCommitSha } = require('./lib/deploySha');
 
 function buildLivenessPayload() {
   const { isMongoReady } = require('./lib/mongoBoot');
-  const gitCommitSha = resolveDeployGitSha();
+  const gitCommitSha = getServerCommitSha();
   return {
     ok: true,
     live: true,
@@ -249,6 +241,14 @@ const {
 } = require('./services/auditLogger');
 
 console.log('[startup] boot phase=routes_loaded');
+try {
+  const { verifyPerkMachineGrantHandlers } = require('./services/perkMachineHandlerCheck');
+  verifyPerkMachineGrantHandlers({ failOnError: true });
+  console.log('[startup] boot phase=perk_machine_handlers_ok');
+} catch (handlerErr) {
+  console.error('[startup] Perk Machine handler check failed:', handlerErr?.message || handlerErr);
+  process.exit(1);
+}
 
 auditStartup({
   nodeEnv: process.env.NODE_ENV || 'development',

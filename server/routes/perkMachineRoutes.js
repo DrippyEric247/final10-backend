@@ -38,6 +38,7 @@ const {
 const { listRegressionRewardFamilies } = require('../config/perkMachineTestRewards');
 const { SPIN_MODES, getRewardIndex } = require('../config/perkMachineRewards');
 const { createSpinTraceId, createSpinTracer } = require('../services/perkMachineSpinTrace');
+const { attachSpinFailureFields } = require('../lib/spinFailurePayload');
 
 const router = express.Router();
 
@@ -112,44 +113,28 @@ router.post('/spin', auth, perkMachineSpinLimiter, async (req, res, next) => {
       mode: String(req.body?.mode || '').trim(),
       lastOkStage: err.lastOkStage || trace.getLastOkStage(),
     });
-    if (err.status) {
-      const clientMessage =
-        err.code === 'INSUFFICIENT_SAVVY'
-          ? err.message
-          : err.code === 'SPIN_IN_PROGRESS' || err.code === 'SPIN_COOLDOWN'
+    const failureBody = attachSpinFailureFields(
+      {
+        message:
+          err.code === 'INSUFFICIENT_SAVVY'
             ? err.message
-            : err.code === 'FREE_SPIN_UNAVAILABLE'
+            : err.code === 'SPIN_IN_PROGRESS' || err.code === 'SPIN_COOLDOWN'
               ? err.message
-              : err.status >= 500
-                ? 'Spin failed — no Savvy was spent. Try again.'
-                : err.message;
-      return res.status(err.status).json({
-        spinTraceId: resolvedTraceId,
-        message: clientMessage,
-        code: err.code,
+              : err.code === 'FREE_SPIN_UNAVAILABLE'
+                ? err.message
+                : err.status && err.status < 500
+                  ? err.message
+                  : 'Spin failed — no Savvy was spent. Try again.',
+        code: err.code || 'SPIN_FAILED',
         required: err.required,
         balance: err.balance,
-        failedStage: err.failedStage || null,
-        lastOkStage: err.lastOkStage || trace.getLastOkStage(),
-        rewardId: err.rewardId || null,
-        rewardType: err.rewardType || null,
-        grantHandler: err.grantHandler || null,
-        failedField: err.field || null,
-        ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
-      });
-    }
-    return res.status(500).json({
-      spinTraceId: resolvedTraceId,
-      code: 'SPIN_FAILED',
-      message: 'Spin failed — no Savvy was spent. Try again.',
-      failedStage: err.failedStage || null,
-      lastOkStage: err.lastOkStage || trace.getLastOkStage(),
-      rewardId: err.rewardId || null,
-      rewardType: err.rewardType || null,
-      grantHandler: err.grantHandler || null,
-      failedField: err.field || null,
-      ...(process.env.NODE_ENV !== 'production' && err?.message ? { detail: err.message } : {}),
-    });
+      },
+      err,
+      trace,
+      spinTraceId
+    );
+    const status = err.status || 500;
+    return res.status(status).json(failureBody);
   }
 });
 
