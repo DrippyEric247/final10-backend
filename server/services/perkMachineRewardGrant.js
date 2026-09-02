@@ -14,11 +14,33 @@ const {
   SUPPLY_DROP_SOURCES,
 } = require('../config/perkMachineSources');
 const { PERK_CALLING_CARD_DUPLICATE_SAVVY, pickPerkCallingCard } = require('../config/perkCallingCards');
-const { grantSavvyReward } = require('./savvyRewardService');
-const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
-const { createSupplyDrop } = require('./supplyDropService');
 const { MULTIPLIER_TYPE } = require('./perkMachineMultiplier');
 const { ensureEventInventory } = require('./scoutFlightTicketService');
+
+/** Lazy resolve — avoids circular-dep undefined binding from top-level destructuring. */
+function requireGrantSavvyReward() {
+  const { grantSavvyReward } = require('./savvyRewardService');
+  if (typeof grantSavvyReward !== 'function') {
+    throw new TypeError('grantSavvyReward is not a function');
+  }
+  return grantSavvyReward;
+}
+
+function requireCreateSupplyDrop() {
+  const { createSupplyDrop } = require('./supplyDropService');
+  if (typeof createSupplyDrop !== 'function') {
+    throw new TypeError('createSupplyDrop is not a function');
+  }
+  return createSupplyDrop;
+}
+
+function requireGrantSystemCosmeticUnlock() {
+  const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
+  if (typeof grantSystemCosmeticUnlock !== 'function') {
+    throw new TypeError('grantSystemCosmeticUnlock is not a function');
+  }
+  return grantSystemCosmeticUnlock;
+}
 
 const GRANT_HANDLERS = Object.freeze({
   savvy: 'grantSavvyReward',
@@ -197,7 +219,7 @@ async function grantPerkMachineSavvy(user, rewardDef, spinId) {
     throw err;
   }
 
-  const result = await grantSavvyReward(user, {
+  const result = await requireGrantSavvyReward()(user, {
     rewardType: PERK_MACHINE_SAVVY_REWARD_TYPE,
     amount: scaledBase,
     baseAmount: scaledBase,
@@ -227,7 +249,7 @@ async function grantPerkMachineSupplyDrop(user) {
     userId: user._id,
     source: PERK_MACHINE_SUPPLY_DROP_SOURCE,
   });
-  const drop = await createSupplyDrop({
+  const drop = await requireCreateSupplyDrop()({
     scope: 'user',
     userId: user._id,
     source: PERK_MACHINE_SUPPLY_DROP_SOURCE,
@@ -258,7 +280,7 @@ async function grantPerkMachineCallingCard(user, spinId, qty = 1) {
 
   let newlyUnlocked = false;
   try {
-    newlyUnlocked = await grantSystemCosmeticUnlock(
+    newlyUnlocked = await requireGrantSystemCosmeticUnlock()(
       user._id,
       card.id,
       PERK_MACHINE_COSMETIC_SOURCE
@@ -273,7 +295,7 @@ async function grantPerkMachineCallingCard(user, spinId, qty = 1) {
   }
 
   granted.callingCardDuplicate = true;
-  const dupResult = await grantSavvyReward(user, {
+  const dupResult = await requireGrantSavvyReward()(user, {
     rewardType: PERK_MACHINE_SAVVY_REWARD_TYPE,
     amount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
     baseAmount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
@@ -523,7 +545,7 @@ async function executePerkMachineRewardGrant(user, rewardDef, spinId, pm) {
     const out = { easterChallenge: activation };
     if (activation.fallbackRequired && activation.slotOccupied) {
       const { REWARD_CLASS } = require('../config/savvyRewardPolicy');
-      const fallback = await grantSavvyReward(user, {
+      const fallback = await requireGrantSavvyReward()(user, {
         rewardType: 'easter_challenge',
         amount: 5000,
         baseAmount: 5000,
@@ -565,4 +587,7 @@ module.exports = {
   assertSupplyDropSourceAllowed,
   executePerkMachineRewardGrant,
   enrichGrantError,
+  requireGrantSavvyReward,
+  requireCreateSupplyDrop,
+  requireGrantSystemCosmeticUnlock,
 };
