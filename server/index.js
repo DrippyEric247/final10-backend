@@ -72,14 +72,26 @@ const PORT = Number(process.env.PORT) || 8080;
 const { logStartupSuccess } = require('./lib/startupBanner');
 
 /** Fast liveness — returns immediately (Railway / load balancer probes). */
+function resolveDeployGitSha() {
+  return (
+    process.env.RAILWAY_GIT_COMMIT_SHA ||
+    process.env.RAILWAY_GIT_SHA ||
+    process.env.GIT_COMMIT ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    null
+  );
+}
+
 function buildLivenessPayload() {
   const { isMongoReady } = require('./lib/mongoBoot');
+  const gitCommitSha = resolveDeployGitSha();
   return {
     ok: true,
     live: true,
     mongoReady: isMongoReady(),
     uptimeSec: Math.round(process.uptime()),
     ts: new Date().toISOString(),
+    ...(gitCommitSha ? { gitCommitSha } : {}),
   };
 }
 
