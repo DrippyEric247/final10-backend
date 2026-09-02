@@ -210,6 +210,7 @@ const userSchema = new mongoose.Schema({
           originalSavvyCost: { type: Number, default: null },
           savvySaleApplied: { type: Boolean, default: false },
           savvySaleSavings: { type: Number, default: 0 },
+          savvyWon: { type: Number, default: 0 },
           rewards: mongoose.Schema.Types.Mixed,
           createdAt: { type: Date, default: Date.now },
         },

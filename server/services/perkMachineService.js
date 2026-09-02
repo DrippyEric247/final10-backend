@@ -43,24 +43,17 @@ const {
   buildMultiplierBreakdown,
   MULTIPLIER_TYPE,
 } = require('./perkMachineMultiplier');
-const { createSupplyDrop } = require('./supplyDropService');
 const {
   buildTournamentTicketProgress,
   recordSpinForTournamentTicket,
-  ensureEventInventory,
 } = require('./scoutFlightTicketService');
-const { grantSystemCosmeticUnlock } = require('./cosmeticInventoryService');
-const {
-  PERK_CALLING_CARD_DUPLICATE_SAVVY,
-  pickPerkCallingCard,
-} = require('../config/perkCallingCards');
 const {
   maybeResetSpinHeat,
   getSpinHeatState,
   formatSpinHeatForClient,
   advanceSpinHeat,
 } = require('./spinHeatService');
-const { applySpinHeatToBaseCost } = require('../config/spinHeatConfig');
+const { applySpinHeatToBaseCost, SPIN_HEAT_MULTIPLIERS } = require('../config/spinHeatConfig');
 const {
   maybeExpireNukeEvent,
   captureNukeEligibility,
@@ -70,11 +63,67 @@ const {
   formatNukeForClient,
   ensureNukeDoc,
 } = require('./perkMachineNukeService');
+const { createSpinTracer } = require('./perkMachineSpinTrace');
+const {
+  sanitizeRewardForGrantLog,
+  validateRewardBeforeGrant,
+  executePerkMachineRewardGrant,
+  enrichGrantError,
+  resolveGrantHandler,
+} = require('./perkMachineRewardGrant');
 
 function sanitizePerkMachineDate(value) {
   if (value == null || value === '') return null;
   const parsed = value instanceof Date ? value : new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function sanitizeStringIdArray(value, cap = 100) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const entry of value) {
+    if (entry == null) continue;
+    const id = String(entry).trim();
+    if (!id) continue;
+    out.push(id);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+function sanitizeTimedEventMap(events) {
+  if (!events || typeof events !== 'object' || Array.isArray(events)) return {};
+  const out = {};
+  for (const [key, raw] of Object.entries(events)) {
+    if (!raw || typeof raw !== 'object') continue;
+    out[key] = {
+      ...raw,
+      activatedAt: sanitizePerkMachineDate(raw.activatedAt),
+      expiresAt: sanitizePerkMachineDate(raw.expiresAt),
+    };
+  }
+  return out;
+}
+
+function sanitizeActiveBoostsMap(boosts) {
+  if (!boosts || typeof boosts !== 'object' || Array.isArray(boosts)) return {};
+  const out = {};
+  for (const [key, raw] of Object.entries(boosts)) {
+    if (!raw || typeof raw !== 'object') continue;
+    out[key] = {
+      ...raw,
+      activatedAt: sanitizePerkMachineDate(raw.activatedAt),
+      expiresAt: sanitizePerkMachineDate(raw.expiresAt),
+    };
+  }
+  return out;
+}
+
+function clampSpinHeatTierIndex(value) {
+  const maxIndex = SPIN_HEAT_MULTIPLIERS.length - 1;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(maxIndex, Math.max(0, Math.round(parsed)));
 }
 
 function sanitizePerkMachineDocDates(pm) {
@@ -85,10 +134,18 @@ function sanitizePerkMachineDocDates(pm) {
   pm.freePerkSpinUntil = sanitizePerkMachineDate(pm.freePerkSpinUntil);
   pm.lastHatchAt = sanitizePerkMachineDate(pm.lastHatchAt);
   pm.lastExchangeAt = sanitizePerkMachineDate(pm.lastExchangeAt);
+  pm.spinHeatTierIndex = clampSpinHeatTierIndex(pm.spinHeatTierIndex);
+
+  pm.personalEvents = sanitizeTimedEventMap(pm.personalEvents);
+  pm.activeBoosts = sanitizeActiveBoostsMap(pm.activeBoosts);
 
   if (pm.nuke && typeof pm.nuke === 'object') {
     pm.nuke.lastActivationAt = sanitizePerkMachineDate(pm.nuke.lastActivationAt);
     pm.nuke.lastCompletionAt = sanitizePerkMachineDate(pm.nuke.lastCompletionAt);
+    pm.nuke.lifetimeQualifyingSpins = Math.max(0, Math.round(Number(pm.nuke.lifetimeQualifyingSpins) || 0));
+    pm.nuke.nukeEventsTriggered = Math.max(0, Math.round(Number(pm.nuke.nukeEventsTriggered) || 0));
+    pm.nuke.processedSpinIds = sanitizeStringIdArray(pm.nuke.processedSpinIds);
+    pm.nuke.milestonesSeen = sanitizeStringIdArray(pm.nuke.milestonesSeen, 50);
     if (pm.nuke.activeEvent && typeof pm.nuke.activeEvent === 'object') {
       pm.nuke.activeEvent.activatedAt = sanitizePerkMachineDate(pm.nuke.activeEvent.activatedAt);
       pm.nuke.activeEvent.expiresAt = sanitizePerkMachineDate(pm.nuke.activeEvent.expiresAt);
@@ -105,8 +162,18 @@ function sanitizePerkMachineDocDates(pm) {
     });
   }
 
-  if (Array.isArray(pm.spinHistory)) {
-    pm.spinHistory = pm.spinHistory.map((entry) => {
+  if (Array.isArray(pm.eggHaulGrants)) {
+    pm.eggHaulGrants = pm.eggHaulGrants.map((entry) => {
+      if (!entry || typeof entry !== 'object') return entry;
+      return {
+        ...entry,
+        grantedAt: sanitizePerkMachineDate(entry.grantedAt) || entry.grantedAt || new Date(),
+      };
+    });
+  }
+
+  if (Array.isArray(pm.eggExchangeHistory)) {
+    pm.eggExchangeHistory = pm.eggExchangeHistory.map((entry) => {
       if (!entry || typeof entry !== 'object') return entry;
       return {
         ...entry,
@@ -114,6 +181,22 @@ function sanitizePerkMachineDocDates(pm) {
       };
     });
   }
+
+  if (!Array.isArray(pm.spinHistory)) {
+    pm.spinHistory = [];
+  }
+}
+
+/** Final normalization immediately before user.save() on spin completion. */
+function sanitizePerkMachineForPersist(user) {
+  const pm = ensurePerkMachineDoc(user);
+  if (!Array.isArray(pm.spinHistory)) pm.spinHistory = [];
+  sanitizePerkMachineDocDates(pm);
+  if (typeof pm.ticketSpinProgress !== 'number' || Number.isNaN(pm.ticketSpinProgress)) {
+    pm.ticketSpinProgress = 0;
+  }
+  user.markModified('perkMachine');
+  return pm;
 }
 
 function ensurePerkMachineDoc(user) {
@@ -142,6 +225,7 @@ function ensurePerkMachineDoc(user) {
   if (typeof pm.spinHeatTierIndex !== 'number' || Number.isNaN(pm.spinHeatTierIndex)) {
     pm.spinHeatTierIndex = 0;
   }
+  pm.spinHeatTierIndex = clampSpinHeatTierIndex(pm.spinHeatTierIndex);
   sanitizePerkMachineDocDates(pm);
   ensureNukeDoc(pm);
   return pm;
@@ -379,249 +463,13 @@ async function applyReward(user, rewardDef, spinId) {
     return granted;
   }
 
-  if (rewardDef.type === 'savvy') {
-    const baseAmount = Number(rewardDef.baseAmount ?? rewardDef.amount) || 0;
-    const spinMult = Number(rewardDef.spinMultiplier) || 1;
-    const scaledBase = Number(rewardDef.amount) || baseAmount;
-    const result = await grantSavvyReward(user, {
-      rewardType: 'perk_machine',
-      amount: scaledBase,
-      baseAmount: scaledBase,
-      idempotencyKey: `perk_machine:${user._id}:${spinId}:${rewardDef.id}:${scaledBase}:${spinMult}`,
-      note: `Perk Machine — ${rewardDef.label}${spinMult > 1 ? ` (${spinMult}× spin)` : ''}`,
-      meta: { spinId, source: 'perk_machine', spinMultiplier: spinMult },
-    });
-    granted.savvyGranted = result.amount;
-    granted.savvyBoosted = false;
-    granted.spinMultiplierApplied = spinMult > 1 ? spinMult : null;
-    granted.newBalance = result.newBalance;
-    granted.rewardClass = result.rewardClass;
-    granted.multiplierEligible = result.multiplierEligible;
-    if (rewardDef.baseAmount != null) {
-      granted.baseAmount = rewardDef.baseAmount;
-      granted.baseLabel = rewardDef.baseLabel || `+${rewardDef.baseAmount} Savvy`;
-    }
-  } else if (rewardDef.type === 'egg') {
-    const tier = rewardDef.eggTier;
-    if (tier === 'extraFreeSpin') {
-      pm.eggInventory.extraFreeSpin = Number(pm.eggInventory.extraFreeSpin) + qty;
-    } else if (tier && pm.eggInventory[tier] != null) {
-      pm.eggInventory[tier] = Number(pm.eggInventory[tier]) + qty;
-    }
-    granted.eggsGranted = qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-    try {
-      const { isHatchableEggTier } = require('../config/eggCamoCollection');
-      if (isHatchableEggTier(tier)) {
-        const eggSource = String(spinId || '').startsWith('hatch:')
-          ? 'perk_machine_hatch'
-          : 'perk_machine';
-        const { recordLegitimateEggAcquisition } = require('./eggCamoProgressService');
-        await recordLegitimateEggAcquisition(user, {
-          tier,
-          quantity: qty,
-          source: eggSource,
-          skipSave: true,
-        });
-      }
-    } catch (err) {
-      console.error('[egg-camo] perk machine grant tracking failed', err?.message || err);
-    }
-  } else if (rewardDef.type === 'token' && rewardDef.tokenKey) {
-    pm.tokens[rewardDef.tokenKey] = Number(pm.tokens[rewardDef.tokenKey] || 0) + qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-  } else if (rewardDef.type === 'streak_shield') {
-    if (!user.dailyStreak) user.dailyStreak = {};
-    user.dailyStreak.scoutShields = Number(user.dailyStreak.scoutShields || 0) + qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-  } else if (rewardDef.type === 'calling_card') {
-    pm.callingCardDrops = Number(pm.callingCardDrops) + qty;
-    if (!Array.isArray(user.badges)) user.badges = [];
-    if (!user.badges.includes('perk_calling_card')) {
-      user.badges.push('perk_calling_card');
-    }
-
-    // Award a specific calling card (server-authoritative) so the reveal can
-    // name it. Owning it already converts the drop into Savvy — never nothing.
-    const card = pickPerkCallingCard();
-    granted.label = 'Calling Card Drop';
-    granted.callingCardId = card.id;
-    granted.callingCardName = card.name;
-    granted.callingCardTagline = card.tagline;
-    granted.callingCardRarity = card.rarity;
-
-    let newlyUnlocked = false;
-    try {
-      newlyUnlocked = await grantSystemCosmeticUnlock(user._id, card.id, 'perk_machine_spin');
-    } catch (e) {
-      newlyUnlocked = false;
-    }
-
-    if (newlyUnlocked) {
-      granted.callingCardDuplicate = false;
-    } else {
-      granted.callingCardDuplicate = true;
-      const dupResult = await grantSavvyReward(user, {
-        rewardType: 'perk_machine',
-        amount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
-        baseAmount: PERK_CALLING_CARD_DUPLICATE_SAVVY,
-        multiplier: 1,
-        idempotencyKey: `perk_card_dupe:${spinId}:${card.id}`,
-        note: `Perk Machine — duplicate ${card.name} converted to Savvy`,
-        meta: { spinId, source: 'perk_machine_calling_card_duplicate', cardId: card.id },
-      });
-      granted.duplicateSavvy = dupResult.amount;
-      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + Number(dupResult.amount || 0);
-      granted.newBalance = dupResult.newBalance;
-    }
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-  } else if (rewardDef.type === 'scout_upgrade') {
-    pm.scoutUpgrades = Number(pm.scoutUpgrades || 0) + 1;
-    if (!Array.isArray(user.badges)) user.badges = [];
-    if (!user.badges.includes('savvy_scout_upgrade')) {
-      user.badges.push('savvy_scout_upgrade');
-    }
-  } else if (rewardDef.type === 'scout_flight_ticket') {
-    const inv = ensureEventInventory(user);
-    inv.scoutFlightTicket = Number(inv.scoutFlightTicket) + qty;
-    granted.ticketsGranted = qty;
-    if (qty > 1) granted.spinMultiplierApplied = qty;
-    user.markModified('eventInventory');
-  } else if (rewardDef.type === 'guaranteed_multiplier') {
-    // Applies to the user's NEXT perk machine spin only (consumed on spin).
-    const value = Math.max(2, Number(rewardDef.multiplierValue) || 2);
-    pm.nextSpinGuaranteedMultiplier = value;
-    granted.guaranteedMultiplier = value;
-  } else if (rewardDef.type === 'permanent_multiplier') {
-    const bonus = Number(rewardDef.permanentBonus) || 0;
-    user.powerMultiplierBonus =
-      Math.round(((Number(user.powerMultiplierBonus) || 0) + bonus) * 100) / 100;
-    granted.permanentBonus = bonus;
-    granted.powerMultiplierBonus = user.powerMultiplierBonus;
-  } else if (rewardDef.type === 'timed_savvy_multiplier') {
-    const { activateMythicSavvyMultiplier } = require('./savvyMultiplierService');
-    const durationMs = Number(rewardDef.durationMs) || 5 * 60 * 60 * 1000;
-    const multiplier = Math.max(1, Number(rewardDef.multiplierValue) || 3);
-    const boost = activateMythicSavvyMultiplier(user, { durationMs, multiplier });
-    granted.savvyEarningsMultiplier = multiplier;
-    granted.savvyEarningsExpiresAt = boost.expiresAt;
-    user.markModified('savvyEarningBoosts');
-  } else if (rewardDef.type === 'timed_event_token') {
-    const token = {
-      id: crypto.randomUUID(),
-      kind: rewardDef.eventKind,
-      label: rewardDef.label,
-      icon: rewardDef.icon || (rewardDef.eventKind === 'savvySale' ? '🏷️' : '⚡'),
-      durationMs: Number(rewardDef.durationMs) || 0,
-      acquiredAt: new Date(),
-    };
-    pm.timedEventTokens.push(token);
-    granted.timedTokenId = token.id;
-    granted.eventKind = token.kind;
-    granted.durationMs = token.durationMs;
-  } else if (rewardDef.type === 'faster_alert_perk') {
-    const { grantFasterAlertPerk } = require('./alertTimingService');
-    const { FASTER_ALERT_PERK } = require('../config/alertSpeedConfig');
-    const durationMs = Number(rewardDef.durationMs) || FASTER_ALERT_PERK.defaultDurationMs;
-    const perkSource = String(spinId || '').startsWith('hatch:') ? 'egg_hatch' : 'perk_machine';
-    const perkResult = await grantFasterAlertPerk(user._id, durationMs, perkSource, {
-      idempotencyKey: `faster_alert:${user._id}:${spinId}:${rewardDef.id}`,
-    });
-    granted.fasterAlertPerk = true;
-    granted.fasterAlertExpiresAt = perkResult.expiresAt;
-    granted.fasterAlertIdempotent = Boolean(perkResult.idempotent);
-  } else if (rewardDef.type === 'supply_drop_token') {
-    pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + qty;
-    granted.supplyDropTokensGranted = qty;
-  } else if (rewardDef.type === 'supply_drop_double') {
-    pm.tokens.maxSupplyDrop = Number(pm.tokens.maxSupplyDrop || 0) + 1;
-    pm.nextSupplyDropDouble = true;
-    granted.supplyDropTokensGranted = 1;
-    granted.nextSupplyDropDouble = true;
-  } else if (rewardDef.type === 'spin_token_2slot') {
-    pm.tokens.paid2Spin = Number(pm.tokens.paid2Spin || 0) + qty;
-    granted.spinTokensGranted = qty;
-  } else if (rewardDef.type === 'bp_tier_skip') {
-    pm.tokens.battlePassTierSkip = Number(pm.tokens.battlePassTierSkip || 0) + qty;
-    granted.tierSkipsGranted = qty;
-  } else if (rewardDef.type === 'bp_tier_skip_bulk') {
-    const tiers = Math.max(1, Number(rewardDef.tiers) || Number(rewardDef.quantity) || 1);
-    const { applyBattlePassTierSkip } = require('./battlePassSkipService');
-    const skipResult = await applyBattlePassTierSkip(user, tiers, {
-      idempotencyKey: `bp_skip_bulk:${user._id}:${spinId}`,
-      source: rewardDef.id || 'mythic_bp_skip_20',
-    });
-    granted.tierSkipsGranted = skipResult.tiersApplied || 0;
-    granted.battlePassSkip = skipResult;
-    if (skipResult.converted) {
-      granted.savvyGranted = skipResult.savvyGranted || 0;
-      granted.label = 'Battle Pass Complete — +2,000 Savvy';
-      granted.convertedFromBpSkip = true;
-    }
-  } else if (rewardDef.type === 'login_streak_advance') {
-    const advanceDays = Math.max(1, Number(rewardDef.days) || 1);
-    const { advanceLoginStreakProgress } = require('./dailyStreakService');
-    const advance = await advanceLoginStreakProgress(user, advanceDays, {
-      idempotencyKey: `login_skip:${user._id}:${spinId}`,
-      source: rewardDef.id || 'login_streak_skip',
-    });
-    granted.loginStreakAdvance = advance;
-    granted.daysAdvanced = advanceDays;
-    if (advance.savvyGranted) {
-      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + advance.savvyGranted;
-    }
-  } else if (rewardDef.type === 'free_perk_spin_hour') {
-    const durationMs = Number(rewardDef.durationMs) || 60 * 60 * 1000;
-    const now = Date.now();
-    const currentUntil = pm.freePerkSpinUntil
-      ? new Date(pm.freePerkSpinUntil).getTime()
-      : 0;
-    const base = currentUntil > now ? currentUntil : now;
-    pm.freePerkSpinUntil = new Date(base + durationMs);
-    granted.freePerkSpinUntil = pm.freePerkSpinUntil;
-    granted.freePerkSpinHour = true;
-  } else if (rewardDef.type === 'egg_haul') {
-    const { grantEggHaul } = require('./eggHaulService');
-    const haul = await grantEggHaul(user, `egg_haul:${user._id}:${spinId}`);
-    granted.eggHaul = haul;
-    granted.totalEggsGranted = haul.totalEggs || 0;
-  } else if (rewardDef.type === 'easter_challenge_activator') {
-    const { activateEasterChallenge } = require('./easterChallengeService');
-    const challengeId = rewardDef.challengeId || 'wave3_placeholder';
-    const activation = await activateEasterChallenge(user, challengeId, {
-      idempotencyKey: `easter_activate:${user._id}:${spinId}`,
-      adminBypass: Boolean(rewardDef.adminBypass),
-    });
-    granted.easterChallenge = activation;
-    if (activation.fallbackRequired && activation.slotOccupied) {
-      const { grantSavvyReward } = require('./savvyRewardService');
-      const { REWARD_CLASS } = require('../config/savvyRewardPolicy');
-      const fallback = await grantSavvyReward(user, {
-        rewardType: 'easter_challenge',
-        amount: 5000,
-        baseAmount: 5000,
-        idempotencyKey: `easter_fallback:${user._id}:${spinId}`,
-        note: 'Easter challenge slot occupied — Savvy fallback',
-        meta: {
-          rewardClass: REWARD_CLASS.FIXED,
-          multiplierEligible: false,
-          fallbackReason: 'slot_occupied',
-          activeChallengeId: activation.activeChallengeId,
-        },
-      });
-      granted.easterChallengeFallback = true;
-      granted.savvyGranted = (Number(granted.savvyGranted) || 0) + (fallback.amount || 0);
-      granted.label = 'Challenge Slot Occupied — +5,000 Savvy';
-    }
-  } else if (rewardDef.type === 'supply_drop') {
-    const drop = await createSupplyDrop({
-      scope: 'user',
-      userId: user._id,
-      source: 'perk_machine',
-    });
-    granted.supplyDropId = drop.dropId;
-    granted.supplyDrop = drop;
-    granted.supplyDropLabel = drop.rewardLabel || rewardDef.label;
+  const handler = resolveGrantHandler(rewardDef.type);
+  try {
+    validateRewardBeforeGrant(rewardDef);
+    const grantResult = await executePerkMachineRewardGrant(user, rewardDef, spinId, pm);
+    granted = { ...granted, ...grantResult };
+  } catch (err) {
+    throw enrichGrantError(err, rewardDef, handler);
   }
 
   user.markModified('perkMachine');
@@ -710,25 +558,39 @@ async function refundFailedSpinSavvy(user, { spinId, amount, spendSource }) {
 }
 
 async function spinPerkMachine(user, options = {}) {
+  const trace = createSpinTracer(options.spinTraceId);
+  const spinTraceId = trace.spinTraceId;
   const userId = user._id;
   const mode = String(options.mode || '').trim();
+  const isFreeSpin = mode === SPIN_MODES.FREE;
+
+  trace.log('START', { userId: String(userId), mode, isFreeSpin });
+
   const config = getSpinConfig(mode);
   if (!config) {
     const err = new Error('Invalid spin mode');
     err.status = 400;
     err.code = 'INVALID_MODE';
+    err.spinTraceId = spinTraceId;
+    trace.logError('REQUEST_PARSED', err, { mode });
     throw err;
   }
 
   let lockedUser;
   let spinContext = null;
   try {
-    lockedUser = await acquirePerkSpinLock(userId);
-    assertSpinCooldown(lockedUser, options.adminBypassCost);
+    lockedUser = await trace.runStage('LOCK_ACQUIRE', () => acquirePerkSpinLock(userId));
+    trace.runStageSync('SPIN_COOLDOWN_CHECK', () => {
+      assertSpinCooldown(lockedUser, options.adminBypassCost);
+      return {};
+    });
     user = lockedUser;
     ensurePerkMachineDoc(user);
+    trace.logOk('LEGACY_STATE_SANITIZED', {
+      spinHeatTierIndex: user.perkMachine?.spinHeatTierIndex ?? 0,
+    });
 
-    logPerkSpin('USER_LOADED', {
+    trace.logOk('USER_LOADED', {
       userId: String(userId),
       hasPerkMachine: Boolean(user.perkMachine),
       spinHeatTierIndex: user.perkMachine?.spinHeatTierIndex ?? 0,
@@ -739,8 +601,7 @@ async function spinPerkMachine(user, options = {}) {
     }
 
     const heatBeforeSpin = getSpinHeatState(user);
-    logPerkSpin('HEAT_CALCULATED', {
-      userId: String(userId),
+    trace.logOk('HEAT_STATE_READ', {
       heatMultiplier: heatBeforeSpin.multiplier,
       heatTierIndex: heatBeforeSpin.tierIndex,
     });
@@ -756,6 +617,8 @@ async function spinPerkMachine(user, options = {}) {
     let freeSpinRollback = null;
     const balanceBefore = Math.round(Number(user.savvyPoints) || 0);
     const freeSpinAvailable = canUseFreeSpin(user);
+
+    trace.logOk('BALANCE_READ', { balance: balanceBefore, isFreeSpin });
 
     const savvySale = await getActiveSavvySale();
 
@@ -775,6 +638,7 @@ async function spinPerkMachine(user, options = {}) {
           usedExtraFreeSpin &&
           eggExtraBefore > (Number(user.perkMachine?.eggInventory?.extraFreeSpin) || 0),
       };
+      trace.logOk('BALANCE_VALIDATED', { balance: balanceBefore, required: 0, isFreeSpin: true });
     } else {
       const salePricing = resolveSavvySaleSpinPricing(savvyCost, savvySale);
       originalSavvyCost = salePricing.originalCost;
@@ -833,22 +697,30 @@ async function spinPerkMachine(user, options = {}) {
           err.code = 'INSUFFICIENT_SAVVY';
           err.required = savvyCost;
           err.balance = balance;
+          err.spinTraceId = spinTraceId;
+          trace.logError('BALANCE_VALIDATED', err, { balance, required: savvyCost });
           throw err;
         }
       } else {
         savvyCost = 0;
         originalSavvyCost = 0;
       }
+      trace.logOk('BALANCE_VALIDATED', { balance, required: savvyCost, isFreeSpin: false });
     }
 
-    logPerkSpin('PRICE_CALCULATED', {
-      userId: String(userId),
-      mode,
+    trace.logOk('REQUEST_PARSED', {
+      spinType: mode,
       slotCount: config.slots,
-      basePrice: config.savvy,
+      isFreeSpin,
+      baseCost: config.savvy,
       heatMultiplier: heatBeforeSpin.multiplier,
-      effectivePrice: savvyCost,
-      freeSpinRequested: mode === SPIN_MODES.FREE,
+      effectiveCost: savvyCost,
+      effectiveCostIsNaN: Number.isNaN(Number(savvyCost)),
+    });
+    trace.logOk('HEAT_PRICE_CALCULATED', {
+      baseCost: config.savvy,
+      heatMultiplier: heatBeforeSpin.multiplier,
+      effectiveCost: savvyCost,
     });
 
     const pm = ensurePerkMachineDoc(user);
@@ -858,6 +730,7 @@ async function spinPerkMachine(user, options = {}) {
 
     spinContext = {
       stage: 'init',
+      spinTraceId,
       userId: String(userId),
       spinId,
       mode,
@@ -866,7 +739,7 @@ async function spinPerkMachine(user, options = {}) {
       heatMultiplier: heatBeforeSpin.multiplier,
       effectivePrice: savvyCost,
       balanceBefore,
-      freeSpinRequested: mode === SPIN_MODES.FREE,
+      freeSpinRequested: isFreeSpin,
       freeSpinAvailable,
       savvyCost,
       savvySpent: false,
@@ -877,22 +750,8 @@ async function spinPerkMachine(user, options = {}) {
       ...(freeSpinRollback || {}),
     };
 
-    logPerkSpin('START', {
-      userId: spinContext.userId,
-      spinId,
-      slotCount: slots,
-      basePrice: config.savvy,
-      heatMultiplier: heatBeforeSpin.multiplier,
-      effectivePrice: savvyCost,
-      balanceBefore,
-      freeSpinRequested: mode === SPIN_MODES.FREE,
-      freeSpinAvailable,
-    });
-
     const pool = buildWeightedPool(tier, options.forceRewardId || null);
-    logPerkSpin('REWARD_POOL_LOADED', {
-      userId: spinContext.userId,
-      spinId,
+    trace.logOk('REWARD_POOL_VALIDATED', {
       poolSize: pool.length,
       forcedRewardId: options.forceRewardId || null,
     });
@@ -904,23 +763,25 @@ async function spinPerkMachine(user, options = {}) {
       const picked = pickWeightedReward(slotPool);
       const validation = validateSpinRewardConfig(picked);
       if (!validation.valid) {
-        console.error('[PERK_SPIN_ERROR]', {
-          stage: 'reward_validation',
-          userId: spinContext.userId,
-          spinId,
-          slotIndex: i,
-          rewardId: validation.rewardId,
-          code: validation.code,
-          message: validation.message,
-        });
         const err = new Error(validation.message || `Invalid reward configuration for slot ${i + 1}`);
         err.status = 500;
         err.code = validation.code || 'INVALID_REWARD_CONFIG';
         err.rewardKey = validation.rewardId || picked?.id || null;
+        err.spinTraceId = spinTraceId;
+        trace.logError('REWARD_POOL_VALIDATED', err, {
+          slotIndex: i,
+          rewardId: validation.rewardId,
+          code: validation.code,
+        });
         throw err;
       }
       rawPicks.push(picked);
     }
+    trace.logOk('REWARDS_SELECTED', {
+      slotCount: slots,
+      rewardIds: rawPicks.map((r) => r.id),
+      rewardTypes: rawPicks.map((r) => r.type),
+    });
 
     const multiplierCount = countMultiplierTiles(rawPicks);
     const tileResult = computeSpinMultiplier(multiplierCount);
@@ -938,9 +799,20 @@ async function spinPerkMachine(user, options = {}) {
     let totalNukeBonusSavvy = 0;
 
     spinContext.stage = 'reward_generation';
+    trace.logStart('DB_TRANSACTION', { note: 'logical spin transaction — rewards then persist' });
     for (const pick of rawPicks) {
       if (pick.type === MULTIPLIER_TYPE) {
-        rewards.push(await applyReward(user, pick, `${spinId}:${grantIndex}`));
+        rewards.push(
+          await trace.runStage(
+            `REWARD_GRANT_${grantIndex}`,
+            () => applyReward(user, pick, `${spinId}:${grantIndex}`),
+            {
+              ...sanitizeRewardForGrantLog(pick),
+              slot: grantIndex,
+              handler: resolveGrantHandler(pick.type),
+            }
+          )
+        );
         grantIndex += 1;
         continue;
       }
@@ -951,57 +823,77 @@ async function spinPerkMachine(user, options = {}) {
         scaled = nukeApplied.reward;
         totalNukeBonusSavvy += nukeApplied.nukeBonusSavvy || 0;
       }
-      const granted = await applyReward(user, scaled, `${spinId}:${grantIndex}`);
+      const grantLogPayload = {
+        ...sanitizeRewardForGrantLog(scaled),
+        slot: grantIndex,
+        handler: resolveGrantHandler(scaled.type),
+      };
+      validateRewardBeforeGrant(scaled);
+      const granted = await trace.runStage(
+        `REWARD_GRANT_${grantIndex}`,
+        () => applyReward(user, scaled, `${spinId}:${grantIndex}`),
+        grantLogPayload
+      );
       if (scaled.nukeBonusSavvy) granted.nukeBonusSavvy = scaled.nukeBonusSavvy;
       if (scaled.nukeMultiplier) granted.nukeMultiplier = scaled.nukeMultiplier;
       rewards.push(granted);
       grantIndex += 1;
     }
-
-    logPerkSpin('REWARDS_GENERATED', {
-      userId: spinContext.userId,
-      spinId,
-      slotCount: slots,
+    trace.logOk('REWARD_GRANT', {
+      count: rewards.length,
       rewardTypes: rewards.map((r) => r.type),
-      rewardIds: rawPicks.map((r) => r.id),
     });
 
     spinContext.stage = 'savvy_spend';
     if (mode !== SPIN_MODES.FREE && savvyCost > 0 && !options.adminBypassCost) {
       const spendSource = savvySaleApplied ? 'perk_spin_sale_discount' : 'perk_machine_spin';
       spinContext.spendSource = spendSource;
-      const spend = await spendSavvyReward(user, {
-        amount: savvyCost,
-        source: spendSource,
-        idempotencyKey: `perk_spin_spend:${spinId}`,
-        note: savvySaleApplied
-          ? `Perk Machine spin (${mode}) — Savvy Sale ${savvySaleSavings} off`
-          : `Perk Machine spin (${mode})`,
-        meta: {
-          mode,
-          spinId,
-          savvySaleApplied,
-          savvySaleEventId: savvySale?.eventId || null,
-          originalSavvyCost,
-          savvySaleSavings,
-          actualCostCharged: savvyCost,
-          spinHeatMultiplier: heatBeforeSpin.multiplier,
-        },
-      });
+      const spend = await trace.runStage(
+        'WALLET_DEBIT',
+        () =>
+          spendSavvyReward(user, {
+            amount: savvyCost,
+            source: spendSource,
+            idempotencyKey: `perk_spin_spend:${spinId}`,
+            note: savvySaleApplied
+              ? `Perk Machine spin (${mode}) — Savvy Sale ${savvySaleSavings} off`
+              : `Perk Machine spin (${mode})`,
+            meta: {
+              mode,
+              spinId,
+              spinTraceId,
+              savvySaleApplied,
+              savvySaleEventId: savvySale?.eventId || null,
+              originalSavvyCost,
+              savvySaleSavings,
+              actualCostCharged: savvyCost,
+              spinHeatMultiplier: heatBeforeSpin.multiplier,
+            },
+          }),
+        { amount: savvyCost, source: spendSource, isFreeSpin: false }
+      );
       if (!spend.spent && !spend.duplicate) {
         const err = new Error(`Not enough Savvy. You need ${savvyCost} Savvy for this spin.`);
         err.status = 402;
         err.code = 'INSUFFICIENT_SAVVY';
         err.required = savvyCost;
         err.balance = Math.round(Number(user.savvyPoints) || 0);
+        err.spinTraceId = spinTraceId;
+        trace.logError('WALLET_DEBIT', err, { amount: savvyCost });
         throw err;
       }
       spinContext.savvySpent = Boolean(spend.spent);
+      trace.logOk('WALLET_LEDGER', {
+        transactionId: spend.transactionId || null,
+        balanceAfter: spend.newBalance,
+        spent: spend.spent,
+      });
+    } else {
+      trace.logOk('WALLET_DEBIT', { skipped: true, reason: isFreeSpin ? 'free_spin' : 'zero_cost' });
+      trace.logOk('WALLET_LEDGER', { skipped: true });
     }
 
-    logPerkSpin('BALANCE_UPDATED', {
-      userId: spinContext.userId,
-      spinId,
+    trace.logOk('BALANCE_UPDATED', {
       savvySpent: spinContext.savvySpent,
       savvyCost: mode === SPIN_MODES.FREE ? 0 : savvyCost,
       balanceAfterSpend: Math.round(Number(user.savvyPoints) || 0),
@@ -1037,10 +929,18 @@ async function spinPerkMachine(user, options = {}) {
       createdAt: new Date(),
     };
 
-    pm.spinHistory.push(historyEntry);
-    if (pm.spinHistory.length > MAX_HISTORY) {
-      pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
-    }
+    trace.runStageSync(
+      'SPIN_HISTORY',
+      () => {
+        pm.spinHistory.push(historyEntry);
+        if (pm.spinHistory.length > MAX_HISTORY) {
+          pm.spinHistory = pm.spinHistory.slice(-MAX_HISTORY);
+        }
+        user.markModified('perkMachine');
+        return { historyLength: pm.spinHistory.length };
+      },
+      { mode, slots: historyEntry.slots, savvyCost: historyEntry.savvyCost }
+    );
 
     if (savvySaleSavings > 0 && !usedPaid3Token && !usedPaid2Token) {
       try {
@@ -1051,7 +951,11 @@ async function spinPerkMachine(user, options = {}) {
       }
     }
 
-    const ticketResult = recordSpinForTournamentTicket(user, pm);
+    const ticketResult = trace.runStageSync(
+      'TOURNAMENT_PROGRESS',
+      () => recordSpinForTournamentTicket(user, pm),
+      { isFreeSpin }
+    );
 
     let spinHeatAdvance = null;
     if (
@@ -1061,7 +965,17 @@ async function spinPerkMachine(user, options = {}) {
       !usedPaid3Token &&
       !usedPaid2Token
     ) {
-      spinHeatAdvance = advanceSpinHeat(user);
+      spinHeatAdvance = trace.runStageSync(
+        'HEAT_UPDATE',
+        () => advanceSpinHeat(user),
+        {
+          heatTierBefore: heatBeforeSpin.tierIndex,
+          heatMultiplierBefore: heatBeforeSpin.multiplier,
+        }
+      );
+      user.markModified('perkMachine');
+    } else {
+      trace.logOk('HEAT_UPDATE', { skipped: true, isFreeSpin });
     }
 
     const combinedMultiplier =
@@ -1087,33 +1001,43 @@ async function spinPerkMachine(user, options = {}) {
       });
     }
 
-    const nukeProgress = recordQualifyingNukeSpin(user, {
-      spinId,
-      mode,
-      savvyCostCharged: finalCost,
-      usedPaid3Token,
-      usedPaid2Token,
-      adminBypass: Boolean(options.adminBypassCost),
-    });
+    const nukeProgress = trace.runStageSync(
+      'NUKE_PROGRESS',
+      () =>
+        recordQualifyingNukeSpin(user, {
+          spinId,
+          mode,
+          savvyCostCharged: finalCost,
+          usedPaid3Token,
+          usedPaid2Token,
+          adminBypass: Boolean(options.adminBypassCost),
+        }),
+      { isFreeSpin, savvyCostCharged: finalCost }
+    );
 
     pm.lastSpinAt = new Date();
-    user.markModified('perkMachine');
     spinContext.stage = 'persist';
-    await user.save();
+    await trace.runStage(
+      'USER_SAVE',
+      async () => {
+        sanitizePerkMachineForPersist(user);
+        await trace.validateUserDoc(user, 'USER');
+        await user.save();
+        return {
+          heatTierIndex: user.perkMachine?.spinHeatTierIndex,
+          balanceAfter: Math.round(Number(user.savvyPoints) || 0),
+        };
+      },
+      { isFreeSpin }
+    );
+    trace.logOk('DB_TRANSACTION_COMMIT', { spinId, mode });
 
-    logPerkSpin('PERSISTED', {
-      userId: spinContext.userId,
-      spinId,
-      heatTierIndex: user.perkMachine?.spinHeatTierIndex,
-    });
-
-    logPerkSpin('SUCCESS', {
-      userId: spinContext.userId,
-      spinId,
+    trace.logOk('SUCCESS', {
       slotCount: slots,
       effectivePrice: finalCost,
       balanceAfter: Math.round(Number(user.savvyPoints) || 0),
       heatTierIndex: user.perkMachine?.spinHeatTierIndex,
+      isFreeSpin,
     });
 
     if (nukeProgress?.thresholdReached) {
@@ -1158,6 +1082,7 @@ async function spinPerkMachine(user, options = {}) {
     }
 
     return {
+      spinTraceId,
       spinId,
       mode,
       slots,
@@ -1218,8 +1143,15 @@ async function spinPerkMachine(user, options = {}) {
       status,
     };
   } catch (err) {
+    trace.logError(err.failedStage || spinContext?.stage || 'unknown', err, {
+      userId: spinContext?.userId || String(userId),
+      spinId: spinContext?.spinId || null,
+      mode: spinContext?.mode || mode,
+      lastOkStage: trace.getLastOkStage(),
+    });
     if (spinContext) {
       logPerkSpinFailed(spinContext.stage || 'unknown', err, {
+        spinTraceId,
         userId: spinContext.userId,
         spinId: spinContext.spinId,
         mode: spinContext.mode,
@@ -1228,6 +1160,7 @@ async function spinPerkMachine(user, options = {}) {
         heatMultiplier: spinContext.heatMultiplier,
         heatTierIndex: user?.perkMachine?.spinHeatTierIndex,
         savvySpent: spinContext.savvySpent,
+        lastOkStage: trace.getLastOkStage(),
       });
       if (spinContext.savvySpent && spinContext.savvyCost > 0) {
         try {
@@ -1253,6 +1186,9 @@ async function spinPerkMachine(user, options = {}) {
       mapped.code = err.code;
       mapped.required = err.required;
       mapped.balance = err.balance;
+      mapped.spinTraceId = spinTraceId;
+      mapped.failedStage = err.failedStage || 'LOCK_ACQUIRE';
+      mapped.lastOkStage = trace.getLastOkStage();
       throw mapped;
     }
     if (err?.name === 'InsufficientSavvyError') {
@@ -1261,14 +1197,21 @@ async function spinPerkMachine(user, options = {}) {
       mapped.code = 'INSUFFICIENT_SAVVY';
       mapped.required = err.required;
       mapped.balance = err.balance;
+      mapped.spinTraceId = spinTraceId;
+      mapped.failedStage = err.failedStage || 'WALLET_DEBIT';
+      mapped.lastOkStage = trace.getLastOkStage();
       throw mapped;
     }
     if (err?.name === 'ValidationError' || err?.name === 'CastError') {
       const mapped = new Error(err.message || 'Spin reward validation failed');
       mapped.status = 500;
       mapped.code = 'SPIN_FAILED';
+      mapped.spinTraceId = spinTraceId;
+      mapped.failedStage = err.failedStage || spinContext?.stage || 'USER_SAVE';
+      mapped.lastOkStage = trace.getLastOkStage();
       throw mapped;
     }
+    if (err && !err.spinTraceId) err.spinTraceId = spinTraceId;
     throw err;
   } finally {
     await releasePerkSpinLock(userId);

@@ -360,13 +360,8 @@ const KNOWN_SPIN_REWARD_TYPES = new Set([
 ]);
 
 function getSupplyDropSourceEnumValues() {
-  try {
-    const SupplyDrop = require('../models/SupplyDrop');
-    const path = SupplyDrop.schema.path('source');
-    return path?.enumValues || path?.options?.enum || [];
-  } catch {
-    return [];
-  }
+  const { SUPPLY_DROP_SOURCES } = require('./perkMachineSources');
+  return [...SUPPLY_DROP_SOURCES];
 }
 
 /**
@@ -433,12 +428,15 @@ function validateSpinRewardConfig(rewardDef) {
   }
 
   if (rewardDef.type === 'supply_drop') {
-    const sources = getSupplyDropSourceEnumValues();
-    if (!sources.includes('perk_machine')) {
+    try {
+      const { assertSupplyDropSourceAllowed } = require('../services/perkMachineRewardGrant');
+      assertSupplyDropSourceAllowed();
+    } catch (err) {
       return {
         valid: false,
-        code: 'REWARD_CONFIG_UNAVAILABLE',
+        code: err.code || 'REWARD_CONFIG_UNAVAILABLE',
         message:
+          err.message ||
           'Supply Drop reward is unavailable — deploy SupplyDrop source enum perk_machine',
         rewardId,
       };

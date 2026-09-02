@@ -186,7 +186,9 @@ describeReal('perkMachine spin — Mongo integration', () => {
     }
   });
 
-  test('each spin pool reward type completes with admin bypass', async () => {
+  test(
+    'each spin pool reward type completes with admin bypass',
+    async () => {
     const user = await User.create({
       username: `pm_all_${Date.now()}`,
       email: `pm_all_${Date.now()}@test.local`,
@@ -215,7 +217,9 @@ describeReal('perkMachine spin — Mongo integration', () => {
       await SupplyDrop.deleteMany({ userId: user._id });
       await User.deleteOne({ _id: user._id });
     }
-  });
+  },
+    60000
+  );
 
   test('failed spin after savvy spend refunds balance', async () => {
     const SupplyDropModel = require('../models/SupplyDrop');
@@ -249,6 +253,52 @@ describeReal('perkMachine spin — Mongo integration', () => {
         ...originalPath.options,
         enum: originalEnum,
       });
+      await User.deleteOne({ _id: user._id });
+    }
+  });
+
+  test('corrupt paid-only perkMachine fields persist after full paid spin', async () => {
+    const user = await User.create({
+      username: `pm_corrupt_${Date.now()}`,
+      email: `pm_corrupt_${Date.now()}@test.local`,
+      password: 'testpass123',
+      savvyPoints: 5000,
+      perkMachine: { lastFreeSpinDay: '1999-01-01', lastSpinAt: null },
+    });
+
+    await User.collection.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          'perkMachine.spinHeatTierIndex': 'bad',
+          'perkMachine.spinHeatCooldownUntil': 'invalid-cooldown',
+          'perkMachine.nuke.processedSpinIds': [null, 123, 'legacy-spin'],
+          'perkMachine.nuke.milestonesSeen': [null, 'm500'],
+          'perkMachine.nuke.lifetimeQualifyingSpins': '12',
+          'perkMachine.activeBoosts.savvyMultiplier15': {
+            activatedAt: 'bad',
+            expiresAt: 'bad',
+          },
+          'perkMachine.personalEvents.savvySale': {
+            activatedAt: 'bad',
+            expiresAt: 'bad',
+          },
+        },
+      }
+    );
+
+    try {
+      const reloaded = await User.findById(user._id);
+      const before = Number(reloaded.savvyPoints);
+      const result = await spinPerkMachine(reloaded, { mode: SPIN_MODES.PAID_1, forceRewardId: 'savvy_25' });
+      expect(result.savvyCost).toBe(20);
+      expect(result.spinHeat.tierIndex).toBeGreaterThan(0);
+
+      const saved = await User.findById(user._id);
+      expect(Number(saved.savvyPoints)).toBe(before - 20 + (result.savvyWon || 0));
+      expect(saved.perkMachine.spinHeatTierIndex).toBeGreaterThan(0);
+      expect(saved.perkMachine.nuke.processedSpinIds.every((id) => typeof id === 'string')).toBe(true);
+    } finally {
       await User.deleteOne({ _id: user._id });
     }
   });

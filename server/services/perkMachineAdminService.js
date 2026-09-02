@@ -2,9 +2,16 @@
  * Admin QA helpers for Savvy Perk Machine.
  */
 
+const crypto = require('crypto');
 const { auditFireAndForget } = require('./securityAuditService');
 const { emptyEggInventory, HATCHABLE_EGG_TIERS } = require('../config/perkMachineRewards');
-const { ensurePerkMachineDoc, getPerkMachineStatus } = require('./perkMachineService');
+const { ensurePerkMachineDoc, getPerkMachineStatus, applyReward } = require('./perkMachineService');
+const { REWARD_BY_ID } = require('../config/perkMachineRewards');
+const {
+  sanitizeRewardForGrantLog,
+  resolveGrantHandler,
+  validateRewardBeforeGrant,
+} = require('./perkMachineRewardGrant');
 const { creditSavvy } = require('./savvyBalanceService');
 const {
   adminSetNukeProgress,
@@ -129,6 +136,38 @@ async function adminGetNukeStateForUserId(userId) {
   return { userId: String(user._id), nuke: formatNukeForClient(user) };
 }
 
+async function adminGrantRewardTest(user, rewardId, adminUser) {
+  const rewardDef = REWARD_BY_ID[String(rewardId || '').trim()];
+  if (!rewardDef) {
+    const err = new Error(`Unknown reward id: ${rewardId}`);
+    err.status = 400;
+    err.code = 'INVALID_REWARD_ID';
+    throw err;
+  }
+
+  validateRewardBeforeGrant(rewardDef);
+  const spinId = `admin_reward_test:${crypto.randomUUID()}`;
+  const savvyBefore = Math.round(Number(user.savvyPoints) || 0);
+  const granted = await applyReward(user, { ...rewardDef }, spinId);
+  user.markModified('perkMachine');
+  await user.save();
+
+  const log = logAdminPerkAction('grant_reward_test', adminUser, user, {
+    rewardId: rewardDef.id,
+    rewardType: rewardDef.type,
+    handler: resolveGrantHandler(rewardDef.type),
+    preview: sanitizeRewardForGrantLog(rewardDef),
+  });
+
+  return {
+    granted,
+    savvyBefore,
+    savvyAfter: Math.round(Number(user.savvyPoints) || 0),
+    status: getPerkMachineStatus(user),
+    adminLog: log,
+  };
+}
+
 module.exports = {
   adminResetFreeSpin,
   adminGrantSavvy,
@@ -139,4 +178,5 @@ module.exports = {
   adminEndNukeEvent,
   adminGetNukeState,
   adminGetNukeStateForUserId,
+  adminGrantRewardTest,
 };
