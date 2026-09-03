@@ -26,7 +26,8 @@ describe('perkMachine handler wiring', () => {
     const result = verifyPerkMachineGrantHandlers({ failOnError: false });
     expect(result.allHandlersValid).toBe(true);
     expect(result.grantSavvyReward).toBe('function');
-    expect(EXTERNAL_HANDLER_CHECKS.length).toBeGreaterThanOrEqual(3);
+    expect(result.spendSavvyReward).toBe('function');
+    expect(EXTERNAL_HANDLER_CHECKS.length).toBeGreaterThanOrEqual(4);
   });
 
   test('spin failure payload includes serverCommitSha and exception fields', () => {
