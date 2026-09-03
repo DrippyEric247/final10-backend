@@ -1652,4 +1652,130 @@ export async function recordPartyEvent(partyId, payload) {
   return data;
 }
 
+// --- Savvy Watch (live stream participation rewards) ---
+
+export async function getSavvyWatchEnabled() {
+  const { data } = await api.get('/savvy-watch/enabled');
+  return data;
+}
+
+export async function getSavvyWatchEvent(slug) {
+  const { data } = await api.get(`/savvy-watch/events/${encodeURIComponent(slug)}`);
+  return data;
+}
+
+export async function getSavvyWatchOverlay(slug) {
+  const { data } = await api.get(`/savvy-watch/events/${encodeURIComponent(slug)}/overlay`);
+  return data;
+}
+
+export async function getSavvyWatchSession(slug) {
+  const { data } = await api.get(`/savvy-watch/events/${encodeURIComponent(slug)}/session`);
+  return data;
+}
+
+export async function joinSavvyWatchEvent(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-watch/events/${encodeURIComponent(slug)}/join`, payload);
+  return data;
+}
+
+export async function savvyWatchHeartbeat(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-watch/events/${encodeURIComponent(slug)}/heartbeat`, payload);
+  return data;
+}
+
+export async function claimSavvyWatchCheckpoint(slug, checkpointId) {
+  const { data } = await api.post(
+    `/savvy-watch/events/${encodeURIComponent(slug)}/checkpoints/${encodeURIComponent(checkpointId)}/claim`
+  );
+  return data;
+}
+
+export async function redeemSavvyWatchLiveCode(slug, code) {
+  const { data } = await api.post(`/savvy-watch/events/${encodeURIComponent(slug)}/live-code/redeem`, { code });
+  return data;
+}
+
+export async function getSavvyWatchHistory(limit = 20) {
+  const { data } = await api.get('/savvy-watch/history', { params: { limit } });
+  return data;
+}
+
+export async function getSavvyWatchCompetitionEntries(slug, compSlug) {
+  const { data } = await api.get(
+    `/savvy-watch/events/${encodeURIComponent(slug)}/competitions/${encodeURIComponent(compSlug)}/entries`
+  );
+  return data;
+}
+
+export async function submitSavvyWatchEntry(slug, compSlug, payload) {
+  const { data } = await api.post(
+    `/savvy-watch/events/${encodeURIComponent(slug)}/competitions/${encodeURIComponent(compSlug)}/entries`,
+    payload
+  );
+  return data;
+}
+
+export async function voteSavvyWatchEntry(slug, compSlug, entryId) {
+  const { data } = await api.post(
+    `/savvy-watch/events/${encodeURIComponent(slug)}/competitions/${encodeURIComponent(compSlug)}/vote`,
+    { entryId }
+  );
+  return data;
+}
+
+export async function listSavvyWatchAdminEvents() {
+  const { data } = await api.get('/savvy-watch/admin/events');
+  return data;
+}
+
+export async function createSavvyWatchGtaPreset(overrides = {}) {
+  const { data } = await api.post('/savvy-watch/admin/events/preset/gta-car-meet', overrides);
+  return data;
+}
+
+export async function updateSavvyWatchEventStatus(slug, status) {
+  const { data } = await api.post(`/savvy-watch/admin/events/${encodeURIComponent(slug)}/status`, { status });
+  return data;
+}
+
+export async function createSavvyWatchLiveCode(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-watch/admin/events/${encodeURIComponent(slug)}/live-code`, payload);
+  return data;
+}
+
+export async function expireSavvyWatchLiveCode(liveCodeId) {
+  const { data } = await api.post(`/savvy-watch/admin/live-code/${encodeURIComponent(liveCodeId)}/expire`);
+  return data;
+}
+
+export async function updateSavvyWatchCompetitionStatus(competitionId, status) {
+  const { data } = await api.post(`/savvy-watch/admin/competitions/${encodeURIComponent(competitionId)}/status`, {
+    status,
+  });
+  return data;
+}
+
+export async function moderateSavvyWatchEntry(entryId, action, note) {
+  const { data } = await api.post(`/savvy-watch/admin/entries/${encodeURIComponent(entryId)}/moderate`, {
+    action,
+    note,
+  });
+  return data;
+}
+
+export async function setSavvyWatchHostScore(entryId, score) {
+  const { data } = await api.post(`/savvy-watch/admin/entries/${encodeURIComponent(entryId)}/host-score`, { score });
+  return data;
+}
+
+export async function lockSavvyWatchCompetition(competitionId) {
+  const { data } = await api.post(`/savvy-watch/admin/competitions/${encodeURIComponent(competitionId)}/lock`);
+  return data;
+}
+
+export async function awardSavvyWatchCompetition(competitionId) {
+  const { data } = await api.post(`/savvy-watch/admin/competitions/${encodeURIComponent(competitionId)}/award`);
+  return data;
+}
 

@@ -17,6 +17,7 @@ const ADMIN_LINKS = [
   { label: "Launch KPIs", path: "/launch-kpis", description: "Growth and funnel metrics" },
   { label: "Growth levers", path: "/growth-levers", description: "Internal growth experiments" },
   { label: "Production readiness", path: "/production-readiness", description: "Launch checklist" },
+  { label: "Savvy Watch", path: "/admin/savvy-watch", description: "Live stream events, QR, live codes, competitions" },
   { label: "Events Hub (admin QA)", path: "/events", description: "Live drops, Savvy Sale, Scout Support testing" },
 ];
 

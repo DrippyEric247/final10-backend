@@ -286,6 +286,26 @@ const easterEggRedeemLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many redemption attempts. Try again shortly.'),
 });
 
+const savvyWatchHeartbeatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => (isBetaMode() ? 120 : 90),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many Savvy Watch heartbeats. Slow down.'),
+});
+
+const savvyWatchClaimLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => caps().easterEggRedeem || 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many Savvy Watch claims. Try again shortly.'),
+});
+
 const founderMessageLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 8,
@@ -362,6 +382,8 @@ module.exports = {
   scoutFlightHeartbeatLimiter,
   scoutMissionClaimLimiter,
   easterEggRedeemLimiter,
+  savvyWatchHeartbeatLimiter,
+  savvyWatchClaimLimiter,
   founderMessageLimiter,
   alertMutationLimiter,
   bestMoveConsumeLimiter,

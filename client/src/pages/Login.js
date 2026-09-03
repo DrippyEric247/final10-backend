@@ -1,6 +1,6 @@
 // client/src/pages/Login.js
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
@@ -18,6 +18,8 @@ import { parseApiError } from '../lib/apiErrorParsing';
 export default function Login() {
   const { login, refreshProfile } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo || null;
   const [form, setForm] = useState({ email: '', password: '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -47,20 +49,23 @@ export default function Login() {
         }
         if (claim?.granted && !claim?.alreadyClaimed) {
           nav(
-            hasCompletedOnboarding(onboardingUserId(signedInUser))
-              ? '/daily-streak'
-              : '/onboarding/preferences',
+            returnTo ||
+              (hasCompletedOnboarding(onboardingUserId(signedInUser))
+                ? '/daily-streak'
+                : '/onboarding/preferences'),
             {
               replace: true,
-              state: {
-                streakClaim: {
-                  scoutMessage: claim.scoutMessage,
-                  grants: claim.grants,
-                  shieldUsed: claim.shieldUsed,
-                  hiddenAchievements: claim.hiddenAchievements,
-                  comeback: claim.comeback,
-                },
-              },
+              state: returnTo
+                ? undefined
+                : {
+                    streakClaim: {
+                      scoutMessage: claim.scoutMessage,
+                      grants: claim.grants,
+                      shieldUsed: claim.shieldUsed,
+                      hiddenAchievements: claim.hiddenAchievements,
+                      comeback: claim.comeback,
+                    },
+                  },
             }
           );
           return;
@@ -72,8 +77,8 @@ export default function Login() {
         triggerStreakReward(loginPower.streakDays);
       }
       nav(
-        hasCompletedOnboarding(onboardingUserId(signedInUser)) ? '/' : '/onboarding/preferences',
-        { replace: true }
+        returnTo || (hasCompletedOnboarding(onboardingUserId(signedInUser)) ? '/' : '/onboarding/preferences'),
+        { replace: true, ...(returnTo ? { state: { welcome: returnTo.includes('/watch/') ? '1' : undefined } } : {}) }
       );
     } catch (e) {
       const { message } = parseApiError(e);

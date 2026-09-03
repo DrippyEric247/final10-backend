@@ -250,6 +250,14 @@ try {
   process.exit(1);
 }
 
+try {
+  const { verifySavvyWatchHandlers } = require('./services/savvyWatchHandlerCheck');
+  verifySavvyWatchHandlers({ failOnError: false });
+  console.log('[startup] boot phase=savvy_watch_handlers_ok');
+} catch (swErr) {
+  console.warn('[startup] Savvy Watch handler check warning:', swErr?.message || swErr);
+}
+
 auditStartup({
   nodeEnv: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 8080,
@@ -263,6 +271,7 @@ app.use('/api/perk-machine', require('./routes/perkMachineRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/scout-flight', require('./routes/scoutFlightRoutes'));
 app.use('/api/events', require('./routes/eventsRoutes'));
+app.use('/api/savvy-watch', require('./routes/savvyWatchRoutes'));
 app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));
 app.use('/api/eggs', require('./routes/eggExchangeRoutes'));
 app.use('/api/egg-camo', require('./routes/eggCamoRoutes'));

@@ -1,5 +1,6 @@
 const C = require('./points');
 const { isBetaMode } = require('./betaMode');
+const { isSavvyWatchEnabled, isSavvyWatchAdminOnly } = require('./savvyWatchConfig');
 
 function getPublicConfig() {
   return {
@@ -10,6 +11,8 @@ function getPublicConfig() {
     badgeTiers: C.BADGE_TIERS,
     discountRatio: C.DISCOUNT_RATIO,
     betaMode: isBetaMode(),
+    savvyWatchEnabled: isSavvyWatchEnabled(),
+    savvyWatchAdminOnly: isSavvyWatchAdminOnly(),
     version: 'v1',
   };
 }

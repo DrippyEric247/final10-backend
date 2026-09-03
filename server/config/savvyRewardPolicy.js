@@ -65,6 +65,13 @@ const FIXED_SOURCES = new Set([
   'flip_sale_stack',
   // Scout Flight nuke bonus (fixed advertised amount — do not alter nuke logic)
   'scout_flight_nuke',
+  // Savvy Watch live stream participation
+  'savvy_watch',
+  'savvy_watch_join',
+  'savvy_watch_checkpoint',
+  'savvy_watch_live_code',
+  'savvy_watch_competition',
+  'savvy_watch_host_award',
   // Legacy profile points — not wallet savvy
   'savvy_credit_convert',
   'savvy_store_redeem',

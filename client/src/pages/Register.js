@@ -1,6 +1,6 @@
 // client/src/pages/Register.js
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Final10Logo from '../components/Final10Logo';
 import Final10Slogan from '../components/branding/Final10Slogan';
@@ -24,6 +24,8 @@ const STRENGTH_COLORS = ['', 'bg-red-500', 'bg-yellow-500', 'bg-emerald-500', 'b
 export default function Register() {
   const { register, refreshProfile } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo || null;
   const [qs] = useSearchParams();
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -105,6 +107,10 @@ export default function Register() {
       }
       if (loginPower.changed) {
         triggerStreakReward(loginPower.streakDays);
+      }
+      if (returnTo && String(returnTo).startsWith('/watch/')) {
+        nav(`${returnTo}${returnTo.includes('?') ? '&' : '?'}welcome=1`, { replace: true });
+        return;
       }
       // Every new account starts with category selection — never reuse
       // device-wide guest onboarding flags from prior sessions.

@@ -106,6 +106,10 @@ import DeleteAccount from "./pages/DeleteAccount";
 import Settings from "./pages/Settings";
 import SavvyShopPage from "./pages/SavvyShopPage";
 import SavvyShopStudio from "./pages/SavvyShopStudio";
+import SavvyWatchEventPage from "./pages/SavvyWatchEventPage";
+import SavvyWatchOverlayPage from "./pages/SavvyWatchOverlayPage";
+import SavvyWatchAdminPage from "./pages/SavvyWatchAdminPage";
+import SavvyWatchHistoryPage from "./pages/SavvyWatchHistoryPage";
 import FoundingTesterMission from "./pages/FoundingTesterMission";
 import FoundingHall from "./pages/FoundingHall";
 import AppTelemetry from "./components/AppTelemetry";
@@ -168,6 +172,7 @@ const ONBOARDING_EXEMPT_PREFIXES = [
   "/terms",
   "/support",
   "/c/",
+  "/watch/",
 ];
 
 function OnboardingRedirect() {
@@ -199,6 +204,9 @@ export default function App() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isOnboardingRoute = /^\/onboarding\b/.test(location.pathname);
+  const isSavvyWatchRoute = /^\/watch\b/.test(location.pathname);
+  const isSavvyWatchOverlayRoute = /^\/watch\/[^/]+\/overlay\/?$/.test(location.pathname);
+  const isMinimalChromeRoute = isSavvyWatchRoute || isOnboardingRoute;
   const onboardingComplete = user ? hasCompletedOnboarding(onboardingUserId(user)) : true;
   const showPostOnboardingFtue = Boolean(user) && onboardingComplete && !isOnboardingRoute;
   const entitlement = useEntitlement(Boolean(user));
@@ -281,28 +289,30 @@ export default function App() {
         {process.env.NODE_ENV !== 'production' ? <DevModeBadge /> : null}
         
         {/* Use the new Navigation component */}
-        <Navigation />
-        <MobileMoreMenuOverlay />
-        <SavvyScoutUpdatingCard />
-        {!isOnboardingRoute ? <UniversalBoostProgressBar /> : null}
-        <Final10RewardHost />
-        <LiveEventsHost />
-        <EventActivationHost />
-        <ProgressionRecapHost />
-        <CallingCardUnlockCeremony />
-        <CamoLockerHost />
-        <ContractsHost />
-        <SmartCoachHost enabled={Boolean(user)} />
-        <SavvyScoutVoiceHost />
-        <ProgressionCelebrationHost />
-        <InventoryActivationHost />
-        <Final10SideAssistant />
-        <TourHost enabled={showPostOnboardingFtue} />
-        {user ? <TabJourneyPanel /> : null}
-        {user ? <PartyDock /> : null}
-        {user ? <EventsFloatingTab /> : null}
-        <SavvyFirstRunExperience user={showPostOnboardingFtue ? user : null} />
-        <SavvyInteractiveDemos enabled={showPostOnboardingFtue} />
+        {!isSavvyWatchRoute ? <Navigation /> : null}
+        {!isSavvyWatchRoute ? <MobileMoreMenuOverlay /> : null}
+        {!isMinimalChromeRoute ? <SavvyScoutUpdatingCard /> : null}
+        {!isMinimalChromeRoute ? <UniversalBoostProgressBar /> : null}
+        {!isSavvyWatchOverlayRoute ? <Final10RewardHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <LiveEventsHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <EventActivationHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <ProgressionRecapHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <CallingCardUnlockCeremony /> : null}
+        {!isSavvyWatchOverlayRoute ? <CamoLockerHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <ContractsHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <SmartCoachHost enabled={Boolean(user)} /> : null}
+        {!isSavvyWatchOverlayRoute ? <SavvyScoutVoiceHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <ProgressionCelebrationHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <InventoryActivationHost /> : null}
+        {!isSavvyWatchOverlayRoute ? <Final10SideAssistant /> : null}
+        {!isSavvyWatchOverlayRoute ? <TourHost enabled={showPostOnboardingFtue} /> : null}
+        {user && !isSavvyWatchRoute ? <TabJourneyPanel /> : null}
+        {user && !isSavvyWatchRoute ? <PartyDock /> : null}
+        {user && !isSavvyWatchRoute ? <EventsFloatingTab /> : null}
+        {!isSavvyWatchOverlayRoute ? (
+          <SavvyFirstRunExperience user={showPostOnboardingFtue ? user : null} />
+        ) : null}
+        {!isSavvyWatchOverlayRoute ? <SavvyInteractiveDemos enabled={showPostOnboardingFtue} /> : null}
         {showStartupBoot && !isOnboardingRoute ? (
           <StartupBootSequence
             appName="Final10"
@@ -322,6 +332,7 @@ export default function App() {
         ) : null}
 
         {/* Keep the existing header for login/logout */}
+        {!isSavvyWatchRoute ? (
         <header className="nav container app-auth-header">
           <div className="app-auth-header-inner flex items-center justify-between px-6 py-4">
             {/* FINAL10 APP Logo */}
@@ -360,8 +371,9 @@ export default function App() {
             </div>
           </div>
         </header>
+        ) : null}
 
-      <main className="container max-w-[100vw] px-4 sm:px-6 pb-[max(5rem,calc(env(safe-area-inset-bottom,0px)+4.5rem))] overflow-x-clip">
+      <main className={`container max-w-[100vw] px-4 sm:px-6 overflow-x-clip ${isSavvyWatchRoute ? 'pb-4' : 'pb-[max(5rem,calc(env(safe-area-inset-bottom,0px)+4.5rem))]'}`}>
         <AppErrorBoundary>
         <Routes>
           {/* Public */}
@@ -395,6 +407,8 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/support" element={<Support />} />
           <Route path="/donation/success" element={<DonationSuccessPreview />} />
+          <Route path="/watch/:eventSlug/overlay" element={<SavvyWatchOverlayPage />} />
+          <Route path="/watch/:eventSlug" element={<SavvyWatchEventPage />} />
           <Route
             path="/founding-tester"
             element={
@@ -702,11 +716,27 @@ export default function App() {
           }
         />
         <Route
+          path="/admin/savvy-watch"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <SavvyWatchAdminPage />
+            </InternalRoute>
+          }
+        />
+        <Route
           path="/admin/trailer-codes"
           element={
             <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
               <EasterEggAdmin />
             </InternalRoute>
+          }
+        />
+        <Route
+          path="/savvy-watch/history"
+          element={
+            <ProtectedRoute>
+              <SavvyWatchHistoryPage />
+            </ProtectedRoute>
           }
         />
         <Route
