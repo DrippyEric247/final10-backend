@@ -5,7 +5,22 @@
 const crypto = require('crypto');
 const { utcDayKey } = require('../config/savvyRewards');
 const { normalizeTier } = require('../config/subscriptionPlans');
-const { grantSavvyReward, spendSavvyReward } = require('./savvyRewardService');
+/** Lazy resolve — top-level destructuring captures undefined under circular module load. */
+function requireSpendSavvyReward() {
+  const { spendSavvyReward } = require('./savvyRewardService');
+  if (typeof spendSavvyReward !== 'function') {
+    throw new TypeError('spendSavvyReward is not a function');
+  }
+  return spendSavvyReward;
+}
+
+function requireGrantSavvyReward() {
+  const { grantSavvyReward } = require('./savvyRewardService');
+  if (typeof grantSavvyReward !== 'function') {
+    throw new TypeError('grantSavvyReward is not a function');
+  }
+  return grantSavvyReward;
+}
 const {
   getSavvyMultiplier,
   serializeActiveBoosts,
@@ -555,7 +570,7 @@ async function rollbackFailedFreeSpinClaim(user, rollback = {}) {
 async function refundFailedSpinSavvy(user, { spinId, amount, spendSource }) {
   const refundAmount = Math.round(Number(amount) || 0);
   if (!spinId || refundAmount <= 0) return;
-  await grantSavvyReward(user, {
+  await requireGrantSavvyReward()(user, {
     rewardType: 'perk_machine_refund',
     amount: refundAmount,
     idempotencyKey: `perk_spin_refund:${spinId}`,
@@ -858,7 +873,7 @@ async function spinPerkMachine(user, options = {}) {
       const spend = await trace.runStage(
         'WALLET_DEBIT',
         () =>
-          spendSavvyReward(user, {
+          requireSpendSavvyReward()(user, {
             amount: savvyCost,
             source: spendSource,
             idempotencyKey: `perk_spin_spend:${spinId}`,

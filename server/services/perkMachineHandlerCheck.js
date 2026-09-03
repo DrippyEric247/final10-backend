@@ -10,8 +10,17 @@ const {
   requireGrantSystemCosmeticUnlock,
 } = require('./perkMachineRewardGrant');
 
+function requireSpendSavvyReward() {
+  const { spendSavvyReward } = require('./savvyRewardService');
+  if (typeof spendSavvyReward !== 'function') {
+    throw new TypeError('spendSavvyReward is not a function');
+  }
+  return spendSavvyReward;
+}
+
 const EXTERNAL_HANDLER_CHECKS = Object.freeze([
   { key: 'grantSavvyReward', resolve: requireGrantSavvyReward },
+  { key: 'spendSavvyReward', resolve: requireSpendSavvyReward },
   { key: 'createSupplyDrop', resolve: requireCreateSupplyDrop },
   { key: 'grantSystemCosmeticUnlock', resolve: requireGrantSystemCosmeticUnlock },
   {
@@ -70,6 +79,7 @@ function verifyPerkMachineGrantHandlers({ failOnError = true } = {}) {
 
   const payload = {
     grantSavvyReward: results.grantSavvyReward || 'missing',
+    spendSavvyReward: results.spendSavvyReward || 'missing',
     createSupplyDrop: results.createSupplyDrop || 'missing',
     grantSystemCosmeticUnlock: results.grantSystemCosmeticUnlock || 'missing',
     activateMythicSavvyMultiplier: results.activateMythicSavvyMultiplier || 'missing',
