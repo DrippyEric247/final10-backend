@@ -12,6 +12,8 @@ const savvyWatchSessionSchema = new mongoose.Schema(
     verifiedActiveSeconds: { type: Number, default: 0 },
     backgroundSince: { type: Date, default: null },
     savvyEarned: { type: Number, default: 0 },
+    predictionSavvyEarned: { type: Number, default: 0 },
+    predictionsSubmitted: { type: Number, default: 0 },
     checkpointClaims: { type: [String], default: [] },
     liveCodeClaims: { type: [String], default: [] },
     competitionVotes: { type: Number, default: 0 },

@@ -11,6 +11,13 @@ import {
   lockSavvyWatchCompetition,
   awardSavvyWatchCompetition,
   getSavvyWatchEvent,
+  getSavvyPredictions,
+  createSavvyPredictionsDragRacePreset,
+  createSavvyPredictionsDriftBattlePreset,
+  createSavvyPredictionsFastestRunPreset,
+  updateSavvyPredictionStatus,
+  previewSavvyPredictionResolution,
+  resolveSavvyPrediction,
 } from '../lib/api';
 import '../styles/SavvyWatch.css';
 
@@ -33,6 +40,9 @@ export default function SavvyWatchAdminPage() {
     hostDisplayName: '',
   });
   const [liveCodeForm, setLiveCodeForm] = useState({ reward: 10, maxClaims: 500, expiresInMinutes: 15 });
+  const [predictions, setPredictions] = useState([]);
+  const [resolveForm, setResolveForm] = useState({ predictionId: '', winningOptionId: '', numericValue: '', label: '' });
+  const [resolvePreview, setResolvePreview] = useState(null);
 
   const refreshEvents = useCallback(async () => {
     try {
@@ -48,8 +58,15 @@ export default function SavvyWatchAdminPage() {
     try {
       const data = await getSavvyWatchEvent(slug);
       setDetail(data);
+      try {
+        const predData = await getSavvyPredictions(slug);
+        setPredictions(predData.predictions || []);
+      } catch {
+        setPredictions([]);
+      }
     } catch {
       setDetail(null);
+      setPredictions([]);
     }
   }, []);
 
@@ -243,6 +260,86 @@ export default function SavvyWatchAdminPage() {
             <button type="button" className="sw-btn sw-btn-primary" disabled={busy} onClick={spawnLiveCode}>
               Generate Live Code
             </button>
+          </section>
+
+          <section className="sw-card">
+            <h2>Savvy Predictions</h2>
+            <p className="sw-muted">Free-entry predictions — no stakes. Fixed rewards on correct picks.</p>
+            <div className="sw-admin-actions">
+              <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => run(() => createSavvyPredictionsDragRacePreset(selectedSlug, { openImmediately: true, sideA: 'BMW M5', sideB: 'Trackhawk' }))}>
+                + Drag Race Preset
+              </button>
+              <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => run(() => createSavvyPredictionsDriftBattlePreset(selectedSlug, { openImmediately: true }))}>
+                + Drift Battle Preset
+              </button>
+              <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => run(() => createSavvyPredictionsFastestRunPreset(selectedSlug, { openImmediately: true, participants: [{ label: 'Driver A' }, { label: 'Driver B' }, { label: 'Driver C' }] }))}>
+                + Fastest Run Preset
+              </button>
+            </div>
+            <ul className="sw-admin-comps">
+              {predictions.map((pred) => (
+                <li key={pred.predictionId}>
+                  <strong>{pred.title}</strong> — {pred.status} ({pred.type})
+                  <div className="sw-admin-actions">
+                    <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => run(() => updateSavvyPredictionStatus(pred.predictionId, 'open'))}>Open</button>
+                    <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => run(() => updateSavvyPredictionStatus(pred.predictionId, 'locked'))}>Lock now</button>
+                    <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => run(() => updateSavvyPredictionStatus(pred.predictionId, 'void'))}>Void</button>
+                    <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => setResolveForm({ predictionId: pred.predictionId, winningOptionId: '', numericValue: '', label: '' })}>Resolve</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {resolveForm.predictionId && (
+              <div className="sw-admin-form">
+                <h3>Submit Official Result</h3>
+                <label>
+                  Winning option ID
+                  <input value={resolveForm.winningOptionId} onChange={(e) => setResolveForm({ ...resolveForm, winningOptionId: e.target.value })} />
+                </label>
+                <label>
+                  Numeric value (brackets)
+                  <input value={resolveForm.numericValue} onChange={(e) => setResolveForm({ ...resolveForm, numericValue: e.target.value })} />
+                </label>
+                <label>
+                  Result label
+                  <input value={resolveForm.label} onChange={(e) => setResolveForm({ ...resolveForm, label: e.target.value })} />
+                </label>
+                <div className="sw-admin-actions">
+                  <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const { preview } = await previewSavvyPredictionResolution(resolveForm.predictionId, {
+                        winningOptionId: resolveForm.winningOptionId || undefined,
+                        numericValue: resolveForm.numericValue ? Number(resolveForm.numericValue) : undefined,
+                        label: resolveForm.label || undefined,
+                      });
+                      setResolvePreview(preview);
+                    } catch (e) {
+                      setError(e?.response?.data?.message || e.message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}>Preview</button>
+                  <button type="button" className="sw-btn sw-btn-primary" disabled={busy || !resolvePreview} onClick={() => run(async () => {
+                    const result = await resolveSavvyPrediction(resolveForm.predictionId, {
+                      winningOptionId: resolveForm.winningOptionId || undefined,
+                      numericValue: resolveForm.numericValue ? Number(resolveForm.numericValue) : undefined,
+                      label: resolveForm.label || undefined,
+                    }, true);
+                    setResolvePreview(null);
+                    setResolveForm({ predictionId: '', winningOptionId: '', numericValue: '', label: '' });
+                    return result;
+                  })}>Confirm &amp; Award</button>
+                </div>
+                {resolvePreview && (
+                  <div className="sw-welcome">
+                    <p>Official result: {resolvePreview.officialResult?.label}</p>
+                    <p>{resolvePreview.correctCount} correct / {resolvePreview.totalEntries} total</p>
+                    <p>{resolvePreview.totalPayoutSavvy} Savvy total payout</p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="sw-card">

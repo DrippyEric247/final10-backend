@@ -25,6 +25,12 @@ const savvyWatchEventSchema = new mongoose.Schema(
       maxSavvyPerViewer: { type: Number, default: 100 },
       label: { type: String, default: 'Verified Event Participation' },
     },
+    predictionRules: {
+      maxPredictionSavvyPerUser: { type: Number, default: 100 },
+      predictionRewardBudget: { type: Number, default: 0 },
+      predictionBudgetClaimed: { type: Number, default: 0 },
+      hideDistributionUntilLock: { type: Boolean, default: true },
+    },
     competitionRules: { type: mongoose.Schema.Types.Mixed, default: {} },
     viewerCap: { type: Number, default: null },
     streamCategory: { type: String, default: 'general', index: true },

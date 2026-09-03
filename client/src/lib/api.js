@@ -1779,3 +1779,76 @@ export async function awardSavvyWatchCompetition(competitionId) {
   return data;
 }
 
+// --- Savvy Predictions (free-entry live predictions) ---
+
+export async function getSavvyPredictionsEnabled() {
+  const { data } = await api.get('/savvy-predictions/enabled');
+  return data;
+}
+
+export async function getSavvyPredictions(slug) {
+  const { data } = await api.get(`/savvy-predictions/events/${encodeURIComponent(slug)}`);
+  return data;
+}
+
+export async function getSavvyPredictionsOverlay(slug) {
+  const { data } = await api.get(`/savvy-predictions/events/${encodeURIComponent(slug)}/overlay`);
+  return data;
+}
+
+export async function submitSavvyPrediction(slug, predictionId, selectedOptionId) {
+  const { data } = await api.post(
+    `/savvy-predictions/events/${encodeURIComponent(slug)}/${encodeURIComponent(predictionId)}/submit`,
+    { selectedOptionId }
+  );
+  return data;
+}
+
+export async function getSavvyPredictionsHistory(limit = 30) {
+  const { data } = await api.get('/savvy-predictions/history', { params: { limit } });
+  return data;
+}
+
+export async function getSavvyPredictionsLeaderboard(slug, limit = 20) {
+  const { data } = await api.get(`/savvy-predictions/events/${encodeURIComponent(slug)}/leaderboard`, { params: { limit } });
+  return data;
+}
+
+export async function createSavvyPrediction(slug, payload) {
+  const { data } = await api.post(`/savvy-predictions/admin/events/${encodeURIComponent(slug)}/create`, payload);
+  return data;
+}
+
+export async function updateSavvyPredictionStatus(predictionId, status) {
+  const { data } = await api.post(`/savvy-predictions/admin/predictions/${encodeURIComponent(predictionId)}/status`, { status });
+  return data;
+}
+
+export async function previewSavvyPredictionResolution(predictionId, officialResult) {
+  const { data } = await api.post(`/savvy-predictions/admin/predictions/${encodeURIComponent(predictionId)}/preview`, { officialResult });
+  return data;
+}
+
+export async function resolveSavvyPrediction(predictionId, officialResult, confirm = true) {
+  const { data } = await api.post(`/savvy-predictions/admin/predictions/${encodeURIComponent(predictionId)}/resolve`, {
+    officialResult,
+    confirm,
+  });
+  return data;
+}
+
+export async function createSavvyPredictionsDragRacePreset(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-predictions/admin/events/${encodeURIComponent(slug)}/preset/drag-race`, payload);
+  return data;
+}
+
+export async function createSavvyPredictionsDriftBattlePreset(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-predictions/admin/events/${encodeURIComponent(slug)}/preset/drift-battle`, payload);
+  return data;
+}
+
+export async function createSavvyPredictionsFastestRunPreset(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-predictions/admin/events/${encodeURIComponent(slug)}/preset/fastest-run`, payload);
+  return data;
+}
+

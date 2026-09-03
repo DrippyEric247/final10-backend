@@ -11,6 +11,7 @@ import {
   getSavvyWatchCompetitionEntries,
   voteSavvyWatchEntry,
 } from '../lib/api';
+import SavvyPredictionsSection from '../components/SavvyPredictionsSection';
 import '../styles/SavvyWatch.css';
 
 function formatMinutes(seconds) {
@@ -203,7 +204,7 @@ export default function SavvyWatchEventPage() {
     return <div className="sw-page sw-error">{error || 'Event not found.'}</div>;
   }
 
-  const { event, competitions = [] } = page;
+  const { event, competitions = [], predictions = [], featureFlags = {} } = page;
   const checkpoints = session?.checkpoints || [];
   const nextCheckpoint = checkpoints.find((c) => !c.claimed && c.eligible && c.kind === 'presence');
 
@@ -293,6 +294,13 @@ export default function SavvyWatchEventPage() {
         </>
       )}
 
+      <SavvyPredictionsSection
+        eventSlug={eventSlug}
+        predictions={predictions}
+        token={token}
+        featureEnabled={featureFlags.predictionsEnabled}
+      />
+
       <section className="sw-card">
         <h2>Live Competitions</h2>
         <div className="sw-comp-list">
@@ -334,6 +342,9 @@ export default function SavvyWatchEventPage() {
             Savvy Watch History
           </Link>
         )}
+        <Link className="sw-overlay-link" to={`/watch/${eventSlug}/overlay/predictions`}>
+          Predictions Overlay
+        </Link>
         <Link className="sw-overlay-link" to={`/watch/${eventSlug}/overlay`}>
           OBS Overlay
         </Link>

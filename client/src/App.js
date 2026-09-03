@@ -108,8 +108,10 @@ import SavvyShopPage from "./pages/SavvyShopPage";
 import SavvyShopStudio from "./pages/SavvyShopStudio";
 import SavvyWatchEventPage from "./pages/SavvyWatchEventPage";
 import SavvyWatchOverlayPage from "./pages/SavvyWatchOverlayPage";
+import SavvyWatchPredictionsOverlayPage from "./pages/SavvyWatchPredictionsOverlayPage";
 import SavvyWatchAdminPage from "./pages/SavvyWatchAdminPage";
 import SavvyWatchHistoryPage from "./pages/SavvyWatchHistoryPage";
+import SavvyPredictionsHistoryPage from "./pages/SavvyPredictionsHistoryPage";
 import FoundingTesterMission from "./pages/FoundingTesterMission";
 import FoundingHall from "./pages/FoundingHall";
 import AppTelemetry from "./components/AppTelemetry";
@@ -407,6 +409,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/support" element={<Support />} />
           <Route path="/donation/success" element={<DonationSuccessPreview />} />
+          <Route path="/watch/:eventSlug/overlay/predictions" element={<SavvyWatchPredictionsOverlayPage />} />
           <Route path="/watch/:eventSlug/overlay" element={<SavvyWatchOverlayPage />} />
           <Route path="/watch/:eventSlug" element={<SavvyWatchEventPage />} />
           <Route
@@ -736,6 +739,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SavvyWatchHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/savvy-predictions/history"
+          element={
+            <ProtectedRoute>
+              <SavvyPredictionsHistoryPage />
             </ProtectedRoute>
           }
         />

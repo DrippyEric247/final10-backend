@@ -1,6 +1,7 @@
 const C = require('./points');
 const { isBetaMode } = require('./betaMode');
 const { isSavvyWatchEnabled, isSavvyWatchAdminOnly } = require('./savvyWatchConfig');
+const { isSavvyPredictionsEnabled, isSavvyPredictionsAdminOnly } = require('./savvyPredictionsConfig');
 
 function getPublicConfig() {
   return {
@@ -13,6 +14,8 @@ function getPublicConfig() {
     betaMode: isBetaMode(),
     savvyWatchEnabled: isSavvyWatchEnabled(),
     savvyWatchAdminOnly: isSavvyWatchAdminOnly(),
+    savvyPredictionsEnabled: isSavvyPredictionsEnabled(),
+    savvyPredictionsAdminOnly: isSavvyPredictionsAdminOnly(),
     version: 'v1',
   };
 }

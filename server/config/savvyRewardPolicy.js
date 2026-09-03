@@ -72,6 +72,10 @@ const FIXED_SOURCES = new Set([
   'savvy_watch_live_code',
   'savvy_watch_competition',
   'savvy_watch_host_award',
+  // Savvy Predictions (free-entry, fixed rewards)
+  'savvy_prediction_correct',
+  'savvy_prediction_bonus',
+  'savvy_prediction_streak',
   // Legacy profile points — not wallet savvy
   'savvy_credit_convert',
   'savvy_store_redeem',

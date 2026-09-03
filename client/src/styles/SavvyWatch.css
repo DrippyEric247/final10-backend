@@ -313,3 +313,132 @@
   text-align: center;
   font-size: 0.9rem;
 }
+
+/* Savvy Predictions */
+.sw-predictions h2 {
+  margin-bottom: 0.35rem;
+}
+
+.sw-prediction-card {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.sw-pred-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #c4b5fd;
+  margin-bottom: 0.35rem;
+}
+
+.sw-pred-matchup {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0.35rem 0;
+}
+
+.sw-pred-timer {
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+
+.sw-pred-locked {
+  color: #fbbf24;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.sw-pred-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.sw-pred-opt {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #1e293b;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sw-pred-opt.selected {
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.25);
+}
+
+.sw-pred-your-pick,
+.sw-pred-reward {
+  font-size: 0.9rem;
+  color: #b8c0d9;
+}
+
+.sw-pred-result {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.sw-pred-official {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #c4b5fd;
+}
+
+.sw-pred-official-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.sw-pred-correct {
+  color: #86efac;
+  font-weight: 800;
+}
+
+.sw-pred-incorrect {
+  color: #b8c0d9;
+}
+
+.sw-pred-dist {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.sw-pred-resolved-heading {
+  margin-top: 1.25rem;
+  font-size: 0.95rem;
+  color: #b8c0d9;
+}
+
+.sw-overlay-predictions {
+  min-width: 260px;
+}
+
+.sw-overlay-pred-timer {
+  font-size: 2rem;
+  font-weight: 900;
+  margin: 0.5rem 0;
+}
+
+.sw-pred-locked-banner {
+  color: #fbbf24;
+}
+
+.sw-overlay-pred-dist {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}

@@ -258,6 +258,14 @@ try {
   console.warn('[startup] Savvy Watch handler check warning:', swErr?.message || swErr);
 }
 
+try {
+  const { verifySavvyPredictionsHandlers } = require('./services/savvyPredictionsHandlerCheck');
+  verifySavvyPredictionsHandlers({ failOnError: false });
+  console.log('[startup] boot phase=savvy_predictions_handlers_ok');
+} catch (spErr) {
+  console.warn('[startup] Savvy Predictions handler check warning:', spErr?.message || spErr);
+}
+
 auditStartup({
   nodeEnv: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 8080,
@@ -272,6 +280,7 @@ app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/scout-flight', require('./routes/scoutFlightRoutes'));
 app.use('/api/events', require('./routes/eventsRoutes'));
 app.use('/api/savvy-watch', require('./routes/savvyWatchRoutes'));
+app.use('/api/savvy-predictions', require('./routes/savvyPredictionsRoutes'));
 app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));
 app.use('/api/eggs', require('./routes/eggExchangeRoutes'));
 app.use('/api/egg-camo', require('./routes/eggCamoRoutes'));

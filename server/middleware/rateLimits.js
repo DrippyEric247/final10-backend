@@ -306,6 +306,16 @@ const savvyWatchClaimLimiter = rateLimit({
   message: () => betaRateLimitMessage('Too many Savvy Watch claims. Try again shortly.'),
 });
 
+const savvyPredictionsSubmitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: () => (isBetaMode() ? 60 : 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitSkipDev,
+  keyGenerator: (req) => String(req.user?.id || req.user?._id || req.ip || 'anon'),
+  message: () => betaRateLimitMessage('Too many prediction submissions. Try again shortly.'),
+});
+
 const founderMessageLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 8,
@@ -384,6 +394,7 @@ module.exports = {
   easterEggRedeemLimiter,
   savvyWatchHeartbeatLimiter,
   savvyWatchClaimLimiter,
+  savvyPredictionsSubmitLimiter,
   founderMessageLimiter,
   alertMutationLimiter,
   bestMoveConsumeLimiter,

@@ -14,6 +14,7 @@ const {
   DEFAULT_CHECKPOINTS,
   DEFAULT_MAX_SAVVY_PER_VIEWER,
 } = require('../config/savvyWatchConfig');
+const { isSavvyPredictionsEnabled } = require('../config/savvyPredictionsConfig');
 const { GTA_CAR_MEET_PRESET } = require('../config/savvyWatchGtaPreset');
 const {
   findOrCreateSession,
@@ -99,10 +100,26 @@ async function getPublicEventPage(slug) {
   const competitions = await SavvyWatchCompetition.find({ eventId: event.eventId })
     .select('competitionId slug title description type status votingMode rewardConfig')
     .lean();
+
+  let predictions = [];
+  if (isSavvyPredictionsEnabled()) {
+    try {
+      const { listEventPredictions } = require('./savvyPredictionsService');
+      predictions = await listEventPredictions(event.eventId);
+    } catch {
+      predictions = [];
+    }
+  }
+
   return {
     event: serializeEventPublic(event, { participantCount }),
     competitions,
-    featureFlags: { enabled: isSavvyWatchEnabled(), adminOnly: isSavvyWatchAdminOnly() },
+    predictions,
+    featureFlags: {
+      enabled: isSavvyWatchEnabled(),
+      adminOnly: isSavvyWatchAdminOnly(),
+      predictionsEnabled: isSavvyPredictionsEnabled(),
+    },
   };
 }
 
