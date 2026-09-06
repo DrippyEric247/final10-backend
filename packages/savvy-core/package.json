@@ -63,7 +63,15 @@
       "require": "./src/events/universeEvents.js",
       "default": "./src/events/universeEvents.js"
     },
-    "./tokens/theme.css": "./src/tokens/theme.css"
+    "./tokens/theme.css": "./src/tokens/theme.css",
+    "./core": {
+      "import": "./src/core/index.js",
+      "default": "./src/core/index.js"
+    },
+    "./core/*": {
+      "import": "./src/core/*.js",
+      "default": "./src/core/*.js"
+    }
   },
   "scripts": {
     "verify": "node scripts/verify-parity.js"

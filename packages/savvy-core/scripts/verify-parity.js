@@ -283,4 +283,35 @@ for (const item of camoLocker.CAMO_ITEMS) {
 }
 ok("camo thresholds, rarities and unlock gates match server mirror");
 
+/* ------------------------- Savvy Core V1 registry parity ------------------- */
+
+console.log("\nSavvy Core V1 registry:");
+
+const SERVER_APP_REGISTRY = path.resolve(PACKAGE_ROOT, "../../server/config/savvyCoreAppRegistryData.js");
+const SERVER_PERMISSIONS = path.resolve(PACKAGE_ROOT, "../../server/config/savvyCorePermissionsData.js");
+
+if (!fs.existsSync(SERVER_APP_REGISTRY) || !fs.existsSync(SERVER_PERMISSIONS)) {
+  fail("Savvy Core server mirror files missing");
+}
+
+const serverRegistry = createRequire(import.meta.url)(SERVER_APP_REGISTRY);
+const serverPermissions = createRequire(import.meta.url)(SERVER_PERMISSIONS);
+const { SAVVY_APP_IDS, SAVVY_APP_REGISTRY } = await import("../src/core/appRegistry.js");
+const { APP_PERMISSIONS } = await import("../src/core/permissions.js");
+
+if (JSON.stringify(serverRegistry.SAVVY_APP_IDS) !== JSON.stringify(SAVVY_APP_IDS)) {
+  fail("SAVVY_APP_IDS drift between @savvy/core and server mirror");
+}
+ok(`SAVVY_APP_IDS synced (${Object.keys(SAVVY_APP_IDS).length} apps)`);
+
+if (JSON.stringify(serverRegistry.SAVVY_APP_REGISTRY) !== JSON.stringify(SAVVY_APP_REGISTRY)) {
+  fail("SAVVY_APP_REGISTRY drift between @savvy/core and server mirror");
+}
+ok("SAVVY_APP_REGISTRY synced");
+
+if (JSON.stringify(serverPermissions.APP_PERMISSIONS) !== JSON.stringify(APP_PERMISSIONS)) {
+  fail("APP_PERMISSIONS drift between @savvy/core and server mirror");
+}
+ok("APP_PERMISSIONS synced");
+
 console.log("\n✓ All parity checks passed.\n");

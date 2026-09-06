@@ -76,6 +76,9 @@ const FIXED_SOURCES = new Set([
   'savvy_prediction_correct',
   'savvy_prediction_bonus',
   'savvy_prediction_streak',
+  // Savvy Core cross-app wallet
+  'savvy_core_earn',
+  'savvy_core_spend',
   // Legacy profile points — not wallet savvy
   'savvy_credit_convert',
   'savvy_store_redeem',

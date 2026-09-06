@@ -155,7 +155,61 @@ const UNIVERSE_CONTRACTS = Object.freeze([
   }),
 ]);
 
-const ALL_CONTRACTS = Object.freeze([...FINAL10_CONTRACTS, ...UNIVERSE_CONTRACTS]);
+const SAVVY_TRIP_TEST_CONTRACTS = Object.freeze([
+  Object.freeze({
+    id: 'savvytrip_test_complete_booking',
+    appId: 'savvytrip_test',
+    appLabel: 'SavvyTrip Test',
+    scope: 'app',
+    title: 'Complete a Booking',
+    description: 'Test contract for Savvy Core V1 integration',
+    type: 'once',
+    difficulty: 'easy',
+    trigger: 'trip_booked',
+    target: 1,
+    reward: { type: 'savvy', amount: 25, label: '+25 Savvy' },
+    icon: '✈️',
+  }),
+  Object.freeze({
+    id: 'savvytrip_test_proof_action',
+    appId: 'savvytrip_test',
+    appLabel: 'SavvyTrip Test',
+    scope: 'app',
+    objectiveType: 'PROOF_ACTION',
+    title: 'Production Proof Action',
+    description: 'Internal Savvy Core V1 production proof — no payout',
+    type: 'once',
+    difficulty: 'easy',
+    trigger: 'proof_action',
+    target: 1,
+    reward: { type: 'none', amount: 0, label: 'Proof only' },
+    icon: '🧪',
+  }),
+]);
+
+const GAME_SAVVY_TEST_CONTRACTS = Object.freeze([
+  Object.freeze({
+    id: 'gamesavvy_test_complete_match',
+    appId: 'gamesavvy_test',
+    appLabel: 'GameSavvy Test',
+    scope: 'app',
+    title: 'Complete a Match',
+    description: 'Test contract for Savvy Core V1 integration',
+    type: 'once',
+    difficulty: 'easy',
+    trigger: 'match_completed',
+    target: 1,
+    reward: { type: 'savvy', amount: 30, label: '+30 Savvy' },
+    icon: '🎮',
+  }),
+]);
+
+const ALL_CONTRACTS = Object.freeze([
+  ...FINAL10_CONTRACTS,
+  ...UNIVERSE_CONTRACTS,
+  ...SAVVY_TRIP_TEST_CONTRACTS,
+  ...GAME_SAVVY_TEST_CONTRACTS,
+]);
 
 const BY_ID = Object.freeze(
   ALL_CONTRACTS.reduce((acc, def) => {
@@ -229,6 +283,8 @@ function getContractsForTrigger(trigger) {
 module.exports = {
   FINAL10_CONTRACTS,
   UNIVERSE_CONTRACTS,
+  SAVVY_TRIP_TEST_CONTRACTS,
+  GAME_SAVVY_TEST_CONTRACTS,
   ALL_CONTRACTS,
   DEFAULT_CONTRACTS_APP_ID,
   PROGRESSION_EVENT_TO_CONTRACT_TRIGGER,

@@ -6,15 +6,24 @@
 
 import { FINAL10_CONTRACTS, FINAL10_CONTRACT_IDS } from './final10.js';
 import { UNIVERSE_CONTRACTS, UNIVERSE_CONTRACT_IDS } from './universe.js';
+import { SAVVY_TRIP_TEST_CONTRACTS, SAVVY_TRIP_TEST_CONTRACT_IDS } from './savvytrip_test.js';
+import { GAME_SAVVY_TEST_CONTRACTS, GAME_SAVVY_TEST_CONTRACT_IDS } from './gamesavvy_test.js';
 
 export { FINAL10_CONTRACTS, FINAL10_CONTRACT_IDS } from './final10.js';
 export { UNIVERSE_CONTRACTS, UNIVERSE_CONTRACT_IDS } from './universe.js';
+export { SAVVY_TRIP_TEST_CONTRACTS, SAVVY_TRIP_TEST_CONTRACT_IDS } from './savvytrip_test.js';
+export { GAME_SAVVY_TEST_CONTRACTS, GAME_SAVVY_TEST_CONTRACT_IDS } from './gamesavvy_test.js';
 
 /** Default app id when none is supplied (Final10 host). */
 export const DEFAULT_CONTRACTS_APP_ID = 'final10';
 
 /** @type {readonly import('./final10.js').ContractDefinition[]} */
-export const ALL_CONTRACTS = Object.freeze([...FINAL10_CONTRACTS, ...UNIVERSE_CONTRACTS]);
+export const ALL_CONTRACTS = Object.freeze([
+  ...FINAL10_CONTRACTS,
+  ...UNIVERSE_CONTRACTS,
+  ...SAVVY_TRIP_TEST_CONTRACTS,
+  ...GAME_SAVVY_TEST_CONTRACTS,
+]);
 
 const BY_ID = Object.freeze(
   ALL_CONTRACTS.reduce((acc, def) => {

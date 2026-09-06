@@ -8,3 +8,4 @@ export * from "./config/featureVoting.js";
 export * from "./config/camoLocker.js";
 export * from "./config/accountProgression.js";
 export * from "./config/scoutBranding.js";
+export * from "./core/index.js";

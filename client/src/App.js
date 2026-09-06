@@ -112,6 +112,7 @@ import SavvyWatchPredictionsOverlayPage from "./pages/SavvyWatchPredictionsOverl
 import SavvyWatchAdminPage from "./pages/SavvyWatchAdminPage";
 import SavvyWatchHistoryPage from "./pages/SavvyWatchHistoryPage";
 import SavvyPredictionsHistoryPage from "./pages/SavvyPredictionsHistoryPage";
+import SavvyCoreProofPage from "./pages/dev/SavvyCoreProofPage";
 import FoundingTesterMission from "./pages/FoundingTesterMission";
 import FoundingHall from "./pages/FoundingHall";
 import AppTelemetry from "./components/AppTelemetry";
@@ -748,6 +749,14 @@ export default function App() {
             <ProtectedRoute>
               <SavvyPredictionsHistoryPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dev/savvy-core-proof"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <SavvyCoreProofPage />
+            </InternalRoute>
           }
         />
         <Route

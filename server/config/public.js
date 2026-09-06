@@ -2,6 +2,8 @@ const C = require('./points');
 const { isBetaMode } = require('./betaMode');
 const { isSavvyWatchEnabled, isSavvyWatchAdminOnly } = require('./savvyWatchConfig');
 const { isSavvyPredictionsEnabled, isSavvyPredictionsAdminOnly } = require('./savvyPredictionsConfig');
+const { isSavvyCoreEnabled, isSavvyCoreExternalWritesEnabled } = require('./savvyCoreConfig');
+const { isSavvyCoreProofEnabled } = require('./savvyCoreProofConfig');
 
 function getPublicConfig() {
   return {
@@ -16,6 +18,9 @@ function getPublicConfig() {
     savvyWatchAdminOnly: isSavvyWatchAdminOnly(),
     savvyPredictionsEnabled: isSavvyPredictionsEnabled(),
     savvyPredictionsAdminOnly: isSavvyPredictionsAdminOnly(),
+    savvyCoreEnabled: isSavvyCoreEnabled(),
+    savvyCoreExternalWritesEnabled: isSavvyCoreExternalWritesEnabled(),
+    savvyCoreProofEnabled: isSavvyCoreProofEnabled(),
     version: 'v1',
   };
 }
