@@ -14,6 +14,9 @@ const FINAL10_PRODUCTION_ORIGINS = Object.freeze([
   'https://www.final10.app',
 ]);
 
+/** Default Vercel project hostname prefixes (Final10-owned previews only — not all *.vercel.app). */
+const DEFAULT_FINAL10_VERCEL_PREVIEW_PREFIXES = Object.freeze(['final10-client']);
+
 const DEFAULT_ORIGINS = Object.freeze([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
@@ -94,17 +97,35 @@ function isLocalDevOrigin(origin) {
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalizeOrigin(origin));
 }
 
-/** Beta-safe: Vercel preview deployments — gated in production unless explicitly allowed. */
-function isVercelAppOrigin(origin) {
+function parseFinal10VercelPreviewPrefixes() {
+  const raw = String(process.env.VERCEL_PREVIEW_ORIGIN_PREFIXES || '').trim();
+  if (!raw) return [...DEFAULT_FINAL10_VERCEL_PREVIEW_PREFIXES];
+  return raw
+    .split(',')
+    .map((s) => String(s || '').trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Trusted Final10 Vercel preview deployments only.
+ * Matches e.g. final10-client.vercel.app, final10-client-git-beta-team.vercel.app
+ * Does NOT match arbitrary *.vercel.app (other Vercel projects).
+ */
+function isFinal10VercelPreviewOrigin(origin) {
   const o = normalizeOrigin(origin);
-  if (!/^https:\/\/[a-z0-9][a-z0-9._-]*\.vercel\.app$/i.test(o)) return false;
-  if (process.env.NODE_ENV === 'production') {
-    return (
-      String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '').toLowerCase() === 'true' ||
-      String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '') === '1'
-    );
-  }
-  return true;
+  const match = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(o);
+  if (!match) return false;
+  const slug = match[1].toLowerCase();
+  const prefixes = parseFinal10VercelPreviewPrefixes();
+  return prefixes.some((prefix) => slug === prefix || slug.startsWith(`${prefix}-`));
+}
+
+/**
+ * @deprecated Broad Vercel allowance — use isFinal10VercelPreviewOrigin instead.
+ * Kept for tests; in production only Final10-prefixed previews are accepted.
+ */
+function isVercelAppOrigin(origin) {
+  return isFinal10VercelPreviewOrigin(origin);
 }
 
 function isFinal10AppOrigin(origin) {
@@ -116,7 +137,7 @@ function isOriginAllowed(origin) {
   const normalized = normalizeOrigin(origin);
   if (buildAllowedOrigins().has(normalized)) return true;
   if (isLocalDevOrigin(normalized)) return true;
-  if (isVercelAppOrigin(normalized)) return true;
+  if (isFinal10VercelPreviewOrigin(normalized)) return true;
   if (isFinal10AppOrigin(normalized)) return true;
   return false;
 }
@@ -179,16 +200,12 @@ function logCorsStartup() {
   const clientUrl = normalizeOrigin(process.env.CLIENT_URL) || '(unset)';
   const allowedEnv = splitOriginCsv(process.env.ALLOWED_ORIGINS);
   const final10Listed = FINAL10_PRODUCTION_ORIGINS.every((o) => explicit.has(o));
-  const vercelPreviews =
-    process.env.NODE_ENV === 'production'
-      ? String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '').toLowerCase() === 'true' ||
-        String(process.env.ALLOW_VERCEL_PREVIEW_CORS || '') === '1'
-      : true;
+  const vercelPrefixes = parseFinal10VercelPreviewPrefixes();
   console.log(
     `[cors] ready clientUrl=${clientUrl} credentials=${useCorsCredentials()} ` +
       `allowedOriginsEnv=${allowedEnv.length ? allowedEnv.join('|') : '(defaults)'} ` +
       `explicitOrigins=${explicit.size} final10ApexAndWww=${final10Listed} ` +
-      `vercelPreviews=${vercelPreviews ? 'enabled' : 'disabled_in_production'} localhost=any-port`
+      `final10VercelPreviewPrefixes=${vercelPrefixes.join('|')} localhost=any-port`
   );
 }
 
@@ -250,6 +267,8 @@ module.exports = {
   applyPreflightHeaders,
   logCorsStartup,
   isVercelAppOrigin,
+  isFinal10VercelPreviewOrigin,
+  parseFinal10VercelPreviewPrefixes,
   isLocalDevOrigin,
   isFinal10AppOrigin,
   splitOriginCsv,

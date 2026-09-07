@@ -3,11 +3,14 @@ const {
   isOriginAllowed,
   resolveCorsOrigin,
   isVercelAppOrigin,
+  isFinal10VercelPreviewOrigin,
   isLocalDevOrigin,
   useCorsCredentials,
   createOptionsPreflightMiddleware,
   FINAL10_PRODUCTION_ORIGINS,
 } = require('../middleware/cors');
+
+const PREVIEW_ORIGIN = 'https://final10-client-git-beta-drippy.vercel.app';
 
 describe('CORS middleware', () => {
   const envSnapshot = { ...process.env };
@@ -28,22 +31,36 @@ describe('CORS middleware', () => {
     expect(isOriginAllowed('http://localhost:4173')).toBe(true);
   });
 
-  it('allows Vercel preview deployments in non-production', () => {
+  it('allows Final10 Vercel preview deployments in non-production', () => {
     process.env.NODE_ENV = 'development';
-    delete process.env.ALLOW_VERCEL_PREVIEW_CORS;
-    expect(isVercelAppOrigin('https://final10-client-git-beta-drippy.vercel.app')).toBe(true);
-    expect(isOriginAllowed('https://final10-client-git-beta-drippy.vercel.app')).toBe(true);
+    delete process.env.VERCEL_PREVIEW_ORIGIN_PREFIXES;
+    expect(isFinal10VercelPreviewOrigin(PREVIEW_ORIGIN)).toBe(true);
+    expect(isOriginAllowed(PREVIEW_ORIGIN)).toBe(true);
+    expect(isVercelAppOrigin(PREVIEW_ORIGIN)).toBe(true);
   });
 
-  it('blocks Vercel previews in production unless ALLOW_VERCEL_PREVIEW_CORS=1', () => {
+  it('allows Final10 Vercel previews in production without ALLOW_VERCEL_PREVIEW_CORS', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.ALLOW_VERCEL_PREVIEW_CORS;
-    expect(isVercelAppOrigin('https://final10-abc123.vercel.app')).toBe(false);
-    expect(isOriginAllowed('https://final10-abc123.vercel.app')).toBe(false);
+    delete process.env.VERCEL_PREVIEW_ORIGIN_PREFIXES;
+    expect(isFinal10VercelPreviewOrigin(PREVIEW_ORIGIN)).toBe(true);
+    expect(isOriginAllowed(PREVIEW_ORIGIN)).toBe(true);
+    expect(resolveCorsOrigin(PREVIEW_ORIGIN)).toBe(PREVIEW_ORIGIN);
+  });
 
-    process.env.ALLOW_VERCEL_PREVIEW_CORS = '1';
-    expect(isVercelAppOrigin('https://final10-abc123.vercel.app')).toBe(true);
-    expect(isOriginAllowed('https://final10-abc123.vercel.app')).toBe(true);
+  it('blocks unrelated Vercel projects in production', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.ALLOW_VERCEL_PREVIEW_CORS;
+    expect(isFinal10VercelPreviewOrigin('https://some-other-project.vercel.app')).toBe(false);
+    expect(isOriginAllowed('https://some-other-project.vercel.app')).toBe(false);
+    expect(isFinal10VercelPreviewOrigin('https://final10-abc123.vercel.app')).toBe(false);
+    expect(isOriginAllowed('https://final10-abc123.vercel.app')).toBe(false);
+  });
+
+  it('supports extra preview prefixes via VERCEL_PREVIEW_ORIGIN_PREFIXES', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_PREVIEW_ORIGIN_PREFIXES = 'final10-client,final10-app';
+    expect(isOriginAllowed('https://final10-app-preview.vercel.app')).toBe(true);
   });
 
   it('blocks unknown origins', () => {
@@ -93,6 +110,59 @@ describe('CORS middleware', () => {
     expect(headers['Access-Control-Allow-Origin']).toBe('https://www.final10.app');
     expect(headers['Access-Control-Allow-Methods']).toContain('POST');
     expect(headers['Access-Control-Allow-Headers']).toContain('Authorization');
+  });
+
+  it('OPTIONS preflight returns 204 for Final10 Vercel preview on /api/auth/login', () => {
+    process.env.NODE_ENV = 'production';
+    const preflight = createOptionsPreflightMiddleware();
+    const headers = {};
+    const res = {
+      statusCode: 200,
+      setHeader(key, value) {
+        headers[key] = value;
+      },
+      sendStatus(code) {
+        this.statusCode = code;
+        return this;
+      },
+    };
+    const req = {
+      method: 'OPTIONS',
+      headers: {
+        origin: PREVIEW_ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+      path: '/api/auth/login',
+    };
+
+    preflight(req, res, () => {});
+    expect(res.statusCode).toBe(204);
+    expect(headers['Access-Control-Allow-Origin']).toBe(PREVIEW_ORIGIN);
+  });
+
+  it('OPTIONS preflight blocks unrelated Vercel preview', () => {
+    process.env.NODE_ENV = 'production';
+    const preflight = createOptionsPreflightMiddleware();
+    const res = {
+      statusCode: 200,
+      setHeader() {},
+      sendStatus(code) {
+        this.statusCode = code;
+        return this;
+      },
+    };
+    const req = {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://random-other-app.vercel.app',
+        'access-control-request-method': 'POST',
+      },
+      path: '/api/auth/login',
+    };
+
+    preflight(req, res, () => {});
+    expect(res.statusCode).toBe(403);
   });
 
   it('does not enable credentials by default', () => {
