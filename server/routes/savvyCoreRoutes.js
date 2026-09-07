@@ -4,10 +4,13 @@ const { requireAdminAccess } = require('../middleware/requireRole');
 const { requireTrustedApp } = require('../middleware/savvyCoreAppAuth');
 const {
   isSavvyCoreEnabled,
+  isSavvyCoreExternalWritesEnabled,
   SAVVY_CORE_VERSION,
   listRegisteredApps,
   validateAppId,
 } = require('../config/savvyCoreConfig');
+const { isSavvyCoreProofEnabled } = require('../config/savvyCoreProofConfig');
+const { getServerCommitSha } = require('../lib/deploySha');
 const { verifySavvyCoreHandlers, SAVVY_CORE_REWARD_SOURCES } = require('../services/savvyCore/savvyCoreHandlerCheck');
 const { getSavvyCoreMe } = require('../services/savvyCore/savvyCoreProfileService');
 const { getSavvyBalance } = require('../services/savvyCore/savvyCoreWalletService');
@@ -67,6 +70,11 @@ router.get('/health', (_req, res) => {
   res.json({
     version: SAVVY_CORE_VERSION,
     enabled: isSavvyCoreEnabled(),
+    savvyCoreV1Enabled: isSavvyCoreEnabled(),
+    savvyCoreProofEnabled: isSavvyCoreProofEnabled(),
+    externalWritesEnabled: isSavvyCoreExternalWritesEnabled(),
+    serverCommitSha: getServerCommitSha() || null,
+    environment: process.env.NODE_ENV || 'development',
     registeredApps: listRegisteredApps(),
     registeredRewardHandlers: SAVVY_CORE_REWARD_SOURCES,
     rewardFamilies: REWARD_FAMILIES,

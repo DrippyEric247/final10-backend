@@ -26,6 +26,7 @@ const {
   PROOF_XP_AMOUNT,
   PROOF_CONTRACT_TRIGGER,
   PROOF_CONTRACT_ID,
+  isSavvyCoreProofEnabled,
   resolveDeploymentSha,
   resolveProofAppKey,
   buildProofIdempotencyKey,
@@ -95,8 +96,8 @@ async function getProofBootstrap(user, { proofRunId: existingRunId } = {}) {
     deploymentSha: resolveDeploymentSha(),
     flags: {
       savvyCoreEnabled: isSavvyCoreEnabled(),
+      savvyCoreProofEnabled: isSavvyCoreProofEnabled(),
       externalWritesEnabled: isSavvyCoreExternalWritesEnabled(),
-      proofEnabled: true,
       appKeyConfigured: Boolean(resolveProofAppKey()),
     },
     user: {

@@ -25,17 +25,19 @@ function StatusBadge({ pass, label }) {
 
 export default function SavvyCoreProofPage() {
   const { user, loading } = useAuth();
-  const { config } = useAppConfig();
+  const { cfg } = useAppConfig();
   const [bootstrap, setBootstrap] = useState(null);
   const [proofRunId, setProofRunId] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [results, setResults] = useState({});
 
-  const flags = bootstrap?.flags || {};
-  const writesDisabled =
-    !config?.savvyCoreEnabled ||
-    !config?.savvyCoreProofEnabled;
+  const serverFlags = bootstrap?.flags || {};
+  const savvyCoreEnabled = serverFlags.savvyCoreEnabled ?? cfg?.savvyCoreEnabled ?? false;
+  const savvyCoreProofEnabled = serverFlags.savvyCoreProofEnabled ?? cfg?.savvyCoreProofEnabled ?? false;
+  const externalWritesEnabled =
+    serverFlags.externalWritesEnabled ?? cfg?.savvyCoreExternalWritesEnabled ?? false;
+  const writesDisabled = !savvyCoreEnabled || !savvyCoreProofEnabled;
 
   const refresh = useCallback(async () => {
     setBusy("refresh");
@@ -136,11 +138,9 @@ export default function SavvyCoreProofPage() {
         <div><strong>DEPLOY SHA:</strong> <code>{bootstrap?.deploymentSha || "—"}</code></div>
         <div><strong>PROOF RUN ID:</strong> <code>{proofRunId || "—"}</code></div>
         <div className="flex flex-wrap gap-2 pt-1">
-          <span className="chip">SAVVY_CORE_V1_ENABLED: {String(flags.savvyCoreEnabled ?? config?.savvyCoreEnabled ?? false)}</span>
-          <span className="chip">
-            EXTERNAL_WRITES: {String(flags.externalWritesEnabled ?? config?.savvyCoreExternalWritesEnabled ?? false)}
-          </span>
-          <span className="chip">PROOF: {String(config?.savvyCoreProofEnabled ?? false)}</span>
+          <span className="chip">SAVVY_CORE_V1_ENABLED: {String(savvyCoreEnabled)}</span>
+          <span className="chip">EXTERNAL_WRITES: {String(externalWritesEnabled)}</span>
+          <span className="chip">PROOF: {String(savvyCoreProofEnabled)}</span>
         </div>
         {writesDisabled ? (
           <p className="text-amber-400 text-sm">
