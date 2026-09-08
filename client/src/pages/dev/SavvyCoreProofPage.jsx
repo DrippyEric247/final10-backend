@@ -24,6 +24,85 @@ function StatusBadge({ pass, label }) {
   );
 }
 
+const PARITY_ENDPOINT = "/api/savvy-core-proof/parity";
+
+function ReadParityResultPanel({ result }) {
+  if (!result) return null;
+
+  if (result.error) {
+    return (
+      <div className="card space-y-2 border border-red-500/40">
+        <h2 className="font-semibold text-red-400">READ PARITY ERROR</h2>
+        <div className="text-sm space-y-1">
+          <div><strong>HTTP status:</strong> {result.httpStatus ?? "—"}</div>
+          <div><strong>Endpoint:</strong> {result.endpoint || PARITY_ENDPOINT}</div>
+          <div><strong>Message:</strong> {result.message || "Request failed."}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const rows = result.comparison || [];
+  const failedRows = rows.filter((row) => row.match === false);
+
+  if (!result.pass && rows.length === 0 && result.message) {
+    return (
+      <div className="card space-y-2 border border-red-500/40">
+        <h2 className="font-semibold text-lg text-red-400">READ PARITY: FAIL</h2>
+        <div className="text-sm text-red-300">{result.message}</div>
+        {result.code ? <div className="text-xs opacity-70">Code: {result.code}</div> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`card space-y-3 border ${
+        result.pass ? "border-emerald-500/40" : "border-red-500/40"
+      }`}
+    >
+      <h2 className={`font-semibold text-lg ${result.pass ? "text-emerald-400" : "text-red-400"}`}>
+        READ PARITY: {result.pass ? "PASS" : "FAIL"}
+      </h2>
+      <p className="text-sm opacity-80">
+        Test subject <code>{result.userId || "—"}</code>
+      </p>
+      <div className="text-xs opacity-70 space-y-1">
+        <div><strong>Savvy Core source:</strong> {result.sources?.savvyCore || "Savvy Core wallet + progression services"}</div>
+        <div><strong>Final10 canonical source:</strong> {result.sources?.final10 || "Final10 User + profileXpService"}</div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left opacity-70">
+              <th className="pr-3 pb-2">Field</th>
+              <th className="pr-3 pb-2">Savvy Core</th>
+              <th className="pr-3 pb-2">Final10 canonical</th>
+              <th className="pb-2">Match</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.field} className={row.match ? "" : "text-red-300"}>
+                <td className="pr-3 py-1">{row.field}</td>
+                <td className="pr-3 py-1">{String(row.savvyCore ?? "—")}</td>
+                <td className="pr-3 py-1">{String(row.final10 ?? "—")}</td>
+                <td className="py-1">{row.match ? "✓" : "✗"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!result.pass && failedRows.length > 0 ? (
+        <div className="text-sm text-red-300">
+          <strong>Mismatched fields:</strong>{" "}
+          {failedRows.map((row) => row.field).join(", ")}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function SavvyCoreProofPage() {
   const { user, loading } = useAuth();
   const { cfg } = useAppConfig();
@@ -32,6 +111,7 @@ export default function SavvyCoreProofPage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [results, setResults] = useState({});
+  const [parityResult, setParityResult] = useState(null);
 
   const serverFlags = bootstrap?.flags || {};
   const savvyCoreEnabled = serverFlags.savvyCoreEnabled ?? cfg?.savvyCoreEnabled ?? false;
@@ -51,7 +131,6 @@ export default function SavvyCoreProofPage() {
       const data = await fetchSavvyCoreProofBootstrap(proofRunId || undefined);
       setBootstrap(data);
       if (data.proofRunId) setProofRunId(data.proofRunId);
-      if (!proofRunId) setResults({});
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Failed to load proof bootstrap.");
     } finally {
@@ -88,8 +167,33 @@ export default function SavvyCoreProofPage() {
     [proofRunId, refresh]
   );
 
+  const runParityCheck = useCallback(async () => {
+    setBusy("parity");
+    setError("");
+    setParityResult(null);
+    try {
+      const result = await runSavvyCoreProofParity();
+      setParityResult(result);
+      setResults((prev) => ({ ...prev, parity: result }));
+    } catch (err) {
+      const failure = {
+        error: true,
+        pass: false,
+        httpStatus: err?.response?.status ?? null,
+        endpoint: err?.config?.url || PARITY_ENDPOINT,
+        message: err?.response?.data?.message || err.message || "Read parity request failed.",
+        code: err?.response?.data?.code || null,
+      };
+      setParityResult(failure);
+      setResults((prev) => ({ ...prev, parity: failure }));
+    } finally {
+      setBusy("");
+    }
+  }, []);
+
   const newProofSession = useCallback(async () => {
     setResults({});
+    setParityResult(null);
     setBusy("refresh");
     setError("");
     try {
@@ -255,7 +359,7 @@ export default function SavvyCoreProofPage() {
           type="button"
           className="btn btn-ghost"
           disabled={busy || readsDisabled || !testSubjectConfigured}
-          onClick={() => runAction("parity", () => runSavvyCoreProofParity())}
+          onClick={runParityCheck}
         >
           RUN READ PARITY CHECK
         </button>
@@ -327,6 +431,8 @@ export default function SavvyCoreProofPage() {
           RUN FULL PROOF
         </button>
       </div>
+
+      <ReadParityResultPanel result={parityResult} />
 
       <div className="card space-y-2">
         <h2 className="font-semibold">Results</h2>

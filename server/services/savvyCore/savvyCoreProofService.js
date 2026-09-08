@@ -374,7 +374,50 @@ async function runReadParityCheckForUser(user) {
     checks,
   });
 
-  return { pass, checks, coreWallet, coreProgression, final10, userId: String(userId) };
+  return {
+    pass,
+    checks,
+    coreWallet,
+    coreProgression,
+    final10,
+    userId: String(userId),
+    comparison: [
+      {
+        field: 'Savvy balance',
+        savvyCore: coreWallet.balance,
+        final10: final10.savvyBalance,
+        match: checks.savvyMatch,
+      },
+      {
+        field: 'Account level',
+        savvyCore: coreProgression.accountLevel,
+        final10: final10.accountLevel,
+        match: checks.levelMatch,
+      },
+      {
+        field: 'Prestige',
+        savvyCore: coreProgression.prestige,
+        final10: final10.prestige,
+        match: checks.prestigeMatch,
+      },
+      {
+        field: 'Account XP',
+        savvyCore: coreProgression.currentXP,
+        final10: final10.accountXp,
+        match: checks.xpMatch,
+      },
+      {
+        field: 'User ID',
+        savvyCore: String(userId),
+        final10: final10.userId,
+        match: checks.sameUserId,
+      },
+    ],
+    sources: {
+      savvyCore: 'Savvy Core wallet + progression services',
+      final10: 'Final10 canonical User + profileXpService',
+    },
+  };
 }
 
 async function runReadParityCheck(operatorUser) {
@@ -384,6 +427,11 @@ async function runReadParityCheck(operatorUser) {
       pass: false,
       code: 'PROOF_TEST_SUBJECT_NOT_CONFIGURED',
       message: context.blockReason || 'Proof test subject is not configured.',
+      comparison: [],
+      sources: {
+        savvyCore: 'Savvy Core wallet + progression services',
+        final10: 'Final10 canonical User + profileXpService',
+      },
     };
   }
   return runReadParityCheckForUser(context.testSubjectUser);
