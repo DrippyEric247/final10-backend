@@ -9,6 +9,7 @@ const {
   resolveCorsOrigin,
   useCorsCredentials,
   logCorsStartup,
+  buildCorsDiagnosticReport,
 } = require('./cors');
 
 // Content Security Policy configuration
@@ -125,6 +126,7 @@ module.exports = {
   resolveCorsOrigin,
   useCorsCredentials,
   logCorsStartup,
+  buildCorsDiagnosticReport,
   rateLimitConfig,
   cspConfig,
 };

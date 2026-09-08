@@ -4,13 +4,19 @@ const {
   resolveCorsOrigin,
   isVercelAppOrigin,
   isFinal10VercelPreviewOrigin,
+  matchesFinal10VercelSlug,
   isLocalDevOrigin,
   useCorsCredentials,
   createOptionsPreflightMiddleware,
+  getCorsRejectReason,
+  logCorsRejected,
+  splitOriginCsv,
   FINAL10_PRODUCTION_ORIGINS,
 } = require('../middleware/cors');
 
 const PREVIEW_ORIGIN = 'https://final10-client-git-beta-drippy.vercel.app';
+const ROOT_PREVIEW_ORIGIN = 'https://final10-git-beta-drippyeric247.vercel.app';
+const BACKEND_PREVIEW_ORIGIN = 'https://final10-backend-jo1t.vercel.app';
 
 describe('CORS middleware', () => {
   const envSnapshot = { ...process.env };
@@ -55,6 +61,44 @@ describe('CORS middleware', () => {
     expect(isOriginAllowed('https://some-other-project.vercel.app')).toBe(false);
     expect(isFinal10VercelPreviewOrigin('https://final10-abc123.vercel.app')).toBe(false);
     expect(isOriginAllowed('https://final10-abc123.vercel.app')).toBe(false);
+  });
+
+  it('allows root Final10 Vercel project branch previews (final10-git-*)', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.VERCEL_PREVIEW_ORIGIN_PREFIXES;
+    expect(isFinal10VercelPreviewOrigin(ROOT_PREVIEW_ORIGIN)).toBe(true);
+    expect(isOriginAllowed(ROOT_PREVIEW_ORIGIN)).toBe(true);
+    expect(resolveCorsOrigin(ROOT_PREVIEW_ORIGIN)).toBe(ROOT_PREVIEW_ORIGIN);
+  });
+
+  it('allows legacy final10-backend Vercel previews', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.VERCEL_PREVIEW_ORIGIN_PREFIXES;
+    expect(isFinal10VercelPreviewOrigin(BACKEND_PREVIEW_ORIGIN)).toBe(true);
+    expect(isOriginAllowed(BACKEND_PREVIEW_ORIGIN)).toBe(true);
+  });
+
+  it('allows Final10 team-scoped Vercel preview URLs', () => {
+    process.env.NODE_ENV = 'production';
+    expect(isOriginAllowed('https://final10-drippyeric247s-projects.vercel.app')).toBe(true);
+    expect(isOriginAllowed('https://final10-client-drippyeric247s-projects.vercel.app')).toBe(true);
+  });
+
+  it('parses ALLOWED_ORIGINS JSON arrays', () => {
+    process.env.ALLOWED_ORIGINS = '["https://final10.app","https://www.final10.app"]';
+    expect(splitOriginCsv(process.env.ALLOWED_ORIGINS)).toEqual([
+      'https://final10.app',
+      'https://www.final10.app',
+    ]);
+  });
+
+  it('logs structured CORS rejections without secrets', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    logCorsRejected('https://evil.example.com', getCorsRejectReason('https://evil.example.com'), 'test');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[CORS_REJECTED] origin=https://evil.example.com reason=origin_not_in_allowlist context=test')
+    );
+    warnSpy.mockRestore();
   });
 
   it('supports extra preview prefixes via VERCEL_PREVIEW_ORIGIN_PREFIXES', () => {
@@ -139,6 +183,35 @@ describe('CORS middleware', () => {
     preflight(req, res, () => {});
     expect(res.statusCode).toBe(204);
     expect(headers['Access-Control-Allow-Origin']).toBe(PREVIEW_ORIGIN);
+  });
+
+  it('OPTIONS preflight returns 204 for root Final10 git preview on /api/analytics/event', () => {
+    process.env.NODE_ENV = 'production';
+    const preflight = createOptionsPreflightMiddleware();
+    const headers = {};
+    const res = {
+      statusCode: 200,
+      setHeader(key, value) {
+        headers[key] = value;
+      },
+      sendStatus(code) {
+        this.statusCode = code;
+        return this;
+      },
+    };
+    const req = {
+      method: 'OPTIONS',
+      headers: {
+        origin: ROOT_PREVIEW_ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+      path: '/api/analytics/event',
+    };
+
+    preflight(req, res, () => {});
+    expect(res.statusCode).toBe(204);
+    expect(headers['Access-Control-Allow-Origin']).toBe(ROOT_PREVIEW_ORIGIN);
   });
 
   it('OPTIONS preflight blocks unrelated Vercel preview', () => {

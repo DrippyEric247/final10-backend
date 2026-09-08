@@ -15,7 +15,12 @@ const FINAL10_PRODUCTION_ORIGINS = Object.freeze([
 ]);
 
 /** Default Vercel project hostname prefixes (Final10-owned previews only — not all *.vercel.app). */
-const DEFAULT_FINAL10_VERCEL_PREVIEW_PREFIXES = Object.freeze(['final10-client']);
+const DEFAULT_FINAL10_VERCEL_PREVIEW_PREFIXES = Object.freeze([
+  'final10-client',
+  'final10-backend',
+  'final10-app',
+  'final10-frontend',
+]);
 
 const DEFAULT_ORIGINS = Object.freeze([
   'http://localhost:3000',
@@ -58,7 +63,21 @@ function expandWwwApexVariants(origin) {
 }
 
 function splitOriginCsv(raw) {
-  return String(raw || '')
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((entry) => normalizeOrigin(entry)).filter(Boolean);
+      }
+    } catch {
+      // fall through to comma parsing
+    }
+  }
+
+  return trimmed
     .split(',')
     .map((s) => normalizeOrigin(s))
     .filter(Boolean);
@@ -107,17 +126,85 @@ function parseFinal10VercelPreviewPrefixes() {
 }
 
 /**
+ * Additional Final10 Vercel slug patterns beyond explicit project prefixes.
+ * Covers root project "final10" branch previews and team-scoped deployment URLs.
+ */
+function matchesFinal10VercelSlug(slug) {
+  const s = String(slug || '').toLowerCase();
+  if (!s) return false;
+
+  const prefixes = parseFinal10VercelPreviewPrefixes();
+  if (prefixes.some((prefix) => s === prefix || s.startsWith(`${prefix}-`))) {
+    return true;
+  }
+
+  if (s === 'final10') return true;
+  if (/^final10-git-[a-z0-9-]+$/.test(s)) return true;
+  if (/^final10-[a-z0-9-]+s-projects$/.test(s)) return true;
+  if (/^final10-[a-z0-9]{6,40}-[a-z0-9-]+$/.test(s)) return true;
+
+  return false;
+}
+
+/**
  * Trusted Final10 Vercel preview deployments only.
- * Matches e.g. final10-client.vercel.app, final10-client-git-beta-team.vercel.app
+ * Matches e.g. final10-client.vercel.app, final10-git-beta-team.vercel.app
  * Does NOT match arbitrary *.vercel.app (other Vercel projects).
  */
 function isFinal10VercelPreviewOrigin(origin) {
   const o = normalizeOrigin(origin);
   const match = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(o);
   if (!match) return false;
-  const slug = match[1].toLowerCase();
-  const prefixes = parseFinal10VercelPreviewPrefixes();
-  return prefixes.some((prefix) => slug === prefix || slug.startsWith(`${prefix}-`));
+  return matchesFinal10VercelSlug(match[1]);
+}
+
+function getCorsRejectReason(origin) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return 'missing_origin';
+
+  if (buildAllowedOrigins().has(normalized)) return null;
+  if (isLocalDevOrigin(normalized)) return null;
+  if (isFinal10VercelPreviewOrigin(normalized)) return null;
+  if (isFinal10AppOrigin(normalized)) return null;
+
+  const vercelMatch = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(normalized);
+  if (vercelMatch) {
+    return 'vercel_origin_not_in_final10_preview_allowlist';
+  }
+
+  return 'origin_not_in_allowlist';
+}
+
+function logCorsRejected(origin, reason, context = 'request') {
+  const safeOrigin = normalizeOrigin(origin) || '(none)';
+  const safeReason = String(reason || 'unknown').slice(0, 120);
+  const safeContext = String(context || 'request').slice(0, 40);
+  console.warn(`[CORS_REJECTED] origin=${safeOrigin} reason=${safeReason} context=${safeContext}`);
+}
+
+function buildCorsDiagnosticReport(requestOrigin) {
+  const normalized = normalizeOrigin(requestOrigin);
+  const explicit = buildAllowedOrigins();
+  const rawAllowedOrigins = String(process.env.ALLOWED_ORIGINS || '').trim();
+  const rawCorsOrigins = String(process.env.CORS_ORIGINS || '').trim();
+  const parsedAllowedOrigins = splitOriginCsv(process.env.ALLOWED_ORIGINS);
+  const parsedCorsOrigins = splitOriginCsv(process.env.CORS_ORIGINS);
+  const rejectReason = normalized ? getCorsRejectReason(normalized) : null;
+
+  return {
+    requestOrigin: normalized || null,
+    originMatch: normalized ? isOriginAllowed(normalized) : null,
+    resolvedOrigin: normalized ? resolveCorsOrigin(normalized) : null,
+    rejectReason,
+    allowedOriginsFormat: 'comma-separated (optional JSON array); CORS_ORIGINS uses same parser',
+    rawAllowedOrigins: rawAllowedOrigins || null,
+    rawCorsOrigins: rawCorsOrigins || null,
+    parsedAllowedOrigins,
+    parsedCorsOrigins,
+    explicitOriginCount: explicit.size,
+    vercelPreviewPrefixes: parseFinal10VercelPreviewPrefixes(),
+    credentialsEnabled: useCorsCredentials(),
+  };
 }
 
 /**
@@ -185,7 +272,7 @@ function createOptionsPreflightMiddleware() {
     const resolved = resolveCorsOrigin(req.headers.origin);
     if (!resolved) {
       if (req.headers.origin) {
-        console.warn(`[cors] blocked OPTIONS preflight from: ${req.headers.origin}`);
+        logCorsRejected(req.headers.origin, getCorsRejectReason(req.headers.origin), 'options_preflight');
       }
       return res.sendStatus(403);
     }
@@ -221,7 +308,7 @@ function createCorsMiddleware() {
 
       const resolved = resolveCorsOrigin(origin);
       if (!resolved) {
-        console.warn(`[cors] blocked origin: ${origin}`);
+        logCorsRejected(origin, getCorsRejectReason(origin), 'cors_middleware');
         return callback(null, false);
       }
 
@@ -272,4 +359,8 @@ module.exports = {
   isLocalDevOrigin,
   isFinal10AppOrigin,
   splitOriginCsv,
+  matchesFinal10VercelSlug,
+  getCorsRejectReason,
+  logCorsRejected,
+  buildCorsDiagnosticReport,
 };

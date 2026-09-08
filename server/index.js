@@ -43,6 +43,7 @@ const {
   createCorsMiddleware,
   createOptionsPreflightMiddleware,
   logCorsStartup,
+  buildCorsDiagnosticReport,
   rateLimitConfig,
   cspConfig,
 } = require('./middleware/security');
@@ -93,6 +94,15 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/health', (_req, res) => {
   res.status(200).json(buildLivenessPayload());
+});
+
+app.get('/api/cors/diagnostic', (req, res) => {
+  const { getServerCommitSha } = require('./lib/deploySha');
+  res.status(200).json({
+    backendHost: req.get('host') || null,
+    serverCommitSha: getServerCommitSha() || null,
+    ...buildCorsDiagnosticReport(req.headers.origin),
+  });
 });
 
 console.log(`[startup] boot phase=early_listen port=${PORT} host=0.0.0.0`);
@@ -155,6 +165,7 @@ const limiter = rateLimit({
     req.path.startsWith('/health/') ||
     req.path === '/api/health' ||
     req.path.startsWith('/api/health/') ||
+    req.path === '/api/cors/diagnostic' ||
     req.path.startsWith('/analytics') ||
     isAuthMeRequest(req) ||
     rateLimitSkipDev(req),
