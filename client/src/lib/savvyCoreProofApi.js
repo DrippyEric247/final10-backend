@@ -1,6 +1,16 @@
 import { api } from "./api";
+import { apiPath, composeApiUrl, getApiBaseUrl } from "./runtimeApi";
 
-const BASE = "/api/savvy-core-proof";
+const BASE = apiPath("savvy-core-proof");
+
+/** @internal diagnostics — base axios root and proof route segment */
+export function getSavvyCoreProofApiTargets() {
+  return {
+    baseApiUrl: getApiBaseUrl(),
+    proofPath: `${BASE}/bootstrap`.replace(/\/bootstrap$/, ""),
+    finalComposedUrl: composeApiUrl("savvy-core-proof/bootstrap"),
+  };
+}
 
 export async function fetchSavvyCoreProofBootstrap(proofRunId) {
   const params = proofRunId ? { proofRunId } : {};

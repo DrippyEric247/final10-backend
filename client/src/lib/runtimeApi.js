@@ -67,6 +67,34 @@ function withApiSuffix(origin) {
   return `${origin}/api`;
 }
 
+/**
+ * Path relative to axios baseURL when baseURL is already `{host}/api`.
+ * Strips a mistaken leading `/api` so callers cannot double-prefix.
+ *
+ * @example apiPath('savvy-core-proof/bootstrap') => '/savvy-core-proof/bootstrap'
+ * @example apiPath('/api/savvy-core-proof/bootstrap') => '/savvy-core-proof/bootstrap'
+ */
+export function apiPath(relativePath = "") {
+  let segment = String(relativePath || "").trim().replace(/^\/+/, "");
+  if (/^api\/+/i.test(segment)) {
+    segment = segment.replace(/^api\/+/i, "");
+  }
+  return segment ? `/${segment}` : "/";
+}
+
+/**
+ * Full backend URL with exactly one `/api` segment.
+ * Safe whether REACT_APP_API_URL is host-only or already ends with `/api`.
+ */
+export function composeApiUrl(relativePath = "") {
+  const base = getApiBaseUrl();
+  if (!base) {
+    if (relativePath) warnMissingApiOnce();
+    return null;
+  }
+  return `${base}${apiPath(relativePath)}`;
+}
+
 /** Axios/fetch API root including `/api`, or null when backend URL is not configured. */
 export function getApiBaseUrl() {
   const origin = getApiOrigin();
