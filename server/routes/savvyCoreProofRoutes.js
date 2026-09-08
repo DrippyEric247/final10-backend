@@ -8,6 +8,7 @@ const {
 } = require('../config/savvyCoreProofConfig');
 const {
   getProofBootstrap,
+  activateConfiguredProofTestSubject,
   runReadParityCheck,
   awardProofSavvy,
   awardProofXp,
@@ -59,6 +60,16 @@ router.get('/bootstrap', async (req, res, next) => {
     const proofRunId = req.query.proofRunId ? String(req.query.proofRunId).trim() : undefined;
     const data = await getProofBootstrap(req.user, { proofRunId });
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/activate-test-subject', async (req, res, next) => {
+  try {
+    const result = await activateConfiguredProofTestSubject(req.user);
+    const bootstrap = await getProofBootstrap(req.user);
+    res.json({ ...result, bootstrap });
   } catch (err) {
     next(err);
   }

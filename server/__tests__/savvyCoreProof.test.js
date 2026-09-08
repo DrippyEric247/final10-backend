@@ -126,4 +126,36 @@ describe('Savvy Core production proof harness', () => {
     expect(context.testSubject.userId).toBe(String(testUser._id));
     expect(context.testSubject.emailMasked).toBe('p****r@final10.app');
   });
+
+  test('activateConfiguredProofTestSubject marks env-configured user as betaTester only', async () => {
+    process.env.SAVVY_CORE_PROOF_ENABLED = 'true';
+    process.env.SAVVY_CORE_V1_ENABLED = 'true';
+    process.env.SAVVY_CORE_PROOF_TEST_USER_EMAIL = 'proof.tester@final10.app';
+
+    const operator = {
+      _id: '507f1f77bcf86cd799439011',
+      email: 'admin@final10.app',
+      username: 'admin',
+    };
+    const testUser = {
+      _id: '507f1f77bcf86cd799439099',
+      email: 'proof.tester@final10.app',
+      username: 'proof_tester',
+      betaTester: false,
+      foundingAccess: false,
+      save: jest.fn().mockResolvedValue(true),
+    };
+    User.findOne.mockResolvedValue(testUser);
+
+    const {
+      activateConfiguredProofTestSubject,
+    } = require('../services/savvyCore/savvyCoreProofService');
+
+    const result = await activateConfiguredProofTestSubject(operator);
+    expect(testUser.betaTester).toBe(true);
+    expect(testUser.foundingAccess).toBe(false);
+    expect(testUser.save).toHaveBeenCalled();
+    expect(result.mutationsEnabled).toBe(true);
+    expect(result.testSubject.userId).toBe(String(testUser._id));
+  });
 });

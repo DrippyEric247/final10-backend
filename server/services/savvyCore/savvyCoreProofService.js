@@ -70,7 +70,7 @@ function isRecognizedInternalTestUser(user) {
   return Boolean(user.betaTester || user.foundingAccess);
 }
 
-async function resolveConfiguredProofTestUser() {
+async function findConfiguredProofTestUserRecord() {
   const configuredEmail = getProofTestUserEmailConfig();
   const configuredId = getProofTestUserIdConfig();
 
@@ -94,6 +94,15 @@ async function resolveConfiguredProofTestUser() {
     };
   }
 
+  return { user, error: null };
+}
+
+async function resolveConfiguredProofTestUser() {
+  const { user, error } = await findConfiguredProofTestUserRecord();
+  if (!user) {
+    return { user: null, error };
+  }
+
   if (!isRecognizedInternalTestUser(user)) {
     return {
       user: null,
@@ -105,13 +114,65 @@ async function resolveConfiguredProofTestUser() {
   return { user, error: null };
 }
 
+async function activateConfiguredProofTestSubject(operatorUser) {
+  if (!isSavvyCoreProofEnabled()) {
+    const err = new Error('Savvy Core production proof is disabled.');
+    err.status = 503;
+    err.code = 'SAVVY_CORE_PROOF_DISABLED';
+    throw err;
+  }
+  if (!isSavvyCoreEnabled()) {
+    const err = new Error('Savvy Core V1 is not enabled.');
+    err.status = 503;
+    err.code = 'SAVVY_CORE_DISABLED';
+    throw err;
+  }
+
+  const { user, error } = await findConfiguredProofTestUserRecord();
+  if (!user) {
+    const err = new Error(error || 'Configured proof test user was not found.');
+    err.status = 404;
+    err.code = 'PROOF_TEST_USER_NOT_FOUND';
+    throw err;
+  }
+
+  if (String(user._id) === String(operatorUser._id)) {
+    const err = new Error(
+      'The configured proof test user cannot be the same account as the operator admin.'
+    );
+    err.status = 403;
+    err.code = 'PROOF_TEST_USER_IS_OPERATOR';
+    throw err;
+  }
+
+  if (!isRecognizedInternalTestUser(user)) {
+    user.betaTester = true;
+    await user.save();
+    logProof('ACTIVATE_TEST_SUBJECT', {
+      operatorUserId: String(operatorUser._id),
+      testSubjectUserId: String(user._id),
+      marker: 'betaTester',
+    });
+  }
+
+  const context = await resolveProofContext(operatorUser);
+  return {
+    activated: true,
+    alreadyActive: Boolean(context.mutationsEnabled),
+    testSubject: context.testSubject,
+    mutationsEnabled: context.mutationsEnabled,
+    blockReason: context.blockReason,
+  };
+}
+
 async function resolveProofContext(operatorUser) {
   const operator = safeUserIdentifier(operatorUser);
-  const { user: testSubjectUser, error } = await resolveConfiguredProofTestUser();
+  const record = await findConfiguredProofTestUserRecord();
+  const { user: testSubjectUser, error: eligibleError } = await resolveConfiguredProofTestUser();
 
   let mutationsEnabled =
     isSavvyCoreProofEnabled() && isSavvyCoreEnabled() && Boolean(testSubjectUser);
-  let blockReason = error;
+  let blockReason = record.error || eligibleError;
 
   if (testSubjectUser && String(testSubjectUser._id) === String(operatorUser._id)) {
     if (!isOperatorAsTestSubjectAllowed()) {
@@ -121,30 +182,46 @@ async function resolveProofContext(operatorUser) {
     }
   }
 
+  const pendingUser = record.user && !testSubjectUser ? record.user : null;
+
   const testSubject = testSubjectUser
     ? {
         ...safeUserIdentifier(testSubjectUser),
         configured: true,
+        accountFound: true,
+        needsInternalMarker: false,
         internalTestUser: true,
         configuredEmailMasked: maskEmail(getProofTestUserEmailConfig()) || null,
       }
-    : {
-        configured: false,
-        userId: null,
-        username: null,
-        emailMasked: getProofTestUserEmailConfig()
-          ? maskEmail(getProofTestUserEmailConfig())
-          : null,
-        internalTestUser: false,
-        configuredEmailMasked: getProofTestUserEmailConfig()
-          ? maskEmail(getProofTestUserEmailConfig())
-          : null,
-      };
+    : pendingUser
+      ? {
+          ...safeUserIdentifier(pendingUser),
+          configured: false,
+          accountFound: true,
+          needsInternalMarker: true,
+          internalTestUser: false,
+          configuredEmailMasked: maskEmail(getProofTestUserEmailConfig()) || null,
+        }
+      : {
+          configured: false,
+          accountFound: false,
+          userId: null,
+          username: null,
+          emailMasked: getProofTestUserEmailConfig()
+            ? maskEmail(getProofTestUserEmailConfig())
+            : null,
+          needsInternalMarker: false,
+          internalTestUser: false,
+          configuredEmailMasked: getProofTestUserEmailConfig()
+            ? maskEmail(getProofTestUserEmailConfig())
+            : null,
+        };
 
   return {
     operator,
     testSubject,
     testSubjectUser,
+    pendingTestSubjectUser: pendingUser,
     mutationsEnabled,
     blockReason: mutationsEnabled ? null : blockReason,
   };
@@ -211,10 +288,12 @@ async function loadAccountSnapshot(userDocOrId) {
 async function getProofBootstrap(operatorUser, { proofRunId: existingRunId } = {}) {
   const proofRunId = existingRunId || createProofRunId();
   const context = await resolveProofContext(operatorUser);
+  const record = await findConfiguredProofTestUserRecord();
+  const testSubjectDoc = context.testSubjectUser || record.user;
 
   const [operatorAccount, testSubjectAccount, appContracts] = await Promise.all([
     loadAccountSnapshot(operatorUser),
-    context.testSubjectUser ? loadAccountSnapshot(context.testSubjectUser) : Promise.resolve(null),
+    testSubjectDoc ? loadAccountSnapshot(testSubjectDoc) : Promise.resolve(null),
     Promise.resolve(getContractsForApp(PROOF_APP_ID)),
   ]);
 
@@ -653,6 +732,8 @@ module.exports = {
   maskEmail,
   isRecognizedInternalTestUser,
   resolveConfiguredProofTestUser,
+  findConfiguredProofTestUserRecord,
+  activateConfiguredProofTestSubject,
   resolveProofContext,
   assertProofMutationsAllowed,
   loadAccountSnapshot,

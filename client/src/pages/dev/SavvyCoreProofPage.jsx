@@ -5,6 +5,7 @@ import { useAppConfig } from "../../lib/useAppConfig";
 import SavvyMark from "../../components/SavvyMark";
 import {
   fetchSavvyCoreProofBootstrap,
+  activateSavvyCoreProofTestSubject,
   runSavvyCoreProofParity,
   savvyCoreProofAwardSavvy,
   savvyCoreProofAwardXp,
@@ -38,6 +39,7 @@ export default function SavvyCoreProofPage() {
   const externalWritesEnabled =
     serverFlags.externalWritesEnabled ?? cfg?.savvyCoreExternalWritesEnabled ?? false;
   const testSubjectConfigured = Boolean(bootstrap?.testSubject?.configured && bootstrap?.testSubject?.userId);
+  const testSubjectNeedsActivation = Boolean(bootstrap?.testSubject?.needsInternalMarker);
   const mutationsEnabled = Boolean(bootstrap?.mutationsEnabled);
   const readsDisabled = !savvyCoreEnabled || !savvyCoreProofEnabled;
   const mutationsDisabled = readsDisabled || !mutationsEnabled;
@@ -101,6 +103,24 @@ export default function SavvyCoreProofPage() {
     }
   }, []);
 
+  const activateTestSubject = useCallback(async () => {
+    setBusy("activate-test-subject");
+    setError("");
+    try {
+      const result = await activateSavvyCoreProofTestSubject();
+      if (result.bootstrap) {
+        setBootstrap(result.bootstrap);
+        if (result.bootstrap.proofRunId) setProofRunId(result.bootstrap.proofRunId);
+      } else {
+        await refresh();
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Failed to activate proof test subject.");
+    } finally {
+      setBusy("");
+    }
+  }, [refresh]);
+
   const operatorSummary = useMemo(() => {
     const account = bootstrap?.operatorAccount;
     if (!account) return null;
@@ -159,7 +179,9 @@ export default function SavvyCoreProofPage() {
           <strong>TEST SUBJECT:</strong>{" "}
           {testSubjectConfigured
             ? `${bootstrap?.testSubject?.emailMasked || "—"} (${bootstrap?.testSubject?.userId})`
-            : bootstrap?.testSubject?.configuredEmailMasked || "not configured"}
+            : testSubjectNeedsActivation
+              ? `${bootstrap?.testSubject?.emailMasked || bootstrap?.testSubject?.configuredEmailMasked || "—"} (${bootstrap?.testSubject?.userId || "pending activation"})`
+              : bootstrap?.testSubject?.configuredEmailMasked || "not configured"}
         </div>
         <div><strong>PROOF TARGET:</strong> TEST SUBJECT ONLY</div>
         {!testSubjectConfigured ? (
@@ -167,6 +189,19 @@ export default function SavvyCoreProofPage() {
             TEST SUBJECT NOT CONFIGURED — MUTATIONS DISABLED
             {bootstrap?.mutationsBlockReason ? ` (${bootstrap.mutationsBlockReason})` : ""}
           </p>
+        ) : null}
+        {testSubjectNeedsActivation ? (
+          <div className="space-y-2">
+            <p className="text-amber-400 text-sm">
+              Configured test account exists but is not marked internal/test yet. Activate it as the proof subject only — no admin role is granted.
+            </p>
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={activateTestSubject}>
+              ACTIVATE CONFIGURED TEST SUBJECT
+            </button>
+            <p className="text-xs opacity-70">
+              Alternative: Admin Hub → Founder control → search user → Grant → Enable Founding Tester (sets betaTester + foundingAccess).
+            </p>
+          </div>
         ) : null}
         {testSubjectConfigured && !mutationsEnabled && bootstrap?.mutationsBlockReason ? (
           <p className="text-amber-400">{bootstrap.mutationsBlockReason}</p>

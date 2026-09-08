@@ -18,6 +18,11 @@ export async function fetchSavvyCoreProofBootstrap(proofRunId) {
   return data;
 }
 
+export async function activateSavvyCoreProofTestSubject() {
+  const { data } = await api.post(`${BASE}/activate-test-subject`);
+  return data;
+}
+
 export async function runSavvyCoreProofParity() {
   const { data } = await api.post(`${BASE}/parity`);
   return data;
