@@ -6,7 +6,8 @@
  *   SAVVY_CORE_PROOF_ENABLED=true
  *   SAVVY_CORE_V1_ENABLED=true
  *   MONGODB_URI
- *   SAVVY_CORE_PROOF_USER_ID or SAVVY_CORE_PROOF_USER_EMAIL
+ *   SAVVY_CORE_PROOF_TEST_USER_EMAIL or SAVVY_CORE_PROOF_USER_EMAIL
+ *   SAVVY_CORE_PROOF_USER_ID (optional alternative)
  *
  * Usage:
  *   node scripts/savvy-core-production-proof.js
@@ -19,7 +20,11 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { isSavvyCoreProofEnabled } = require('../config/savvyCoreProofConfig');
 const { isSavvyCoreEnabled } = require('../config/savvyCoreConfig');
-const { runFullProofFlow, PROOF_APP_ID } = require('../services/savvyCore/savvyCoreProofService');
+const {
+  runFullProofFlowOnTestSubject,
+  PROOF_APP_ID,
+  resolveConfiguredProofTestUser,
+} = require('../services/savvyCore/savvyCoreProofService');
 const { resolveDeploymentSha } = require('../config/savvyCoreProofConfig');
 
 const REPORT_PATH = path.join(__dirname, '..', '..', 'SAVVY_CORE_PRODUCTION_PROOF.md');
@@ -34,19 +39,9 @@ function passFail(v) {
 }
 
 async function resolveTestUser() {
-  const id = process.env.SAVVY_CORE_PROOF_USER_ID;
-  const email = process.env.SAVVY_CORE_PROOF_USER_EMAIL;
-  if (id) {
-    const user = await User.findById(id);
-    if (!user) fail(`Test user not found: ${id}`);
-    return user;
-  }
-  if (email) {
-    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
-    if (!user) fail(`Test user not found: ${email}`);
-    return user;
-  }
-  fail('Set SAVVY_CORE_PROOF_USER_ID or SAVVY_CORE_PROOF_USER_EMAIL');
+  const { user, error } = await resolveConfiguredProofTestUser();
+  if (!user) fail(error || 'Proof test user not configured');
+  return user;
 }
 
 function buildReport(result) {
@@ -117,7 +112,7 @@ async function main() {
   const user = await resolveTestUser();
   console.log(`Running Savvy Core production proof for user ${user._id} (${user.username || user.email})`);
 
-  const result = await runFullProofFlow(user);
+  const result = await runFullProofFlowOnTestSubject(user);
   const allPass = Object.values(result.results || {}).every(Boolean);
 
   const report = buildReport(result);

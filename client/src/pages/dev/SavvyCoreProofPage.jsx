@@ -37,7 +37,10 @@ export default function SavvyCoreProofPage() {
   const savvyCoreProofEnabled = serverFlags.savvyCoreProofEnabled ?? cfg?.savvyCoreProofEnabled ?? false;
   const externalWritesEnabled =
     serverFlags.externalWritesEnabled ?? cfg?.savvyCoreExternalWritesEnabled ?? false;
-  const writesDisabled = !savvyCoreEnabled || !savvyCoreProofEnabled;
+  const testSubjectConfigured = Boolean(bootstrap?.testSubject?.configured && bootstrap?.testSubject?.userId);
+  const mutationsEnabled = Boolean(bootstrap?.mutationsEnabled);
+  const readsDisabled = !savvyCoreEnabled || !savvyCoreProofEnabled;
+  const mutationsDisabled = readsDisabled || !mutationsEnabled;
 
   const refresh = useCallback(async () => {
     setBusy("refresh");
@@ -98,16 +101,35 @@ export default function SavvyCoreProofPage() {
     }
   }, []);
 
-  const summary = useMemo(() => {
-    if (!bootstrap) return null;
+  const operatorSummary = useMemo(() => {
+    const account = bootstrap?.operatorAccount;
+    if (!account) return null;
     return {
-      userId: bootstrap.user?.userId,
-      savvy: bootstrap.core?.wallet?.balance,
-      level: bootstrap.core?.progression?.accountLevel,
-      prestige: bootstrap.core?.progression?.prestige,
-      xp: bootstrap.core?.progression?.currentXP,
+      userId: account.userId,
+      emailMasked: account.emailMasked,
+      username: account.username,
+      savvy: account.core?.wallet?.balance,
+      level: account.core?.progression?.accountLevel,
+      prestige: account.core?.progression?.prestige,
+      xp: account.core?.progression?.currentXP,
     };
   }, [bootstrap]);
+
+  const testSubjectSummary = useMemo(() => {
+    const account = bootstrap?.testSubjectAccount;
+    if (!account) return null;
+    return {
+      userId: account.userId,
+      emailMasked: account.emailMasked,
+      username: account.username,
+      savvy: account.core?.wallet?.balance,
+      level: account.core?.progression?.accountLevel,
+      prestige: account.core?.progression?.prestige,
+      xp: account.core?.progression?.currentXP,
+    };
+  }, [bootstrap]);
+
+  const summary = testSubjectSummary || operatorSummary;
 
   if (loading) {
     return (
@@ -132,8 +154,24 @@ export default function SavvyCoreProofPage() {
       </div>
 
       <div className="card space-y-2 text-sm">
+        <div><strong>OPERATOR:</strong> {bootstrap?.operator?.emailMasked || "—"} ({bootstrap?.operator?.userId || "—"})</div>
+        <div>
+          <strong>TEST SUBJECT:</strong>{" "}
+          {testSubjectConfigured
+            ? `${bootstrap?.testSubject?.emailMasked || "—"} (${bootstrap?.testSubject?.userId})`
+            : bootstrap?.testSubject?.configuredEmailMasked || "not configured"}
+        </div>
+        <div><strong>PROOF TARGET:</strong> TEST SUBJECT ONLY</div>
+        {!testSubjectConfigured ? (
+          <p className="text-amber-400">
+            TEST SUBJECT NOT CONFIGURED — MUTATIONS DISABLED
+            {bootstrap?.mutationsBlockReason ? ` (${bootstrap.mutationsBlockReason})` : ""}
+          </p>
+        ) : null}
+        {testSubjectConfigured && !mutationsEnabled && bootstrap?.mutationsBlockReason ? (
+          <p className="text-amber-400">{bootstrap.mutationsBlockReason}</p>
+        ) : null}
         <div><strong>CONNECTED APP:</strong> SavvyTrip Test ({bootstrap?.appId || "savvytrip_test"})</div>
-        <div><strong>USER:</strong> {user?.username || "—"} ({summary?.userId || "—"})</div>
         <div><strong>SAVVY CORE:</strong> {bootstrap?.savvyCoreVersion || "—"}</div>
         <div><strong>DEPLOY SHA:</strong> <code>{bootstrap?.deploymentSha || "—"}</code></div>
         <div><strong>PROOF RUN ID:</strong> <code>{proofRunId || "—"}</code></div>
@@ -142,18 +180,31 @@ export default function SavvyCoreProofPage() {
           <span className="chip">EXTERNAL_WRITES: {String(externalWritesEnabled)}</span>
           <span className="chip">PROOF: {String(savvyCoreProofEnabled)}</span>
         </div>
-        {writesDisabled ? (
+        {readsDisabled ? (
           <p className="text-amber-400 text-sm">
             Proof reads/writes disabled — set SAVVY_CORE_V1_ENABLED=true and SAVVY_CORE_PROOF_ENABLED=true on the server.
           </p>
         ) : null}
       </div>
 
-      <div className="card grid grid-cols-2 gap-3 text-sm">
-        <div><strong>SAVVY BALANCE</strong><div>{summary?.savvy ?? "—"}</div></div>
-        <div><strong>ACCOUNT LEVEL</strong><div>{summary?.level ?? "—"}</div></div>
-        <div><strong>PRESTIGE</strong><div>{summary?.prestige ?? "—"}</div></div>
-        <div><strong>ACCOUNT XP</strong><div>{summary?.xp ?? "—"}</div></div>
+      <div className="card space-y-3 text-sm">
+        <h2 className="font-semibold">Operator account (unchanged by proof mutations)</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <div><strong>SAVVY BALANCE</strong><div>{operatorSummary?.savvy ?? "—"}</div></div>
+          <div><strong>ACCOUNT LEVEL</strong><div>{operatorSummary?.level ?? "—"}</div></div>
+          <div><strong>PRESTIGE</strong><div>{operatorSummary?.prestige ?? "—"}</div></div>
+          <div><strong>ACCOUNT XP</strong><div>{operatorSummary?.xp ?? "—"}</div></div>
+        </div>
+      </div>
+
+      <div className="card space-y-3 text-sm">
+        <h2 className="font-semibold">Test subject account (proof mutations apply here)</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <div><strong>SAVVY BALANCE</strong><div>{testSubjectSummary?.savvy ?? summary?.savvy ?? "—"}</div></div>
+          <div><strong>ACCOUNT LEVEL</strong><div>{testSubjectSummary?.level ?? summary?.level ?? "—"}</div></div>
+          <div><strong>PRESTIGE</strong><div>{testSubjectSummary?.prestige ?? summary?.prestige ?? "—"}</div></div>
+          <div><strong>ACCOUNT XP</strong><div>{testSubjectSummary?.xp ?? summary?.xp ?? "—"}</div></div>
+        </div>
       </div>
 
       {error ? <div className="card text-red-400 text-sm">{error}</div> : null}
@@ -168,7 +219,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={busy || writesDisabled}
+          disabled={busy || readsDisabled || !testSubjectConfigured}
           onClick={() => runAction("parity", () => runSavvyCoreProofParity())}
         >
           RUN READ PARITY CHECK
@@ -176,7 +227,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-purple"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={() => runAction("savvy50", (id) => savvyCoreProofAwardSavvy(id))}
         >
           AWARD +50 SAVVY
@@ -184,7 +235,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-purple"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={() => runAction("idempotency", (id) => savvyCoreProofAwardSavvy(id, { retry: true }))}
         >
           RETRY LAST IDEMPOTENCY KEY
@@ -192,7 +243,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-purple"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={() => runAction("xp25", (id) => savvyCoreProofAwardXp(id))}
         >
           AWARD +25 XP
@@ -200,7 +251,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={() => runAction("contract", (id) => savvyCoreProofProgressContract(id))}
         >
           PROGRESS TEST CONTRACT
@@ -208,7 +259,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={() => runAction("cosmetic", (id) => savvyCoreProofUnlockCosmetic(id))}
         >
           UNLOCK TEST CALLING CARD
@@ -216,7 +267,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={() => runAction("security", () => savvyCoreProofSecurityTests())}
         >
           RUN SECURITY NEGATIVE TESTS
@@ -224,7 +275,7 @@ export default function SavvyCoreProofPage() {
         <button
           type="button"
           className="btn btn-primary"
-          disabled={busy || writesDisabled}
+          disabled={busy || mutationsDisabled}
           onClick={async () => {
             setBusy("full");
             setError("");

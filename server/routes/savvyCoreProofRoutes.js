@@ -16,6 +16,8 @@ const {
   verifyLedgerEntry,
   runSecurityNegativeTests,
   runFullProofFlow,
+  resolveProofContext,
+  assertProofMutationsAllowed,
 } = require('../services/savvyCore/savvyCoreProofService');
 
 const router = express.Router();
@@ -34,6 +36,20 @@ function proofGate(_req, res, next) {
     });
   }
   return next();
+}
+
+async function attachProofMutationTarget(req, res, next) {
+  try {
+    const context = await resolveProofContext(req.user);
+    req.proofContext = context;
+    req.proofTestUser = assertProofMutationsAllowed(context);
+    return next();
+  } catch (err) {
+    return res.status(err.status || 503).json({
+      code: err.code || 'PROOF_MUTATIONS_DISABLED',
+      message: err.message,
+    });
+  }
 }
 
 router.use(proofGate, auth, requireAdminAccess());
@@ -57,7 +73,7 @@ router.post('/parity', async (req, res, next) => {
   }
 });
 
-router.post('/actions/award-savvy', async (req, res, next) => {
+router.post('/actions/award-savvy', attachProofMutationTarget, async (req, res, next) => {
   try {
     const clientAmount = req.body?.amount;
     if (clientAmount != null && Number(clientAmount) !== PROOF_SAVVY_AMOUNT) {
@@ -74,71 +90,82 @@ router.post('/actions/award-savvy', async (req, res, next) => {
       return res.status(400).json({ code: 'PROOF_RUN_ID_REQUIRED', message: 'proofRunId is required.' });
     }
     const retry = Boolean(req.body?.retry);
-    const result = await awardProofSavvy(req.user, proofRunId, { retry });
+    const result = await awardProofSavvy(req.proofTestUser, proofRunId, {
+      retry,
+      operatorUserId: req.user._id,
+    });
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/actions/award-xp', async (req, res, next) => {
+router.post('/actions/award-xp', attachProofMutationTarget, async (req, res, next) => {
   try {
     const proofRunId = String(req.body?.proofRunId || '').trim();
     if (!proofRunId) {
       return res.status(400).json({ code: 'PROOF_RUN_ID_REQUIRED', message: 'proofRunId is required.' });
     }
-    const result = await awardProofXp(req.user, proofRunId);
+    const result = await awardProofXp(req.proofTestUser, proofRunId, {
+      operatorUserId: req.user._id,
+    });
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/actions/progress-contract', async (req, res, next) => {
+router.post('/actions/progress-contract', attachProofMutationTarget, async (req, res, next) => {
   try {
     const proofRunId = String(req.body?.proofRunId || '').trim();
     if (!proofRunId) {
       return res.status(400).json({ code: 'PROOF_RUN_ID_REQUIRED', message: 'proofRunId is required.' });
     }
-    const result = await progressProofContract(req.user, proofRunId);
+    const result = await progressProofContract(req.proofTestUser, proofRunId, {
+      operatorUserId: req.user._id,
+    });
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/actions/unlock-cosmetic', async (req, res, next) => {
+router.post('/actions/unlock-cosmetic', attachProofMutationTarget, async (req, res, next) => {
   try {
     const proofRunId = String(req.body?.proofRunId || '').trim();
     if (!proofRunId) {
       return res.status(400).json({ code: 'PROOF_RUN_ID_REQUIRED', message: 'proofRunId is required.' });
     }
-    const result = await unlockProofCosmetic(req.user, proofRunId);
+    const result = await unlockProofCosmetic(req.proofTestUser, proofRunId, {
+      operatorUserId: req.user._id,
+    });
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/ledger/:proofRunId', async (req, res, next) => {
+router.get('/ledger/:proofRunId', attachProofMutationTarget, async (req, res, next) => {
   try {
-    const result = await verifyLedgerEntry(req.user, req.params.proofRunId);
+    const result = await verifyLedgerEntry(req.proofTestUser, req.params.proofRunId);
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/security-tests', async (req, res, next) => {
+router.post('/security-tests', attachProofMutationTarget, async (req, res, next) => {
   try {
-    const result = await runSecurityNegativeTests(req.user);
+    const result = await runSecurityNegativeTests(req.proofTestUser, {
+      operatorUserId: req.user._id,
+    });
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/run-full', async (req, res, next) => {
+router.post('/run-full', attachProofMutationTarget, async (req, res, next) => {
   try {
     const proofRunId = req.body?.proofRunId ? String(req.body.proofRunId).trim() : undefined;
     const result = await runFullProofFlow(req.user, { proofRunId });

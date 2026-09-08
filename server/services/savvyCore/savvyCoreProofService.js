@@ -27,6 +27,9 @@ const {
   PROOF_CONTRACT_TRIGGER,
   PROOF_CONTRACT_ID,
   isSavvyCoreProofEnabled,
+  getProofTestUserEmailConfig,
+  getProofTestUserIdConfig,
+  isOperatorAsTestSubjectAllowed,
   resolveDeploymentSha,
   resolveProofAppKey,
   buildProofIdempotencyKey,
@@ -42,6 +45,119 @@ const { parseAppKeys } = require('../../middleware/savvyCoreAppAuth');
 function logProof(phase, payload) {
   // eslint-disable-next-line no-console
   console.log(`[SAVVY_CORE_PROOF][${phase}]`, JSON.stringify(payload));
+}
+
+function maskEmail(email) {
+  const value = String(email || '').trim();
+  if (!value || !value.includes('@')) return value || null;
+  const [local, domain] = value.split('@');
+  if (!local) return `*@${domain}`;
+  if (local.length <= 2) return `${local[0] || '*'}*@${domain}`;
+  return `${local[0]}${'*'.repeat(Math.min(local.length - 2, 4))}${local.slice(-1)}@${domain}`;
+}
+
+function safeUserIdentifier(user) {
+  if (!user) return null;
+  return {
+    userId: String(user._id),
+    username: user.username || null,
+    emailMasked: maskEmail(user.email),
+  };
+}
+
+function isRecognizedInternalTestUser(user) {
+  if (!user) return false;
+  return Boolean(user.betaTester || user.foundingAccess);
+}
+
+async function resolveConfiguredProofTestUser() {
+  const configuredEmail = getProofTestUserEmailConfig();
+  const configuredId = getProofTestUserIdConfig();
+
+  if (!configuredEmail && !configuredId) {
+    return {
+      user: null,
+      error: 'SAVVY_CORE_PROOF_TEST_USER_EMAIL is not configured on the server.',
+    };
+  }
+
+  const user = configuredId
+    ? await User.findById(configuredId)
+    : await User.findOne({ email: configuredEmail });
+
+  if (!user) {
+    return {
+      user: null,
+      error: configuredId
+        ? 'Configured proof test user id was not found.'
+        : 'Configured proof test user email was not found.',
+    };
+  }
+
+  if (!isRecognizedInternalTestUser(user)) {
+    return {
+      user: null,
+      error:
+        'Configured proof test user must be marked internal/test (betaTester or foundingAccess).',
+    };
+  }
+
+  return { user, error: null };
+}
+
+async function resolveProofContext(operatorUser) {
+  const operator = safeUserIdentifier(operatorUser);
+  const { user: testSubjectUser, error } = await resolveConfiguredProofTestUser();
+
+  let mutationsEnabled =
+    isSavvyCoreProofEnabled() && isSavvyCoreEnabled() && Boolean(testSubjectUser);
+  let blockReason = error;
+
+  if (testSubjectUser && String(testSubjectUser._id) === String(operatorUser._id)) {
+    if (!isOperatorAsTestSubjectAllowed()) {
+      mutationsEnabled = false;
+      blockReason =
+        'Proof test subject cannot be the operator admin account. Configure a dedicated internal test user.';
+    }
+  }
+
+  const testSubject = testSubjectUser
+    ? {
+        ...safeUserIdentifier(testSubjectUser),
+        configured: true,
+        internalTestUser: true,
+        configuredEmailMasked: maskEmail(getProofTestUserEmailConfig()) || null,
+      }
+    : {
+        configured: false,
+        userId: null,
+        username: null,
+        emailMasked: getProofTestUserEmailConfig()
+          ? maskEmail(getProofTestUserEmailConfig())
+          : null,
+        internalTestUser: false,
+        configuredEmailMasked: getProofTestUserEmailConfig()
+          ? maskEmail(getProofTestUserEmailConfig())
+          : null,
+      };
+
+  return {
+    operator,
+    testSubject,
+    testSubjectUser,
+    mutationsEnabled,
+    blockReason: mutationsEnabled ? null : blockReason,
+  };
+}
+
+function assertProofMutationsAllowed(context) {
+  if (!context?.mutationsEnabled || !context?.testSubjectUser) {
+    const err = new Error(context?.blockReason || 'Proof mutations are disabled.');
+    err.status = 503;
+    err.code = 'PROOF_MUTATIONS_DISABLED';
+    throw err;
+  }
+  return context.testSubjectUser;
 }
 
 function createProofRunId() {
@@ -61,35 +177,65 @@ async function readFinal10Canonical(userId) {
   };
 }
 
-async function getProofBootstrap(user, { proofRunId: existingRunId } = {}) {
-  const proofRunId = existingRunId || createProofRunId();
-  const userId = user._id;
+async function loadAccountSnapshot(userDocOrId) {
+  const user =
+    userDocOrId && userDocOrId._id
+      ? userDocOrId
+      : await User.findById(userDocOrId).lean();
+  if (!user) return null;
 
-  const [coreMe, coreWallet, coreProgression, final10, appContracts] = await Promise.all([
+  const userId = user._id;
+  const [coreMe, coreWallet, coreProgression, final10] = await Promise.all([
     getSavvyCoreMe(user),
     getSavvyBalance({ userId }),
     getAccountProgression({ userId }),
     readFinal10Canonical(userId),
+  ]);
+
+  return {
+    userId: String(userId),
+    username: user.username || null,
+    emailMasked: maskEmail(user.email),
+    baseline: {
+      userId: String(userId),
+      savvy: coreWallet.balance,
+      xp: coreProgression.currentXP,
+      level: coreProgression.accountLevel,
+      prestige: coreProgression.prestige,
+    },
+    core: { me: coreMe, wallet: coreWallet, progression: coreProgression },
+    final10,
+  };
+}
+
+async function getProofBootstrap(operatorUser, { proofRunId: existingRunId } = {}) {
+  const proofRunId = existingRunId || createProofRunId();
+  const context = await resolveProofContext(operatorUser);
+
+  const [operatorAccount, testSubjectAccount, appContracts] = await Promise.all([
+    loadAccountSnapshot(operatorUser),
+    context.testSubjectUser ? loadAccountSnapshot(context.testSubjectUser) : Promise.resolve(null),
     Promise.resolve(getContractsForApp(PROOF_APP_ID)),
   ]);
 
-  const baseline = {
-    userId: String(userId),
-    savvy: coreWallet.balance,
-    xp: coreProgression.currentXP,
-    level: coreProgression.accountLevel,
-    prestige: coreProgression.prestige,
-  };
+  const primary = testSubjectAccount || operatorAccount;
 
   logProof('READ', {
     testProofId: proofRunId,
     appId: PROOF_APP_ID,
-    userId: baseline.userId,
+    operatorUserId: context.operator?.userId,
+    testSubjectUserId: context.testSubject?.userId,
+    mutationsEnabled: context.mutationsEnabled,
     result: 'ok',
   });
 
   return {
     proofRunId,
+    proofTarget: 'test_subject_only',
+    operator: context.operator,
+    testSubject: context.testSubject,
+    mutationsEnabled: context.mutationsEnabled,
+    mutationsBlockReason: context.blockReason,
     connectedApp: PROOF_APP_LABEL,
     appId: PROOF_APP_ID,
     savvyCoreVersion: SAVVY_CORE_VERSION,
@@ -101,12 +247,14 @@ async function getProofBootstrap(user, { proofRunId: existingRunId } = {}) {
       appKeyConfigured: Boolean(resolveProofAppKey()),
     },
     user: {
-      userId: String(userId),
-      username: user.username,
+      userId: primary?.userId,
+      username: primary?.username,
     },
-    baseline,
-    core: { me: coreMe, wallet: coreWallet, progression: coreProgression },
-    final10,
+    baseline: primary?.baseline,
+    core: primary?.core,
+    final10: primary?.final10,
+    operatorAccount,
+    testSubjectAccount,
     contracts: appContracts.map((c) => ({
       id: c.id,
       trigger: c.trigger,
@@ -122,7 +270,7 @@ async function getProofBootstrap(user, { proofRunId: existingRunId } = {}) {
   };
 }
 
-async function runReadParityCheck(user) {
+async function runReadParityCheckForUser(user) {
   const userId = user._id;
   const [coreWallet, coreProgression, final10] = await Promise.all([
     getSavvyBalance({ userId }),
@@ -147,10 +295,22 @@ async function runReadParityCheck(user) {
     checks,
   });
 
-  return { pass, checks, coreWallet, coreProgression, final10 };
+  return { pass, checks, coreWallet, coreProgression, final10, userId: String(userId) };
 }
 
-async function awardProofSavvy(user, proofRunId, { retry = false } = {}) {
+async function runReadParityCheck(operatorUser) {
+  const context = await resolveProofContext(operatorUser);
+  if (!context.testSubjectUser) {
+    return {
+      pass: false,
+      code: 'PROOF_TEST_SUBJECT_NOT_CONFIGURED',
+      message: context.blockReason || 'Proof test subject is not configured.',
+    };
+  }
+  return runReadParityCheckForUser(context.testSubjectUser);
+}
+
+async function awardProofSavvy(user, proofRunId, { retry = false, operatorUserId = null } = {}) {
   const userId = user._id;
   const before = await getSavvyBalance({ userId });
   const key = buildProofIdempotencyKey(proofRunId, 'savvy50');
@@ -172,6 +332,7 @@ async function awardProofSavvy(user, proofRunId, { retry = false } = {}) {
   logProof(retry ? 'IDEMPOTENCY_REPLAY' : 'WALLET_EARN', {
     testProofId: proofRunId,
     appId: PROOF_APP_ID,
+    operatorUserId: operatorUserId ? String(operatorUserId) : null,
     userId: String(userId),
     idempotencyKey: key,
     duplicate: Boolean(result.duplicate),
@@ -191,7 +352,7 @@ async function awardProofSavvy(user, proofRunId, { retry = false } = {}) {
   };
 }
 
-async function awardProofXp(user, proofRunId) {
+async function awardProofXp(user, proofRunId, { operatorUserId = null } = {}) {
   const userId = user._id;
   const before = await getAccountProgression({ userId });
   const key = buildProofIdempotencyKey(proofRunId, 'xp25');
@@ -212,6 +373,7 @@ async function awardProofXp(user, proofRunId) {
   logProof('XP_AWARD', {
     testProofId: proofRunId,
     appId: PROOF_APP_ID,
+    operatorUserId: operatorUserId ? String(operatorUserId) : null,
     userId: String(userId),
     idempotencyKey: key,
     duplicate: Boolean(result.duplicate),
@@ -236,7 +398,7 @@ async function awardProofXp(user, proofRunId) {
   };
 }
 
-async function progressProofContract(user, proofRunId) {
+async function progressProofContract(user, proofRunId, { operatorUserId = null } = {}) {
   const userId = user._id;
   const before = await ContractProgress.findOne({
     userId,
@@ -267,6 +429,7 @@ async function progressProofContract(user, proofRunId) {
   logProof('CONTRACT_PROGRESS', {
     testProofId: proofRunId,
     appId: PROOF_APP_ID,
+    operatorUserId: operatorUserId ? String(operatorUserId) : null,
     userId: String(userId),
     trigger: PROOF_CONTRACT_TRIGGER,
     progressed: result.progressed?.length || 0,
@@ -283,7 +446,7 @@ async function progressProofContract(user, proofRunId) {
   };
 }
 
-async function unlockProofCosmetic(user, proofRunId) {
+async function unlockProofCosmetic(user, proofRunId, { operatorUserId = null } = {}) {
   const userId = user._id;
   const key = buildProofIdempotencyKey(proofRunId, 'cosmetic');
 
@@ -315,6 +478,7 @@ async function unlockProofCosmetic(user, proofRunId) {
   logProof('COSMETIC_UNLOCK', {
     testProofId: proofRunId,
     appId: PROOF_APP_ID,
+    operatorUserId: operatorUserId ? String(operatorUserId) : null,
     userId: String(userId),
     cosmeticId: PROOF_COSMETIC_ID,
     duplicate: Boolean(retry.duplicate),
@@ -368,7 +532,7 @@ function verifyAppCredentials(appId, appKey) {
   return { ok: true, appId };
 }
 
-async function runSecurityNegativeTests(user) {
+async function runSecurityNegativeTests(user, { operatorUserId = null } = {}) {
   const userId = user._id;
   const beforeWallet = await getSavvyBalance({ userId });
   const results = {};
@@ -418,6 +582,7 @@ async function runSecurityNegativeTests(user) {
   logProof('SECURITY', {
     testProofId: 'security',
     appId: PROOF_APP_ID,
+    operatorUserId: operatorUserId ? String(operatorUserId) : null,
     userId: String(userId),
     result: allPass ? 'pass' : 'fail',
   });
@@ -425,24 +590,32 @@ async function runSecurityNegativeTests(user) {
   return { pass: allPass, results };
 }
 
-async function runFullProofFlow(user, { proofRunId: existingRunId } = {}) {
+async function runFullProofFlowOnTestSubject(
+  testUser,
+  { proofRunId: existingRunId, operatorUserId = null, operatorUser = null } = {}
+) {
   const proofRunId = existingRunId || createProofRunId();
-  const bootstrap = await getProofBootstrap(user);
-  const parity = await runReadParityCheck(user);
-  const savvy = await awardProofSavvy(user, proofRunId);
-  const idempotency = await awardProofSavvy(user, proofRunId, { retry: true });
-  const xp = await awardProofXp(user, proofRunId);
-  const contract = await progressProofContract(user, proofRunId);
-  const cosmetic = await unlockProofCosmetic(user, proofRunId);
-  const ledger = await verifyLedgerEntry(user, proofRunId);
-  const security = await runSecurityNegativeTests(user);
-  const finalParity = await runReadParityCheck(user);
+  const bootstrap = operatorUser
+    ? await getProofBootstrap(operatorUser, { proofRunId })
+    : {
+        baseline: (await loadAccountSnapshot(testUser))?.baseline,
+      };
+  const parity = await runReadParityCheckForUser(testUser);
+  const savvy = await awardProofSavvy(testUser, proofRunId, { operatorUserId });
+  const idempotency = await awardProofSavvy(testUser, proofRunId, { retry: true, operatorUserId });
+  const xp = await awardProofXp(testUser, proofRunId, { operatorUserId });
+  const contract = await progressProofContract(testUser, proofRunId, { operatorUserId });
+  const cosmetic = await unlockProofCosmetic(testUser, proofRunId, { operatorUserId });
+  const ledger = await verifyLedgerEntry(testUser, proofRunId);
+  const security = await runSecurityNegativeTests(testUser, { operatorUserId });
+  const finalParity = await runReadParityCheckForUser(testUser);
 
   return {
     proofRunId,
     deploymentSha: resolveDeploymentSha(),
     appId: PROOF_APP_ID,
-    testUser: String(user._id),
+    operatorUser: operatorUserId ? String(operatorUserId) : null,
+    testUser: String(testUser._id),
     baseline: bootstrap.baseline,
     results: {
       readParity: parity.pass,
@@ -461,14 +634,31 @@ async function runFullProofFlow(user, { proofRunId: existingRunId } = {}) {
   };
 }
 
+async function runFullProofFlow(operatorUser, { proofRunId: existingRunId } = {}) {
+  const context = await resolveProofContext(operatorUser);
+  const testUser = assertProofMutationsAllowed(context);
+  return runFullProofFlowOnTestSubject(testUser, {
+    proofRunId: existingRunId,
+    operatorUserId: operatorUser._id,
+    operatorUser,
+  });
+}
+
 module.exports = {
   PROOF_APP_ID,
   PROOF_COSMETIC_ID,
   PROOF_SAVVY_AMOUNT,
   PROOF_XP_AMOUNT,
   createProofRunId,
+  maskEmail,
+  isRecognizedInternalTestUser,
+  resolveConfiguredProofTestUser,
+  resolveProofContext,
+  assertProofMutationsAllowed,
+  loadAccountSnapshot,
   getProofBootstrap,
   runReadParityCheck,
+  runReadParityCheckForUser,
   awardProofSavvy,
   awardProofXp,
   progressProofContract,
@@ -476,5 +666,6 @@ module.exports = {
   verifyLedgerEntry,
   runSecurityNegativeTests,
   runFullProofFlow,
+  runFullProofFlowOnTestSubject,
   verifyAppCredentials,
 };

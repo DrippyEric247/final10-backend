@@ -22,6 +22,25 @@ function isSavvyCoreProofEnabled() {
   return envFlag('SAVVY_CORE_PROOF_ENABLED', false);
 }
 
+/** Dedicated internal account that receives proof mutations (never from browser). */
+function getProofTestUserEmailConfig() {
+  return String(
+    process.env.SAVVY_CORE_PROOF_TEST_USER_EMAIL ||
+      process.env.SAVVY_CORE_PROOF_USER_EMAIL ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function getProofTestUserIdConfig() {
+  return String(process.env.SAVVY_CORE_PROOF_USER_ID || '').trim();
+}
+
+function isOperatorAsTestSubjectAllowed() {
+  return envFlag('SAVVY_CORE_PROOF_ALLOW_OPERATOR_AS_SUBJECT', false);
+}
+
 function resolveDeploymentSha() {
   return (
     process.env.RAILWAY_GIT_COMMIT_SHA ||
@@ -56,6 +75,9 @@ module.exports = {
   PROOF_CONTRACT_TRIGGER,
   PROOF_CONTRACT_ID,
   isSavvyCoreProofEnabled,
+  getProofTestUserEmailConfig,
+  getProofTestUserIdConfig,
+  isOperatorAsTestSubjectAllowed,
   resolveDeploymentSha,
   resolveProofAppKey,
   buildProofIdempotencyKey,
