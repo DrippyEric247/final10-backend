@@ -6,6 +6,11 @@ const { evaluateListingTrust } = require('../lib/listingRanking/trustScoreEngine
 const { evaluateBestMove } = require('../lib/listingRanking/bestMoveEngine');
 const { buildSellerTrustEvidence } = require('../lib/listingRanking/sellerTrustEvidence');
 const { toNum } = require('../lib/listingRanking/utils');
+const {
+  computePopularityScore,
+  computePopularityBoost,
+  applyDiversityRanking,
+} = require('../lib/listingRanking/popularityScoreEngine');
 
 const RECOMMENDATION_WEIGHT = {
   buy_now_better: 4,
@@ -24,7 +29,7 @@ function feedbackCount(item) {
   return Number.isFinite(flat) ? flat : 0;
 }
 
-function computeCompositeRank(item, trust, decision) {
+function computeCompositeRank(item, trust, decision, options = {}) {
   const price = Number(item.buyNowPrice ?? item.currentBidPrice ?? item.price ?? 0);
   const market = Number(item.marketValue ?? 0);
   const savings = Math.max(0, market - price);
@@ -40,6 +45,13 @@ function computeCompositeRank(item, trust, decision) {
     Math.max(0, Number(item.bidCount || 0) * 8) +
     (Number(decision.confidenceScore) || 0) * 60;
 
+  const category = options.category || item.category || item.interest || '';
+  const popularity = computePopularityScore(item, category);
+  const popularityBoost = computePopularityBoost(popularity.score, {
+    dealScore: decision.dealScore,
+    savingsPct,
+  });
+
   return (
     Math.min(300, savings) * 0.85 +
     Math.min(60, savingsPct) * 2.2 +
@@ -47,7 +59,8 @@ function computeCompositeRank(item, trust, decision) {
     sellerRep * 0.9 +
     shipConf * 0.35 +
     urgency * 0.55 +
-    activity * 0.75
+    activity * 0.75 +
+    popularityBoost
   );
 }
 
@@ -82,7 +95,7 @@ function scoreListing(listing, options = {}) {
     trust.trustLevel === 'unverified' ||
     (trust.trustScore < 32 && feedbackCount(item) < 5);
 
-  let rankScore = computeCompositeRank(item, trust, decision);
+  let rankScore = computeCompositeRank(item, trust, decision, options);
   if (risky) rankScore *= 0.35;
 
   const tierBoost = Number(options.tierBoost) || 0;
@@ -98,6 +111,8 @@ function scoreListing(listing, options = {}) {
 
   return {
     listingId: String(item.listingId || item.id || item.itemId || ''),
+    listing: item,
+    category: options.category || item.category || item.interest || '',
     rankScore: Math.round(rankScore * 100) / 100,
     sellerEvidence: buildSellerTrustEvidence(item, trust),
     signals: {
@@ -110,6 +125,7 @@ function scoreListing(listing, options = {}) {
       sellerScore: Math.min(100, feedbackCount(item) / 8),
       safeToRecommend: trust.safeToRecommend,
       recommendationType: decision.recommendationType,
+      popularityScore: computePopularityScore(item, options.category || item.category || item.interest || '').score,
     },
     labels,
     risky,
@@ -161,9 +177,15 @@ function rankListings(listings, options = {}) {
     return b.rankScore - a.rankScore;
   });
 
-  return scored.map((row, index) => ({
+  const diversified = applyDiversityRanking(scored, {
+    scoreKey: 'rankScore',
+    categoryKey: 'category',
+  });
+
+  return diversified.map((row, index) => ({
     ...row,
     rankPosition: index + 1,
+    listing: undefined,
     trust: undefined,
     decision: undefined,
   }));

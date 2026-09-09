@@ -38,6 +38,12 @@ import {
   normalizeBestMoveListing,
   validateBestMoveListing,
 } from "./bestMoveListingValidation";
+import {
+  computePopularityBoost,
+  computePopularityScore,
+  applyDiversityRanking,
+  POPULARITY_RANK_WEIGHTS,
+} from "./popularityScoreEngine";
 
 const ebayApi = (path: string) => buildApiUrl(`/ebay${path.startsWith("/") ? path : `/${path}`}`);
 const DEFAULT_PER_CATEGORY_LIMIT = 20;
@@ -111,6 +117,8 @@ export type InstantBestMoveCandidate = {
   savingsAmount: number;
   urgencyScore: number;
   instantScore: number;
+  popularityScore?: number;
+  popularityBoost?: number;
 };
 
 export type InstantBestMoveResult = {
@@ -197,7 +205,8 @@ function composeInstantScore(
   trustScore: number,
   savingsPercent: number,
   dealScore: number,
-  urgencyScore: number
+  urgencyScore: number,
+  popularityBoost = 0
 ): number {
   // Savings can reasonably saturate around ~60% under market; clamp to 100
   // so mega-low-trust gigantic "too good to be true" listings cannot runaway
@@ -207,7 +216,8 @@ function composeInstantScore(
     trustScore * 0.58 +
     normalizedSavings * 0.18 +
     dealScore * 0.14 +
-    urgencyScore * 0.1;
+    urgencyScore * 0.1 +
+    popularityBoost;
   return Math.round(composite * 10) / 10;
 }
 
@@ -608,12 +618,18 @@ export function scoreListing(
 
   const { savingsAmount, savingsPercent } = computeSavings(listing, decision);
   const urgencyScore = urgencyFromSeconds(pickSecondsRemaining(listing));
+  const popularity = computePopularityScore(listing, interest);
+  const popularityBoost = computePopularityBoost(popularity.score, {
+    dealScore: decision.dealScore,
+    savingsPct: savingsPercent,
+  });
 
   const instantScore = composeInstantScore(
     trust.trustScore,
     savingsPercent,
     decision.dealScore,
-    urgencyScore
+    urgencyScore,
+    popularityBoost
   );
 
   return {
@@ -625,13 +641,15 @@ export function scoreListing(
     savingsAmount,
     urgencyScore,
     instantScore,
+    popularityScore: popularity.score,
+    popularityBoost,
   };
 }
 
 export function rankCandidates(
   candidates: InstantBestMoveCandidate[]
 ): InstantBestMoveCandidate[] {
-  return [...candidates].sort((a, b) => {
+  const sorted = [...candidates].sort((a, b) => {
     // Gate: exclude 'pass' recommendations from the top slot whenever a
     // non-pass candidate exists.
     const aPass = a.decision.bestMove === "pass" ? 1 : 0;
@@ -646,6 +664,11 @@ export function rankCandidates(
     const bp = pickComparablePrice(b.listing) ?? Infinity;
     return ap - bp;
   });
+
+  return applyDiversityRanking(
+    sorted.map((c) => ({ ...c, rankScore: c.instantScore, category: c.interest })),
+    { scoreKey: "rankScore", categoryKey: "category", limit: POPULARITY_RANK_WEIGHTS.diversityWindow }
+  );
 }
 
 function isAcceptableFirstImpression(c: InstantBestMoveCandidate): boolean {
@@ -707,6 +730,9 @@ export function computeOnboardingFinalistScore(c: InstantBestMoveCandidate): num
     ? 14
     : 0;
   const underMarketBoost = isUnderMarket(c) ? 10 : 0;
+  const popularityBoost =
+    (c.popularityScore ?? computePopularityScore(c.listing, c.interest).score) *
+    POPULARITY_RANK_WEIGHTS.finalistBoost;
   return (
     trust * 0.34 +
     savings * 0.26 +
@@ -715,7 +741,8 @@ export function computeOnboardingFinalistScore(c: InstantBestMoveCandidate): num
     demand * 0.08 +
     heroBoost +
     underMarketBoost +
-    c.instantScore * 0.06
+    c.instantScore * 0.06 +
+    popularityBoost
   );
 }
 

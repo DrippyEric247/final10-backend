@@ -25,6 +25,11 @@ import {
   listingKey,
   rankListingsOnServer,
 } from './serverListingRanking';
+import {
+  computePopularityBoost,
+  computePopularityScore,
+  applyDiversityRanking,
+} from './popularityScoreEngine';
 
 const LOG_PREFIX = '[QuickSnipesBestMove]';
 
@@ -186,6 +191,11 @@ export function rankQuickSnipeListings(items, liveTick = 0) {
     const activity = watchers + (Number(item.confidenceScore || item.aiConfidence) || 0) * 0.6;
     const interest = inferInterest(item);
     const personalizedBoost = userInterests.includes(interest) ? 28 : 0;
+    const popularity = computePopularityScore(item, interest);
+    const popularityBoost = computePopularityBoost(popularity.score, {
+      dealScore: Number(item.dealScore || item.confidenceScore) || 0,
+      savingsPct,
+    });
 
     const compositeRank =
       Math.min(300, savings) * 0.85 +
@@ -195,7 +205,8 @@ export function rankQuickSnipeListings(items, liveTick = 0) {
       shipConf * 0.35 +
       urgency * 0.55 +
       activity * 0.75 +
-      personalizedBoost;
+      personalizedBoost +
+      popularityBoost;
 
     const wowScore =
       Math.min(300, savings) * 0.9 +
@@ -247,7 +258,10 @@ export function rankQuickSnipeListings(items, liveTick = 0) {
     return b.compositeRank - a.compositeRank || b.bestMoveScore - a.bestMoveScore;
   });
 
-  return scored;
+  return applyDiversityRanking(scored, {
+    scoreKey: 'compositeRank',
+    categoryKey: 'interest',
+  });
 }
 
 export function buildSavvyPickReason(scored, { isFallback = false } = {}) {
