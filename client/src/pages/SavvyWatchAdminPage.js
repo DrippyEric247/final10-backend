@@ -23,6 +23,8 @@ import {
 } from '../lib/api';
 import '../styles/SavvyWatch.css';
 
+/** Admin-settable competition statuses (matches Savvy Watch competition lifecycle). */
+const COMP_STATUS_ACTIONS = ['entries_open', 'entries_closed', 'voting_open', 'voting_closed'];
 
 function adminStatusBadge(status) {
   const normalized = String(status || '').toLowerCase();
