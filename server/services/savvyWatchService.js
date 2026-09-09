@@ -13,6 +13,14 @@ const {
   normalizeAttributionSource,
   DEFAULT_CHECKPOINTS,
   DEFAULT_MAX_SAVVY_PER_VIEWER,
+  getPublicLifecyclePhase,
+  getPublicLifecycleLabel,
+  isPubliclyVisibleEventStatus,
+  canTransitionEventStatus,
+  PUBLIC_LIFECYCLE_PHASES,
+  HOMEPAGE_LIVE_ATTRIBUTION_SOURCE,
+  buildSavvyWatchJoinUrl,
+  buildEventThumbnailUrl,
 } = require('../config/savvyWatchConfig');
 const { isSavvyPredictionsEnabled } = require('../config/savvyPredictionsConfig');
 const { GTA_CAR_MEET_PRESET } = require('../config/savvyWatchGtaPreset');
@@ -60,12 +68,15 @@ async function logAudit(eventId, actorUserId, action, meta = {}) {
 
 function serializeEventPublic(event, { participantCount = 0 } = {}) {
   if (!event) return null;
+  const lifecyclePhase = getPublicLifecyclePhase(event.status);
   return {
     eventId: event.eventId,
     slug: event.slug,
     title: event.title,
     description: event.description,
     status: event.status,
+    lifecyclePhase,
+    lifecycleLabel: getPublicLifecycleLabel(event.status),
     platform: event.platform,
     platformUrl: event.platformUrl,
     youtubeVideoId: event.youtubeVideoId,
@@ -96,6 +107,9 @@ async function getEventBySlug(slug) {
 async function getPublicEventPage(slug) {
   const event = await getEventBySlug(slug);
   if (!event) throw new SavvyWatchError(404, 'EVENT_NOT_FOUND', 'Savvy Watch event not found.');
+  if (!isPubliclyVisibleEventStatus(event.status)) {
+    throw new SavvyWatchError(404, 'EVENT_NOT_FOUND', 'Savvy Watch event not found.');
+  }
   const participantCount = await getParticipantCount(event.eventId);
   const competitions = await SavvyWatchCompetition.find({ eventId: event.eventId })
     .select('competitionId slug title description type status votingMode rewardConfig')
@@ -115,6 +129,7 @@ async function getPublicEventPage(slug) {
     event: serializeEventPublic(event, { participantCount }),
     competitions,
     predictions,
+    lifecyclePhase: getPublicLifecyclePhase(event.status),
     featureFlags: {
       enabled: isSavvyWatchEnabled(),
       adminOnly: isSavvyWatchAdminOnly(),
@@ -304,7 +319,7 @@ async function createEventFromPreset(adminUser, preset = GTA_CAR_MEET_PRESET, ov
     platformUrl: overrides.platformUrl || null,
     youtubeVideoId: overrides.youtubeVideoId || null,
     youtubeChannelId: overrides.youtubeChannelId || null,
-    status: 'draft',
+    status: 'scheduled',
     rewardBudget: overrides.rewardBudget ?? preset.rewardBudget ?? 0,
     rewardRules: {
       checkpoints: overrides.checkpoints || preset.rewardRules?.checkpoints || DEFAULT_CHECKPOINTS,
@@ -333,18 +348,69 @@ async function updateEventStatus(adminUser, slug, status) {
   const event = await getEventBySlug(slug);
   if (!event) throw new SavvyWatchError(404, 'EVENT_NOT_FOUND', 'Event not found.');
 
-  const updates = { status };
-  if (status === 'live' && !event.actualStartAt) updates.actualStartAt = new Date();
-  if (status === 'ended') updates.endedAt = new Date();
+  const nextStatus = String(status || '').toLowerCase();
+  if (!canTransitionEventStatus(event.status, nextStatus)) {
+    throw new SavvyWatchError(409, 'INVALID_STATUS_TRANSITION', `Cannot change event status from ${event.status} to ${nextStatus}.`, {
+      from: event.status,
+      to: nextStatus,
+    });
+  }
+
+  const updates = { status: nextStatus };
+  if (nextStatus === 'live' && !event.actualStartAt) updates.actualStartAt = new Date();
+  if (nextStatus === 'ended') updates.endedAt = new Date();
 
   await SavvyWatchEvent.updateOne({ eventId: event.eventId }, { $set: updates });
-  await logAudit(event.eventId, adminUser._id, `event_${status}`, { status });
+  await logAudit(event.eventId, adminUser._id, `event_${nextStatus}`, { status: nextStatus, from: event.status });
   return SavvyWatchEvent.findOne({ eventId: event.eventId }).lean();
 }
 
 async function listAdminEvents(adminUser) {
   assertSavvyWatchAccess(adminUser, { adminOk: true });
   return SavvyWatchEvent.find().sort({ createdAt: -1 }).limit(50).lean();
+}
+
+function serializeLivePromoEvent(event, { participantCount = 0 } = {}) {
+  if (!event) return null;
+  const slug = event.slug;
+  return {
+    eventId: event.eventId,
+    slug,
+    title: event.title,
+    hostDisplayName: event.hostDisplayName,
+    actualStartAt: event.actualStartAt,
+    scheduledStartAt: event.scheduledStartAt,
+    thumbnailUrl: buildEventThumbnailUrl(event),
+    joinUrl: buildSavvyWatchJoinUrl(slug, { source: HOMEPAGE_LIVE_ATTRIBUTION_SOURCE, useSourceParam: true }),
+    joinPath: `/watch/${encodeURIComponent(slug)}?source=${encodeURIComponent(HOMEPAGE_LIVE_ATTRIBUTION_SOURCE)}`,
+    participantCount,
+  };
+}
+
+async function getLiveSavvyWatchHomePromo() {
+  if (!isSavvyWatchEnabled()) {
+    return { live: false, reason: 'disabled' };
+  }
+
+  const liveEvents = await SavvyWatchEvent.find({ status: 'live' })
+    .sort({ actualStartAt: -1, scheduledStartAt: -1, updatedAt: -1 })
+    .limit(10)
+    .lean();
+
+  if (!liveEvents.length) {
+    return { live: false };
+  }
+
+  const primary = liveEvents[0];
+  const participantCount = await getParticipantCount(primary.eventId);
+  const moreCount = Math.max(0, liveEvents.length - 1);
+
+  return {
+    live: true,
+    primary: serializeLivePromoEvent(primary, { participantCount }),
+    moreCount,
+    eventsHubPath: '/events',
+  };
 }
 
 module.exports = {
@@ -364,4 +430,7 @@ module.exports = {
   updateEventStatus,
   listAdminEvents,
   logAudit,
+  getLiveSavvyWatchHomePromo,
+  serializeLivePromoEvent,
+  PUBLIC_LIFECYCLE_PHASES,
 };

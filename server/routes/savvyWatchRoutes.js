@@ -21,6 +21,7 @@ const {
   getEventBySlug,
   getParticipantCount,
   serializeEventPublic,
+  getLiveSavvyWatchHomePromo,
 } = require('../services/savvyWatchService');
 const {
   listCompetitions,
@@ -39,13 +40,21 @@ const {
   redeemLiveCode,
   expireLiveCode,
 } = require('../services/savvyWatchLiveCodeService');
-const { isSavvyWatchEnabled } = require('../config/savvyWatchConfig');
+const {
+  SavvyWatchLiveWelcomeError,
+  claimLiveWelcomeBonus,
+  getLiveWelcomeBonusStatus,
+  recordQrVisit,
+  getEventQrStats,
+} = require('../services/savvyWatchLiveWelcomeBonusService');
+const { renderSavvyWatchLiveQrPng } = require('../services/savvyWatchQrAssetService');
+const { isSavvyWatchEnabled, buildSavvyWatchJoinUrl, LIVE_WELCOME_BONUS_AMOUNT } = require('../config/savvyWatchConfig');
 const { GTA_CAR_MEET_PRESET } = require('../config/savvyWatchGtaPreset');
 
 const router = express.Router();
 
 function handleError(err, res, next) {
-  if (err instanceof SavvyWatchError || err instanceof SavvyWatchRewardError) {
+  if (err instanceof SavvyWatchError || err instanceof SavvyWatchRewardError || err instanceof SavvyWatchLiveWelcomeError) {
     return res.status(err.status || 500).json({
       code: err.code || 'SAVVY_WATCH_ERROR',
       message: err.message,
@@ -55,9 +64,23 @@ function handleError(err, res, next) {
   return next(err);
 }
 
+function readAttributionSource(req) {
+  return req.body?.source || req.query?.source || req.body?.src || req.query?.src;
+}
+
 /** Public feature flag */
 router.get('/enabled', (_req, res) => {
   res.json({ enabled: isSavvyWatchEnabled() });
+});
+
+/** Homepage live promo — driven by events with status=live */
+router.get('/live-promo', async (req, res, next) => {
+  try {
+    const promo = await getLiveSavvyWatchHomePromo();
+    res.json(promo);
+  } catch (err) {
+    handleError(err, res, next);
+  }
 });
 
 /** Public event page data */
@@ -81,7 +104,8 @@ router.get('/events/:slug/overlay', async (req, res, next) => {
     const openCompetition = competitions.find((c) => ['entries_open', 'voting_open'].includes(c.status));
     res.json({
       event: serializeEventPublic(event, { participantCount }),
-      qrUrl: `/watch/${event.slug}?src=stream-qr`,
+      qrUrl: buildSavvyWatchJoinUrl(event.slug, { useSourceParam: true }),
+      liveWelcomeBonusAmount: LIVE_WELCOME_BONUS_AMOUNT,
       liveCodes: liveCodes.map((c) => ({ label: c.label, expiresAt: c.expiresAt, claimCount: c.claimCount })),
       openCompetition: openCompetition ? { title: openCompetition.title, status: openCompetition.status } : null,
       savvyWatchParticipants: participantCount,
@@ -104,7 +128,36 @@ router.get('/events/:slug/session', auth, async (req, res, next) => {
 router.post('/events/:slug/join', auth, savvyWatchClaimLimiter, async (req, res, next) => {
   try {
     const result = await joinEvent(req.user, req.params.slug, {
-      source: req.body?.source || req.query?.src,
+      source: readAttributionSource(req),
+    });
+    res.json(result);
+  } catch (err) {
+    handleError(err, res, next);
+  }
+});
+
+router.post('/events/:slug/qr-visit', async (req, res, next) => {
+  try {
+    const result = await recordQrVisit(req.params.slug, { source: readAttributionSource(req) });
+    res.json(result);
+  } catch (err) {
+    handleError(err, res, next);
+  }
+});
+
+router.get('/events/:slug/live-welcome-bonus/status', auth, async (req, res, next) => {
+  try {
+    const status = await getLiveWelcomeBonusStatus(req.user._id);
+    res.json({ ...status, bonusAmount: LIVE_WELCOME_BONUS_AMOUNT });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+});
+
+router.post('/events/:slug/live-welcome-bonus/claim', auth, savvyWatchClaimLimiter, async (req, res, next) => {
+  try {
+    const result = await claimLiveWelcomeBonus(req.user, req.params.slug, {
+      source: readAttributionSource(req),
     });
     res.json(result);
   } catch (err) {
@@ -224,6 +277,38 @@ router.post('/admin/events/:slug/status', auth, requireAdminAccess(), async (req
   try {
     const event = await updateEventStatus(req.user, req.params.slug, req.body?.status);
     res.json({ event });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+});
+
+router.get('/admin/events/:slug/qr', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const event = await getEventBySlug(req.params.slug);
+    if (!event) throw new SavvyWatchError(404, 'EVENT_NOT_FOUND', 'Event not found.');
+    const joinUrl = buildSavvyWatchJoinUrl(event.slug, { useSourceParam: true });
+    const stats = await getEventQrStats(event.slug);
+    res.json({
+      slug: event.slug,
+      joinUrl,
+      liveWelcomeBonusAmount: LIVE_WELCOME_BONUS_AMOUNT,
+      stats,
+    });
+  } catch (err) {
+    handleError(err, res, next);
+  }
+});
+
+router.get('/admin/events/:slug/qr.png', auth, requireAdminAccess(), async (req, res, next) => {
+  try {
+    const event = await getEventBySlug(req.params.slug);
+    if (!event) throw new SavvyWatchError(404, 'EVENT_NOT_FOUND', 'Event not found.');
+    const transparent = String(req.query.transparent || '').toLowerCase() === '1';
+    const png = await renderSavvyWatchLiveQrPng(event.slug, { transparent });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Content-Disposition', `inline; filename="savvy-watch-${event.slug}${transparent ? '-transparent' : ''}.png"`);
+    res.send(png);
   } catch (err) {
     handleError(err, res, next);
   }

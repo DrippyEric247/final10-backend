@@ -12,6 +12,7 @@
     "test:battle-pass-trust": "jest __tests__/battle-pass-trust.test.js --testTimeout=120000",
     "test:alert-e2e": "jest __tests__/alert-flow.e2e.test.js --testTimeout=60000",
     "savvy-core:production-proof": "node scripts/savvy-core-production-proof.js",
+    "savvy-watch:generate-qr": "node scripts/generateSavvyWatchLiveQr.js",
     "build": "echo 'No build step required for Node.js'",
     "railway:deploy": "npm install && npm start"
   },
@@ -57,7 +58,9 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.7",
     "puppeteer": "^21.6.1",
+    "qrcode": "^1.5.4",
     "resend": "^4.8.0",
+    "sharp": "^0.35.4",
     "socket.io": "^4.7.4",
     "stripe": "^14.25.0"
   },

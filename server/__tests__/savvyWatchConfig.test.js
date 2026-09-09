@@ -8,6 +8,7 @@ const { GTA_CAR_MEET_PRESET } = require('../config/savvyWatchGtaPreset');
 describe('savvyWatch config', () => {
   test('normalizeAttributionSource accepts known sources without affecting semantics', () => {
     expect(normalizeAttributionSource('stream-qr')).toBe('stream-qr');
+    expect(normalizeAttributionSource('homepage-live')).toBe('homepage-live');
     expect(normalizeAttributionSource('DISCORD')).toBe('discord');
     expect(normalizeAttributionSource('unknown-source')).toBe('unknown');
   });

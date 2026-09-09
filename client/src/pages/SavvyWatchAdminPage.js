@@ -6,6 +6,8 @@ import {
   listSavvyWatchAdminEvents,
   createSavvyWatchGtaPreset,
   updateSavvyWatchEventStatus,
+  getSavvyWatchAdminQr,
+  fetchSavvyWatchQrPngBlob,
   createSavvyWatchLiveCode,
   updateSavvyWatchCompetitionStatus,
   lockSavvyWatchCompetition,
@@ -21,8 +23,20 @@ import {
 } from '../lib/api';
 import '../styles/SavvyWatch.css';
 
-const STATUS_ACTIONS = ['scheduled', 'live', 'ended', 'archived', 'cancelled'];
-const COMP_STATUS_ACTIONS = ['entries_open', 'entries_closed', 'voting_open', 'voting_closed'];
+
+function adminStatusBadge(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'scheduled') {
+    return { label: '🟡 STARTING SOON', className: 'sw-admin-status-badge sw-admin-status-soon' };
+  }
+  if (normalized === 'live') {
+    return { label: '🔴 LIVE', className: 'sw-admin-status-badge sw-admin-status-live' };
+  }
+  if (normalized === 'ended' || normalized === 'archived') {
+    return { label: '⚫ ENDED', className: 'sw-admin-status-badge sw-admin-status-ended' };
+  }
+  return { label: String(status || 'unknown').toUpperCase(), className: 'sw-admin-status-badge' };
+}
 
 export default function SavvyWatchAdminPage() {
   const { user, loading } = useAuth();
@@ -43,6 +57,8 @@ export default function SavvyWatchAdminPage() {
   const [predictions, setPredictions] = useState([]);
   const [resolveForm, setResolveForm] = useState({ predictionId: '', winningOptionId: '', numericValue: '', label: '' });
   const [resolvePreview, setResolvePreview] = useState(null);
+  const [qrInfo, setQrInfo] = useState(null);
+  const [qrPreviewUrl, setQrPreviewUrl] = useState('');
 
   const refreshEvents = useCallback(async () => {
     try {
@@ -77,6 +93,32 @@ export default function SavvyWatchAdminPage() {
   useEffect(() => {
     if (selectedSlug) loadDetail(selectedSlug);
   }, [selectedSlug, loadDetail]);
+
+  useEffect(() => {
+    let objectUrl = '';
+    if (!selectedSlug) {
+      setQrInfo(null);
+      setQrPreviewUrl('');
+      return undefined;
+    }
+
+    (async () => {
+      try {
+        const info = await getSavvyWatchAdminQr(selectedSlug);
+        setQrInfo(info);
+        const blob = await fetchSavvyWatchQrPngBlob(selectedSlug);
+        objectUrl = URL.createObjectURL(blob);
+        setQrPreviewUrl(objectUrl);
+      } catch {
+        setQrInfo(null);
+        setQrPreviewUrl('');
+      }
+    })();
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedSlug]);
 
   const run = async (fn) => {
     setBusy(true);
@@ -130,6 +172,30 @@ export default function SavvyWatchAdminPage() {
     }
   };
 
+  const copyJoinLink = async () => {
+    if (!qrInfo?.joinUrl) return;
+    await navigator.clipboard.writeText(qrInfo.joinUrl);
+    setMessage('Join link copied.');
+  };
+
+  const downloadQrPng = async (transparent = false) => {
+    if (!selectedSlug) return;
+    try {
+      const blob = await fetchSavvyWatchQrPngBlob(selectedSlug, { transparent });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = transparent
+        ? `savvy-watch-${selectedSlug}-transparent.png`
+        : `savvy-watch-${selectedSlug}.png`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setMessage(transparent ? 'Transparent QR downloaded.' : 'QR PNG downloaded.');
+    } catch (e) {
+      setError(e?.response?.data?.message || e.message || 'QR download failed.');
+    }
+  };
+
   if (loading) return <div className="sw-page sw-loading">Loading…</div>;
   if (!show) {
     return (
@@ -141,6 +207,7 @@ export default function SavvyWatchAdminPage() {
 
   const selectedEvent = events.find((e) => e.slug === selectedSlug);
   const competitions = detail?.competitions || [];
+  const selectedBadge = selectedEvent ? adminStatusBadge(selectedEvent.status) : null;
 
   return (
     <div className="sw-page sw-admin">
@@ -192,10 +259,12 @@ export default function SavvyWatchAdminPage() {
       <section className="sw-card">
         <h2>Events</h2>
         <ul className="sw-admin-events">
-          {events.map((ev) => (
+          {events.map((ev) => {
+            const badge = adminStatusBadge(ev.status);
+            return (
             <li key={ev.eventId}>
               <button type="button" className={selectedSlug === ev.slug ? 'active' : ''} onClick={() => setSelectedSlug(ev.slug)}>
-                {ev.title} — {ev.status}
+                {ev.title} <span className={badge.className}>{badge.label}</span>
               </button>
               <Link to={`/watch/${ev.slug}`} target="_blank" rel="noreferrer">
                 Open
@@ -204,29 +273,102 @@ export default function SavvyWatchAdminPage() {
                 Overlay
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
 
       {selectedEvent && (
         <>
           <section className="sw-card">
-            <h2>{selectedEvent.title}</h2>
-            <p>Status: {selectedEvent.status}</p>
+            <h2>
+              {selectedEvent.title}
+              {selectedBadge ? <span className={selectedBadge.className}>{selectedBadge.label}</span> : null}
+            </h2>
+            <p className="sw-muted">Internal status: {selectedEvent.status}</p>
             <p>
               Public URL:{' '}
-              <a href={`/watch/${selectedEvent.slug}`} target="_blank" rel="noreferrer">
-                /watch/{selectedEvent.slug}
+              <a href={`/watch/${selectedEvent.slug}?source=stream-qr`} target="_blank" rel="noreferrer">
+                /watch/{selectedEvent.slug}?source=stream-qr
               </a>
             </p>
-            <p>QR resolves to: /watch/{selectedEvent.slug}?src=stream-qr</p>
+            <p className="sw-muted">
+              QR works immediately while <strong>STARTING SOON</strong>. Waiting viewers auto-transition when you go live.
+            </p>
             <div className="sw-admin-actions">
-              {STATUS_ACTIONS.map((st) => (
-                <button key={st} type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => setEventStatus(st)}>
-                  {st}
+              {selectedEvent.status === 'draft' && (
+                <button type="button" className="sw-btn sw-btn-primary" disabled={busy} onClick={() => setEventStatus('scheduled')}>
+                  Publish — Starting Soon
                 </button>
-              ))}
+              )}
+              {selectedEvent.status === 'scheduled' && (
+                <button type="button" className="sw-btn sw-btn-primary" disabled={busy} onClick={() => setEventStatus('live')}>
+                  GO LIVE
+                </button>
+              )}
+              {selectedEvent.status === 'live' && (
+                <button type="button" className="sw-btn sw-btn-primary" disabled={busy} onClick={() => setEventStatus('ended')}>
+                  END EVENT
+                </button>
+              )}
+              {selectedEvent.status === 'ended' && (
+                <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => setEventStatus('archived')}>
+                  Archive
+                </button>
+              )}
+              {['scheduled', 'live'].includes(selectedEvent.status) && (
+                <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => setEventStatus('cancelled')}>
+                  Cancel Event
+                </button>
+              )}
             </div>
+          </section>
+
+          <section className="sw-card sw-qr-card">
+            <h2>Event QR — Live Join Bonus</h2>
+            <p className="sw-qr-label">LIVE JOIN BONUS: 500 SAVVY</p>
+            {qrInfo?.joinUrl ? (
+              <>
+                <label className="sw-qr-field">
+                  Event Join URL
+                  <input readOnly value={qrInfo.joinUrl} onFocus={(e) => e.target.select()} />
+                </label>
+                {qrPreviewUrl ? (
+                  <div className="sw-qr-preview-wrap">
+                    <img src={qrPreviewUrl} alt={`Savvy Watch QR for ${selectedEvent.slug}`} className="sw-qr-preview" />
+                  </div>
+                ) : null}
+                <div className="sw-admin-actions">
+                  <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={copyJoinLink}>
+                    Copy Join Link
+                  </button>
+                  <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => downloadQrPng(false)}>
+                    Download QR PNG
+                  </button>
+                  <button type="button" className="sw-btn sw-btn-sm" disabled={busy} onClick={() => downloadQrPng(true)}>
+                    Download Transparent QR
+                  </button>
+                  <a
+                    className="sw-btn sw-btn-sm"
+                    href={qrInfo.joinUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open Join Page
+                  </a>
+                </div>
+                {qrInfo.stats ? (
+                  <ul className="sw-qr-stats">
+                    <li>QR visits: {qrInfo.stats.visits ?? 0}</li>
+                    <li>Signups (QR): {qrInfo.stats.signups ?? 0}</li>
+                    <li>Bonus claims: {qrInfo.stats.bonusClaims ?? 0}</li>
+                    <li>Live-event joins (stream-qr): {qrInfo.stats.liveEventJoins ?? 0}</li>
+                  </ul>
+                ) : null}
+              </>
+            ) : (
+              <p className="sw-muted">Select an event to generate the live join QR.</p>
+            )}
           </section>
 
           <section className="sw-card">

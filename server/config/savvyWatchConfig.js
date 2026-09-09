@@ -11,6 +11,7 @@ const SAVVY_WATCH_REWARD_SOURCES = Object.freeze([
   'savvy_watch_live_code',
   'savvy_watch_competition',
   'savvy_watch_host_award',
+  'savvy_watch_live_welcome_bonus',
 ]);
 
 const EVENT_STATUSES = Object.freeze([
@@ -49,6 +50,30 @@ const DEFAULT_CHECKPOINTS = Object.freeze([
 
 const DEFAULT_MAX_SAVVY_PER_VIEWER = 100;
 
+const LIVE_WELCOME_BONUS_AMOUNT = 500;
+const LIVE_WELCOME_BONUS_SOURCE = 'stream-qr';
+const HOMEPAGE_LIVE_ATTRIBUTION_SOURCE = 'homepage-live';
+const PRODUCTION_WATCH_BASE_URL = 'https://final10.app';
+
+/** Public-facing lifecycle phases mapped from persisted event.status */
+const PUBLIC_LIFECYCLE_PHASES = Object.freeze({
+  STARTING_SOON: 'starting_soon',
+  LIVE: 'live',
+  ENDED: 'ended',
+});
+
+/** Statuses visible on the public /watch/:slug page */
+const PUBLICLY_VISIBLE_EVENT_STATUSES = Object.freeze(['scheduled', 'live', 'ended', 'archived']);
+
+const EVENT_STATUS_TRANSITIONS = Object.freeze({
+  draft: ['scheduled', 'cancelled'],
+  scheduled: ['live', 'cancelled'],
+  live: ['ended'],
+  ended: ['archived'],
+  archived: [],
+  cancelled: [],
+});
+
 const HEARTBEAT_INTERVAL_SEC = 45;
 const HEARTBEAT_GRACE_SEC = 120;
 const BACKGROUND_PAUSE_AFTER_SEC = 90;
@@ -83,6 +108,7 @@ function generateLiveCode(length = 8) {
 function normalizeAttributionSource(src) {
   const allowed = new Set([
     'stream-qr',
+    'homepage-live',
     'youtube-description',
     'pinned-comment',
     'discord',
@@ -93,6 +119,71 @@ function normalizeAttributionSource(src) {
   ]);
   const key = String(src || 'unknown').trim().toLowerCase().slice(0, 64);
   return allowed.has(key) ? key : 'unknown';
+}
+
+function isStreamQrAttribution(src) {
+  return normalizeAttributionSource(src) === LIVE_WELCOME_BONUS_SOURCE;
+}
+
+function sanitizeEventSlug(slug) {
+  const s = String(slug || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(s)) {
+    throw new Error('Invalid event slug');
+  }
+  return s;
+}
+
+function getSavvyWatchPublicBaseUrl() {
+  const raw =
+    process.env.SAVVY_WATCH_PUBLIC_URL ||
+    process.env.CLIENT_URL ||
+    process.env.FRONTEND_URL ||
+    PRODUCTION_WATCH_BASE_URL;
+  return String(raw).replace(/\/$/, '');
+}
+
+function buildEventThumbnailUrl(event) {
+  if (!event) return null;
+  const meta = event.meta || {};
+  const custom = typeof meta.thumbnailUrl === 'string' ? meta.thumbnailUrl.trim() : '';
+  if (custom) return custom;
+  const videoId = String(event.youtubeVideoId || '').trim();
+  if (videoId) return `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
+  return null;
+}
+
+function buildSavvyWatchJoinUrl(slug, { source = LIVE_WELCOME_BONUS_SOURCE, useSourceParam = true } = {}) {
+  const safeSlug = sanitizeEventSlug(slug);
+  const base = getSavvyWatchPublicBaseUrl();
+  const param = useSourceParam ? 'source' : 'src';
+  return `${base}/watch/${encodeURIComponent(safeSlug)}?${param}=${encodeURIComponent(source)}`;
+}
+
+function isPubliclyVisibleEventStatus(status) {
+  return PUBLICLY_VISIBLE_EVENT_STATUSES.includes(String(status || '').toLowerCase());
+}
+
+function getPublicLifecyclePhase(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'scheduled') return PUBLIC_LIFECYCLE_PHASES.STARTING_SOON;
+  if (normalized === 'live') return PUBLIC_LIFECYCLE_PHASES.LIVE;
+  if (normalized === 'ended' || normalized === 'archived') return PUBLIC_LIFECYCLE_PHASES.ENDED;
+  return null;
+}
+
+function canTransitionEventStatus(fromStatus, toStatus) {
+  const from = String(fromStatus || '').toLowerCase();
+  const to = String(toStatus || '').toLowerCase();
+  const allowed = EVENT_STATUS_TRANSITIONS[from] || [];
+  return allowed.includes(to);
+}
+
+function getPublicLifecycleLabel(status) {
+  const phase = getPublicLifecyclePhase(status);
+  if (phase === PUBLIC_LIFECYCLE_PHASES.STARTING_SOON) return 'STARTING SOON';
+  if (phase === PUBLIC_LIFECYCLE_PHASES.LIVE) return 'LIVE';
+  if (phase === PUBLIC_LIFECYCLE_PHASES.ENDED) return 'ENDED';
+  return String(status || '').toUpperCase();
 }
 
 module.exports = {
@@ -112,4 +203,20 @@ module.exports = {
   generateEventId,
   generateLiveCode,
   normalizeAttributionSource,
+  isStreamQrAttribution,
+  sanitizeEventSlug,
+  getSavvyWatchPublicBaseUrl,
+  buildSavvyWatchJoinUrl,
+  LIVE_WELCOME_BONUS_AMOUNT,
+  LIVE_WELCOME_BONUS_SOURCE,
+  HOMEPAGE_LIVE_ATTRIBUTION_SOURCE,
+  buildEventThumbnailUrl,
+  PRODUCTION_WATCH_BASE_URL,
+  PUBLIC_LIFECYCLE_PHASES,
+  PUBLICLY_VISIBLE_EVENT_STATUSES,
+  EVENT_STATUS_TRANSITIONS,
+  isPubliclyVisibleEventStatus,
+  getPublicLifecyclePhase,
+  getPublicLifecycleLabel,
+  canTransitionEventStatus,
 };

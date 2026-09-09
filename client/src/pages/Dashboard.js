@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import FirstSixtyLanding from '../components/onboarding/FirstSixtyLanding';
 import HomeLandingSections from '../components/home/HomeLandingSections';
+import EventsHubPromo from '../components/home/EventsHubPromo';
 import AttributionBanner from '../components/onboarding/AttributionBanner';
 import BuildWarsBanner from '../components/BuildWarsBanner';
 import { SCOUT_LABELS, SAVVY_SCOUT } from '../config/savvyScoutBranding';
@@ -139,14 +140,7 @@ const Dashboard = () => {
         {/* Attribution confirmation: "You joined through @creator" */}
         <AttributionBanner user={user} />
         {user ? <BuildWarsBanner /> : null}
-        {user ? (
-          <p className="events-hint" style={{ marginBottom: '1rem' }}>
-            🎪 Live events, drops, and Scout Support —{' '}
-            <Link to="/events" style={{ color: '#c4b5fd', fontWeight: 600 }}>
-              open Events Hub
-            </Link>
-          </p>
-        ) : null}
+        <EventsHubPromo user={user} />
 
         <HomeLandingSections user={user} />
 

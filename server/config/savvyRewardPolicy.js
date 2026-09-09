@@ -72,6 +72,7 @@ const FIXED_SOURCES = new Set([
   'savvy_watch_live_code',
   'savvy_watch_competition',
   'savvy_watch_host_award',
+  'savvy_watch_live_welcome_bonus',
   // Savvy Predictions (free-entry, fixed rewards)
   'savvy_prediction_correct',
   'savvy_prediction_bonus',

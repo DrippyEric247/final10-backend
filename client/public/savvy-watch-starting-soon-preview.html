@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Savvy Watch — Starting Soon Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #f5f7ff;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 58, 237, 0.35), transparent),
+        linear-gradient(180deg, #05070f 0%, #0a0612 45%, #06040a 100%);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 420px; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+    .badge {
+      display: inline-block;
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      color: #fff;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      font-size: 0.72rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+    }
+    header { text-align: center; margin: 1.25rem 0 1rem; }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      color: #f5e6a8;
+      margin: 0.65rem 0 0.5rem;
+    }
+    .pill {
+      display: inline-block;
+      padding: 0.4rem 1rem;
+      border-radius: 999px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      background: rgba(212, 175, 55, 0.15);
+      border: 1px solid rgba(212, 175, 55, 0.55);
+      color: #f5e6a8;
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+    }
+    .card {
+      background: rgba(12, 8, 24, 0.92);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      border-radius: 18px;
+      padding: 1.5rem 1.15rem;
+      text-align: center;
+      box-shadow: 0 0 32px rgba(124, 58, 237, 0.12);
+    }
+    .lead {
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      margin: 0 0 1.1rem;
+    }
+    .reward {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1rem;
+      border-radius: 12px;
+      background: linear-gradient(90deg, rgba(124, 58, 237, 0.25), rgba(212, 175, 55, 0.15));
+      border: 1px solid rgba(212, 175, 55, 0.45);
+      color: #f5e6a8;
+      font-size: 0.92rem;
+      margin-bottom: 1rem;
+    }
+    .copy { color: #b8c0d9; font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.25rem; }
+    .btn {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #fff;
+      background: linear-gradient(90deg, #7c3aed, #5b21b6);
+      box-shadow: 0 0 24px rgba(124, 58, 237, 0.35);
+      cursor: pointer;
+    }
+    .ready {
+      margin-top: 0.5rem;
+      padding: 1rem;
+      border-radius: 14px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .ready-title { font-weight: 900; color: #86efac; letter-spacing: 0.05em; }
+    .muted { color: #64748b; font-size: 0.78rem; text-align: center; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="badge">SAVVY WATCH</div>
+      <h1>GTA CAR MEET</h1>
+      <div class="pill">STARTING SOON</div>
+    </header>
+    <section class="card">
+      <p class="lead">THE MEET IS ABOUT TO GO LIVE.</p>
+      <div class="reward"><span>🎁</span><strong>500 SAVVY LIVE JOIN BONUS</strong></div>
+      <p class="copy">Join Final10 now and get ready to vote, predict, and participate when the event goes live.</p>
+      <button class="btn" type="button">JOIN + GET 500 SAVVY</button>
+    </section>
+    <section class="card" style="margin-top: 1rem;">
+      <p class="lead">LOGGED-IN STATE</p>
+      <div class="ready">
+        <div class="ready-title">✓ YOU&apos;RE READY</div>
+        <p>Current balance: <strong>1,250 Savvy</strong></p>
+        <p class="copy" style="margin: 0.5rem 0 0;">We&apos;ll notify you here when the stream goes live — no rescan needed.</p>
+      </div>
+    </section>
+    <p class="muted">Static preview · Powered by Savvy Scout · Final10</p>
+  </div>
+</body>
+</html>

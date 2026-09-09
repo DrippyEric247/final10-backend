@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Savvy Watch — Homepage LIVE Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #f5f7ff;
+      background:
+        radial-gradient(1300px 600px at 75% -20%, rgba(37, 99, 235, 0.28), transparent 62%),
+        radial-gradient(1000px 500px at -10% 30%, rgba(168, 85, 247, 0.2), transparent 60%),
+        #020617;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 420px; margin: 0 auto; padding: 5rem 1rem 2rem; }
+    .events-hint { margin: 0 0 1rem; color: #94a3b8; font-size: 0.92rem; }
+    .events-hint a { color: #c4b5fd; font-weight: 600; text-decoration: none; }
+    .preview-label { margin: 0 0 0.75rem; color: #64748b; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .sw-home-live-promo { position: relative; margin: 0 0 1rem; max-width: 100%; overflow: hidden; }
+    .sw-home-live-glow { position: absolute; inset: -8px; border-radius: 22px; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124, 58, 237, 0.35), transparent 70%), radial-gradient(ellipse 60% 50% at 100% 100%, rgba(212, 175, 55, 0.12), transparent 65%); pointer-events: none; }
+    .sw-home-live-inner { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.85rem; padding: 0.85rem; border-radius: 18px; background: linear-gradient(145deg, rgba(8, 10, 22, 0.96) 0%, rgba(12, 8, 24, 0.94) 55%, rgba(6, 8, 18, 0.98) 100%); border: 1px solid rgba(124, 58, 237, 0.45); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45), 0 0 28px rgba(124, 58, 237, 0.18); }
+    .sw-home-live-thumb { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #0f172a; border: 1px solid rgba(124, 58, 237, 0.25); }
+    .sw-home-live-thumb-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(124, 58, 237, 0.35), rgba(15, 23, 42, 0.95)); }
+    .sw-home-live-thumb-mark { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; color: #f5e6a8; }
+    .sw-home-live-thumb-overlay { position: absolute; left: 0.45rem; bottom: 0.45rem; padding: 0.2rem 0.45rem; border-radius: 6px; background: rgba(220, 38, 38, 0.92); color: #fff; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em; }
+    .sw-home-live-now { display: inline-flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem; color: #fca5a5; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; }
+    .sw-home-live-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); }
+    .sw-home-live-brand { color: #c4b5fd; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.16em; margin-bottom: 0.2rem; }
+    .sw-home-live-title { margin: 0; color: #f5e6a8; font-size: 1.25rem; font-weight: 900; letter-spacing: 0.04em; line-height: 1.15; text-transform: uppercase; }
+    .sw-home-live-host { margin: 0.35rem 0 0; color: #b8c0d9; font-size: 0.82rem; }
+    .sw-home-live-tagline { margin: 0.45rem 0 0.65rem; color: #94a3b8; font-size: 0.78rem; line-height: 1.35; }
+    .sw-home-live-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .sw-home-live-join { flex: 1 1 140px; display: inline-flex; align-items: center; justify-content: center; min-height: 2.65rem; padding: 0.65rem 1rem; border-radius: 10px; background: linear-gradient(90deg, #7c3aed, #2563eb); color: #fff; font-weight: 800; letter-spacing: 0.06em; text-decoration: none; box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35); }
+    .sw-home-live-hub { flex: 0 1 auto; display: inline-flex; align-items: center; justify-content: center; min-height: 2.65rem; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1px solid rgba(196, 181, 253, 0.35); background: rgba(15, 23, 42, 0.65); color: #e2e8f0; font-weight: 700; font-size: 0.82rem; text-decoration: none; }
+    .sw-home-live-powered { margin: 0.45rem 0 0; color: rgba(148, 163, 184, 0.75); font-size: 0.68rem; letter-spacing: 0.04em; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="preview-label">State A — LIVE (GTA Car Meet)</p>
+    <section class="sw-home-live-promo" aria-label="Savvy Watch live event">
+      <div class="sw-home-live-glow" aria-hidden></div>
+      <div class="sw-home-live-inner">
+        <div class="sw-home-live-thumb" aria-hidden>
+          <div class="sw-home-live-thumb-fallback">
+            <span class="sw-home-live-thumb-mark">SAVVY WATCH</span>
+          </div>
+          <span class="sw-home-live-thumb-overlay">LIVE</span>
+        </div>
+        <div class="sw-home-live-copy">
+          <div class="sw-home-live-now"><span class="sw-home-live-dot" aria-hidden></span> LIVE NOW</div>
+          <div class="sw-home-live-brand">SAVVY WATCH</div>
+          <h2 class="sw-home-live-title">GTA Car Meet</h2>
+          <p class="sw-home-live-host">Hosted by EricIsGaming</p>
+          <p class="sw-home-live-tagline">Don't just watch. Vote. Predict. Participate. Earn.</p>
+          <div class="sw-home-live-actions">
+            <a class="sw-home-live-join" href="/watch/gta-car-meet-001?source=homepage-live">JOIN LIVE</a>
+            <a class="sw-home-live-hub" href="/events">Events Hub</a>
+          </div>
+          <p class="sw-home-live-powered">Powered by the Savvy Universe</p>
+        </div>
+      </div>
+    </section>
+
+    <p class="preview-label" style="margin-top: 2rem;">State B — No live event</p>
+    <p class="events-hint">
+      🎪 Live events, drops, and Scout Support —
+      <a href="/events">open Events Hub</a>
+    </p>
+  </div>
+</body>
+</html>

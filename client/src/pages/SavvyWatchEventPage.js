@@ -5,6 +5,9 @@ import {
   getSavvyWatchEvent,
   getSavvyWatchSession,
   joinSavvyWatchEvent,
+  recordSavvyWatchQrVisit,
+  claimSavvyWatchLiveWelcomeBonus,
+  getSavvyWatchLiveWelcomeBonusStatus,
   savvyWatchHeartbeat,
   claimSavvyWatchCheckpoint,
   redeemSavvyWatchLiveCode,
@@ -12,6 +15,8 @@ import {
   voteSavvyWatchEntry,
 } from '../lib/api';
 import SavvyPredictionsSection from '../components/SavvyPredictionsSection';
+import SavvyWatchStartingSoonRoom from '../components/SavvyWatchStartingSoonRoom';
+import SavvyWatchEndedRoom from '../components/SavvyWatchEndedRoom';
 import '../styles/SavvyWatch.css';
 
 function formatMinutes(seconds) {
@@ -44,7 +49,7 @@ export default function SavvyWatchEventPage() {
   const { eventSlug } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [page, setPage] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -54,13 +59,20 @@ export default function SavvyWatchEventPage() {
   const [selectedComp, setSelectedComp] = useState(null);
   const [entries, setEntries] = useState([]);
   const [welcome, setWelcome] = useState(false);
+  const [liveWelcomeBonus, setLiveWelcomeBonus] = useState(null);
+  const [bonusStatus, setBonusStatus] = useState(null);
+  const [liveTransition, setLiveTransition] = useState(null);
   const heartbeatRef = useRef(null);
+  const qrFlowRef = useRef(false);
+  const pollRef = useRef(null);
 
-  const joinSource = searchParams.get('src') || 'direct';
+  const joinSource = searchParams.get('src') || searchParams.get('source') || 'direct';
+  const streamQr = joinSource === 'stream-qr';
   const returnPath = `/watch/${eventSlug}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+  const lifecyclePhase = page?.lifecyclePhase || page?.event?.lifecyclePhase;
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const data = await getSavvyWatchEvent(eventSlug);
@@ -68,15 +80,25 @@ export default function SavvyWatchEventPage() {
       if (token) {
         const sess = await getSavvyWatchSession(eventSlug);
         setSession(sess);
+        if (streamQr) {
+          try {
+            const status = await getSavvyWatchLiveWelcomeBonusStatus(eventSlug);
+            setBonusStatus(status);
+          } catch {
+            setBonusStatus(null);
+          }
+        }
       } else {
         setSession(null);
+        setBonusStatus(null);
       }
     } catch (e) {
       setError(e?.response?.data?.message || e.message || 'Failed to load Savvy Watch event.');
+      setPage(null);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [eventSlug, token]);
+  }, [eventSlug, token, streamQr]);
 
   useEffect(() => {
     refresh();
@@ -85,6 +107,87 @@ export default function SavvyWatchEventPage() {
   useEffect(() => {
     if (searchParams.get('welcome') === '1') setWelcome(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!streamQr || !eventSlug) return undefined;
+    recordSavvyWatchQrVisit(eventSlug, { source: 'stream-qr' }).catch(() => {});
+    return undefined;
+  }, [eventSlug, streamQr]);
+
+  useEffect(() => {
+    if (!token || !page?.event || !streamQr || qrFlowRef.current || loading) return undefined;
+    if (lifecyclePhase === 'ended') return undefined;
+
+    qrFlowRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        if (lifecyclePhase === 'live' && !session?.joined) {
+          await joinSavvyWatchEvent(eventSlug, { source: 'stream-qr' });
+        }
+        const bonus = await claimSavvyWatchLiveWelcomeBonus(eventSlug, { source: 'stream-qr' });
+        if (cancelled) return;
+        if (bonus.awarded) {
+          setLiveWelcomeBonus(bonus);
+          setWelcome(true);
+        } else if (bonus.alreadyClaimed) {
+          setLiveWelcomeBonus(bonus);
+        } else if (bonus.reason === 'EVENT_ENDED') {
+          setLiveWelcomeBonus(bonus);
+        }
+        await refresh({ silent: true });
+      } catch (e) {
+        if (!cancelled) {
+          qrFlowRef.current = false;
+          if (lifecyclePhase !== 'starting_soon') {
+            setError(e?.response?.data?.message || e.message || 'Could not complete live welcome flow.');
+          }
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, page?.event, session?.joined, streamQr, eventSlug, loading, lifecyclePhase, refresh]);
+
+  useEffect(() => {
+    if (lifecyclePhase !== 'starting_soon') {
+      if (pollRef.current) clearInterval(pollRef.current);
+      return undefined;
+    }
+
+    const poll = async () => {
+      try {
+        const data = await getSavvyWatchEvent(eventSlug);
+        const nextPhase = data.lifecyclePhase || data.event?.lifecyclePhase;
+        if (nextPhase === 'live') {
+          setPage(data);
+          setLiveTransition({ active: true, countdown: 3 });
+        }
+      } catch {
+        /* non-blocking */
+      }
+    };
+
+    pollRef.current = setInterval(poll, 15000);
+    return () => clearInterval(pollRef.current);
+  }, [lifecyclePhase, eventSlug]);
+
+  const enterLiveEvent = useCallback(async () => {
+    setLiveTransition(null);
+    setLoading(true);
+    try {
+      if (token && streamQr && !session?.joined) {
+        await joinSavvyWatchEvent(eventSlug, { source: 'stream-qr' });
+      }
+      await refresh();
+    } catch (e) {
+      setError(e?.response?.data?.message || e.message || 'Could not enter live event.');
+      setLoading(false);
+    }
+  }, [token, streamQr, session?.joined, eventSlug, refresh]);
 
   const handleJoin = async () => {
     if (!token) {
@@ -201,10 +304,37 @@ export default function SavvyWatchEventPage() {
   }
 
   if (!page?.event) {
-    return <div className="sw-page sw-error">{error || 'Event not found.'}</div>;
+    return <div className="sw-page sw-error">{error || 'Savvy Watch event not found.'}</div>;
   }
 
   const { event, competitions = [], predictions = [], featureFlags = {} } = page;
+
+  if (lifecyclePhase === 'starting_soon') {
+    return (
+      <SavvyWatchStartingSoonRoom
+        event={event}
+        token={token}
+        user={user}
+        returnPath={returnPath}
+        streamQr={streamQr}
+        liveWelcomeBonus={liveWelcomeBonus}
+        bonusStatus={bonusStatus}
+        liveTransition={liveTransition}
+        onEnterLive={enterLiveEvent}
+      />
+    );
+  }
+
+  if (lifecyclePhase === 'ended') {
+    return (
+      <SavvyWatchEndedRoom
+        event={event}
+        competitions={competitions}
+        predictions={predictions}
+      />
+    );
+  }
+
   const checkpoints = session?.checkpoints || [];
   const nextCheckpoint = checkpoints.find((c) => !c.claimed && c.eligible && c.kind === 'presence');
 
@@ -220,10 +350,26 @@ export default function SavvyWatchEventPage() {
         </p>
       </header>
 
-      {welcome && (
+      {liveWelcomeBonus?.awarded && (
+        <section className="sw-live-bonus">
+          <div className="sw-live-bonus-badge">+500 SAVVY — LIVE WELCOME BONUS</div>
+          <p>You&apos;re ready to vote and make predictions.</p>
+          {liveWelcomeBonus.newBalance != null ? (
+            <p className="sw-muted">Balance: <strong>{liveWelcomeBonus.newBalance} Savvy</strong></p>
+          ) : null}
+        </section>
+      )}
+
+      {welcome && !liveWelcomeBonus?.awarded && (
         <section className="sw-welcome">
           <h2>Welcome to Savvy Universe</h2>
           <p>You joined through: {event.title}</p>
+        </section>
+      )}
+
+      {liveWelcomeBonus?.alreadyClaimed && !liveWelcomeBonus?.awarded && streamQr && (
+        <section className="sw-welcome sw-welcome-muted">
+          <p>Live welcome bonus already claimed for this account.</p>
         </section>
       )}
 

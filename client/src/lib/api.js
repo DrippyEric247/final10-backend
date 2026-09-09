@@ -1659,6 +1659,11 @@ export async function getSavvyWatchEnabled() {
   return data;
 }
 
+export async function getSavvyWatchLivePromo() {
+  const { data } = await api.get('/savvy-watch/live-promo');
+  return data;
+}
+
 export async function getSavvyWatchEvent(slug) {
   const { data } = await api.get(`/savvy-watch/events/${encodeURIComponent(slug)}`);
   return data;
@@ -1676,6 +1681,24 @@ export async function getSavvyWatchSession(slug) {
 
 export async function joinSavvyWatchEvent(slug, payload = {}) {
   const { data } = await api.post(`/savvy-watch/events/${encodeURIComponent(slug)}/join`, payload);
+  return data;
+}
+
+export async function recordSavvyWatchQrVisit(slug, payload = {}) {
+  const { data } = await api.post(`/savvy-watch/events/${encodeURIComponent(slug)}/qr-visit`, payload);
+  return data;
+}
+
+export async function claimSavvyWatchLiveWelcomeBonus(slug, payload = {}) {
+  const { data } = await api.post(
+    `/savvy-watch/events/${encodeURIComponent(slug)}/live-welcome-bonus/claim`,
+    payload
+  );
+  return data;
+}
+
+export async function getSavvyWatchLiveWelcomeBonusStatus(slug) {
+  const { data } = await api.get(`/savvy-watch/events/${encodeURIComponent(slug)}/live-welcome-bonus/status`);
   return data;
 }
 
@@ -1736,6 +1759,19 @@ export async function createSavvyWatchGtaPreset(overrides = {}) {
 
 export async function updateSavvyWatchEventStatus(slug, status) {
   const { data } = await api.post(`/savvy-watch/admin/events/${encodeURIComponent(slug)}/status`, { status });
+  return data;
+}
+
+export async function getSavvyWatchAdminQr(slug) {
+  const { data } = await api.get(`/savvy-watch/admin/events/${encodeURIComponent(slug)}/qr`);
+  return data;
+}
+
+export async function fetchSavvyWatchQrPngBlob(slug, { transparent = false } = {}) {
+  const { data } = await api.get(`/savvy-watch/admin/events/${encodeURIComponent(slug)}/qr.png`, {
+    params: transparent ? { transparent: '1' } : {},
+    responseType: 'blob',
+  });
   return data;
 }
 
