@@ -92,6 +92,14 @@ function isSavvyWatchAdminOnly() {
   return envFlag('SAVVY_WATCH_ADMIN_ONLY', true);
 }
 
+/** True when an authenticated user may join/participate (not admin preview). */
+function canUserParticipateInSavvyWatch(user) {
+  if (!isSavvyWatchEnabled()) return false;
+  if (!isSavvyWatchAdminOnly()) return true;
+  const role = String(user?.role || '').toLowerCase();
+  return role === 'admin' || role === 'superadmin' || Boolean(user?.foundingAccess);
+}
+
 function generateEventId() {
   return `sw_${crypto.randomBytes(8).toString('hex')}`;
 }
@@ -200,6 +208,7 @@ module.exports = {
   BACKGROUND_PAUSE_AFTER_SEC,
   isSavvyWatchEnabled,
   isSavvyWatchAdminOnly,
+  canUserParticipateInSavvyWatch,
   generateEventId,
   generateLiveCode,
   normalizeAttributionSource,

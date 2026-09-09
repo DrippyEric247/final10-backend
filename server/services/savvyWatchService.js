@@ -147,16 +147,18 @@ async function joinEvent(user, slug, { source = 'unknown' } = {}) {
   }
 
   const joinSource = normalizeAttributionSource(source);
-  await SavvyWatchEvent.updateOne(
-    { eventId: event.eventId },
-    { $inc: { [`attributionCounts.${joinSource}`]: 1 } }
-  );
-
-  const session = await findOrCreateSession({
+  const { session, created } = await findOrCreateSession({
     eventId: event.eventId,
     userId: user._id,
     joinSource,
   });
+
+  if (created) {
+    await SavvyWatchEvent.updateOne(
+      { eventId: event.eventId },
+      { $inc: { [`attributionCounts.${joinSource}`]: 1 } }
+    );
+  }
 
   const joinCheckpoint = (event.rewardRules?.checkpoints || DEFAULT_CHECKPOINTS).find((c) => c.kind === 'join');
   let joinReward = null;

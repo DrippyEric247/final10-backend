@@ -2,6 +2,8 @@ const {
   normalizeAttributionSource,
   generateLiveCode,
   isSavvyWatchEnabled,
+  isSavvyWatchAdminOnly,
+  canUserParticipateInSavvyWatch,
 } = require('../config/savvyWatchConfig');
 const { GTA_CAR_MEET_PRESET } = require('../config/savvyWatchGtaPreset');
 
@@ -38,5 +40,18 @@ describe('savvyWatch config', () => {
     delete process.env.SAVVY_WATCH_ENABLED;
     expect(isSavvyWatchEnabled()).toBe(false);
     process.env.SAVVY_WATCH_ENABLED = prev;
+  });
+
+  test('admin-only defaults to true and public participation requires explicit false', () => {
+    const prevEnabled = process.env.SAVVY_WATCH_ENABLED;
+    const prevAdminOnly = process.env.SAVVY_WATCH_ADMIN_ONLY;
+    process.env.SAVVY_WATCH_ENABLED = 'true';
+    delete process.env.SAVVY_WATCH_ADMIN_ONLY;
+    expect(isSavvyWatchAdminOnly()).toBe(true);
+    process.env.SAVVY_WATCH_ADMIN_ONLY = 'false';
+    expect(isSavvyWatchAdminOnly()).toBe(false);
+    expect(canUserParticipateInSavvyWatch({ role: 'user' })).toBe(true);
+    process.env.SAVVY_WATCH_ENABLED = prevEnabled;
+    process.env.SAVVY_WATCH_ADMIN_ONLY = prevAdminOnly;
   });
 });

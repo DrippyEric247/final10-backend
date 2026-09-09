@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { hasAdminRole } from '../lib/adminAccess';
 import {
   getSavvyWatchEvent,
   getSavvyWatchSession,
@@ -64,10 +65,12 @@ export default function SavvyWatchEventPage() {
   const [liveTransition, setLiveTransition] = useState(null);
   const heartbeatRef = useRef(null);
   const qrFlowRef = useRef(false);
+  const liveJoinRef = useRef(false);
   const pollRef = useRef(null);
 
   const joinSource = searchParams.get('src') || searchParams.get('source') || 'direct';
   const streamQr = joinSource === 'stream-qr';
+  const homepageLive = joinSource === 'homepage-live';
   const returnPath = `/watch/${eventSlug}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
   const lifecyclePhase = page?.lifecyclePhase || page?.event?.lifecyclePhase;
 
@@ -151,6 +154,45 @@ export default function SavvyWatchEventPage() {
       cancelled = true;
     };
   }, [token, page?.event, session?.joined, streamQr, eventSlug, loading, lifecyclePhase, refresh]);
+
+  useEffect(() => {
+    if (!token || !page?.event || lifecyclePhase !== 'live' || session?.joined || loading) return undefined;
+    if (streamQr || !homepageLive) return undefined;
+    if (page?.featureFlags?.adminOnly && user && !hasAdminRole(user)) return undefined;
+    if (liveJoinRef.current) return undefined;
+
+    liveJoinRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await joinSavvyWatchEvent(eventSlug, { source: 'homepage-live' });
+        if (cancelled) return;
+        await refresh({ silent: true });
+      } catch (e) {
+        if (!cancelled) {
+          liveJoinRef.current = false;
+          setError(e?.response?.data?.message || e.message || 'Could not join Savvy Watch event.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    token,
+    page?.event,
+    page?.featureFlags?.adminOnly,
+    session?.joined,
+    streamQr,
+    homepageLive,
+    eventSlug,
+    loading,
+    lifecyclePhase,
+    user,
+    refresh,
+  ]);
 
   useEffect(() => {
     if (lifecyclePhase !== 'starting_soon') {
@@ -337,6 +379,7 @@ export default function SavvyWatchEventPage() {
 
   const checkpoints = session?.checkpoints || [];
   const nextCheckpoint = checkpoints.find((c) => !c.claimed && c.eligible && c.kind === 'presence');
+  const adminPreviewMode = Boolean(featureFlags.adminOnly) && token && user && !hasAdminRole(user);
 
   return (
     <div className="sw-page">
@@ -373,7 +416,13 @@ export default function SavvyWatchEventPage() {
         </section>
       )}
 
-      {error && <div className="sw-alert">{error}</div>}
+      {adminPreviewMode && (
+        <div className="sw-alert">
+          Savvy Watch is in admin preview mode. Public participation is not open yet for this account.
+        </div>
+      )}
+
+      {error && !adminPreviewMode && <div className="sw-alert">{error}</div>}
 
       <YouTubeEmbed videoId={event.youtubeVideoId} />
       {event.platformUrl && (
@@ -385,8 +434,16 @@ export default function SavvyWatchEventPage() {
       {!session?.joined ? (
         <section className="sw-card">
           <h2>{token ? 'Join Event' : 'Join Savvy Watch'}</h2>
-          <p>Earn Savvy through verified event participation — not guaranteed YouTube watch time.</p>
-          <button type="button" className="sw-btn sw-btn-primary" disabled={busy} onClick={handleJoin}>
+          <p>
+            Watch the stream, vote, make free-entry predictions, enter competitions, redeem Savvy Check codes,
+            and earn eligible Savvy rewards through verified participation.
+          </p>
+          <button
+            type="button"
+            className="sw-btn sw-btn-primary"
+            disabled={busy || adminPreviewMode}
+            onClick={handleJoin}
+          >
             {token ? 'JOIN EVENT' : 'SIGN IN TO JOIN'}
           </button>
           {!token && (

@@ -87,7 +87,7 @@ async function findOrCreateSession({ eventId, userId, joinSource = 'unknown' }) 
       session.lastPresenceAt = new Date();
       await session.save();
     }
-    return session;
+    return { session, created: false };
   }
 
   session = await SavvyWatchSession.create({
@@ -102,7 +102,7 @@ async function findOrCreateSession({ eventId, userId, joinSource = 'unknown' }) 
     status: 'active',
   });
 
-  return session;
+  return { session, created: true };
 }
 
 function buildCheckpointProgress(event, session) {
