@@ -712,13 +712,9 @@ const LocalDeals = () => {
   const heroSavings = Math.max(0, Math.round(heroMarket - heroPrice));
   const heroWatchers = Math.max(1, Number(heroItem?.bidCount || 0));
   const heroTime = Math.max(0, Number(heroItem?.secondsRemaining || 0) - liveTick);
-  const heroSellerLabel = (() => {
-    if (!heroItem) return 'Seller —';
-    const ev = buildSellerTrustEvidence(heroItem);
-    if (ev.positiveFeedbackPercent != null) return sellerTrustEvidenceSummary(ev);
-    if (ev.evidenceState === 'LIMITED_HISTORY') return 'Limited seller history';
-    return ev.evidenceState === 'GOOD' ? 'Strong seller' : 'Check seller';
-  })();
+  const heroSellerLabel = heroItem
+    ? sellerTrustEvidenceSummary(buildSellerTrustEvidence(heroItem))
+    : 'Seller —';
 
   const runHunt = (raw, source = 'hunt', opts = {}) => {
     const q = String(raw || '').trim();

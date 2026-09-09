@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { evaluateBestMove } from "../../lib/bestMoveEngine";
 import { evaluateTrustScore, trustScoreInputFromListing } from "../../lib/trustScoreEngine";
+import {
+  buildSellerTrustEvidence,
+  sellerTrustEvidenceSummary,
+} from "../../lib/sellerTrustEvidence";
 import { emitBuyerEarnToast } from "../../lib/dualEarn";
 import ListingCardImage from "../listings/ListingCardImage";
 import { formatPrice, formatTime } from "./DealCard";
@@ -77,13 +81,29 @@ function heroBadgeLabel(decision) {
   return isSavvyBest ? "⚡ Savvy Best Move" : "💎 #1 Ranked Deal";
 }
 
-function trustEdgeLabel(trustResult) {
-  const band = trustResult.sellerTrustBand;
-  if (band === "elite") return { text: "🟢 Elite Verified Seller", tier: "high" };
-  if (band === "high") return { text: "🟢 Trusted Seller", tier: "high" };
-  if (band === "medium") return { text: "🟡 Established Seller", tier: "med" };
-  if (band === "low") return { text: "🔴 Limited seller history", tier: "low" };
-  return { text: "🟡 Seller profile partial", tier: "med" };
+function trustEdgeLabel(item, trustResult) {
+  const evidence = buildSellerTrustEvidence(item || {}, trustResult);
+  const summary = sellerTrustEvidenceSummary(evidence);
+  if (
+    evidence.positiveFeedbackPercent != null &&
+    evidence.positiveFeedbackPercent >= 98 &&
+    (evidence.feedbackCount || 0) >= 100
+  ) {
+    return { text: `🟢 ${summary}`, tier: "high" };
+  }
+  if (
+    evidence.evidenceState === "CONCERN_DETECTED" ||
+    evidence.evidenceState === "CHECK_DETAILS"
+  ) {
+    return { text: "🔴 Review seller details", tier: "low" };
+  }
+  if (evidence.evidenceState === "LIMITED_HISTORY") {
+    return { text: `🟡 ${summary}`, tier: "med" };
+  }
+  if (evidence.evidenceState === "SELLER_DATA_UNAVAILABLE") {
+    return { text: summary, tier: "med" };
+  }
+  return { text: summary, tier: "med" };
 }
 
 function competitionEdgeLabel(bids) {
@@ -163,7 +183,7 @@ export default function QuickSnipesHeroCard({
   const savvyQuote = buildSavvyAiQuote(item, decision);
   const bids = toNum(item.bidCount) ?? 0;
   const badgeText = heroBadgeLabel(decision);
-  const trustEdge = trustEdgeLabel(trustResult);
+  const trustEdge = trustEdgeLabel(item, trustResult);
   const compEdge = competitionEdgeLabel(bids);
   const url = item.itemWebUrl;
   const spend =

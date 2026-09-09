@@ -161,7 +161,10 @@ function buildSnipeTags(scored) {
   const bids = Number(scored?.item?.bidCount || 0);
   const evidence = buildSellerTrustEvidence(scored?.item || {});
   if (bids <= 2) tags.push({ key: 'lowcomp', label: 'LOW COMPETITION', tone: 'hot' });
-  if (evidence.evidenceState === 'GOOD' && (evidence.feedbackCount || 0) >= 100) {
+  if (
+    (evidence.positiveFeedbackPercent || 0) >= 98 &&
+    (evidence.feedbackCount || 0) >= 100
+  ) {
     tags.push({ key: 'trust', label: 'STRONG SELLER', tone: 'cyan' });
   } else if (evidence.evidenceState === 'LIMITED_HISTORY') {
     tags.push({ key: 'watch', label: 'LIMITED HISTORY', tone: 'violet' });

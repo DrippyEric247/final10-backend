@@ -5,7 +5,7 @@ import { bestMoveDecisionFromServerItem } from '../../lib/serverListingRanking';
 import type { BestMoveResult } from '../../types/bestMove';
 import { evaluateTrustScore, trustScoreInputFromListing } from '../../lib/trustScoreEngine';
 import type { TrustScoreResult } from '../../types/trustScore';
-import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from '../../lib/sellerTrustEvidence';
+import { CompactSellerTrust } from '../trust/SellerTrustEvidence';
 import SavvyTrustPanel from '../trust/SavvyTrustPanel';
 import SavvyDealRewardsIntegration from '../rewards/SavvyDealRewardsIntegration';
 import SavvyRewardCoinBadge from '../rewards/SavvyRewardCoinBadge';
@@ -321,9 +321,6 @@ export function DealCardShell({
   const confidence = confidenceLabel(decision.confidence);
   const confidenceClasses = confidenceTone(decision.confidence);
   const reason = compactReason(item.recommendationReason || decision.reason);
-  const trustEvidenceLine = compactReason(
-    sellerTrustEvidenceSummary(buildSellerTrustEvidence(item as Record<string, unknown>, trustResult))
-  );
   const basePoints = toEstimatedPoints(item);
   // Only forward an explicit per-listing multiplier override (e.g. a promoted
   // bonus). Otherwise SavvyRewardBadge reads the user's live Savvy
@@ -759,7 +756,12 @@ export function DealCardShell({
 
         <div className="mt-3 rounded-lg border border-gray-700/80 bg-black/30 px-3 py-2">
           <p className="text-xs text-gray-200 line-clamp-1">{reason}</p>
-          <p className="mt-1 text-xs text-gray-300 line-clamp-1">{trustEvidenceLine}</p>
+          <CompactSellerTrust
+            listing={item as Record<string, unknown>}
+            trust={trustResult}
+            showWhyToggle={false}
+            className="mt-2"
+          />
         </div>
 
         <DualEarnChip

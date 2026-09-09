@@ -64,6 +64,16 @@
   color: rgba(148, 163, 184, 0.75);
 }
 
+.seller-trust-evidence__concerns {
+  margin-top: 0.25rem;
+}
+
+.seller-trust-evidence__concern {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #fca5a5;
+}
+
 .seller-trust-evidence__final10 {
   margin: 0;
   color: rgba(226, 232, 240, 0.92);

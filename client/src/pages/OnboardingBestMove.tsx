@@ -29,7 +29,11 @@ import AuctionLiveCountdown, {
   isAuctionCountdownUrgent,
 } from "../components/deals/AuctionLiveCountdown";
 import WhySavvyPickedSection from "../components/deals/WhySavvyPickedSection";
-import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from "../lib/sellerTrustEvidence";
+import {
+  buildSellerTrustEvidence,
+  sellerTrustEvidenceSummary,
+  sellerTrustEvidenceSupportingLine,
+} from "../lib/sellerTrustEvidence";
 import type { DealListing } from "../components/deals/DealCard";
 import "../styles/best-move-insights.css";
 import "../styles/OnboardingBestMove.css";
@@ -708,14 +712,10 @@ function ResultPanel({
           <div className="onboard-move-card-grid">
             <div className={`onboard-move-stat trust trust-${band}`}>
               <div className="onboard-move-stat-label">Seller</div>
-              <div className="onboard-move-stat-value">
-                {sellerSummary}
-                <span className="onboard-move-stat-suffix">
-                  {" "}
-                  · {sellerEvidence.evidenceState.replace(/_/g, " ")}
-                </span>
-              </div>
-              <p className="onboard-move-stat-note">{sellerEvidence.final10Note}</p>
+              <div className="onboard-move-stat-value">{sellerSummary}</div>
+              <p className="onboard-move-stat-note">
+                {sellerTrustEvidenceSupportingLine(sellerEvidence) || sellerEvidence.final10Note}
+              </p>
             </div>
             <div className="onboard-move-stat rank">
               <div className="onboard-move-stat-label">Scored above</div>

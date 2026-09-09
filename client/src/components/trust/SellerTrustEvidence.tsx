@@ -2,8 +2,12 @@ import React, { useId, useState } from 'react';
 import type { SellerTrustEvidence as SellerTrustEvidencePayload } from '../../lib/sellerTrustEvidence';
 import {
   EVIDENCE_STATE_LABEL,
+  NO_MAJOR_CONCERNS_BADGE,
   RISK_LEVEL_LABEL,
+  SELLER_REPUTATION_UNAVAILABLE,
   sellerTrustEvidenceSummary,
+  sellerTrustEvidenceSupportingLine,
+  shouldShowNoMajorConcernsBadge,
 } from '../../lib/sellerTrustEvidence';
 import type { TrustScoreResult } from '../../types/trustScore';
 import { buildSellerTrustEvidence } from '../../lib/sellerTrustEvidence';
@@ -58,6 +62,10 @@ export default function SellerTrustEvidence({
   const summary = sellerTrustEvidenceSummary(resolved);
   const hasPositive =
     resolved.positiveFeedbackPercent != null || resolved.feedbackCount != null;
+  const showNeutralBadge = shouldShowNoMajorConcernsBadge(resolved);
+  const supportingLine = sellerTrustEvidenceSupportingLine(resolved);
+  const hideRiskLabels =
+    resolved.evidenceState === 'SELLER_DATA_UNAVAILABLE' || resolved.riskLevel === 'unknown';
   const stateClass = `seller-trust-evidence--${resolved.evidenceState.toLowerCase()}`;
   const riskClass = `seller-trust-evidence--risk-${resolved.riskLevel.replace(/_/g, '-')}`;
   const badgeRemarks = resolved.final10Remarks.filter((r) =>
@@ -65,10 +73,10 @@ export default function SellerTrustEvidence({
       'NEW_SELLER',
       'ESTABLISHED_SELLER',
       'TOP_RATED_SELLER',
-      'LIMITED_EVIDENCE',
       'NO_RETURNS',
       'RETURNS_ACCEPTED',
       'LOW_FEEDBACK_COUNT',
+      'LIMITED_FEEDBACK_COUNT',
     ].includes(r.code)
   );
 
@@ -106,11 +114,22 @@ export default function SellerTrustEvidence({
           </>
         ) : (
           <span className="seller-trust-evidence__summary seller-trust-evidence__summary--muted">
-            Seller reputation unavailable
+            {SELLER_REPUTATION_UNAVAILABLE}
           </span>
         )}
-        <span className="seller-trust-evidence__attrib">eBay seller feedback</span>
+        {hasPositive ? (
+          <span className="seller-trust-evidence__attrib">eBay seller feedback</span>
+        ) : null}
       </div>
+
+      {showNeutralBadge ? (
+        <div className="seller-trust-evidence__badges" aria-label="Final10 seller notes">
+          <RemarkBadge
+            label={NO_MAJOR_CONCERNS_BADGE}
+            explanation="Final10 did not find major seller concerns in available marketplace signals."
+          />
+        </div>
+      ) : null}
 
       {badgeRemarks.length > 0 ? (
         <div className="seller-trust-evidence__badges" aria-label="Final10 seller notes">
@@ -120,7 +139,17 @@ export default function SellerTrustEvidence({
         </div>
       ) : null}
 
-      {resolved.riskLevel !== 'unknown' ? (
+      {resolved.sellerConcerns.length > 0 ? (
+        <div className="seller-trust-evidence__concerns" role="note">
+          {resolved.sellerConcerns.slice(0, 2).map((concern) => (
+            <p key={concern} className="seller-trust-evidence__concern">
+              {concern}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {!hideRiskLabels && resolved.riskLevel !== 'unknown' ? (
         <div className="seller-trust-evidence__risk" title={resolved.riskReasons.join(' • ')}>
           <span className="seller-trust-evidence__risk-label">
             {RISK_LEVEL_LABEL[resolved.riskLevel]}
@@ -135,10 +164,15 @@ export default function SellerTrustEvidence({
         </div>
       ) : null}
 
-      <p className="seller-trust-evidence__final10">
-        <span className="seller-trust-evidence__final10-label">Final10 note:</span>{' '}
-        {resolved.final10Note}
-      </p>
+      {supportingLine ? (
+        <p className="seller-trust-evidence__final10">{supportingLine}</p>
+      ) : resolved.final10Note &&
+        resolved.final10Note !== 'No major seller concerns detected.' ? (
+        <p className="seller-trust-evidence__final10">
+          <span className="seller-trust-evidence__final10-label">Final10 note:</span>{' '}
+          {resolved.final10Note}
+        </p>
+      ) : null}
 
       {compact && showWhyToggle ? (
         <>

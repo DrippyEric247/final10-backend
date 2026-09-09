@@ -11,7 +11,11 @@ import {
   readMockWalletBalance,
 } from '../../lib/mockSavvyDealRewards';
 import { applyBetaRewardUnlock, getBetaRewardsActiveLabel } from '../../lib/betaRewardsDisplay';
-import { buildSellerTrustEvidence, sellerTrustEvidenceSummary } from '../../lib/sellerTrustEvidence';
+import {
+  buildSellerTrustEvidence,
+  sellerTrustEvidenceSummary,
+  sellerTrustEvidenceSupportingLine,
+} from '../../lib/sellerTrustEvidence';
 import { SAVVY_SCOUT } from '../../config/savvyScoutBranding';
 import '../../styles/savvy-deal-rewards.css';
 import WhyPickedPanel from '../ai/WhyPickedPanel';
@@ -132,6 +136,7 @@ export default function SavvyDealRewardsIntegration({
     [item, trustResult]
   );
   const sellerSummary = sellerTrustEvidenceSummary(sellerEvidence);
+  const sellerSupportingLine = sellerTrustEvidenceSupportingLine(sellerEvidence);
 
   const mockModel = useMemo(() => {
     const preBase = dealEstimate?.baseSavvy ?? Math.max(0, Math.round(Number(basePoints) || 0));
@@ -310,6 +315,9 @@ export default function SavvyDealRewardsIntegration({
           <div>
             <span>Seller</span>
             <strong>{sellerSummary}</strong>
+            {sellerSupportingLine ? (
+              <span className="sdr-scores__support">{sellerSupportingLine}</span>
+            ) : null}
           </div>
           <div>
             <span>Competition</span>

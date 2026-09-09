@@ -29,7 +29,8 @@ export type Final10RemarkCode =
   | 'STRONG_LONG_TERM_HISTORY'
   | 'LIMITED_SELLING_HISTORY'
   | 'MARKETPLACE_VERIFIED'
-  | 'LIMITED_EVIDENCE';
+  | 'LIMITED_EVIDENCE'
+  | 'NO_MAJOR_CONCERNS_DETECTED';
 
 export type Final10Remark = {
   code: Final10RemarkCode;
@@ -167,9 +168,16 @@ function deriveEvidenceState(params: {
   return 'GOOD';
 }
 
+export const SELLER_REPUTATION_UNAVAILABLE = 'Seller reputation unavailable';
+
+export const LIMITED_MARKETPLACE_HISTORY_NOTE =
+  'Final10 found limited marketplace history for this seller.';
+
+export const NO_MAJOR_CONCERNS_BADGE = 'No major concerns detected';
+
 function buildDefaultFinal10Note(state: SellerEvidenceState, remarks: Final10Remark[]): string {
   if (state === 'SELLER_DATA_UNAVAILABLE') {
-    return 'Marketplace reputation data was not available for this listing.';
+    return LIMITED_MARKETPLACE_HISTORY_NOTE;
   }
   const primary = remarks.find((r) =>
     ['NEW_SELLER', 'LIMITED_EVIDENCE', 'RECENT_NEGATIVE_FEEDBACK'].includes(r.code)
@@ -326,7 +334,7 @@ function deriveRiskAssessment(params: {
     return {
       riskLevel: 'unknown',
       riskReasons: ['MARKETPLACE_DATA_UNAVAILABLE'],
-      materialConcerns: ['Marketplace reputation data unavailable'],
+      materialConcerns: [],
     };
   }
 
@@ -407,13 +415,6 @@ function mapSellerConcerns(trust: TrustScoreResult | null | undefined, input: Tr
     concerns.push('Some negative feedback detected. Review seller feedback before purchasing.');
   } else if (pct != null && pct < 90) {
     concerns.push('Feedback percentage is weaker than typical trusted sellers.');
-  }
-
-  const sellerName = String(input.seller || '').trim();
-  if (!sellerName || /^(unknown|ebay seller)$/i.test(sellerName)) {
-    if (pct == null && count == null) {
-      concerns.push('Seller identity is incomplete in marketplace data.');
-    }
   }
 
   return [...new Set(concerns)].slice(0, 4);
@@ -560,13 +561,63 @@ export function sellerTrustEvidenceSummary(evidence: SellerTrustEvidence): strin
     evidence.positiveFeedbackPercent,
     evidence.feedbackCount
   );
-  return line || 'Seller reputation unavailable';
+  return line || SELLER_REPUTATION_UNAVAILABLE;
+}
+
+/** Supporting explanation beneath the primary seller status on deal cards. */
+export function sellerTrustEvidenceSupportingLine(evidence: SellerTrustEvidence): string | null {
+  if (evidence.evidenceState === 'SELLER_DATA_UNAVAILABLE') {
+    return LIMITED_MARKETPLACE_HISTORY_NOTE;
+  }
+  if (evidence.sellerConcerns[0]) {
+    return evidence.sellerConcerns[0];
+  }
+  const limited = evidence.final10Remarks.find((r) => r.code === 'LIMITED_EVIDENCE');
+  if (limited) return limited.explanation;
+  if (
+    evidence.final10Note &&
+    evidence.final10Note !== 'No major seller concerns detected.' &&
+    evidence.final10Note !== NO_MAJOR_CONCERNS_BADGE
+  ) {
+    return evidence.final10Note;
+  }
+  return null;
+}
+
+const MATERIAL_UNAVAILABLE_PATTERNS =
+  /marketplace reputation data unavailable|marketplace data unavailable/i;
+
+/** Neutral badge — only when available evidence supports the conclusion. */
+export function shouldShowNoMajorConcernsBadge(evidence: SellerTrustEvidence): boolean {
+  if (
+    evidence.evidenceState === 'CONCERN_DETECTED' ||
+    evidence.evidenceState === 'CHECK_DETAILS'
+  ) {
+    return false;
+  }
+  if (evidence.sellerConcerns.length > 0) return false;
+
+  const actionableMaterial = evidence.materialConcerns.filter(
+    (c) => !MATERIAL_UNAVAILABLE_PATTERNS.test(c)
+  );
+  if (actionableMaterial.length > 0) return false;
+
+  if (
+    evidence.positiveFeedbackPercent != null &&
+    evidence.positiveFeedbackPercent < 95
+  ) {
+    return false;
+  }
+
+  if (evidence.evidenceState === 'SELLER_DATA_UNAVAILABLE') return true;
+
+  return false;
 }
 
 export const EVIDENCE_STATE_LABEL: Record<SellerEvidenceState, string> = {
-  GOOD: 'Good',
-  CHECK_DETAILS: 'Check details',
-  LIMITED_HISTORY: 'Limited history',
-  CONCERN_DETECTED: 'Concern detected',
-  SELLER_DATA_UNAVAILABLE: 'Seller data unavailable',
+  GOOD: 'Marketplace seller data available',
+  CHECK_DETAILS: 'Review seller details',
+  LIMITED_HISTORY: 'Limited seller history',
+  CONCERN_DETECTED: 'Seller concerns detected',
+  SELLER_DATA_UNAVAILABLE: SELLER_REPUTATION_UNAVAILABLE,
 };

@@ -190,7 +190,7 @@ function deriveRiskAssessment({ pct, count, sellerConcerns, returnsAccepted, has
     return {
       riskLevel: 'unknown',
       riskReasons: ['MARKETPLACE_DATA_UNAVAILABLE'],
-      materialConcerns: ['Marketplace reputation data unavailable'],
+      materialConcerns: [],
     };
   }
 
@@ -215,9 +215,14 @@ function deriveRiskAssessment({ pct, count, sellerConcerns, returnsAccepted, has
   return { riskLevel, riskReasons: reasons, materialConcerns: material.slice(0, 4) };
 }
 
+const SELLER_REPUTATION_UNAVAILABLE = 'Seller reputation unavailable';
+const LIMITED_MARKETPLACE_HISTORY_NOTE =
+  'Final10 found limited marketplace history for this seller.';
+const NO_MAJOR_CONCERNS_BADGE = 'No major concerns detected';
+
 function buildDefaultFinal10Note(state, remarks) {
   if (state === 'SELLER_DATA_UNAVAILABLE') {
-    return 'Marketplace reputation data was not available for this listing.';
+    return LIMITED_MARKETPLACE_HISTORY_NOTE;
   }
   const primary = remarks.find((r) =>
     ['NEW_SELLER', 'LIMITED_EVIDENCE', 'RECENT_NEGATIVE_FEEDBACK'].includes(r.code)
@@ -361,9 +366,40 @@ function buildSellerTrustEvidence(listingOrInput, trustResult) {
   };
 }
 
+function sellerTrustEvidenceSummary(evidence) {
+  const pct = evidence.positiveFeedbackPercent;
+  const count = evidence.feedbackCount;
+  const rating = formatMarketplaceRatingDisplay(pct);
+  if (rating && count != null) return `${rating} • ${formatFeedbackCount(count)} ratings`;
+  if (rating) return rating;
+  if (count != null) return `${formatFeedbackCount(count)} ratings`;
+  return SELLER_REPUTATION_UNAVAILABLE;
+}
+
+function shouldShowNoMajorConcernsBadge(evidence) {
+  if (evidence.evidenceState === 'CONCERN_DETECTED' || evidence.evidenceState === 'CHECK_DETAILS') {
+    return false;
+  }
+  if ((evidence.sellerConcerns || []).length > 0) return false;
+  const actionableMaterial = (evidence.materialConcerns || []).filter(
+    (c) => !/marketplace reputation data unavailable|marketplace data unavailable/i.test(c)
+  );
+  if (actionableMaterial.length > 0) return false;
+  if (evidence.positiveFeedbackPercent != null && evidence.positiveFeedbackPercent < 95) {
+    return false;
+  }
+  if (evidence.evidenceState === 'SELLER_DATA_UNAVAILABLE') return true;
+  return false;
+}
+
 module.exports = {
   buildSellerTrustEvidence,
   deriveEvidenceState,
   formatMarketplaceRatingDisplay,
   RISK_LEVEL_LABEL,
+  sellerTrustEvidenceSummary,
+  shouldShowNoMajorConcernsBadge,
+  SELLER_REPUTATION_UNAVAILABLE,
+  LIMITED_MARKETPLACE_HISTORY_NOTE,
+  NO_MAJOR_CONCERNS_BADGE,
 };

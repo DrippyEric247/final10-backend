@@ -1,7 +1,11 @@
 import {
   buildSellerTrustEvidence,
   formatMarketplaceRatingDisplay,
+  LIMITED_MARKETPLACE_HISTORY_NOTE,
+  NO_MAJOR_CONCERNS_BADGE,
   sellerTrustEvidenceSummary,
+  sellerTrustEvidenceSupportingLine,
+  shouldShowNoMajorConcernsBadge,
 } from './sellerTrustEvidence';
 import { evaluateTrustScore } from './trustScoreEngine';
 
@@ -64,14 +68,38 @@ describe('sellerTrustEvidence — marketplace-grounded trust', () => {
     expect(evidence.sellerConcerns.some((c) => /shipping delays|item condition/i.test(c))).toBe(false);
   });
 
-  test('E — no marketplace reputation → unavailable, no fake 0%', () => {
+  test('B — unavailable reputation, no concerns → neutral badge + limited history note', () => {
     const evidence = buildSellerTrustEvidence({ seller: 'unknown' });
 
     expect(evidence.positiveFeedbackPercent).toBeNull();
     expect(evidence.marketplaceRating.display).toBeNull();
     expect(evidence.evidenceState).toBe('SELLER_DATA_UNAVAILABLE');
     expect(sellerTrustEvidenceSummary(evidence)).toBe('Seller reputation unavailable');
-    expect(sellerTrustEvidenceSummary(evidence)).not.toMatch(/0%/);
+    expect(sellerTrustEvidenceSummary(evidence)).not.toMatch(/0%|GOOD|BAD|RISKY/i);
+    expect(shouldShowNoMajorConcernsBadge(evidence)).toBe(true);
+    expect(sellerTrustEvidenceSupportingLine(evidence)).toBe(LIMITED_MARKETPLACE_HISTORY_NOTE);
+    expect(evidence.final10Note).toBe(LIMITED_MARKETPLACE_HISTORY_NOTE);
+  });
+
+  test('C — unavailable reputation with warning → no neutral badge', () => {
+    const evidence = buildSellerTrustEvidence(
+      { seller: 'unknown' },
+      {
+        trustScore: 40,
+        sellerTrustScore: 40,
+        safeToRecommend: false,
+        sellerTrustBand: 'low',
+        savvyWarningHeadline: 'Recent buyer disputes reported for this seller.',
+        sellerTrustReasons: ['Recent buyer disputes reported for this seller.'],
+        trustReasons: [],
+        dealRiskWarnings: [],
+        dealHighlights: [],
+      } as import('../types/trustScore').TrustScoreResult
+    );
+
+    expect(sellerTrustEvidenceSummary(evidence)).toBe('Seller reputation unavailable');
+    expect(shouldShowNoMajorConcernsBadge(evidence)).toBe(false);
+    expect(evidence.sellerConcerns.length).toBeGreaterThan(0);
   });
 
   test('F — 100% positive, 5 ratings, no returns → NEW SELLER + NO RETURNS', () => {
