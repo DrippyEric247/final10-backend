@@ -332,6 +332,7 @@ app.use('/api/project-alerts', projectAlertsRoutes);
 app.use('/api/build-wars', buildWarsRoutes);
 app.use("/api/ebay", ebayRoutes);
 app.use('/api/ebay-auth', ebayAuthRoutes);
+app.use('/api/best-buy-integration', require('./routes/bestBuyIntegrationRoutes'));
 app.use('/api/mcp', mcpRoutes);
 app.use('/api/promo-codes', promoCodeRoutes);
 app.use('/api/easter-eggs', easterEggRoutes);

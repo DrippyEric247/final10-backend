@@ -21,6 +21,8 @@ const SERVER_ENV_REGISTRY = [
   { name: 'STRIPE_WEBHOOK_SECRET', scope: 'server', requirement: 'conditional', secret: true, prod: true, consumer: 'stripeWebhook', failure: 'Webhook returns 503 WEBHOOK_MISCONFIGURED' },
   { name: 'EBAY_CLIENT_ID', scope: 'server', requirement: 'conditional', secret: true, prod: true, consumer: 'ebayAuth', failure: 'Mock/stale cache fallback for Browse API' },
   { name: 'EBAY_CLIENT_SECRET', scope: 'server', requirement: 'conditional', secret: true, prod: true, consumer: 'ebayAuth', failure: 'Mock/stale cache fallback' },
+  { name: 'BESTBUY_API_KEY', scope: 'server', requirement: 'optional', secret: true, prod: true, consumer: 'bestBuyProvider', failure: 'Best Buy integration disabled; eBay unaffected' },
+  { name: 'BESTBUY_INTEGRATION_ENABLED', scope: 'server', requirement: 'optional', secret: false, prod: true, consumer: 'bestBuyConfig', failure: 'Auto-enabled when BESTBUY_API_KEY is set' },
   { name: 'RESEND_API_KEY', scope: 'server', requirement: 'optional', secret: true, prod: true, consumer: 'emailService', failure: 'Email delivery skipped; alerts may not email' },
   { name: 'ALERT_EMAIL_ENABLED', scope: 'server', requirement: 'optional', secret: false, prod: true, consumer: 'alertDelivery', failure: 'Alert email delivery disabled' },
   { name: 'DISABLE_SAVVY_SCOUT_SCAN', scope: 'server', requirement: 'optional', secret: false, prod: true, consumer: 'background jobs', failure: 'Disables alert scanner cron when true' },

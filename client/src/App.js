@@ -78,6 +78,7 @@ import PromotionDashboard from "./pages/PromotionDashboard"; // protected
 import ShieldDashboard from "./pages/ShieldDashboard"; // superadmin only
 import OwnerControlPanel from "./pages/OwnerControlPanel"; // superadmin only
 import AdminHub from "./pages/AdminHub";
+import BestBuyIntegrationPage from "./pages/admin/BestBuyIntegrationPage";
 import ProductionReadinessPage from "./pages/ProductionReadinessPage"; // internal planning
 import LaunchKPIDashboard from "./pages/LaunchKPIDashboard"; // internal KPI dashboard
 import GrowthLeversDashboard from "./pages/GrowthLeversDashboard"; // internal growth lever system
@@ -716,6 +717,14 @@ export default function App() {
           element={
             <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
               <AdminEmailTestCenter />
+            </InternalRoute>
+          }
+        />
+        <Route
+          path="/admin/best-buy-integration"
+          element={
+            <InternalRoute allowedRoles={["admin", "superadmin", "owner"]}>
+              <BestBuyIntegrationPage />
             </InternalRoute>
           }
         />
