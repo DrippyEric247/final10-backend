@@ -14,6 +14,12 @@ const FINAL10_PRODUCTION_ORIGINS = Object.freeze([
   'https://www.final10.app',
 ]);
 
+/** SavvyTrip production browser origins (Railway previews via ALLOWED_ORIGINS). */
+const SAVVYTRIP_PRODUCTION_ORIGINS = Object.freeze([
+  'https://savvytrip.app',
+  'https://www.savvytrip.app',
+]);
+
 /** Default Vercel project hostname prefixes (Final10-owned previews only — not all *.vercel.app). */
 const DEFAULT_FINAL10_VERCEL_PREVIEW_PREFIXES = Object.freeze([
   'final10-client',
@@ -28,6 +34,7 @@ const DEFAULT_ORIGINS = Object.freeze([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   ...FINAL10_PRODUCTION_ORIGINS,
+  ...SAVVYTRIP_PRODUCTION_ORIGINS,
 ]);
 
 const CORS_METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'];
@@ -166,6 +173,7 @@ function getCorsRejectReason(origin) {
   if (isLocalDevOrigin(normalized)) return null;
   if (isFinal10VercelPreviewOrigin(normalized)) return null;
   if (isFinal10AppOrigin(normalized)) return null;
+  if (isSavvyTripAppOrigin(normalized)) return null;
 
   const vercelMatch = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(normalized);
   if (vercelMatch) {
@@ -219,6 +227,10 @@ function isFinal10AppOrigin(origin) {
   return /^https:\/\/(www\.)?final10\.app$/i.test(normalizeOrigin(origin));
 }
 
+function isSavvyTripAppOrigin(origin) {
+  return /^https:\/\/(www\.)?savvytrip\.app$/i.test(normalizeOrigin(origin));
+}
+
 function isOriginAllowed(origin) {
   if (!origin) return true;
   const normalized = normalizeOrigin(origin);
@@ -226,6 +238,7 @@ function isOriginAllowed(origin) {
   if (isLocalDevOrigin(normalized)) return true;
   if (isFinal10VercelPreviewOrigin(normalized)) return true;
   if (isFinal10AppOrigin(normalized)) return true;
+  if (isSavvyTripAppOrigin(normalized)) return true;
   return false;
 }
 
@@ -342,6 +355,7 @@ function ensureCorsHeaders(req, res) {
 module.exports = {
   DEFAULT_ORIGINS,
   FINAL10_PRODUCTION_ORIGINS,
+  SAVVYTRIP_PRODUCTION_ORIGINS,
   CORS_METHODS,
   CORS_ALLOWED_HEADERS,
   buildAllowedOrigins,

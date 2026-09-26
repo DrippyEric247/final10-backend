@@ -11,18 +11,36 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { google, apple, getClientBaseUrl } = require('../config/socialAuthConfig');
+const { isOriginAllowed } = require('../middleware/cors');
 const { verifyJwtWithJwks } = require('./oauthJwks');
 
 const STATE_TTL = '10m';
 
 /* --------------------------------- state --------------------------------- */
 
-function signState({ provider, nonce }) {
-  return jwt.sign(
-    { k: 'oauth_state', provider, nonce },
-    process.env.JWT_SECRET,
-    { expiresIn: STATE_TTL }
-  );
+function normalizeClientOrigin(raw) {
+  const trimmed = String(raw || '').trim().replace(/\/+$/, '');
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Allowed browser origin for OAuth return (must pass CORS allowlist). */
+function resolveOAuthClientOrigin(raw) {
+  const origin = normalizeClientOrigin(raw);
+  if (!origin) return null;
+  return isOriginAllowed(origin) ? origin : null;
+}
+
+function signState({ provider, nonce, clientOrigin }) {
+  const payload = { k: 'oauth_state', provider, nonce };
+  if (clientOrigin) payload.clientOrigin = clientOrigin;
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: STATE_TTL });
 }
 
 function verifyState(token, expectedProvider) {
@@ -39,9 +57,10 @@ function makeNonce() {
 
 /* ----------------------------- authorize URLs ---------------------------- */
 
-function getGoogleAuthUrl() {
+function getGoogleAuthUrl({ clientOrigin } = {}) {
   const nonce = makeNonce();
-  const state = signState({ provider: 'google', nonce });
+  const resolvedOrigin = resolveOAuthClientOrigin(clientOrigin);
+  const state = signState({ provider: 'google', nonce, clientOrigin: resolvedOrigin || undefined });
   const params = new URLSearchParams({
     client_id: google.clientId,
     redirect_uri: google.callbackUrl,
@@ -56,9 +75,10 @@ function getGoogleAuthUrl() {
   return `${google.authUrl}?${params.toString()}`;
 }
 
-function getAppleAuthUrl() {
+function getAppleAuthUrl({ clientOrigin } = {}) {
   const nonce = makeNonce();
-  const state = signState({ provider: 'apple', nonce });
+  const resolvedOrigin = resolveOAuthClientOrigin(clientOrigin);
+  const state = signState({ provider: 'apple', nonce, clientOrigin: resolvedOrigin || undefined });
   const params = new URLSearchParams({
     client_id: apple.clientId,
     redirect_uri: apple.callbackUrl,
@@ -275,14 +295,23 @@ async function findOrCreateSocialUser(profile) {
 
 /* --------------------------------- redirect ------------------------------ */
 
-function buildClientSuccessRedirect(token, provider) {
-  const base = getClientBaseUrl();
-  const params = new URLSearchParams({ token, provider });
-  return `${base}/auth/social?${params.toString()}`;
+function oauthClientLandingPath(clientOrigin) {
+  const base = clientOrigin || getClientBaseUrl();
+  if (/^https:\/\/(www\.)?final10\.app$/i.test(String(base))) {
+    return '/auth/social';
+  }
+  return '/auth/callback';
 }
 
-function buildClientErrorRedirect(reason, provider) {
-  const base = getClientBaseUrl();
+function buildClientSuccessRedirect(token, provider, clientOrigin) {
+  const base = resolveOAuthClientOrigin(clientOrigin) || getClientBaseUrl();
+  const params = new URLSearchParams({ token, provider });
+  const path = oauthClientLandingPath(base);
+  return `${base}${path}?${params.toString()}`;
+}
+
+function buildClientErrorRedirect(reason, provider, clientOrigin) {
+  const base = resolveOAuthClientOrigin(clientOrigin) || getClientBaseUrl();
   const params = new URLSearchParams({ error: reason || 'social_auth_failed' });
   if (provider) params.set('provider', provider);
   return `${base}/login?${params.toString()}`;
@@ -300,4 +329,5 @@ module.exports = {
   generateUniqueUsername,
   buildClientSuccessRedirect,
   buildClientErrorRedirect,
+  resolveOAuthClientOrigin,
 };
