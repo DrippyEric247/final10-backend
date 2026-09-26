@@ -5,6 +5,7 @@ import { hasAdminRole } from '../../lib/adminAccess';
 import {
   compareMarketplaceCandidates,
   fetchBestBuyIntegrationStatus,
+  getBestBuyIntegrationApiBase,
   searchBestBuyIntegration,
   testBestBuyConnection,
 } from '../../lib/bestBuyIntegrationApi';
@@ -131,8 +132,9 @@ export default function BestBuyIntegrationPage() {
         </Link>
         <h1>Best Buy Integration</h1>
         <p className="bb-int-sub">
-          Phase 1 — official Best Buy API via Final10 backend. Final10 is the app; Best Buy is the
-          marketplace source.
+          Phase 1 — official Best Buy API via Final10 backend only. Do not call{' '}
+          <code>api.bestbuy.com</code> from the browser (CORS will fail with status 0). Final10 is the
+          app; Best Buy is the marketplace source.
         </p>
         <div className="bb-int-attribution" aria-label="Best Buy attribution">
           <img
@@ -167,6 +169,10 @@ export default function BestBuyIntegrationPage() {
           <div>
             <dt>API base (this browser)</dt>
             <dd className="bb-int-key">{apiDiagnostics.apiBaseUrl || '—'}</dd>
+          </div>
+          <div>
+            <dt>Best Buy proxy route</dt>
+            <dd className="bb-int-key">{getBestBuyIntegrationApiBase() || '—'}</dd>
           </div>
           <div>
             <dt>Search cache TTL</dt>

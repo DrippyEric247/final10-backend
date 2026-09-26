@@ -2,7 +2,7 @@ import axios from "axios";
 import { devDiagApiFailure } from "./devApiDiagnostics";
 import { parseApiError } from "./apiErrorParsing";
 import { trackEvent } from "./analytics";
-import { getApiBaseUrl } from "./runtimeApi";
+import { assertFinal10ApiOrigin, getApiBaseUrl, getApiOrigin } from "./runtimeApi";
 import {
   gatedRequest,
   markServerRateLimit,
@@ -34,8 +34,36 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    const rawUrl = String(config.url || "");
+    if (/^https?:\/\//i.test(rawUrl)) {
+      const check = assertFinal10ApiOrigin(rawUrl);
+      if (!check.ok) {
+        const err = new Error(check.reason);
+        err.code = "FINAL10_API_MISCONFIGURED";
+        err.isConfigError = true;
+        return Promise.reject(err);
+      }
+    }
     const base = getApiBaseUrl();
-    if (base) config.baseURL = base;
+    if (base) {
+      const check = assertFinal10ApiOrigin(base);
+      if (!check.ok) {
+        const err = new Error(check.reason);
+        err.code = "FINAL10_API_MISCONFIGURED";
+        err.isConfigError = true;
+        return Promise.reject(err);
+      }
+      config.baseURL = base;
+    }
+    const host = String(config.baseURL || getApiOrigin() || "");
+    if (/api\.bestbuy\.com/i.test(host) || /api\.bestbuy\.com/i.test(rawUrl)) {
+      const err = new Error(
+        "Blocked direct Best Buy API call from the browser. Use /api/best-buy-integration on the Final10 server."
+      );
+      err.code = "BESTBUY_CLIENT_DIRECT_BLOCKED";
+      err.isConfigError = true;
+      return Promise.reject(err);
+    }
     return config;
   },
   (error) => Promise.reject(error)

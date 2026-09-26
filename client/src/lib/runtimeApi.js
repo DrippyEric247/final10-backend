@@ -1,6 +1,8 @@
 const LOCAL_API_ORIGIN = "http://localhost:5000";
 const PRODUCTION_API_ORIGIN = "https://api.final10.app";
 
+const FORBIDDEN_API_HOSTS = ["api.bestbuy.com", "bestbuy.com"];
+
 function clean(value) {
   return String(value || "")
     .trim()
@@ -49,10 +51,38 @@ function warnMissingApiOnce() {
   }
 }
 
+function hostnameFromOrigin(origin) {
+  try {
+    return new URL(origin).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** Reject marketplace URLs mistakenly used as Final10 API base (causes CORS status 0). */
+export function assertFinal10ApiOrigin(origin) {
+  const host = hostnameFromOrigin(origin);
+  if (!host) return { ok: false, reason: "API origin is missing or invalid." };
+  if (FORBIDDEN_API_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    return {
+      ok: false,
+      reason:
+        "REACT_APP_API_URL must point at the Final10 backend (e.g. your Railway API URL), not api.bestbuy.com. Best Buy calls are server-side only.",
+    };
+  }
+  return { ok: true, host };
+}
+
 /** API server origin without `/api`. Defaults to the official API domain in production. */
 export function getApiOrigin() {
   const configured = readConfiguredApiUrl();
-  if (configured) return configured;
+  if (configured) {
+    const check = assertFinal10ApiOrigin(configured);
+    if (!check.ok && typeof console !== "undefined") {
+      console.error(`[Final10 API] ${check.reason}`);
+    }
+    return configured;
+  }
   if (isLocalDevHost()) return LOCAL_API_ORIGIN;
   return PRODUCTION_API_ORIGIN;
 }

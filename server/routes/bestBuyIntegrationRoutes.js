@@ -12,6 +12,7 @@ const {
   searchBestBuyWithOpenBox,
   getBestBuyProductBySku,
   getBestBuyProductByUpc,
+  getBestBuyOpenBoxForSkus,
 } = require('../services/bestBuy/bestBuyProvider');
 const { getMarketplaceCandidates } = require('../services/marketplace/marketplaceCandidateService');
 const { warn } = require('../services/structuredLog');
@@ -94,6 +95,45 @@ router.get('/search', async (req, res) => {
       upstreamStatus: err.upstreamStatus,
       items: [],
       providerStatus: 'error',
+    });
+  }
+});
+
+router.get('/openbox', async (req, res) => {
+  if (!isBestBuyIntegrationEnabled()) {
+    return res.status(503).json({
+      code: 'BESTBUY_NOT_CONFIGURED',
+      message: SAFE_USER_MESSAGE,
+      offers: [],
+    });
+  }
+  try {
+    const raw = String(req.query.skus || req.query.sku || '').trim();
+    const skus = raw
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!skus.length) {
+      return res.status(400).json({
+        code: 'BESTBUY_SKUS_REQUIRED',
+        message: 'Provide skus query param (comma-separated Best Buy SKUs).',
+      });
+    }
+    const data = await getBestBuyOpenBoxForSkus(skus);
+    res.json(stripSecrets(data));
+  } catch (err) {
+    warn('BESTBUY_OPENBOX_FAILED', {
+      message: err.message,
+      code: err.code,
+      upstreamStatus: err.upstreamStatus,
+      skus: String(req.query.skus || '').slice(0, 120),
+    });
+    res.status(err.status || 503).json({
+      code: err.code || 'BESTBUY_OPENBOX_FAILED',
+      message: err.userMessage || SAFE_USER_MESSAGE,
+      detail: err.message,
+      upstreamStatus: err.upstreamStatus,
+      offers: [],
     });
   }
 });
