@@ -7,9 +7,47 @@ function toPositiveInt(raw, fallback) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+const BESTBUY_KEY_ENV_NAMES = ['BESTBUY_API_KEY', 'BBY_API_KEY', 'BEST_BUY_API_KEY'];
+
+function detectBestBuyKeySource() {
+  for (const name of BESTBUY_KEY_ENV_NAMES) {
+    const raw = String(process.env[name] || '').trim();
+    if (raw) return name;
+  }
+  return null;
+}
+
 function getBestBuyApiKey() {
-  const key = String(process.env.BESTBUY_API_KEY || process.env.BBY_API_KEY || '').trim();
-  return key || null;
+  const source = detectBestBuyKeySource();
+  if (!source) return null;
+  return String(process.env[source] || '').trim() || null;
+}
+
+/** Boot/admin diagnostics — never includes the key value. */
+function getBestBuyStartupDiagnostics() {
+  const source = detectBestBuyKeySource();
+  const apiKeyConfigured = Boolean(source);
+  const integrationEnabled = isBestBuyIntegrationEnabled();
+  return {
+    apiKeyConfigured,
+    integrationEnabled,
+    keyEnvVar: source,
+    expectedEnvVar: 'BESTBUY_API_KEY',
+  };
+}
+
+function logBestBuyStartupConfig() {
+  const diag = getBestBuyStartupDiagnostics();
+  // eslint-disable-next-line no-console
+  console.log(
+    `[BEST_BUY_CONFIG] apiKeyConfigured=${diag.apiKeyConfigured} integrationEnabled=${diag.integrationEnabled} keyEnvVar=${diag.keyEnvVar || 'none'}`
+  );
+  if (!diag.apiKeyConfigured) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[BEST_BUY_CONFIG] Best Buy API disabled — set BESTBUY_API_KEY on the server (never expose to client).'
+    );
+  }
 }
 
 function isBestBuyIntegrationEnabled() {
@@ -34,7 +72,11 @@ function getBestBuyConfig() {
 }
 
 module.exports = {
+  BESTBUY_KEY_ENV_NAMES,
+  detectBestBuyKeySource,
   getBestBuyApiKey,
   isBestBuyIntegrationEnabled,
   getBestBuyConfig,
+  getBestBuyStartupDiagnostics,
+  logBestBuyStartupConfig,
 };

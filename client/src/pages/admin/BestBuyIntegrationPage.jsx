@@ -8,6 +8,7 @@ import {
   searchBestBuyIntegration,
   testBestBuyConnection,
 } from '../../lib/bestBuyIntegrationApi';
+import { getApiBaseUrl, getApiOrigin } from '../../lib/runtimeApi';
 import '../../styles/best-buy-integration.css';
 
 const DEFAULT_QUERY = 'Samsung Odyssey G7';
@@ -28,6 +29,23 @@ export default function BestBuyIntegrationPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
+  const apiDiagnostics = React.useMemo(() => {
+    const base = getApiBaseUrl();
+    const origin = getApiOrigin();
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const looksBetaHost = /beta|preview|localhost|railway/i.test(host);
+    const looksProdApi = /api\.final10\.app/i.test(origin || '');
+    return {
+      apiBaseUrl: base,
+      apiOrigin: origin,
+      pageHost: host,
+      mismatchWarning:
+        looksBetaHost && looksProdApi
+          ? 'This page may be on Beta/Preview but the API client is pointed at production (api.final10.app). Set REACT_APP_API_URL to your Beta Railway API URL.'
+          : null,
+    };
+  }, []);
+
   const loadStatus = useCallback(async () => {
     const data = await fetchBestBuyIntegrationStatus();
     setStatus(data);
@@ -46,7 +64,12 @@ export default function BestBuyIntegrationPage() {
       setConnection(result);
       await loadStatus();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Connection test failed.');
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.detail ||
+          err?.message ||
+          'Best Buy data is temporarily unavailable.'
+      );
     } finally {
       setBusy('');
     }
@@ -59,7 +82,12 @@ export default function BestBuyIntegrationPage() {
       const result = await searchBestBuyIntegration(query.trim());
       setSearchResult(result);
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Search failed.');
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.detail ||
+          err?.message ||
+          'Best Buy data is temporarily unavailable.'
+      );
     } finally {
       setBusy('');
     }
@@ -133,18 +161,33 @@ export default function BestBuyIntegrationPage() {
             <dd>{status?.enabled ? 'Yes' : 'No'}</dd>
           </div>
           <div>
+            <dt>Key env var</dt>
+            <dd>{status?.diagnostics?.keyEnvVar || 'none'}</dd>
+          </div>
+          <div>
+            <dt>API base (this browser)</dt>
+            <dd className="bb-int-key">{apiDiagnostics.apiBaseUrl || '—'}</dd>
+          </div>
+          <div>
             <dt>Search cache TTL</dt>
             <dd>{status?.cacheTtls?.searchMs ? `${Math.round(status.cacheTtls.searchMs / 60000)} min` : '—'}</dd>
           </div>
         </dl>
+        {apiDiagnostics.mismatchWarning ? (
+          <p className="bb-int-note bb-int-note--warn">{apiDiagnostics.mismatchWarning}</p>
+        ) : null}
         <button type="button" className="bb-int-btn" disabled={busy === 'connection'} onClick={runConnectionTest}>
           {busy === 'connection' ? 'Testing…' : 'Test connection'}
         </button>
         {connection ? (
-          <p className={`bb-int-note ${connection.ok ? 'bb-int-note--ok' : 'bb-int-note--warn'}`}>
-            {connection.message}
-            {connection.sampleSku ? ` (sample SKU ${connection.sampleSku})` : ''}
-          </p>
+          <div className={`bb-int-note ${connection.ok ? 'bb-int-note--ok' : 'bb-int-note--warn'}`}>
+            <strong>{connection.statusLabel || (connection.ok ? 'Best Buy API: CONNECTED' : 'Best Buy API: FAILED')}</strong>
+            <div>{connection.reason || connection.message}</div>
+            {connection.upstreamStatus ? (
+              <div className="bb-int-muted">Upstream HTTP {connection.upstreamStatus}</div>
+            ) : null}
+            {connection.sampleSku ? <div>Sample SKU {connection.sampleSku}</div> : null}
+          </div>
         ) : null}
       </section>
 

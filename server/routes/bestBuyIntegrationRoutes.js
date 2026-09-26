@@ -1,7 +1,12 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const { requireAdminAccess } = require('../middleware/requireRole');
-const { isBestBuyIntegrationEnabled, getBestBuyConfig } = require('../config/bestBuyConfig');
+const {
+  isBestBuyIntegrationEnabled,
+  getBestBuyConfig,
+  getBestBuyStartupDiagnostics,
+} = require('../config/bestBuyConfig');
+const { SAFE_USER_MESSAGE } = require('../services/bestBuy/bestBuyHttpClient');
 const {
   testBestBuyConnection,
   searchBestBuyWithOpenBox,
@@ -42,6 +47,8 @@ router.get('/status', (_req, res) => {
   res.json({
     provider: 'bestbuy',
     ...publicConfig(),
+    diagnostics: getBestBuyStartupDiagnostics(),
+    safeUserMessage: SAFE_USER_MESSAGE,
   });
 });
 
@@ -74,10 +81,17 @@ router.get('/search', async (req, res) => {
     const data = await searchBestBuyWithOpenBox({ query, page, pageSize });
     res.json(stripSecrets(data));
   } catch (err) {
-    warn('BESTBUY_SEARCH_FAILED', { message: err.message });
+    warn('BESTBUY_SEARCH_FAILED', {
+      message: err.message,
+      code: err.code,
+      upstreamStatus: err.upstreamStatus,
+      query: String(req.query.q || req.query.query || '').trim(),
+    });
     res.status(err.status || 503).json({
       code: err.code || 'BESTBUY_SEARCH_FAILED',
-      message: err.message,
+      message: err.userMessage || SAFE_USER_MESSAGE,
+      detail: err.message,
+      upstreamStatus: err.upstreamStatus,
       items: [],
       providerStatus: 'error',
     });

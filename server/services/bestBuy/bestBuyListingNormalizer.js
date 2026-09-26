@@ -1,8 +1,9 @@
 const { buildCanonicalProductKey } = require('../../lib/marketplace/canonicalProductKey');
 const { mapOpenBoxCondition, openBoxConditionLabel } = require('./bestBuyConditionMapper');
 
+/** Best Buy Products API — documented attributes only (invalid show fields can break queries). */
 const PRODUCT_SHOW_FIELDS =
-  'sku,name,salePrice,regularPrice,onSale,active,onlineAvailability,onlineAvail,inStoreAvailability,image,thumbnail,largeFrontImage,url,productUrl,upc,manufacturer,modelNumber,condition,type,categoryPath,shortDescription,longDescription,customerReviewAverage,customerReviewCount';
+  'sku,name,salePrice,regularPrice,onSale,active,onlineAvailability,inStoreAvailability,largeFrontImage,url,upc,manufacturer,modelNumber,condition,type,categoryPath,customerReviewAverage,customerReviewCount';
 
 function toMoney(value) {
   const n = Number(value);

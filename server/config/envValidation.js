@@ -203,6 +203,7 @@ function printSecurityStartupReport() {
     `- Stripe secret key: ${String(process.env.STRIPE_SECRET_KEY || '').startsWith('sk_') && !looksLikePlaceholder(process.env.STRIPE_SECRET_KEY)}`,
     `- FINAL10_REQUIRE_EBAY_APP_CREDENTIALS: ${envFlag('FINAL10_REQUIRE_EBAY_APP_CREDENTIALS')}`,
     `- BETA_MODE: ${envFlag('BETA_MODE') ? 'ON (all logged-in users get Beta Pro access; softened limits)' : 'off'}`,
+    `- BEST_BUY_CONFIG: apiKeyConfigured=${Boolean(process.env.BESTBUY_API_KEY || process.env.BBY_API_KEY || process.env.BEST_BUY_API_KEY)} integrationEnabled=${Boolean(process.env.BESTBUY_API_KEY || process.env.BBY_API_KEY || process.env.BEST_BUY_API_KEY) && String(process.env.BESTBUY_INTEGRATION_ENABLED || '').toLowerCase() !== 'false'}`,
     `- STRIPE_WEBHOOK_SECRET configured: ${Boolean(process.env.STRIPE_WEBHOOK_SECRET) && !looksLikePlaceholder(process.env.STRIPE_WEBHOOK_SECRET)}`,
     `- STRIPE_PREMIUM_PRICE_ID configured: ${Boolean(process.env.STRIPE_PREMIUM_PRICE_ID)}`,
     `- FRONTEND_URL configured: ${Boolean(process.env.FRONTEND_URL)}`,

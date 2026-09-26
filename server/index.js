@@ -27,6 +27,8 @@ if (process.env.NODE_ENV !== 'production') {
 const { validateCoreEnv, printSecurityStartupReport, isProduction } = require('./config/envValidation');
 console.log(`[startup] boot phase=env_validation NODE_ENV=${process.env.NODE_ENV || 'undefined'} PORT=${process.env.PORT || '(default 8080)'}`);
 validateCoreEnv();
+const { logBestBuyStartupConfig } = require('./config/bestBuyConfig');
+logBestBuyStartupConfig();
 
 const express = require('express');
 const { requestTelemetry } = require('./middleware/requestTelemetry');

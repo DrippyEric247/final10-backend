@@ -22,6 +22,7 @@ const SERVER_ENV_REGISTRY = [
   { name: 'EBAY_CLIENT_ID', scope: 'server', requirement: 'conditional', secret: true, prod: true, consumer: 'ebayAuth', failure: 'Mock/stale cache fallback for Browse API' },
   { name: 'EBAY_CLIENT_SECRET', scope: 'server', requirement: 'conditional', secret: true, prod: true, consumer: 'ebayAuth', failure: 'Mock/stale cache fallback' },
   { name: 'BESTBUY_API_KEY', scope: 'server', requirement: 'optional', secret: true, prod: true, consumer: 'bestBuyProvider', failure: 'Best Buy integration disabled; eBay unaffected' },
+  { name: 'BEST_BUY_API_KEY', scope: 'server', requirement: 'optional', secret: true, prod: true, consumer: 'bestBuyProvider', failure: 'Alias of BESTBUY_API_KEY (typo-tolerant)' },
   { name: 'BESTBUY_INTEGRATION_ENABLED', scope: 'server', requirement: 'optional', secret: false, prod: true, consumer: 'bestBuyConfig', failure: 'Auto-enabled when BESTBUY_API_KEY is set' },
   { name: 'RESEND_API_KEY', scope: 'server', requirement: 'optional', secret: true, prod: true, consumer: 'emailService', failure: 'Email delivery skipped; alerts may not email' },
   { name: 'ALERT_EMAIL_ENABLED', scope: 'server', requirement: 'optional', secret: false, prod: true, consumer: 'alertDelivery', failure: 'Alert email delivery disabled' },
