@@ -102,6 +102,7 @@ const CALLING_CARD_IDS = new Set([
   'card_master_classified',
   // Savvy Core production proof (internal test only)
   'savvytrip_test_proof_card',
+  'savvytrip_proof_card',
 ]);
 
 const TITLE_IDS = new Set(['title_operator', 'title_neon_hunter', 'title_closer']);

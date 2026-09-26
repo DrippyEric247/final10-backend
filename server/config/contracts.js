@@ -155,6 +155,24 @@ const UNIVERSE_CONTRACTS = Object.freeze([
   }),
 ]);
 
+const SAVVY_TRIP_CONTRACTS = Object.freeze([
+  Object.freeze({
+    id: 'savvytrip_core_proof_action',
+    appId: 'savvytrip',
+    appLabel: 'SavvyTrip',
+    scope: 'app',
+    objectiveType: 'PROOF_ACTION',
+    title: 'SavvyTrip Core Proof Action',
+    description: 'Internal App #2 integration proof — no payout',
+    type: 'once',
+    difficulty: 'easy',
+    trigger: 'savvytrip_core_proof',
+    target: 1,
+    reward: { type: 'none', amount: 0, label: 'Proof only' },
+    icon: '🧪',
+  }),
+]);
+
 const SAVVY_TRIP_TEST_CONTRACTS = Object.freeze([
   Object.freeze({
     id: 'savvytrip_test_complete_booking',
@@ -207,6 +225,7 @@ const GAME_SAVVY_TEST_CONTRACTS = Object.freeze([
 const ALL_CONTRACTS = Object.freeze([
   ...FINAL10_CONTRACTS,
   ...UNIVERSE_CONTRACTS,
+  ...SAVVY_TRIP_CONTRACTS,
   ...SAVVY_TRIP_TEST_CONTRACTS,
   ...GAME_SAVVY_TEST_CONTRACTS,
 ]);
@@ -283,6 +302,7 @@ function getContractsForTrigger(trigger) {
 module.exports = {
   FINAL10_CONTRACTS,
   UNIVERSE_CONTRACTS,
+  SAVVY_TRIP_CONTRACTS,
   SAVVY_TRIP_TEST_CONTRACTS,
   GAME_SAVVY_TEST_CONTRACTS,
   ALL_CONTRACTS,

@@ -302,6 +302,8 @@ app.use('/api/savvy-watch', require('./routes/savvyWatchRoutes'));
 app.use('/api/savvy-predictions', require('./routes/savvyPredictionsRoutes'));
 app.use('/api/savvy-core', require('./routes/savvyCoreRoutes'));
 app.use('/api/savvy-core-proof', require('./routes/savvyCoreProofRoutes'));
+app.use('/api/savvytrip-core', require('./routes/savvyTripCoreRoutes'));
+app.use('/api/savvytrip-core-proof', require('./routes/savvyTripAppProofRoutes'));
 app.use('/api/scout-support', require('./routes/scoutSupportRoutes'));
 app.use('/api/eggs', require('./routes/eggExchangeRoutes'));
 app.use('/api/egg-camo', require('./routes/eggCamoRoutes'));
