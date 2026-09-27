@@ -404,7 +404,7 @@ router.get('/providers', (req, res) => {
 });
 
 /** Finalize any verified social profile → JWT + redirect back to the client. */
-async function completeSocialLogin(profile, provider, res) {
+async function completeSocialLogin(profile, provider, res, { clientOrigin } = {}) {
   const { user, isNew } = await socialAuth.findOrCreateSocialUser(profile);
   await ensureFounderAdminRole(user);
   const token = signUserToken(user);
@@ -412,16 +412,17 @@ async function completeSocialLogin(profile, provider, res) {
     userId: user._id,
     meta: { provider, isNew },
   });
-  return res.redirect(socialAuth.buildClientSuccessRedirect(token, provider));
+  return res.redirect(socialAuth.buildClientSuccessRedirect(token, provider, clientOrigin));
 }
 
 /** GET /api/auth/google → redirect to Google consent screen (or JSON when disabled). */
 router.get('/google', (req, res) => {
+  const oauthClientOrigin = req.query?.client_origin;
   if (!googleEnabled()) {
     return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect);
   }
   try {
-    const url = socialAuth.getGoogleAuthUrl();
+    const url = socialAuth.getGoogleAuthUrl({ clientOrigin: oauthClientOrigin });
     if (wantsJsonOAuthResponse(req)) {
       return res.json({ ok: true, configured: true, provider: 'google', url });
     }
@@ -436,7 +437,7 @@ router.get('/google', (req, res) => {
         provider: 'google',
       });
     }
-    return res.redirect(socialAuth.buildClientErrorRedirect('google_start_failed', 'google'));
+    return res.redirect(socialAuth.buildClientErrorRedirect('google_start_failed', 'google', oauthClientOrigin));
   }
 });
 
@@ -461,7 +462,9 @@ router.get(
         OAUTH_EXTERNAL_TIMEOUT_MS,
         'google_token_exchange'
       );
-      return await completeSocialLogin(profile, 'google', res);
+      return await completeSocialLogin(profile, 'google', res, {
+        clientOrigin: verifiedState.clientOrigin || null,
+      });
     } catch (err) {
       console.error('[auth/google/callback] failed', err.message);
       return res.redirect(socialAuth.buildClientErrorRedirect('google_auth_failed', 'google'));
@@ -471,11 +474,12 @@ router.get(
 
 /** GET /api/auth/apple → redirect to Apple sign-in (or JSON when disabled). */
 router.get('/apple', (req, res) => {
+  const oauthClientOrigin = req.query?.client_origin;
   if (!appleEnabled()) {
     return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
   }
   try {
-    const url = socialAuth.getAppleAuthUrl();
+    const url = socialAuth.getAppleAuthUrl({ clientOrigin: oauthClientOrigin });
     if (wantsJsonOAuthResponse(req)) {
       return res.json({ ok: true, configured: true, provider: 'apple', url });
     }
@@ -490,7 +494,7 @@ router.get('/apple', (req, res) => {
         provider: 'apple',
       });
     }
-    return res.redirect(socialAuth.buildClientErrorRedirect('apple_start_failed', 'apple'));
+    return res.redirect(socialAuth.buildClientErrorRedirect('apple_start_failed', 'apple', oauthClientOrigin));
   }
 });
 
@@ -521,7 +525,9 @@ router.post(
         OAUTH_EXTERNAL_TIMEOUT_MS,
         'apple_token_exchange'
       );
-      return await completeSocialLogin(profile, 'apple', res);
+      return await completeSocialLogin(profile, 'apple', res, {
+        clientOrigin: verifiedState.clientOrigin || null,
+      });
     } catch (err) {
       console.error('[auth/apple/callback] failed', err.message);
       return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
@@ -549,7 +555,9 @@ router.get(
         OAUTH_EXTERNAL_TIMEOUT_MS,
         'apple_token_exchange'
       );
-      return await completeSocialLogin(profile, 'apple', res);
+      return await completeSocialLogin(profile, 'apple', res, {
+        clientOrigin: verifiedState.clientOrigin || null,
+      });
     } catch (err) {
       console.error('[auth/apple/callback GET] failed', err.message);
       return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
