@@ -14,11 +14,15 @@ const FINAL10_PRODUCTION_ORIGINS = Object.freeze([
   'https://www.final10.app',
 ]);
 
-/** SavvyTrip production browser origins (Railway previews via ALLOWED_ORIGINS). */
+/** SavvyTrip production + known deployment previews (Vercel/Railway — also use ALLOWED_ORIGINS for one-offs). */
 const SAVVYTRIP_PRODUCTION_ORIGINS = Object.freeze([
   'https://savvytrip.app',
   'https://www.savvytrip.app',
+  'https://savvytrip-mi44shntm-drippyeric247s-projects.vercel.app',
 ]);
+
+/** SavvyTrip Vercel project slug prefixes (not all *.vercel.app). */
+const DEFAULT_SAVVYTRIP_VERCEL_PREVIEW_PREFIXES = Object.freeze(['savvytrip']);
 
 /** Default Vercel project hostname prefixes (Final10-owned previews only — not all *.vercel.app). */
 const DEFAULT_FINAL10_VERCEL_PREVIEW_PREFIXES = Object.freeze([
@@ -165,6 +169,43 @@ function isFinal10VercelPreviewOrigin(origin) {
   return matchesFinal10VercelSlug(match[1]);
 }
 
+function parseSavvyTripVercelPreviewPrefixes() {
+  const raw = String(process.env.SAVVYTRIP_VERCEL_PREVIEW_PREFIXES || '').trim();
+  if (!raw) return [...DEFAULT_SAVVYTRIP_VERCEL_PREVIEW_PREFIXES];
+  return raw
+    .split(',')
+    .map((s) => String(s || '').trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function matchesSavvyTripVercelSlug(slug) {
+  const s = String(slug || '').toLowerCase();
+  if (!s) return false;
+
+  const prefixes = parseSavvyTripVercelPreviewPrefixes();
+  if (prefixes.some((prefix) => s === prefix || s.startsWith(`${prefix}-`))) {
+    return true;
+  }
+
+  if (s === 'savvytrip') return true;
+  if (/^savvytrip-git-[a-z0-9-]+$/.test(s)) return true;
+  if (/^savvytrip-[a-z0-9-]+s-projects$/.test(s)) return true;
+  if (/^savvytrip-[a-z0-9]{6,40}-[a-z0-9-]+$/.test(s)) return true;
+
+  return false;
+}
+
+/**
+ * Trusted SavvyTrip Vercel preview deployments only.
+ * Matches e.g. savvytrip-mi44shntm-drippyeric247s-projects.vercel.app
+ */
+function isSavvyTripVercelPreviewOrigin(origin) {
+  const o = normalizeOrigin(origin);
+  const match = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(o);
+  if (!match) return false;
+  return matchesSavvyTripVercelSlug(match[1]);
+}
+
 function getCorsRejectReason(origin) {
   const normalized = normalizeOrigin(origin);
   if (!normalized) return 'missing_origin';
@@ -174,10 +215,11 @@ function getCorsRejectReason(origin) {
   if (isFinal10VercelPreviewOrigin(normalized)) return null;
   if (isFinal10AppOrigin(normalized)) return null;
   if (isSavvyTripAppOrigin(normalized)) return null;
+  if (isSavvyTripVercelPreviewOrigin(normalized)) return null;
 
   const vercelMatch = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(normalized);
   if (vercelMatch) {
-    return 'vercel_origin_not_in_final10_preview_allowlist';
+    return 'vercel_origin_not_in_trusted_preview_allowlist';
   }
 
   return 'origin_not_in_allowlist';
@@ -239,6 +281,7 @@ function isOriginAllowed(origin) {
   if (isFinal10VercelPreviewOrigin(normalized)) return true;
   if (isFinal10AppOrigin(normalized)) return true;
   if (isSavvyTripAppOrigin(normalized)) return true;
+  if (isSavvyTripVercelPreviewOrigin(normalized)) return true;
   return false;
 }
 
@@ -301,11 +344,13 @@ function logCorsStartup() {
   const allowedEnv = splitOriginCsv(process.env.ALLOWED_ORIGINS);
   const final10Listed = FINAL10_PRODUCTION_ORIGINS.every((o) => explicit.has(o));
   const vercelPrefixes = parseFinal10VercelPreviewPrefixes();
+  const savvyTripVercelPrefixes = parseSavvyTripVercelPreviewPrefixes();
   console.log(
     `[cors] ready clientUrl=${clientUrl} credentials=${useCorsCredentials()} ` +
       `allowedOriginsEnv=${allowedEnv.length ? allowedEnv.join('|') : '(defaults)'} ` +
       `explicitOrigins=${explicit.size} final10ApexAndWww=${final10Listed} ` +
-      `final10VercelPreviewPrefixes=${vercelPrefixes.join('|')} localhost=any-port`
+      `final10VercelPreviewPrefixes=${vercelPrefixes.join('|')} ` +
+      `savvyTripVercelPreviewPrefixes=${savvyTripVercelPrefixes.join('|')} localhost=any-port`
   );
 }
 
@@ -369,7 +414,10 @@ module.exports = {
   logCorsStartup,
   isVercelAppOrigin,
   isFinal10VercelPreviewOrigin,
+  isSavvyTripVercelPreviewOrigin,
   parseFinal10VercelPreviewPrefixes,
+  parseSavvyTripVercelPreviewPrefixes,
+  matchesSavvyTripVercelSlug,
   isLocalDevOrigin,
   isFinal10AppOrigin,
   splitOriginCsv,
