@@ -37,9 +37,24 @@ describe('OAuth return origin', () => {
     expect(redirect.protocol).toBe('https:');
   });
 
-  it('stores the EyeSpySavvy apex origin', () => {
+  it('sends the EyeSpySavvy apex origin to the canonical www host', () => {
     const payload = statePayload(getGoogleAuthUrl({ clientOrigin: 'https://eyespysavvy.app/' }));
-    expect(payload.clientOrigin).toBe('https://eyespysavvy.app');
+    expect(payload.clientOrigin).toBe('https://www.eyespysavvy.app');
+    const redirect = new URL(
+      buildClientSuccessRedirect('session-token', 'google', 'https://eyespysavvy.app')
+    );
+    expect(redirect.origin).toBe('https://www.eyespysavvy.app');
+    expect(redirect.pathname).toBe('/auth/callback');
+  });
+
+  it('keeps SavvyTrip on the host that started sign-in', () => {
+    for (const origin of ['https://savvytrip.app', 'https://www.savvytrip.app']) {
+      const payload = statePayload(getGoogleAuthUrl({ clientOrigin: origin }));
+      expect(payload.clientOrigin).toBe(origin);
+      const redirect = new URL(buildClientSuccessRedirect('session-token', 'google', origin));
+      expect(redirect.origin).toBe(origin);
+      expect(redirect.pathname).toBe('/auth/callback');
+    }
   });
 
   it('keeps Final10 on its own callback path', () => {

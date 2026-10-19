@@ -30,11 +30,21 @@ function normalizeClientOrigin(raw) {
   }
 }
 
+/** Apex 308s here and preserves the callback query, so this is the EyeSpySavvy return host. */
+const EYESPYSAVVY_CANONICAL_ORIGIN = 'https://www.eyespysavvy.app';
+
+function canonicalOAuthReturnOrigin(origin) {
+  if (/^https:\/\/(www\.)?eyespysavvy\.app$/i.test(origin)) {
+    return EYESPYSAVVY_CANONICAL_ORIGIN;
+  }
+  return origin;
+}
+
 /** Allowed browser origin for OAuth return (must pass CORS allowlist). */
 function resolveOAuthClientOrigin(raw) {
   const origin = normalizeClientOrigin(raw);
-  if (!origin) return null;
-  return isOriginAllowed(origin) ? origin : null;
+  if (!origin || !isOriginAllowed(origin)) return null;
+  return canonicalOAuthReturnOrigin(origin);
 }
 
 function signState({ provider, nonce, clientOrigin }) {
