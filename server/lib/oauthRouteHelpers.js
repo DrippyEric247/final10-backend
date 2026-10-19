@@ -30,11 +30,11 @@ function oauthDisabledPayload(provider) {
  * Respond when a social provider is not fully configured (missing env vars).
  * Browser navigations redirect to the client login page; API/XHR gets JSON.
  */
-function respondOAuthDisabled(req, res, provider, buildClientErrorRedirect) {
+function respondOAuthDisabled(req, res, provider, buildClientErrorRedirect, clientOrigin) {
   if (wantsJsonOAuthResponse(req)) {
     return res.status(503).json(oauthDisabledPayload(provider));
   }
-  return res.redirect(buildClientErrorRedirect(`${provider}_not_configured`, provider));
+  return res.redirect(buildClientErrorRedirect(`${provider}_not_configured`, provider, clientOrigin));
 }
 
 /**

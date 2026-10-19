@@ -419,7 +419,7 @@ async function completeSocialLogin(profile, provider, res, { clientOrigin } = {}
 router.get('/google', (req, res) => {
   const oauthClientOrigin = req.query?.client_origin;
   if (!googleEnabled()) {
-    return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect);
+    return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect, oauthClientOrigin);
   }
   try {
     const url = socialAuth.getGoogleAuthUrl({ clientOrigin: oauthClientOrigin });
@@ -446,14 +446,15 @@ router.get(
   '/google/callback',
   wrapOAuthHandler(async (req, res) => {
     const { code, state, error } = req.query || {};
+    const returnOrigin = socialAuth.clientOriginFromOAuthState(state, 'google');
     if (error) {
-      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'google'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'google', returnOrigin));
     }
     if (!code || !state) {
-      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'google'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'google', returnOrigin));
     }
     if (!googleEnabled()) {
-      return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect);
+      return respondOAuthDisabled(req, res, 'google', socialAuth.buildClientErrorRedirect, returnOrigin);
     }
     try {
       const verifiedState = socialAuth.verifyState(String(state), 'google');
@@ -467,7 +468,7 @@ router.get(
       });
     } catch (err) {
       console.error('[auth/google/callback] failed', err.message);
-      return res.redirect(socialAuth.buildClientErrorRedirect('google_auth_failed', 'google'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('google_auth_failed', 'google', returnOrigin));
     }
   }, { label: 'auth/google/callback' })
 );
@@ -476,7 +477,7 @@ router.get(
 router.get('/apple', (req, res) => {
   const oauthClientOrigin = req.query?.client_origin;
   if (!appleEnabled()) {
-    return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
+    return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect, oauthClientOrigin);
   }
   try {
     const url = socialAuth.getAppleAuthUrl({ clientOrigin: oauthClientOrigin });
@@ -509,14 +510,15 @@ router.post(
   express.urlencoded({ extended: false }),
   wrapOAuthHandler(async (req, res) => {
     const { code, state, error, user: appleUser } = req.body || {};
+    const returnOrigin = socialAuth.clientOriginFromOAuthState(state, 'apple');
     if (error) {
-      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple', returnOrigin));
     }
     if (!code || !state) {
-      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple', returnOrigin));
     }
     if (!appleEnabled()) {
-      return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
+      return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect, returnOrigin);
     }
     try {
       const verifiedState = socialAuth.verifyState(String(state), 'apple');
@@ -530,7 +532,7 @@ router.post(
       });
     } catch (err) {
       console.error('[auth/apple/callback] failed', err.message);
-      return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple', returnOrigin));
     }
   }, { label: 'auth/apple/callback' })
 );
@@ -539,14 +541,15 @@ router.get(
   '/apple/callback',
   wrapOAuthHandler(async (req, res) => {
     const { code, state, error } = req.query || {};
+    const returnOrigin = socialAuth.clientOriginFromOAuthState(state, 'apple');
     if (error) {
-      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('cancelled', 'apple', returnOrigin));
     }
     if (!code || !state) {
-      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('missing_code', 'apple', returnOrigin));
     }
     if (!appleEnabled()) {
-      return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect);
+      return respondOAuthDisabled(req, res, 'apple', socialAuth.buildClientErrorRedirect, returnOrigin);
     }
     try {
       const verifiedState = socialAuth.verifyState(String(state), 'apple');
@@ -560,7 +563,7 @@ router.get(
       });
     } catch (err) {
       console.error('[auth/apple/callback GET] failed', err.message);
-      return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple'));
+      return res.redirect(socialAuth.buildClientErrorRedirect('apple_auth_failed', 'apple', returnOrigin));
     }
   }, { label: 'auth/apple/callback_get' })
 );

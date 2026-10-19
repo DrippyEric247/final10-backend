@@ -51,6 +51,17 @@ function verifyState(token, expectedProvider) {
   return decoded;
 }
 
+/** Allowlisted return origin stored in a valid OAuth state JWT, or null. */
+function clientOriginFromOAuthState(state, provider) {
+  if (!state || !provider) return null;
+  try {
+    const decoded = verifyState(String(state), provider);
+    return resolveOAuthClientOrigin(decoded.clientOrigin);
+  } catch {
+    return null;
+  }
+}
+
 function makeNonce() {
   return crypto.randomBytes(16).toString('hex');
 }
@@ -330,4 +341,5 @@ module.exports = {
   buildClientSuccessRedirect,
   buildClientErrorRedirect,
   resolveOAuthClientOrigin,
+  clientOriginFromOAuthState,
 };
