@@ -22,6 +22,14 @@ describe('CORS middleware', () => {
     expect(resolveCorsOrigin('https://www.final10.app')).toBe('https://www.final10.app');
   });
 
+  it('allows SavvyTrip and EyeSpySavvy production origins', () => {
+    expect(isOriginAllowed('https://savvytrip.app')).toBe(true);
+    expect(isOriginAllowed('https://www.savvytrip.app')).toBe(true);
+    expect(isOriginAllowed('https://eyespysavvy.app')).toBe(true);
+    expect(isOriginAllowed('https://www.eyespysavvy.app')).toBe(true);
+    expect(resolveCorsOrigin('https://eyespysavvy.app/')).toBe('https://eyespysavvy.app');
+  });
+
   it('allows localhost on any dev port', () => {
     expect(isLocalDevOrigin('http://localhost:3000')).toBe(true);
     expect(isLocalDevOrigin('http://127.0.0.1:5173')).toBe(true);
@@ -93,7 +101,56 @@ describe('CORS middleware', () => {
     expect(headers['Access-Control-Allow-Origin']).toBe('https://www.final10.app');
     expect(headers['Access-Control-Allow-Methods']).toContain('POST');
     expect(headers['Access-Control-Allow-Headers']).toContain('Authorization');
+    expect(String(headers['Access-Control-Allow-Origin'])).not.toBe('*');
   });
+
+  it.each(['https://eyespysavvy.app', 'https://www.eyespysavvy.app'])(
+    'OPTIONS preflight allows %s for auth and core headers',
+    (origin) => {
+      const preflight = createOptionsPreflightMiddleware();
+      const headers = {};
+      const res = {
+        statusCode: 200,
+        setHeader(key, value) {
+          headers[key] = value;
+        },
+        sendStatus(code) {
+          this.statusCode = code;
+          return this;
+        },
+      };
+      const req = {
+        method: 'OPTIONS',
+        headers: {
+          origin,
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'authorization,content-type',
+        },
+        path: '/api/auth/login',
+      };
+
+      let nextCalled = false;
+      preflight(req, res, () => {
+        nextCalled = true;
+      });
+
+      expect(nextCalled).toBe(false);
+      expect(res.statusCode).toBe(204);
+      expect(headers['Access-Control-Allow-Origin']).toBe(origin);
+      expect(headers['Access-Control-Allow-Methods']).toEqual(
+        expect.stringContaining('GET')
+      );
+      expect(headers['Access-Control-Allow-Methods']).toEqual(
+        expect.stringContaining('POST')
+      );
+      expect(headers['Access-Control-Allow-Methods']).toEqual(
+        expect.stringContaining('OPTIONS')
+      );
+      expect(headers['Access-Control-Allow-Headers']).toContain('Authorization');
+      expect(headers['Access-Control-Allow-Headers']).toContain('Content-Type');
+      expect(headers['Access-Control-Allow-Credentials']).toBeUndefined();
+    }
+  );
 
   it('does not enable credentials by default', () => {
     delete process.env.CORS_CREDENTIALS;

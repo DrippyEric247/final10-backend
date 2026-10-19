@@ -21,6 +21,12 @@ const SAVVYTRIP_PRODUCTION_ORIGINS = Object.freeze([
   'https://savvytrip-mi44shntm-drippyeric247s-projects.vercel.app',
 ]);
 
+/** EyeSpySavvy production origins. The Core app id remains savvytrip. */
+const EYESPYSAVVY_PRODUCTION_ORIGINS = Object.freeze([
+  'https://eyespysavvy.app',
+  'https://www.eyespysavvy.app',
+]);
+
 /** SavvyTrip Vercel project slug prefixes (not all *.vercel.app). */
 const DEFAULT_SAVVYTRIP_VERCEL_PREVIEW_PREFIXES = Object.freeze(['savvytrip']);
 
@@ -39,6 +45,7 @@ const DEFAULT_ORIGINS = Object.freeze([
   'http://127.0.0.1:5173',
   ...FINAL10_PRODUCTION_ORIGINS,
   ...SAVVYTRIP_PRODUCTION_ORIGINS,
+  ...EYESPYSAVVY_PRODUCTION_ORIGINS,
 ]);
 
 const CORS_METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'];
@@ -215,6 +222,7 @@ function getCorsRejectReason(origin) {
   if (isFinal10VercelPreviewOrigin(normalized)) return null;
   if (isFinal10AppOrigin(normalized)) return null;
   if (isSavvyTripAppOrigin(normalized)) return null;
+  if (isEyeSpySavvyAppOrigin(normalized)) return null;
   if (isSavvyTripVercelPreviewOrigin(normalized)) return null;
 
   const vercelMatch = /^https:\/\/([a-z0-9][a-z0-9-]*)\.vercel\.app$/i.exec(normalized);
@@ -273,6 +281,10 @@ function isSavvyTripAppOrigin(origin) {
   return /^https:\/\/(www\.)?savvytrip\.app$/i.test(normalizeOrigin(origin));
 }
 
+function isEyeSpySavvyAppOrigin(origin) {
+  return /^https:\/\/(www\.)?eyespysavvy\.app$/i.test(normalizeOrigin(origin));
+}
+
 function isOriginAllowed(origin) {
   if (!origin) return true;
   const normalized = normalizeOrigin(origin);
@@ -281,6 +293,7 @@ function isOriginAllowed(origin) {
   if (isFinal10VercelPreviewOrigin(normalized)) return true;
   if (isFinal10AppOrigin(normalized)) return true;
   if (isSavvyTripAppOrigin(normalized)) return true;
+  if (isEyeSpySavvyAppOrigin(normalized)) return true;
   if (isSavvyTripVercelPreviewOrigin(normalized)) return true;
   return false;
 }
@@ -401,6 +414,7 @@ module.exports = {
   DEFAULT_ORIGINS,
   FINAL10_PRODUCTION_ORIGINS,
   SAVVYTRIP_PRODUCTION_ORIGINS,
+  EYESPYSAVVY_PRODUCTION_ORIGINS,
   CORS_METHODS,
   CORS_ALLOWED_HEADERS,
   buildAllowedOrigins,
@@ -420,6 +434,8 @@ module.exports = {
   matchesSavvyTripVercelSlug,
   isLocalDevOrigin,
   isFinal10AppOrigin,
+  isSavvyTripAppOrigin,
+  isEyeSpySavvyAppOrigin,
   splitOriginCsv,
   matchesFinal10VercelSlug,
   getCorsRejectReason,
