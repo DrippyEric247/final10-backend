@@ -11,7 +11,9 @@
     "build": "cd client && npm run build",
     "start": "node server/index.js",
     "verify:savvy-core": "node packages/savvy-core/scripts/verify-parity.js",
-    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "cloud:install": "bash scripts/cloud-agent-install.sh",
+    "test:unit": "cd server && npm run test:unit"
   },
   "keywords": [
     "auction",

@@ -60,7 +60,8 @@ ehthumbs.db
 *.swo
 
 # Local tooling
-.cursor/
+.cursor/*
+!.cursor/environment.json
 .claude/
 
 # Generated audit output (not used by app, tests, or deployment)
