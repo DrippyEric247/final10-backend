@@ -6,7 +6,9 @@ const mongoose = require('mongoose');
 const {
   validateShieldWebhookSecretAtBoot,
   getShieldWebhookSecret,
+  isShieldWebhookEnabled,
 } = require('../lib/shieldWebhookSecret');
+const { validateCoreEnv } = require('../config/envValidation');
 const {
   acquireJobLease,
   releaseJobLease,
@@ -63,6 +65,71 @@ describe('Wave 7 closure — secret boot (unit)', () => {
     delete process.env.SHIELD_WEBHOOK_SECRET;
     delete process.env.SHIELD_WEBHOOK_ENABLED;
     expect(() => validateShieldWebhookSecretAtBoot()).toThrow(/SHIELD_WEBHOOK_SECRET/);
+  });
+
+  it('production stays fail-closed for blank or non-false Shield flags', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.SHIELD_WEBHOOK_SECRET;
+    for (const value of ['', '   ', 'true', 'TRUE', '0', 'off', 'falsehood', '"true"']) {
+      process.env.SHIELD_WEBHOOK_ENABLED = value;
+      expect(() => validateShieldWebhookSecretAtBoot()).toThrow(/SHIELD_WEBHOOK_SECRET/);
+    }
+  });
+
+  it('production accepts a disabled Shield flag without a secret', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.SHIELD_WEBHOOK_SECRET;
+    for (const value of ['false', 'False', 'FALSE', ' false ', 'false\n', 'false\r\n', '"false"', "'false'", ' "false" ']) {
+      process.env.SHIELD_WEBHOOK_ENABLED = value;
+      expect(isShieldWebhookEnabled()).toBe(false);
+      expect(() => validateShieldWebhookSecretAtBoot()).not.toThrow();
+      expect(getShieldWebhookSecret()).toBeNull();
+    }
+  });
+
+  function applyProductionBootEnv(overrides = {}) {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'wave7-boot-test-secret-min-32-chars!!';
+    process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/final10_beta_boot';
+    delete process.env.SHIELD_WEBHOOK_SECRET;
+    delete process.env.SHIELD_WEBHOOK_ENABLED;
+    delete process.env.DISABLE_EBAY_AUTH;
+    delete process.env.ALLOW_PROGRESSION_TRUST_BYPASS;
+    delete process.env.ALLOW_BP_CLIENT_PREMIUM_UNLOCK;
+    delete process.env.FINAL10_REQUIRE_STRIPE;
+    delete process.env.FINAL10_REQUIRE_EBAY_APP_CREDENTIALS;
+    delete process.env.ALERT_EMAIL_ENABLED;
+    Object.assign(process.env, overrides);
+  }
+
+  it('validateCoreEnv allows production boot when Shield is explicitly disabled and no secret is set', () => {
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+    for (const value of ['false', 'FALSE', ' false\n', '"false"']) {
+      applyProductionBootEnv({ SHIELD_WEBHOOK_ENABLED: value });
+      validateCoreEnv();
+      expect(exitSpy).not.toHaveBeenCalled();
+    }
+    exitSpy.mockRestore();
+  });
+
+  it('validateCoreEnv refuses production boot when Shield is enabled without a valid secret', () => {
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+    for (const value of [undefined, 'true', 'TRUE', '1', '0', 'off', '   ']) {
+      exitSpy.mockClear();
+      applyProductionBootEnv();
+      if (value === undefined) delete process.env.SHIELD_WEBHOOK_ENABLED;
+      else process.env.SHIELD_WEBHOOK_ENABLED = value;
+      validateCoreEnv();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    }
+    applyProductionBootEnv({
+      SHIELD_WEBHOOK_ENABLED: 'true',
+      SHIELD_WEBHOOK_SECRET: 'default_secret',
+    });
+    exitSpy.mockClear();
+    validateCoreEnv();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 
   it('production rejects default_secret placeholder', () => {

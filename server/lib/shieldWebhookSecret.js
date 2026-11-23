@@ -5,8 +5,24 @@
 
 const { isProduction, looksLikePlaceholder } = require('../config/envValidation');
 
+/**
+ * Shield webhooks stay on unless the flag is exactly false.
+ * Railway and pasted .env values often include a trailing newline or quotes.
+ * Unset, blank, and every other value stay enabled so production fails closed.
+ */
 function isShieldWebhookEnabled() {
-  return String(process.env.SHIELD_WEBHOOK_ENABLED || 'true').toLowerCase() !== 'false';
+  let raw = String(process.env.SHIELD_WEBHOOK_ENABLED ?? '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase();
+  if (
+    raw.length >= 2 &&
+    ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))
+  ) {
+    raw = raw.slice(1, -1).trim();
+  }
+  if (!raw) return true;
+  return raw !== 'false';
 }
 
 function validateShieldWebhookSecretAtBoot() {
