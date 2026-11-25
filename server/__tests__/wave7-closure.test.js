@@ -7,6 +7,7 @@ const {
   validateShieldWebhookSecretAtBoot,
   getShieldWebhookSecret,
   isShieldWebhookEnabled,
+  describeShieldWebhookFlag,
 } = require('../lib/shieldWebhookSecret');
 const { validateCoreEnv } = require('../config/envValidation');
 const {
@@ -130,6 +131,52 @@ describe('Wave 7 closure — secret boot (unit)', () => {
     validateCoreEnv();
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
+  });
+
+  it('boot diagnostic reports flag presence without printing the value', () => {
+    const lines = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((line) => {
+      lines.push(String(line));
+    });
+    process.env.NODE_ENV = 'production';
+    delete process.env.SHIELD_WEBHOOK_SECRET;
+
+    delete process.env.SHIELD_WEBHOOK_ENABLED;
+    expect(() => validateShieldWebhookSecretAtBoot()).toThrow(/SHIELD_WEBHOOK_SECRET/);
+    expect(lines.at(-1)).toContain('present=false');
+    expect(lines.at(-1)).toContain('enabled=true');
+
+    process.env.SHIELD_WEBHOOK_ENABLED = 'sentinel-value';
+    lines.length = 0;
+    expect(() => validateShieldWebhookSecretAtBoot()).toThrow(/SHIELD_WEBHOOK_SECRET/);
+    expect(lines.at(-1)).toContain('present=true');
+    expect(lines.at(-1)).toContain('length=14');
+    expect(lines.at(-1)).toContain('enabled=true');
+    expect(lines.at(-1)).not.toContain('sentinel-value');
+
+    process.env.SHIELD_WEBHOOK_ENABLED = '"false"\n';
+    lines.length = 0;
+    expect(() => validateShieldWebhookSecretAtBoot()).not.toThrow();
+    expect(describeShieldWebhookFlag()).toMatchObject({
+      present: true,
+      quoteWrapped: true,
+      enabled: false,
+    });
+    expect(lines.at(-1)).toContain('quoteWrapped=true');
+    expect(lines.at(-1)).toContain('nonAscii=false');
+    expect(lines.at(-1)).toContain('enabled=false');
+    expect(lines.at(-1)).not.toContain('"false"');
+
+    process.env.SHIELD_WEBHOOK_ENABLED = 'caf\u00e9';
+    lines.length = 0;
+    expect(() => validateShieldWebhookSecretAtBoot()).toThrow(/SHIELD_WEBHOOK_SECRET/);
+    expect(lines.at(-1)).toContain('present=true');
+    expect(lines.at(-1)).toContain('length=4');
+    expect(lines.at(-1)).toContain('nonAscii=true');
+    expect(lines.at(-1)).toContain('enabled=true');
+    expect(lines.at(-1)).not.toContain('caf');
+    expect(lines.at(-1)).not.toMatch(/mongodb|secret|password|jwt/i);
+    spy.mockRestore();
   });
 
   it('production rejects default_secret placeholder', () => {

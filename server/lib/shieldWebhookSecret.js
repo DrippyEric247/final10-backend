@@ -10,22 +10,64 @@ const { isProduction, looksLikePlaceholder } = require('../config/envValidation'
  * Railway and pasted .env values often include a trailing newline or quotes.
  * Unset, blank, and every other value stay enabled so production fails closed.
  */
-function isShieldWebhookEnabled() {
-  let raw = String(process.env.SHIELD_WEBHOOK_ENABLED ?? '')
+const SHIELD_WEBHOOK_FLAG = 'SHIELD_WEBHOOK_ENABLED';
+
+function readShieldWebhookFlag() {
+  const present = Object.prototype.hasOwnProperty.call(process.env, SHIELD_WEBHOOK_FLAG);
+  return {
+    present,
+    raw: present ? String(process.env[SHIELD_WEBHOOK_FLAG]) : '',
+  };
+}
+
+function normalizeShieldWebhookFlag(raw) {
+  let value = String(raw ?? '')
     .replace(/^\uFEFF/, '')
     .trim()
     .toLowerCase();
   if (
-    raw.length >= 2 &&
-    ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
   ) {
-    raw = raw.slice(1, -1).trim();
+    value = value.slice(1, -1).trim();
   }
-  if (!raw) return true;
-  return raw !== 'false';
+  return value;
+}
+
+function isShieldWebhookEnabled() {
+  const normalized = normalizeShieldWebhookFlag(readShieldWebhookFlag().raw);
+  if (!normalized) return true;
+  return normalized !== 'false';
+}
+
+function describeShieldWebhookFlag() {
+  const { present, raw } = readShieldWebhookFlag();
+  const trimmed = raw.trim();
+  const quoteWrapped = (
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  );
+  const nonAscii = Array.from(raw).some((ch) => ch.codePointAt(0) > 126);
+  return {
+    present,
+    length: present ? raw.length : 0,
+    quoteWrapped,
+    nonAscii,
+    enabled: isShieldWebhookEnabled(),
+  };
+}
+
+function logShieldWebhookFlagDecision() {
+  const info = describeShieldWebhookFlag();
+  // stderr is unbuffered enough to survive the process.exit that follows a failed boot.
+  // The raw flag is never written; it is not a credential, but it can be padded or quoted.
+  console.error(
+    `[security] shield webhook flag present=${info.present} length=${info.length} quoteWrapped=${info.quoteWrapped} nonAscii=${info.nonAscii} enabled=${info.enabled}`
+  );
 }
 
 function validateShieldWebhookSecretAtBoot() {
+  logShieldWebhookFlagDecision();
   if (!isProduction() || !isShieldWebhookEnabled()) return;
 
   const secret = String(process.env.SHIELD_WEBHOOK_SECRET || '').trim();
@@ -62,6 +104,7 @@ function getShieldWebhookSecret() {
 
 module.exports = {
   isShieldWebhookEnabled,
+  describeShieldWebhookFlag,
   validateShieldWebhookSecretAtBoot,
   getShieldWebhookSecret,
 };
