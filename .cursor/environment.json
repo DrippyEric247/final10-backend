@@ -1,0 +1,4 @@
+{
+  "name": "Final10 Backend Cloud",
+  "install": "bash scripts/cloud-agent-install.sh"
+}

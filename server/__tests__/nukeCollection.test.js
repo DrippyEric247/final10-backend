@@ -14,7 +14,7 @@ const { CAMO_CATALOG_VERSION } = require('../config/camoLocker');
 
 describe('Nuke Collection foundation', () => {
   test('catalog version bumped for secret nuke category', () => {
-    expect(CAMO_CATALOG_VERSION).toBe(15);
+    expect(CAMO_CATALOG_VERSION).toBe(16);
   });
 
   test('normal user cannot access nuke collection', () => {
